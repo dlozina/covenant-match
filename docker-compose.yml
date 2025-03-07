@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    container_name: covenant-match-frontend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost/api
+    depends_on:
+      - backend
+    networks:
+      - covenant-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: covenant-match-backend
+    restart: unless-stopped
+    environment:
+      - RUST_LOG=info
+      - MONGODB_URI=mongodb://mongodb:27017/covenant-match
+    depends_on:
+      - mongodb
+    networks:
+      - covenant-network
+
+  mongodb:
+    image: mongo:latest
+    container_name: covenant-match-mongodb
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_DATABASE=covenant-match
+    volumes:
+      - ./mongodb/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+      - mongodb_data:/data/db
+    networks:
+      - covenant-network
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: covenant-match-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - frontend
+      - backend
+    volumes:
+      - ./nginx/ssl:/etc/nginx/ssl
+    networks:
+      - covenant-network
+
+networks:
+  covenant-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:

@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
+    ports:
+      - "3000:3000"
+    command: npm run dev
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    volumes:
+      - ./backend:/app
+      - /app/target
+    environment:
+      - RUST_LOG=debug
+      - MONGODB_URI=mongodb://mongodb:27017/covenant-match
+    ports:
+      - "8080:8080"
+    command: cargo watch -x run
+
+  mongodb:
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./mongodb/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+      - mongodb_data:/data/db
+
+  # In development, we can optionally disable nginx
+  # and access frontend/backend directly
+  nginx:
+    ports:
+      - "80:80"
