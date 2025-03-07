@@ -1,7 +1,11 @@
-use mongodb::{Database, bson::{doc, Document}, Collection, options::FindOptions};
-use crate::models::session::{GameSession, SessionStatus};
 use crate::models::error::AppError;
+use crate::models::session::{GameSession, SessionStatus};
 use futures::TryStreamExt;
+use mongodb::{
+    bson::{doc, to_bson, Document},
+    options::FindOptions,
+    Collection, Database,
+};
 
 fn get_collection(db: &Database) -> Collection<GameSession> {
     db.collection::<GameSession>("sessions")
@@ -19,16 +23,19 @@ pub async fn find_by_id(db: &Database, id: &str) -> Result<Option<GameSession>, 
     Ok(session)
 }
 
-pub async fn find_sessions(db: &Database, status: Option<SessionStatus>) -> Result<Vec<GameSession>, AppError> {
+pub async fn find_sessions(
+    db: &Database,
+    status: Option<SessionStatus>,
+) -> Result<Vec<GameSession>, AppError> {
     let filter = match status {
-        Some(status) => doc! { "status": status },
+        Some(status) => doc! { "status": to_bson(&status)? },
         None => doc! {},
     };
-    
+
     let options = FindOptions::builder()
         .sort(doc! { "created_at": -1 })
         .build();
-    
+
     let cursor = get_collection(db).find(filter, options).await?;
     let sessions = cursor.try_collect().await?;
     Ok(sessions)
@@ -40,18 +47,18 @@ pub async fn update_session(db: &Database, session: &GameSession) -> Result<(), 
             "host_id": &session.host_id,
             "password": &session.password,
             "character": &session.character,
-            "status": &session.status,
-            "joined_players": &session.joined_players,
-            "results": &session.results,
-            "updated_at": &session.updated_at,
-            "started_at": &session.started_at,
-            "completed_at": &session.completed_at,
+            "status": to_bson(&session.status)?,
+            "joined_players": to_bson(&session.joined_players)?,
+            "results": to_bson(&session.results)?,
+            "updated_at": to_bson(&session.updated_at)?,
+            "started_at": to_bson(&session.started_at)?,
+            "completed_at": to_bson(&session.completed_at)?,
         }
     };
-    
+
     get_collection(db)
         .update_one(doc! { "_id": &session.id }, update, None)
         .await?;
-    
+
     Ok(())
 }

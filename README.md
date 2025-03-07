@@ -13,7 +13,7 @@ A matchmaking application for Nightreign players. Find teammates, create game se
 
 ```
 covenant-match/
-├── frontend/               # Next.js application with Radix UI
+├── frontend/               # Next.js application with shadcn-ui
 ├── backend/                # Rust Actix-web backend
 ├── nginx/                  # Nginx configuration
 ├── mongodb/                # MongoDB initialization

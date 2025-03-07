@@ -24,7 +24,6 @@ pub async fn create_session(db: &Database, session_data: CreateSessionDto) -> Re
         id: Uuid::new_v4().to_string(),
         host_id: session_data.host_id,
         password,
-        character: session_data.character,
         status: SessionStatus::Open,
         joined_players: vec![
             PlayerInfo {
@@ -34,6 +33,7 @@ pub async fn create_session(db: &Database, session_data: CreateSessionDto) -> Re
                 joined_at: now,
             }
         ],
+        character: session_data.character,
         results: vec![],
         created_at: now,
         updated_at: now,

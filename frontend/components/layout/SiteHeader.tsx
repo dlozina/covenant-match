@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { Menu } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 export function SiteHeader() {
   const pathname = usePathname();
@@ -47,7 +50,7 @@ export function SiteHeader() {
                 href={route.href}
                 className={cn(
                   "text-sm font-medium transition-colors hover:text-primary",
-                  route.active ? "text-foreground" : "text-foreground/60"
+                  route.active ? "text-foreground" : "text-muted-foreground"
                 )}
               >
                 {route.label}
@@ -57,12 +60,16 @@ export function SiteHeader() {
         </div>
         <div className="flex flex-1 items-center justify-end space-x-4">
           <nav className="flex items-center space-x-1">
-            <button
+            <ThemeToggle />
+            <Button
+              variant="ghost"
+              size="icon"
               className="md:hidden"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
             >
-              Menu
-            </button>
+              <Menu className="h-5 w-5" />
+              <span className="sr-only">Toggle menu</span>
+            </Button>
             {isMenuOpen && (
               <div className="absolute top-16 right-0 w-full bg-background border-b md:hidden">
                 <div className="flex flex-col space-y-4 p-4">
@@ -72,7 +79,7 @@ export function SiteHeader() {
                       href={route.href}
                       className={cn(
                         "text-sm font-medium transition-colors hover:text-primary",
-                        route.active ? "text-foreground" : "text-foreground/60"
+                        route.active ? "text-foreground" : "text-muted-foreground"
                       )}
                       onClick={() => setIsMenuOpen(false)}
                     >

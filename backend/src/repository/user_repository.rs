@@ -1,7 +1,11 @@
-use mongodb::{Database, bson::{doc, Document}, Collection, options::FindOneOptions};
-use crate::models::user::User;
 use crate::models::error::AppError;
+use crate::models::user::User;
 use futures::TryStreamExt;
+use mongodb::{
+    bson::{self, doc, Document},
+    options::FindOneOptions,
+    Collection, Database,
+};
 
 fn get_collection(db: &Database) -> Collection<User> {
     db.collection::<User>("users")
@@ -33,7 +37,11 @@ pub async fn find_by_email(db: &Database, email: &str) -> Result<Option<User>, A
     Ok(user)
 }
 
-pub async fn find_by_username_or_email(db: &Database, username: &str, email: &str) -> Result<Option<User>, AppError> {
+pub async fn find_by_username_or_email(
+    db: &Database,
+    username: &str,
+    email: &str,
+) -> Result<Option<User>, AppError> {
     let user = get_collection(db)
         .find_one(
             doc! {
@@ -56,13 +64,13 @@ pub async fn update_user(db: &Database, user: &User) -> Result<(), AppError> {
             "password_hash": &user.password_hash,
             "display_name": &user.display_name,
             "avatar_url": &user.avatar_url,
-            "updated_at": &user.updated_at,
+            "updated_at": bson::DateTime::from(std::time::SystemTime::from(user.updated_at)),
         }
     };
-    
+
     get_collection(db)
         .update_one(doc! { "_id": &user.id }, update, None)
         .await?;
-    
+
     Ok(())
 }

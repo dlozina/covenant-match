@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { GameSession } from "@/types";
 import { timeAgo } from "@/lib/utils";
+import { UserCircle2 } from "lucide-react";
 
 interface SessionCardProps {
   session: GameSession;
@@ -17,7 +18,10 @@ export function SessionCard({ session, onJoin }: SessionCardProps) {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Session by {session.joinedPlayers[0]?.username || "Unknown"}</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <UserCircle2 className="h-5 w-5" />
+          {session.joinedPlayers[0]?.username || "Unknown"}&apos;s Session
+        </CardTitle>
         <CardDescription>
           Created {timeAgo(session.createdAt)} • {playerCount}/{maxPlayers} players
         </CardDescription>
@@ -52,6 +56,7 @@ export function SessionCard({ session, onJoin }: SessionCardProps) {
           onClick={() => onJoin(session.id)} 
           disabled={!isJoinable}
           className="w-full"
+          variant={isJoinable ? "default" : "secondary"}
         >
           {isJoinable ? "Join Session" : session.status === 'full' ? "Session Full" : "Session Unavailable"}
         </Button>
