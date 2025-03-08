@@ -14,6 +14,45 @@ use actix_web::{middleware::Logger, App, HttpServer};
 use dotenv::dotenv;
 use log::info;
 use mongodb::{options::ClientOptions, Client};
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
+
+// Define the API documentation
+#[derive(OpenApi)]
+#[openapi(
+    paths(
+        // Health routes
+        health::health_check_v1,
+        health::health_check_v2,
+        // User routes
+        users::create_user,
+        users::login,
+        users::get_current_user,
+        // Session routes
+        // Add your session endpoints here
+        // Statistics routes
+        // Add your statistics endpoints here
+    ),
+    components(
+        schemas(
+            // User models
+            models::user::User,
+            models::user::CreateUserDto,
+            models::user::UserResponse,
+            models::user::LoginUserDto,
+            models::user::UpdateUserDto,
+            models::user::AuthResponse,
+            // Add other models as needed
+        )
+    ),
+    tags(
+        (name = "health", description = "Health check endpoints"),
+        (name = "users", description = "User management endpoints"),
+        (name = "sessions", description = "Session management endpoints"),
+        (name = "statistics", description = "Statistics endpoints")
+    )
+)]
+struct ApiDoc;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -45,7 +84,8 @@ async fn main() -> std::io::Result<()> {
     let db = client.database("covenant-match");
 
     // Optional: Check if users collection exists
-    let collections = db.list_collection_names(None)
+    let collections = db
+        .list_collection_names(None)
         .await
         .expect("Failed to list collections");
 
@@ -71,6 +111,11 @@ async fn main() -> std::io::Result<()> {
             .configure(users::config)
             .configure(sessions::config)
             .configure(statistics::config)
+            // Add Swagger UI
+            .service(
+                SwaggerUi::new("/api/docs/{_:.*}")
+                    .url("/api-docs/openapi.json", ApiDoc::openapi()),
+            )
     })
     .bind(format!("0.0.0.0:{}", server_port))?
     .run()

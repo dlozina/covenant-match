@@ -1,9 +1,29 @@
-use actix_web::{web, HttpResponse, Responder, post, get, put};
-use mongodb::Database;
 use crate::models::user::{CreateUserDto, LoginUserDto, UserResponse};
 use crate::services::user_service;
+use actix_web::{get, post, put, web, HttpResponse, Responder};
+use mongodb::Database;
+use utoipa::{IntoParams, ToSchema};
 
-#[post("/users")]
+/// Response for authentication endpoints
+#[derive(serde::Serialize, ToSchema)]
+pub struct AuthResponse {
+    status: String,
+    token: String,
+}
+
+/// Create a new user
+#[utoipa::path(
+    post,
+    path = "/api/v1/users",
+    request_body = CreateUserDto,
+    responses(
+        (status = 201, description = "User created successfully", body = UserResponse),
+        (status = 400, description = "Invalid input"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "users"
+)]
+#[post("")]
 async fn create_user(
     db: web::Data<Database>,
     user_data: web::Json<CreateUserDto>,
@@ -20,11 +40,20 @@ async fn create_user(
     }
 }
 
-#[post("/users/login")]
-async fn login(
-    db: web::Data<Database>,
-    credentials: web::Json<LoginUserDto>,
-) -> impl Responder {
+/// Login a user
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/login",
+    request_body = LoginUserDto,
+    responses(
+        (status = 200, description = "Login successful", body = AuthResponse),
+        (status = 401, description = "Invalid credentials"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "users"
+)]
+#[post("/login")]
+async fn login(db: web::Data<Database>, credentials: web::Json<LoginUserDto>) -> impl Responder {
     match user_service::login_user(&db, credentials.into_inner()).await {
         Ok(token) => HttpResponse::Ok().json(serde_json::json!({
             "status": "success",
@@ -40,7 +69,21 @@ async fn login(
     }
 }
 
-#[get("/users/me")]
+/// Get current user profile
+#[utoipa::path(
+    get,
+    path = "/api/v1/users/me",
+    responses(
+        (status = 200, description = "User profile retrieved successfully", body = UserResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "users"
+)]
+#[get("/me")]
 async fn get_current_user(
     db: web::Data<Database>,
     // This will be expanded with JWT middleware later
@@ -53,7 +96,16 @@ async fn get_current_user(
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {
-    cfg.service(create_user)
-       .service(login)
-       .service(get_current_user);
+    cfg.service(
+        web::scope("/api/v1")
+            .service(
+                web::scope("/users")
+                    .service(create_user)
+                    .service(get_current_user)
+            )
+            .service(
+                web::scope("/auth")
+                    .service(login)
+            )
+    );
 }
