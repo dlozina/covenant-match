@@ -19,12 +19,14 @@ pub struct User {
 #[derive(Debug, Serialize, Deserialize, Validate)]
 pub struct CreateUserDto {
     #[validate(length(min = 3, max = 30))]
+    #[serde(alias = "name")]
     pub username: String,
     #[validate(email)]
     pub email: String,
     #[validate(length(min = 8))]
     pub password: String,
     pub display_name: Option<String>,
+    pub name: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

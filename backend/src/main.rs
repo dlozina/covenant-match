@@ -11,11 +11,15 @@ use crate::routes::{health, sessions, statistics, users};
 use actix_cors::Cors;
 use actix_web::web::Data;
 use actix_web::{middleware::Logger, App, HttpServer};
+use dotenv::dotenv;
 use log::info;
 use mongodb::{options::ClientOptions, Client};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    // Load .env file if it exists
+    dotenv().ok();
+
     // Initialize environment logger
     env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
 
@@ -39,6 +43,15 @@ async fn main() -> std::io::Result<()> {
     info!("Successfully connected to MongoDB!");
 
     let db = client.database("covenant-match");
+
+    // Optional: Check if users collection exists
+    let collections = db.list_collection_names(None)
+        .await
+        .expect("Failed to list collections");
+
+    if !collections.contains(&"users".to_string()) {
+        info!("Users collection doesn't exist yet - it will be created on first user registration");
+    }
 
     info!("Starting HTTP server on port {}", server_port);
     HttpServer::new(move || {
