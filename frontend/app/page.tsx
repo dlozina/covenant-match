@@ -9,7 +9,7 @@ export default function Home() {
         <p className="text-xl mb-8 text-muted-foreground">Find teammates, create game sessions, and track your Nightreign statistics.</p>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 my-12">
-          <div className="bg-card rounded-lg p-6 shadow-sm border">
+          <div className="bg-card rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
             <h2 className="text-2xl font-semibold mb-4">Find Sessions</h2>
             <p className="mb-4 text-muted-foreground">Join other players looking for teammates and start playing immediately.</p>
             <Button asChild>
@@ -17,7 +17,7 @@ export default function Home() {
             </Button>
           </div>
           
-          <div className="bg-card rounded-lg p-6 shadow-sm border">
+          <div className="bg-card rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
             <h2 className="text-2xl font-semibold mb-4">Create Session</h2>
             <p className="mb-4 text-muted-foreground">Host a new game session and invite other players to join you.</p>
             <Button asChild>
