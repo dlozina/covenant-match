@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu } from "lucide-react";
+import { Menu, UserPlus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -63,6 +63,17 @@ export function SiteHeader() {
           </nav>
         </div>
         <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="hover:bg-accent hover:text-accent-foreground"
+            asChild
+          >
+            <Link href="/create-profile">
+              <UserPlus className="h-5 w-5" />
+              <span className="sr-only">Create Profile</span>
+            </Link>
+          </Button>
           <ThemeToggle />
           <div className="md:hidden">
             <DropdownMenu>
@@ -90,6 +101,11 @@ export function SiteHeader() {
                     </Link>
                   </DropdownMenuItem>
                 ))}
+                <DropdownMenuItem asChild>
+                  <Link href="/create-profile" className="w-full">
+                    Create Profile
+                  </Link>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
