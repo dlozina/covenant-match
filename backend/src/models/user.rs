@@ -36,6 +36,7 @@ pub struct CreateUserDto {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct UserResponse {
     pub id: String,
     pub username: String,
