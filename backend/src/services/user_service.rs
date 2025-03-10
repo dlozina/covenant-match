@@ -44,6 +44,7 @@ pub async fn create_user(
         display_name: user.display_name,
         avatar_url: user.avatar_url,
         created_at: user.created_at,
+        updated_at: user.updated_at,
     })
 }
 
@@ -66,18 +67,30 @@ pub async fn login_user(db: &Database, login_data: LoginUserDto) -> Result<Strin
     Ok("placeholder_jwt_token".to_string())
 }
 
-pub async fn get_user_by_id(
-    db: &Database,
-    user_id: &str,
-) -> Result<Option<UserResponse>, AppError> {
-    let user = user_repository::find_by_id(db, user_id).await?;
+pub async fn get_user_by_id(db: &Database, user_id: &str) -> Result<UserResponse, AppError> {
+    let user = user_repository::find_user_by_id(db, user_id).await?;
 
-    Ok(user.map(|u| UserResponse {
-        id: u.id,
-        username: u.username,
-        email: u.email,
-        display_name: u.display_name,
-        avatar_url: u.avatar_url,
-        created_at: u.created_at,
-    }))
+    Ok(UserResponse {
+        id: user.id.to_string(),
+        username: user.username,
+        email: user.email,
+        display_name: user.display_name,
+        avatar_url: user.avatar_url,
+        created_at: user.created_at,
+        updated_at: user.updated_at,
+    })
+}
+
+/// Validate a JWT token and return the user ID
+pub fn validate_token(token: &str) -> Result<String, Box<dyn std::error::Error>> {
+    // This is where you would validate the JWT token
+    // For now, we'll just return a placeholder error
+
+    // TODO: Implement proper JWT validation
+    // 1. Decode the token
+    // 2. Verify the signature
+    // 3. Check if the token is expired
+    // 4. Extract and return the user ID from the token claims
+
+    Err("Token validation not implemented".into())
 }

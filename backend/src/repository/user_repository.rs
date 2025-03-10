@@ -74,3 +74,16 @@ pub async fn update_user(db: &Database, user: &User) -> Result<(), AppError> {
 
     Ok(())
 }
+
+/// Find a user by ID
+pub async fn find_user_by_id(db: &Database, user_id: &str) -> Result<User, AppError> {
+    let users_collection = db.collection::<User>("users");
+
+    let user = users_collection
+        .find_one(doc! { "id": user_id }, None)
+        .await
+        .map_err(|e| AppError::DatabaseError(e))?
+        .ok_or(AppError::UserNotFound)?;
+
+    Ok(user)
+}

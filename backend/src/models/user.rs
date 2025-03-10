@@ -40,6 +40,7 @@ pub struct UserResponse {
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
     pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -65,6 +66,7 @@ impl From<User> for UserResponse {
             display_name: user.display_name,
             avatar_url: user.avatar_url,
             created_at: user.created_at,
+            updated_at: user.updated_at,
         }
     }
 }

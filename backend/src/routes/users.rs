@@ -1,6 +1,6 @@
 use crate::models::user::{CreateUserDto, LoginUserDto, UserResponse};
 use crate::services::user_service;
-use actix_web::{get, post, web, HttpResponse, Responder};
+use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 use mongodb::Database;
 use utoipa::{IntoParams, ToSchema};
 
@@ -29,9 +29,7 @@ async fn create_user(
     user_data: web::Json<CreateUserDto>,
 ) -> impl Responder {
     match user_service::create_user(&db, user_data.into_inner()).await {
-        Ok(user) => {
-            HttpResponse::Created().json(user)
-        }
+        Ok(user) => HttpResponse::Created().json(user),
         Err(e) => {
             log::error!("Error creating user: {:?}", e);
             // Check if the error message contains information about missing fields
@@ -95,12 +93,53 @@ async fn login(db: web::Data<Database>, credentials: web::Json<LoginUserDto>) ->
     tag = "users"
 )]
 #[get("/api/v1/users/me")]
-async fn get_current_user(db: web::Data<Database>) -> impl Responder {
-    // Placeholder for now
-    HttpResponse::Ok().json(serde_json::json!({
-        "status": "success",
-        "message": "Current user profile endpoint"
-    }))
+async fn get_current_user(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
+    // Extract the user ID from the authentication token
+    // This is a placeholder - you'll need to implement proper token extraction
+    let user_id = match extract_user_id_from_token(&req) {
+        Some(id) => id,
+        None => {
+            return HttpResponse::Unauthorized().json(serde_json::json!({
+                "status": "error",
+                "message": "Unauthorized"
+            }));
+        }
+    };
+
+    // Get the user from the database
+    match user_service::get_user_by_id(&db, &user_id).await {
+        Ok(user) => HttpResponse::Ok().json(user),
+        Err(e) => {
+            log::error!("Error fetching user: {:?}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": "error",
+                "message": e.to_string()
+            }))
+        }
+    }
+}
+
+// Helper function to extract user ID from token
+// This is a placeholder - implement your actual token validation logic
+fn extract_user_id_from_token(req: &HttpRequest) -> Option<String> {
+    // Get the Authorization header
+    let auth_header = req.headers().get("Authorization")?;
+    let auth_str = auth_header.to_str().ok()?;
+
+    // Check if it's a Bearer token
+    if !auth_str.starts_with("Bearer ") {
+        return None;
+    }
+
+    // Extract the token
+    let token = auth_str.trim_start_matches("Bearer ").trim();
+
+    // Here you would validate the token and extract the user ID
+    // For now, we'll just return a placeholder
+    // In a real implementation, you would decode the JWT and extract the user ID
+
+    // Placeholder implementation - replace with actual JWT validation
+    user_service::validate_token(token).ok()
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {
