@@ -1,6 +1,6 @@
 use crate::models::user::{CreateUserDto, LoginUserDto, UserResponse};
 use crate::services::user_service;
-use actix_web::{get, post, put, web, HttpResponse, Responder};
+use actix_web::{get, post, web, HttpResponse, Responder};
 use mongodb::Database;
 use utoipa::{IntoParams, ToSchema};
 
@@ -23,15 +23,27 @@ pub struct AuthResponse {
     ),
     tag = "users"
 )]
-#[post("")]
+#[post("/api/v1/users")]
 async fn create_user(
     db: web::Data<Database>,
     user_data: web::Json<CreateUserDto>,
 ) -> impl Responder {
     match user_service::create_user(&db, user_data.into_inner()).await {
-        Ok(user) => HttpResponse::Created().json(user),
+        Ok(user) => {
+            log::info!("User created successfully");
+            HttpResponse::Created().json(user)
+        }
         Err(e) => {
             log::error!("Error creating user: {:?}", e);
+            // Check if the error message contains information about missing fields
+            let error_msg = e.to_string();
+            if error_msg.contains("missing field") || error_msg.contains("BsonDeserialization") {
+                return HttpResponse::BadRequest().json(serde_json::json!({
+                    "status": "error",
+                    "message": format!("Validation error: {}", error_msg)
+                }));
+            }
+            // For other errors, return 500
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "status": "error",
                 "message": e.to_string()
@@ -52,7 +64,7 @@ async fn create_user(
     ),
     tag = "users"
 )]
-#[post("/login")]
+#[post("/api/v1/auth/login")]
 async fn login(db: web::Data<Database>, credentials: web::Json<LoginUserDto>) -> impl Responder {
     match user_service::login_user(&db, credentials.into_inner()).await {
         Ok(token) => HttpResponse::Ok().json(serde_json::json!({
@@ -83,11 +95,8 @@ async fn login(db: web::Data<Database>, credentials: web::Json<LoginUserDto>) ->
     ),
     tag = "users"
 )]
-#[get("/me")]
-async fn get_current_user(
-    db: web::Data<Database>,
-    // This will be expanded with JWT middleware later
-) -> impl Responder {
+#[get("/api/v1/users/me")]
+async fn get_current_user(db: web::Data<Database>) -> impl Responder {
     // Placeholder for now
     HttpResponse::Ok().json(serde_json::json!({
         "status": "success",
@@ -96,16 +105,12 @@ async fn get_current_user(
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {
-    cfg.service(
-        web::scope("/api/v1")
-            .service(
-                web::scope("/users")
-                    .service(create_user)
-                    .service(get_current_user)
-            )
-            .service(
-                web::scope("/auth")
-                    .service(login)
-            )
-    );
+    log::info!("Registering user routes");
+
+    // Register each service directly with full paths
+    cfg.service(create_user)
+        .service(login)
+        .service(get_current_user);
+
+    log::info!("User routes registered");
 }

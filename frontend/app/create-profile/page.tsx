@@ -56,8 +56,8 @@ export default function CreateProfilePage() {
     setIsLoading(true)
 
     try {
-      // TODO: Implement API call to create profile
-      const response = await fetch('/api/profile', {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const response = await fetch(`${apiBaseUrl}/api/v1/users`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

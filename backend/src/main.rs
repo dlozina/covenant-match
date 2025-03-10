@@ -107,14 +107,13 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             .app_data(Data::new(db.clone()))
             // Register routes
-            .configure(health::config)
             .configure(users::config)
-            .configure(sessions::config)
-            .configure(statistics::config)
+            .configure(health::config)
+            //.configure(sessions::config)
+            //.configure(statistics::config)
             // Add Swagger UI
             .service(
-                SwaggerUi::new("/api/docs/{_:.*}")
-                    .url("/api-docs/openapi.json", ApiDoc::openapi()),
+                SwaggerUi::new("/api/docs/{_:.*}").url("/api-docs/openapi.json", ApiDoc::openapi()),
             )
     })
     .bind(format!("0.0.0.0:{}", server_port))?

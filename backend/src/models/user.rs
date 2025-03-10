@@ -21,7 +21,6 @@ pub struct User {
 #[derive(Debug, Serialize, Deserialize, Validate, ToSchema)]
 pub struct CreateUserDto {
     #[validate(length(min = 3, max = 30))]
-    #[serde(alias = "name")]
     pub username: String,
     #[validate(email)]
     pub email: String,
@@ -29,7 +28,6 @@ pub struct CreateUserDto {
     #[schema(format = "password")]
     pub password: String,
     pub display_name: Option<String>,
-    pub name: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
