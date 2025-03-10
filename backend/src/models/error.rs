@@ -1,5 +1,9 @@
 use mongodb::bson;
 use thiserror::Error;
+use actix_web::{HttpResponse, ResponseError};
+use serde_json::json;
+use std::fmt;
+use actix_web::http::StatusCode;
 
 #[derive(Error, Debug)]
 pub enum AppError {
@@ -38,4 +42,52 @@ pub enum AppError {
 
     #[error("Internal server error: {0}")]
     InternalError(String),
+
+    #[error("Token expired")]
+    TokenExpired,
+
+    #[error("Invalid token")]
+    InvalidToken,
+
+    #[error("Authentication required")]
+    AuthenticationRequired,
+
+    #[error("Insufficient permissions")]
+    InsufficientPermissions,
+}
+
+impl ResponseError for AppError {
+    fn error_response(&self) -> HttpResponse {
+        let status_code = self.status_code();
+        
+        HttpResponse::build(status_code).json(json!({
+            "status": "error",
+            "message": self.to_string()
+        }))
+    }
+    
+    fn status_code(&self) -> StatusCode {
+        match self {
+            AppError::InvalidCredentials => StatusCode::UNAUTHORIZED,
+            AppError::TokenExpired => StatusCode::UNAUTHORIZED,
+            AppError::InvalidToken => StatusCode::UNAUTHORIZED,
+            AppError::AuthenticationRequired => StatusCode::UNAUTHORIZED,
+            AppError::AuthError(_) => StatusCode::UNAUTHORIZED,
+            AppError::InsufficientPermissions => StatusCode::FORBIDDEN,
+            
+            AppError::UserNotFound => StatusCode::NOT_FOUND,
+            AppError::SessionNotFound => StatusCode::NOT_FOUND,
+            
+            AppError::UserAlreadyExists => StatusCode::CONFLICT,
+            AppError::UserAlreadyInSession => StatusCode::CONFLICT,
+            AppError::SessionFull => StatusCode::CONFLICT,
+            
+            AppError::ValidationError(_) => StatusCode::BAD_REQUEST,
+            AppError::InvalidSessionState => StatusCode::BAD_REQUEST,
+            
+            AppError::DatabaseError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::BsonError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
 }

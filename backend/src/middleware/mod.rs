@@ -1,1 +1,1 @@
-// Placeholder for future authentication middleware
+pub mod auth;

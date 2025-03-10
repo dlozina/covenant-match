@@ -1,15 +1,10 @@
+use crate::middleware::auth::RequireRole;
 use crate::models::user::{CreateUserDto, LoginUserDto, UserResponse};
 use crate::services::user_service;
-use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
+use crate::utils::jwt;
+use actix_web::{get, post, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError};
 use mongodb::Database;
 use utoipa::{IntoParams, ToSchema};
-
-/// Response for authentication endpoints
-#[derive(serde::Serialize, ToSchema)]
-pub struct AuthResponse {
-    status: String,
-    token: String,
-}
 
 /// Create a new user
 #[utoipa::path(
@@ -19,6 +14,7 @@ pub struct AuthResponse {
     responses(
         (status = 201, description = "User created successfully", body = UserResponse),
         (status = 400, description = "Invalid input"),
+        (status = 409, description = "User already exists"),
         (status = 500, description = "Internal server error")
     ),
     tag = "users"
@@ -27,24 +23,29 @@ pub struct AuthResponse {
 async fn create_user(
     db: web::Data<Database>,
     user_data: web::Json<CreateUserDto>,
+    req: HttpRequest,
 ) -> impl Responder {
-    match user_service::create_user(&db, user_data.into_inner()).await {
+    // Check if request has authentication (for role check)
+    let requesting_user_role = if let Some(auth_header) = req.headers().get("Authorization") {
+        let auth_str = auth_header.to_str().unwrap_or("");
+        if auth_str.starts_with("Bearer ") {
+            let token = auth_str.trim_start_matches("Bearer ");
+            jwt::get_role_from_token(token).ok()
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    // Pass the requesting user's role (if any) to determine if they can create an admin
+    match user_service::create_user(&db, user_data.into_inner(), requesting_user_role.as_deref())
+        .await
+    {
         Ok(user) => HttpResponse::Created().json(user),
         Err(e) => {
             log::error!("Error creating user: {:?}", e);
-            // Check if the error message contains information about missing fields
-            let error_msg = e.to_string();
-            if error_msg.contains("missing field") || error_msg.contains("BsonDeserialization") {
-                return HttpResponse::BadRequest().json(serde_json::json!({
-                    "status": "error",
-                    "message": format!("Validation error: {}", error_msg)
-                }));
-            }
-            // For other errors, return 500
-            HttpResponse::InternalServerError().json(serde_json::json!({
-                "status": "error",
-                "message": e.to_string()
-            }))
+            e.error_response()
         }
     }
 }
@@ -64,16 +65,14 @@ async fn create_user(
 #[post("/api/v1/auth/login")]
 async fn login(db: web::Data<Database>, credentials: web::Json<LoginUserDto>) -> impl Responder {
     match user_service::login_user(&db, credentials.into_inner()).await {
-        Ok(token) => HttpResponse::Ok().json(serde_json::json!({
+        Ok((token, user)) => HttpResponse::Ok().json(serde_json::json!({
             "status": "success",
-            "token": token
+            "token": token,
+            "user": user
         })),
         Err(e) => {
             log::error!("Login error: {:?}", e);
-            HttpResponse::Unauthorized().json(serde_json::json!({
-                "status": "error",
-                "message": "Invalid credentials"
-            }))
+            e.error_response()
         }
     }
 }
@@ -95,13 +94,27 @@ async fn login(db: web::Data<Database>, credentials: web::Json<LoginUserDto>) ->
 #[get("/api/v1/users/me")]
 async fn get_current_user(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
     // Extract the user ID from the authentication token
-    // This is a placeholder - you'll need to implement proper token extraction
-    let user_id = match extract_user_id_from_token(&req) {
-        Some(id) => id,
+    let auth_header = req.headers().get("Authorization");
+    let user_id = match auth_header {
+        Some(header) => {
+            let auth_str = header.to_str().unwrap_or("");
+            if auth_str.starts_with("Bearer ") {
+                let token = auth_str.trim_start_matches("Bearer ");
+                match jwt::get_user_id_from_token(token) {
+                    Ok(id) => id,
+                    Err(e) => return e.error_response(),
+                }
+            } else {
+                return HttpResponse::Unauthorized().json(serde_json::json!({
+                    "status": "error",
+                    "message": "Invalid authorization header format"
+                }));
+            }
+        }
         None => {
             return HttpResponse::Unauthorized().json(serde_json::json!({
                 "status": "error",
-                "message": "Unauthorized"
+                "message": "Authentication required"
             }));
         }
     };
@@ -111,40 +124,79 @@ async fn get_current_user(db: web::Data<Database>, req: HttpRequest) -> impl Res
         Ok(user) => HttpResponse::Ok().json(user),
         Err(e) => {
             log::error!("Error fetching user: {:?}", e);
-            HttpResponse::InternalServerError().json(serde_json::json!({
-                "status": "error",
-                "message": e.to_string()
-            }))
+            e.error_response()
         }
     }
 }
 
-// Helper function to extract user ID from token
-// This is a placeholder - implement your actual token validation logic
-fn extract_user_id_from_token(req: &HttpRequest) -> Option<String> {
-    // Get the Authorization header
-    let auth_header = req.headers().get("Authorization")?;
-    let auth_str = auth_header.to_str().ok()?;
+/// Create a new admin user (admin only)
+#[utoipa::path(
+    post,
+    path = "/api/v1/admin/users",
+    request_body = CreateUserDto,
+    responses(
+        (status = 201, description = "Admin user created successfully", body = UserResponse),
+        (status = 400, description = "Invalid input"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - requires admin role"),
+        (status = 409, description = "User already exists"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "admin"
+)]
+// Changed path to be relative to the scope ("/users" instead of "/api/v1/admin/users")
+#[post("/users")]
+async fn create_admin_user(
+    db: web::Data<Database>,
+    user_data: web::Json<CreateUserDto>,
+    req: HttpRequest,
+) -> impl Responder {
+    // Extract claims from the request extensions (set by middleware)
+    let claims = match req.extensions().get::<jwt::Claims>() {
+        Some(claims) if claims.role == "admin" => claims,
+        Some(_) => {
+            return HttpResponse::Forbidden().json(serde_json::json!({
+                "status": "error",
+                "message": "Admin role required"
+            }));
+        }
+        None => {
+            return HttpResponse::Unauthorized().json(serde_json::json!({
+                "status": "error",
+                "message": "Authentication required"
+            }));
+        }
+    };
 
-    // Check if it's a Bearer token
-    if !auth_str.starts_with("Bearer ") {
-        return None;
+    // Create a new user with admin role
+    let mut admin_user_data = user_data.into_inner();
+    admin_user_data.role = Some("admin".to_string());
+
+    match user_service::create_user(&db, admin_user_data, Some("admin")).await {
+        Ok(user) => HttpResponse::Created().json(user),
+        Err(e) => {
+            log::error!("Error creating admin user: {:?}", e);
+            e.error_response()
+        }
     }
-
-    // Extract the token
-    let token = auth_str.trim_start_matches("Bearer ").trim();
-
-    // Here you would validate the token and extract the user ID
-    // For now, we'll just return a placeholder
-    // In a real implementation, you would decode the JWT and extract the user ID
-
-    // Placeholder implementation - replace with actual JWT validation
-    user_service::validate_token(token).ok()
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {
-    // Register each service directly with full paths
+    // Public endpoints (no authentication required)
     cfg.service(create_user)
-        .service(login)
-        .service(get_current_user);
+       .service(login);
+       
+    // User endpoints (require user authentication)
+    cfg.service(get_current_user);
+    
+    // Admin endpoints (require admin role)
+    cfg.service(
+        web::scope("/api/v1/admin")
+            .wrap(RequireRole::admin())  // Apply admin role middleware
+            .service(create_admin_user)  // This service now has a relative path
+            // Add other admin endpoints here
+    );
 }

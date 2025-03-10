@@ -22,23 +22,23 @@ async fn get_sessions(
     }
 }
 
-#[post("/sessions")]
-async fn create_session(
-    db: web::Data<Database>,
-    session_data: web::Json<CreateSessionDto>,
-    // Will add user authentication later
-) -> impl Responder {
-    match session_service::create_session(&db, session_data.into_inner()).await {
-        Ok(session) => HttpResponse::Created().json(session),
-        Err(e) => {
-            log::error!("Error creating session: {:?}", e);
-            HttpResponse::InternalServerError().json(serde_json::json!({
-                "status": "error",
-                "message": e.to_string()
-            }))
-        }
-    }
-}
+// #[post("/sessions")]
+// async fn create_session(
+//     db: web::Data<Database>,
+//     session_data: web::Json<CreateSessionDto>,
+//     // Will add user authentication later
+// ) -> impl Responder {
+//     match session_service::create_session(&db, session_data.into_inner()).await {
+//         Ok(session) => HttpResponse::Created().json(session),
+//         Err(e) => {
+//             log::error!("Error creating session: {:?}", e);
+//             HttpResponse::InternalServerError().json(serde_json::json!({
+//                 "status": "error",
+//                 "message": e.to_string()
+//             }))
+//         }
+//     }
+// }
 
 #[get("/sessions/{id}")]
 async fn get_session(
@@ -63,25 +63,25 @@ async fn get_session(
     }
 }
 
-#[post("/sessions/{id}/join")]
-async fn join_session(
-    db: web::Data<Database>,
-    path: web::Path<String>,
-    join_data: web::Json<JoinSessionDto>,
-) -> impl Responder {
-    let id = path.into_inner();
+// #[post("/sessions/{id}/join")]
+// async fn join_session(
+//     db: web::Data<Database>,
+//     path: web::Path<String>,
+//     join_data: web::Json<JoinSessionDto>,
+// ) -> impl Responder {
+//     let id = path.into_inner();
     
-    match session_service::join_session(&db, &id, join_data.into_inner()).await {
-        Ok(session) => HttpResponse::Ok().json(session),
-        Err(e) => {
-            log::error!("Error joining session: {:?}", e);
-            HttpResponse::BadRequest().json(serde_json::json!({
-                "status": "error",
-                "message": e.to_string()
-            }))
-        }
-    }
-}
+//     match session_service::join_session(&db, &id, join_data.into_inner()).await {
+//         Ok(session) => HttpResponse::Ok().json(session),
+//         Err(e) => {
+//             log::error!("Error joining session: {:?}", e);
+//             HttpResponse::BadRequest().json(serde_json::json!({
+//                 "status": "error",
+//                 "message": e.to_string()
+//             }))
+//         }
+//     }
+// }
 
 #[post("/sessions/{id}/start")]
 async fn start_session(
@@ -128,9 +128,9 @@ async fn submit_result(
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(get_sessions)
-       .service(create_session)
+       //.service(create_session)
        .service(get_session)
-       .service(join_session)
+       //.service(join_session)
        .service(start_session)
        .service(submit_result);
 }

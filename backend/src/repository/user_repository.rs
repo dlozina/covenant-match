@@ -1,33 +1,93 @@
 use crate::models::error::AppError;
 use crate::models::user::User;
 use futures::TryStreamExt;
+use log::error;
 use mongodb::{
     bson::{self, doc, Document},
     options::FindOneOptions,
     Collection, Database,
 };
 
+const COLLECTION_NAME: &str = "users";
+
 fn get_collection(db: &Database) -> Collection<User> {
-    db.collection::<User>("users")
+    db.collection::<User>(COLLECTION_NAME)
 }
 
 pub async fn create_user(db: &Database, user: &User) -> Result<(), AppError> {
-    get_collection(db).insert_one(user, None).await?;
+    let collection = db.collection::<User>(COLLECTION_NAME);
+    collection
+        .insert_one(user, None)
+        .await
+        .map_err(|e| {
+            error!("Database error creating user: {:?}", e);
+            AppError::DatabaseError(e)
+        })?;
     Ok(())
 }
 
-pub async fn find_by_id(db: &Database, id: &str) -> Result<Option<User>, AppError> {
-    let user = get_collection(db)
-        .find_one(doc! { "_id": id }, None)
-        .await?;
-    Ok(user)
+pub async fn find_by_username(db: &Database, username: &str) -> Result<Option<User>, AppError> {
+    let collection = db.collection::<User>(COLLECTION_NAME);
+    let filter = doc! { "username": username };
+    
+    collection
+        .find_one(filter, None)
+        .await
+        .map_err(|e| {
+            error!("Database error finding user by username: {:?}", e);
+            AppError::DatabaseError(e)
+        })
 }
 
-pub async fn find_by_username(db: &Database, username: &str) -> Result<Option<User>, AppError> {
-    let user = get_collection(db)
-        .find_one(doc! { "username": username }, None)
-        .await?;
-    Ok(user)
+pub async fn find_by_username_or_email(
+    db: &Database,
+    username: &str,
+    email: &str,
+) -> Result<Option<User>, AppError> {
+    let collection = db.collection::<User>(COLLECTION_NAME);
+    let filter = doc! {
+        "$or": [
+            { "username": username },
+            { "email": email }
+        ]
+    };
+    
+    collection
+        .find_one(filter, None)
+        .await
+        .map_err(|e| {
+            error!("Database error finding user by username or email: {:?}", e);
+            AppError::DatabaseError(e)
+        })
+}
+
+// TODO: Maybe _id needs to be renamed to id
+pub async fn find_user_by_id(db: &Database, id: &str) -> Result<Option<User>, AppError> {
+    let collection = db.collection::<User>(COLLECTION_NAME);
+    let filter = doc! { "_id": id };
+    
+    collection
+        .find_one(filter, None)
+        .await
+        .map_err(|e| {
+            error!("Database error finding user by id: {:?}", e);
+            AppError::DatabaseError(e)
+        })
+}
+
+pub async fn admin_exists(db: &Database) -> Result<bool, AppError> {
+    let collection: Collection<User> = db.collection(COLLECTION_NAME);
+    let filter = doc! { "role": "admin" };
+    
+    let count = collection
+        .count_documents(filter, None)
+        .await
+        .map_err(|e| {
+            error!("Database error checking if admin exists: {:?}", e);
+            AppError::DatabaseError(e)
+        })?;
+    
+    Ok(count > 0)
 }
 
 pub async fn find_by_email(db: &Database, email: &str) -> Result<Option<User>, AppError> {
@@ -37,24 +97,6 @@ pub async fn find_by_email(db: &Database, email: &str) -> Result<Option<User>, A
     Ok(user)
 }
 
-pub async fn find_by_username_or_email(
-    db: &Database,
-    username: &str,
-    email: &str,
-) -> Result<Option<User>, AppError> {
-    let user = get_collection(db)
-        .find_one(
-            doc! {
-                "$or": [
-                    { "username": username },
-                    { "email": email }
-                ]
-            },
-            None,
-        )
-        .await?;
-    Ok(user)
-}
 
 pub async fn update_user(db: &Database, user: &User) -> Result<(), AppError> {
     let update = doc! {
@@ -73,17 +115,4 @@ pub async fn update_user(db: &Database, user: &User) -> Result<(), AppError> {
         .await?;
 
     Ok(())
-}
-
-/// Find a user by ID
-pub async fn find_user_by_id(db: &Database, user_id: &str) -> Result<User, AppError> {
-    let users_collection = db.collection::<User>("users");
-
-    let user = users_collection
-        .find_one(doc! { "id": user_id }, None)
-        .await
-        .map_err(|e| AppError::DatabaseError(e))?
-        .ok_or(AppError::UserNotFound)?;
-
-    Ok(user)
 }

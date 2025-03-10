@@ -15,6 +15,7 @@ pub struct User {
     pub password_hash: String,
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
+    pub role: String, // "admin" or "user"
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -30,6 +31,8 @@ pub struct CreateUserDto {
     #[schema(format = "password")]
     pub password: String,
     pub display_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>, // Only used by admins when creating users
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -39,6 +42,7 @@ pub struct UserResponse {
     pub email: String,
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
+    pub role: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -65,6 +69,7 @@ impl From<User> for UserResponse {
             email: user.email,
             display_name: user.display_name,
             avatar_url: user.avatar_url,
+            role: user.role,
             created_at: user.created_at,
             updated_at: user.updated_at,
         }
