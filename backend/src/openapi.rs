@@ -1,5 +1,5 @@
 use crate::models::user::{
-    AuthResponse, CreateUserDto, LoginUserDto, UpdateUserDto, User, UserResponse,
+    AuthResponse, CreateUserDto, LoginUserDto, UpdateUserDto, User, UserResponse, UpdateUserProfileDto
 };
 use crate::routes::{
     health::*,
@@ -31,6 +31,8 @@ use utoipa::{
         login,
         get_current_user,
         create_admin_user,
+        update_profile,
+        delete_user,
         // Add session and statistics routes as they become available
     ),
     components(
@@ -42,6 +44,7 @@ use utoipa::{
             LoginUserDto,
             UpdateUserDto,
             AuthResponse,
+            UpdateUserProfileDto,
             // Add other models as needed
         ),
     ),

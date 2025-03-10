@@ -1,5 +1,5 @@
 use crate::models::error::AppError;
-use crate::models::user::{CreateUserDto, LoginUserDto, User, UserResponse};
+use crate::models::user::{CreateUserDto, LoginUserDto, UpdateUserProfileDto, User, UserResponse};
 use crate::repository::user_repository;
 use crate::utils::jwt;
 use bcrypt::{hash, verify, DEFAULT_COST};
@@ -154,4 +154,72 @@ pub async fn ensure_admin_exists(db: &Database) -> Result<(), AppError> {
         info!("Admin user already exists");
         Ok(())
     }
+}
+
+pub async fn update_user_profile(
+    db: &Database,
+    user_id: &str,
+    update_data: UpdateUserProfileDto,
+) -> Result<UserResponse, AppError> {
+    // Check if email is being updated and if it's already in use
+    if let Some(email) = &update_data.email {
+        if let Some(existing_user) = user_repository::find_by_email(db, email).await? {
+            if existing_user.id != user_id {
+                return Err(AppError::EmailAlreadyInUse);
+            }
+        }
+    }
+
+    // Get the current timestamp as a string in RFC3339 format
+    let now = chrono::Utc::now().to_rfc3339();
+
+    // Get the user first
+    let user = user_repository::find_user_by_id(db, user_id)
+        .await?
+        .ok_or(AppError::UserNotFound)?;
+
+    // Create update document
+    let mut update_doc = doc! {};
+
+    if let Some(email) = update_data.email.clone() {
+        update_doc.insert("email", email);
+    }
+    if let Some(display_name) = update_data.display_name.clone() {
+        update_doc.insert("display_name", display_name);
+    }
+    if let Some(avatar_url) = update_data.avatar_url.clone() {
+        update_doc.insert("avatar_url", avatar_url);
+    }
+    if let Some(password) = update_data.password.clone() {
+        let password_hash =
+            hash(&password, DEFAULT_COST).map_err(|e| AppError::InternalError(e.to_string()))?;
+        update_doc.insert("password_hash", password_hash);
+    }
+
+    // Always update the updated_at field with string timestamp
+    update_doc.insert("updated_at", now);
+
+    // Update the user
+    user_repository::update_user_with_doc(db, user_id, update_doc).await?;
+
+    // Get the updated user
+    let updated_user = user_repository::find_user_by_id(db, user_id)
+        .await?
+        .ok_or(AppError::UserNotFound)?;
+
+    Ok(updated_user.into())
+}
+
+pub async fn delete_user(db: &Database, user_id: &str) -> Result<(), AppError> {
+    // Check if the user exists first
+    let user_exists = user_repository::find_user_by_id(db, user_id).await?;
+
+    if user_exists.is_none() {
+        return Err(AppError::UserNotFound);
+    }
+
+    // Delete the user
+    user_repository::delete_user(db, user_id).await?;
+
+    Ok(())
 }

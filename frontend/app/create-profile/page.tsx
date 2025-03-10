@@ -69,8 +69,19 @@ export default function CreateProfilePage() {
         throw new Error('Failed to create profile')
       }
 
-      toast.success("Profile created successfully!")
-      router.push('/profile')
+      // Parse the response to get the token
+      const responseData = await response.json()
+      
+      // Store the token in localStorage
+      if (responseData.token) {
+        localStorage.setItem('token', responseData.token)
+        toast.success("Profile created successfully!")
+        router.push('/profile')
+      } else {
+        // If no token is returned, redirect to login
+        toast.success("Profile created successfully! Please log in.")
+        router.push('/login')
+      }
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Something went wrong. Please try again.")
     } finally {

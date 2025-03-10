@@ -54,6 +54,9 @@ pub enum AppError {
 
     #[error("Insufficient permissions")]
     InsufficientPermissions,
+
+    #[error("Email already in use")]
+    EmailAlreadyInUse,
 }
 
 impl ResponseError for AppError {
@@ -88,6 +91,8 @@ impl ResponseError for AppError {
             AppError::DatabaseError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::BsonError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+
+            AppError::EmailAlreadyInUse => StatusCode::CONFLICT,
         }
     }
 }

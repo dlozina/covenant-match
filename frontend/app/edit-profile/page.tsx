@@ -53,11 +53,19 @@ export default function EditProfilePage() {
     async function fetchProfile() {
       try {
         const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+          toast.error("Authentication required");
+          router.push('/login');
+          return;
+        }
+
         const response = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            // You'll need to add authentication headers here once you implement auth
+            'Authorization': `Bearer ${token}`
           },
         })
 
@@ -90,14 +98,23 @@ export default function EditProfilePage() {
 
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        toast.error("Authentication required");
+        router.push('/login');
+        return;
+      }
+      
+
       const response = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          // You'll need to add authentication headers here once you implement auth
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(data),
-      })
+      });
 
       if (!response.ok) {
         throw new Error('Failed to update profile')
@@ -109,6 +126,40 @@ export default function EditProfilePage() {
       toast.error(error instanceof Error ? error.message : "Something went wrong. Please try again.")
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  async function handleDeleteProfile() {
+    if (window.confirm("Are you sure you want to delete your profile? This action cannot be undone.")) {
+      try {
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+          toast.error("Authentication required");
+          router.push('/login');
+          return;
+        }
+        
+        const response = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to delete profile');
+        }
+
+        // Clear token and other stored data
+        localStorage.removeItem('token');
+        
+        toast.success("Profile deleted successfully");
+        router.push('/');
+      } catch (error: unknown) {
+        toast.error(error instanceof Error ? error.message : "Failed to delete profile");
+      }
     }
   }
 
@@ -141,10 +192,10 @@ export default function EditProfilePage() {
                 <FormItem>
                   <FormLabel>Username</FormLabel>
                   <FormControl>
-                    <Input placeholder="username" {...field} />
+                    <Input placeholder="username" {...field} readOnly disabled className="bg-muted" />
                   </FormControl>
                   <FormDescription>
-                    This is your unique username on the platform.
+                    Your username cannot be changed.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -199,6 +250,19 @@ export default function EditProfilePage() {
             </div>
           </form>
         </Form>
+
+        <div className="border-t pt-6">
+          <h2 className="text-xl font-semibold text-red-600 mb-4">Danger Zone</h2>
+          <p className="text-muted-foreground mb-4">
+            Once you delete your profile, there is no going back. Please be certain.
+          </p>
+          <Button 
+            variant="destructive" 
+            onClick={handleDeleteProfile}
+          >
+            Delete Profile
+          </Button>
+        </div>
       </div>
     </div>
   )

@@ -98,10 +98,30 @@ export default function ProfilePage() {
             </div>
           </CardContent>
           <CardFooter className="flex justify-between">
-            <Button variant="outline" onClick={() => router.push('/edit-profile')}>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                // Verify token exists before navigation
+                const token = localStorage.getItem('token');
+                if (token) {
+                  router.push('/edit-profile');
+                } else {
+                  toast.error("Authentication required");
+                  router.push('/login');
+                }
+              }}
+            >
               Edit Profile
             </Button>
-            <Button variant="destructive" onClick={() => toast.info("Logout functionality will be implemented soon")}>
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                // Implement logout functionality
+                localStorage.removeItem('token');
+                toast.success("Logged out successfully");
+                router.push('/login');
+              }}
+            >
               Logout
             </Button>
           </CardFooter>

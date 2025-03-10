@@ -1,8 +1,11 @@
 use crate::middleware::auth::RequireRole;
-use crate::models::user::{CreateUserDto, LoginUserDto, UserResponse};
+use crate::models::error::AppError;
+use crate::models::user::{CreateUserDto, LoginUserDto, UpdateUserProfileDto, UserResponse};
 use crate::services::user_service;
 use crate::utils::jwt;
-use actix_web::{get, post, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError};
+use actix_web::{
+    get, post, put, delete, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError,
+};
 use mongodb::Database;
 use utoipa::{IntoParams, ToSchema};
 
@@ -129,6 +132,119 @@ async fn get_current_user(db: web::Data<Database>, req: HttpRequest) -> impl Res
     }
 }
 
+/// Update current user profile
+#[utoipa::path(
+    put,
+    path = "/api/v1/users/me",
+    request_body = UpdateUserProfileDto,
+    responses(
+        (status = 200, description = "Profile updated successfully", body = UserResponse),
+        (status = 400, description = "Invalid input"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "User not found"),
+        (status = 409, description = "Email already in use"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "users"
+)]
+#[put("/api/v1/users/me")]
+async fn update_profile(
+    db: web::Data<Database>,
+    req: HttpRequest,
+    update_data: web::Json<UpdateUserProfileDto>,
+) -> impl Responder {
+    // Extract the user ID from the authentication token
+    let auth_header = req.headers().get("Authorization");
+    let user_id = match auth_header {
+        Some(header) => {
+            let auth_str = header.to_str().unwrap_or("");
+            if auth_str.starts_with("Bearer ") {
+                let token = auth_str.trim_start_matches("Bearer ");
+                match jwt::get_user_id_from_token(token) {
+                    Ok(id) => id,
+                    Err(e) => return e.error_response(),
+                }
+            } else {
+                return HttpResponse::Unauthorized().json(serde_json::json!({
+                    "status": "error",
+                    "message": "Invalid authorization header format"
+                }));
+            }
+        }
+        None => {
+            return HttpResponse::Unauthorized().json(serde_json::json!({
+                "status": "error",
+                "message": "Authentication required"
+            }));
+        }
+    };
+
+    // Update the user profile
+    match user_service::update_user_profile(&db, &user_id, update_data.into_inner()).await {
+        Ok(user) => HttpResponse::Ok().json(user),
+        Err(e) => {
+            log::error!("Error updating user profile: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
+/// Delete current user
+#[utoipa::path(
+    delete,
+    path = "/api/v1/users/me",
+    responses(
+        (status = 204, description = "User deleted successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "User not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "users"
+)]
+#[delete("/api/v1/users/me")]
+async fn delete_user(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
+    // Extract the user ID from the authentication token
+    let auth_header = req.headers().get("Authorization");
+    let user_id = match auth_header {
+        Some(header) => {
+            let auth_str = header.to_str().unwrap_or("");
+            if auth_str.starts_with("Bearer ") {
+                let token = auth_str.trim_start_matches("Bearer ");
+                match jwt::get_user_id_from_token(token) {
+                    Ok(id) => id,
+                    Err(e) => return e.error_response(),
+                }
+            } else {
+                return HttpResponse::Unauthorized().json(serde_json::json!({
+                    "status": "error",
+                    "message": "Invalid authorization header format"
+                }));
+            }
+        }
+        None => {
+            return HttpResponse::Unauthorized().json(serde_json::json!({
+                "status": "error",
+                "message": "Authentication required"
+            }));
+        }
+    };
+
+    // Delete the user
+    match user_service::delete_user(&db, &user_id).await {
+        Ok(_) => HttpResponse::NoContent().finish(),
+        Err(e) => {
+            log::error!("Error deleting user: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
 /// Create a new admin user (admin only)
 #[utoipa::path(
     post,
@@ -186,17 +302,18 @@ async fn create_admin_user(
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     // Public endpoints (no authentication required)
-    cfg.service(create_user)
-       .service(login);
-       
+    cfg.service(create_user).service(login);
+
     // User endpoints (require user authentication)
-    cfg.service(get_current_user);
-    
+    cfg.service(get_current_user)
+       .service(update_profile)
+       .service(delete_user); // Add the delete user endpoint
+
     // Admin endpoints (require admin role)
     cfg.service(
         web::scope("/api/v1/admin")
-            .wrap(RequireRole::admin())  // Apply admin role middleware
-            .service(create_admin_user)  // This service now has a relative path
-            // Add other admin endpoints here
+            .wrap(RequireRole::admin()) // Apply admin role middleware
+            .service(create_admin_user), // This service now has a relative path
+                                         // Add other admin endpoints here
     );
 }

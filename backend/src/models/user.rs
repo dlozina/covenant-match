@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use validator::Validate;
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 pub struct User {
     #[serde(rename = "_id")]
     pub id: String,
@@ -59,6 +59,16 @@ pub struct LoginUserDto {
 pub struct UpdateUserDto {
     pub display_name: Option<String>,
     pub email: Option<String>,
+    pub avatar_url: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateUserProfileDto {
+    pub email: Option<String>,
+    #[schema(format = "password")]
+    pub password: Option<String>,
+    pub display_name: Option<String>,
     pub avatar_url: Option<String>,
 }
 
