@@ -30,7 +30,6 @@ async fn create_user(
 ) -> impl Responder {
     match user_service::create_user(&db, user_data.into_inner()).await {
         Ok(user) => {
-            log::info!("User created successfully");
             HttpResponse::Created().json(user)
         }
         Err(e) => {
@@ -105,12 +104,8 @@ async fn get_current_user(db: web::Data<Database>) -> impl Responder {
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {
-    log::info!("Registering user routes");
-
     // Register each service directly with full paths
     cfg.service(create_user)
         .service(login)
         .service(get_current_user);
-
-    log::info!("User routes registered");
 }

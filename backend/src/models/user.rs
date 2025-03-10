@@ -9,7 +9,8 @@ pub struct User {
     pub id: String,
     pub username: String,
     pub email: String,
-    #[serde(skip_serializing)]
+    #[serde(rename = "password_hash")]
+    #[serde(skip_serializing_if = "is_api_response")]
     #[schema(write_only)]
     pub password_hash: String,
     pub display_name: Option<String>,
@@ -19,6 +20,7 @@ pub struct User {
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateUserDto {
     #[validate(length(min = 3, max = 30))]
     pub username: String,
@@ -71,4 +73,8 @@ impl From<User> for UserResponse {
 pub struct AuthResponse {
     pub token: String,
     pub user: UserResponse,
+}
+
+fn is_api_response(_: &str) -> bool {
+    false
 }
