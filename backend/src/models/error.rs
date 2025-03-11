@@ -57,6 +57,9 @@ pub enum AppError {
 
     #[error("Email already in use")]
     EmailAlreadyInUse,
+
+    #[error("Display name already in use")]
+    DisplayNameAlreadyInUse,
 }
 
 impl ResponseError for AppError {
@@ -93,6 +96,7 @@ impl ResponseError for AppError {
             AppError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
 
             AppError::EmailAlreadyInUse => StatusCode::CONFLICT,
+            AppError::DisplayNameAlreadyInUse => StatusCode::CONFLICT,
         }
     }
 }

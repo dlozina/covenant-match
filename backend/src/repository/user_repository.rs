@@ -145,3 +145,16 @@ pub async fn update_user_with_doc(
 
     find_user_by_id(db, user_id).await
 }
+
+pub async fn find_by_display_name(
+    db: &Database,
+    display_name: &str,
+) -> Result<Option<User>, AppError> {
+    let collection = db.collection::<User>("users");
+    let filter = doc! { "display_name": display_name };
+
+    collection
+        .find_one(filter, None)
+        .await
+        .map_err(AppError::DatabaseError)
+}

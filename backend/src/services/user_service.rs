@@ -20,6 +20,17 @@ pub async fn create_user(
     {
         return Err(AppError::UserAlreadyExists);
     }
+
+    // Check if display name already exists (if provided)
+    if let Some(display_name) = &user_data.display_name {
+        if user_repository::find_by_display_name(db, display_name)
+            .await?
+            .is_some()
+        {
+            return Err(AppError::DisplayNameAlreadyInUse);
+        }
+    }
+
     // Hash the password
     let password_hash = hash(&user_data.password, DEFAULT_COST)
         .map_err(|e| AppError::InternalError(e.to_string()))?;
@@ -166,6 +177,16 @@ pub async fn update_user_profile(
         if let Some(existing_user) = user_repository::find_by_email(db, email).await? {
             if existing_user.id != user_id {
                 return Err(AppError::EmailAlreadyInUse);
+            }
+        }
+    }
+
+    // Check if display name is being updated and if it's already in use
+    if let Some(display_name) = &update_data.display_name {
+        if let Some(existing_user) = user_repository::find_by_display_name(db, display_name).await?
+        {
+            if existing_user.id != user_id {
+                return Err(AppError::DisplayNameAlreadyInUse);
             }
         }
     }

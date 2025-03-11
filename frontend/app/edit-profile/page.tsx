@@ -106,7 +106,6 @@ export default function EditProfilePage() {
         return;
       }
       
-
       const response = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
         method: 'PUT',
         headers: {
@@ -117,7 +116,9 @@ export default function EditProfilePage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update profile')
+        // Parse the error response to get the specific message
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update profile');
       }
 
       toast.success("Profile updated successfully!")
@@ -149,7 +150,9 @@ export default function EditProfilePage() {
         });
 
         if (!response.ok) {
-          throw new Error('Failed to delete profile');
+          // Parse the error response to get the specific message
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to delete profile');
         }
 
         // Clear token and other stored data
