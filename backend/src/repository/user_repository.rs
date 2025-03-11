@@ -52,7 +52,6 @@ pub async fn find_by_username_or_email(
     })
 }
 
-// TODO: Maybe _id needs to be renamed to id
 pub async fn find_user_by_id(db: &Database, id: &str) -> Result<Option<User>, AppError> {
     let collection = db.collection::<User>(COLLECTION_NAME);
     let filter = doc! { "_id": id };

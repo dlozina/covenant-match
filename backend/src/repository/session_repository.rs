@@ -26,6 +26,8 @@ pub async fn find_by_id(db: &Database, id: &str) -> Result<Option<GameSession>, 
 pub async fn find_sessions(
     db: &Database,
     status: Option<SessionStatus>,
+    limit: Option<u64>,
+    offset: Option<u64>,
 ) -> Result<Vec<GameSession>, AppError> {
     let filter = match status {
         Some(status) => doc! { "status": to_bson(&status)? },
@@ -34,6 +36,8 @@ pub async fn find_sessions(
 
     let options = FindOptions::builder()
         .sort(doc! { "created_at": -1 })
+        .limit(limit.map(|l| l as i64))
+        .skip(offset.map(|o| o as u64))
         .build();
 
     let cursor = get_collection(db).find(filter, options).await?;
@@ -50,6 +54,7 @@ pub async fn update_session(db: &Database, session: &GameSession) -> Result<(), 
             "status": to_bson(&session.status)?,
             "joined_players": to_bson(&session.joined_players)?,
             "results": to_bson(&session.results)?,
+            "ratings": to_bson(&session.ratings)?,
             "updated_at": to_bson(&session.updated_at)?,
             "started_at": to_bson(&session.started_at)?,
             "completed_at": to_bson(&session.completed_at)?,

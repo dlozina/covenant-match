@@ -1,7 +1,8 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct PlayerInfo {
     pub user_id: String,
     pub username: String,
@@ -9,21 +10,21 @@ pub struct PlayerInfo {
     pub joined_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct SessionResult {
     pub user_id: String,
     pub result: GameResult,
     pub submitted_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, ToSchema)]
 pub enum GameResult {
     Win,
     Loss,
     Disconnect,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, ToSchema)]
 pub enum SessionStatus {
     Open,
     Full,
@@ -42,32 +43,33 @@ pub struct GameSession {
     pub status: SessionStatus,
     pub joined_players: Vec<PlayerInfo>,
     pub results: Vec<SessionResult>,
+    pub ratings: Vec<RateSessionDto>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub started_at: Option<DateTime<Utc>>,
     pub completed_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateSessionDto {
     pub host_id: String,
     pub character: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct JoinSessionDto {
     pub user_id: String,
     pub username: String,
     pub character: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct SubmitResultDto {
     pub user_id: String,
     pub result: GameResult,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct SessionResponseDto {
     pub id: String,
     pub host_id: String,
@@ -97,4 +99,21 @@ impl From<GameSession> for SessionResponseDto {
             password: None, // Default to not showing password
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+pub struct RateSessionDto {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<String>,
+    pub rating: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+    #[serde(default = "Utc::now")]
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+pub struct ResultsResponseDto {
+    pub session_id: String,
+    pub results: Vec<SessionResult>,
 }

@@ -15,6 +15,7 @@ use actix_web::{middleware::Logger, App, HttpServer};
 use dotenv::dotenv;
 use log::{info, warn};
 use mongodb::{options::ClientOptions, Client};
+use routes::sessions;
 use services::user_service;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -83,7 +84,8 @@ async fn main() -> std::io::Result<()> {
             // Register routes
             .configure(users::config)
             .configure(health::config)
-            //.configure(sessions::config)
+            .configure(sessions::config)
+            //TODO: Add statistics routes
             //.configure(statistics::config)
             // Add Swagger UI with the OpenAPI schema from our new module
             .service(

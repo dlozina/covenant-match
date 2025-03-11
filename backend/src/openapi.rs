@@ -1,13 +1,17 @@
+use crate::models::session::{
+    CreateSessionDto, GameResult, JoinSessionDto, PlayerInfo, RateSessionDto, ResultsResponseDto,
+    SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto,
+};
 use crate::models::user::{
     AuthResponse, CreateUserDto, GetUsersQuery, LoginUserDto, PaginationInfo, UpdateUserDto,
     UpdateUserProfileDto, User, UserResponse, UsersListData, UsersListResponse,
 };
 use crate::routes::{
     health::*,
-    users::*,
     // Import other routes as they become available
-    // sessions::*,
+    sessions::*,
     // statistics::*,
+    users::*,
 };
 
 use utoipa::{
@@ -39,7 +43,17 @@ use utoipa::{
         get_user_by_id_admin,
         update_user_admin,
         delete_user_admin,
-        // Add session and statistics routes as they become available
+        // Session routes
+        get_sessions,
+        create_session,
+        get_session,
+        join_session,
+        start_session,
+        cancel_session,
+        submit_result,
+        get_results,
+        rate_session,
+        // Add statistics routes as they become available
     ),
     components(
         schemas(
@@ -55,6 +69,18 @@ use utoipa::{
             UsersListResponse,
             UsersListData,
             PaginationInfo,
+            // Session models
+            CreateSessionDto,
+            JoinSessionDto,
+            RateSessionDto,
+            SubmitResultDto,
+            SessionResponseDto,
+            ResultsResponseDto,
+            // Add the missing schema components
+            PlayerInfo,
+            SessionStatus,
+            GameResult,
+            SessionResult,
             // Add other models as needed
         ),
     ),
