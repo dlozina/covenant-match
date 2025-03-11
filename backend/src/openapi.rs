@@ -1,5 +1,6 @@
 use crate::models::user::{
-    AuthResponse, CreateUserDto, LoginUserDto, UpdateUserDto, User, UserResponse, UpdateUserProfileDto
+    AuthResponse, CreateUserDto, GetUsersQuery, LoginUserDto, PaginationInfo, UpdateUserDto,
+    UpdateUserProfileDto, User, UserResponse, UsersListData, UsersListResponse,
 };
 use crate::routes::{
     health::*,
@@ -33,6 +34,11 @@ use utoipa::{
         create_admin_user,
         update_profile,
         delete_user,
+        // Admin routes
+        get_all_users,
+        get_user_by_id_admin,
+        update_user_admin,
+        delete_user_admin,
         // Add session and statistics routes as they become available
     ),
     components(
@@ -45,6 +51,10 @@ use utoipa::{
             UpdateUserDto,
             AuthResponse,
             UpdateUserProfileDto,
+            GetUsersQuery,
+            UsersListResponse,
+            UsersListData,
+            PaginationInfo,
             // Add other models as needed
         ),
     ),
@@ -69,33 +79,33 @@ impl Modify for SecurityAddon {
             let mut http = utoipa::openapi::security::Http::new(
                 utoipa::openapi::security::HttpAuthScheme::Bearer,
             );
-            
+
             // Set description and bearer format directly on the Http struct
             http.description = Some("Enter JWT token".to_string());
             http.bearer_format = Some("JWT".to_string());
-            
+
             // Add the security scheme to components
             components.add_security_scheme("bearer_auth", SecurityScheme::Http(http));
-            
+
             // Apply security to all endpoints except login and user creation
             for (path, path_item) in openapi.paths.paths.iter_mut() {
                 for (method, operation) in &mut path_item.operations {
                     // Check the path and method for exceptions
                     let method_str = match method {
                         utoipa::openapi::PathItemType::Post => "post",
-                        _ => "other"
+                        _ => "other",
                     };
-                    
+
                     // Skip auth for login and user creation endpoints
-                    if !(path.contains("/auth/login") || 
-                         (path.contains("/users") && method_str == "post"))
+                    if !(path.contains("/auth/login")
+                        || (path.contains("/users") && method_str == "post"))
                     {
                         // Create a security requirement with bearer_auth and empty scopes
                         let security_req = utoipa::openapi::SecurityRequirement::new(
-                            "bearer_auth", 
-                            Vec::<String>::new()
+                            "bearer_auth",
+                            Vec::<String>::new(),
                         );
-                        
+
                         // Assign the security requirement
                         operation.security = Some(vec![security_req]);
                     }

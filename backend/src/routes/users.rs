@@ -1,10 +1,12 @@
 use crate::middleware::auth::RequireRole;
 use crate::models::error::AppError;
-use crate::models::user::{CreateUserDto, LoginUserDto, UpdateUserProfileDto, UserResponse};
+use crate::models::user::{
+    CreateUserDto, GetUsersQuery, LoginUserDto, UpdateUserProfileDto, UserResponse,
+};
 use crate::services::user_service;
 use crate::utils::jwt;
 use actix_web::{
-    get, post, put, delete, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError,
+    delete, get, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError,
 };
 use mongodb::Database;
 use utoipa::{IntoParams, ToSchema};
@@ -300,20 +302,206 @@ async fn create_admin_user(
     }
 }
 
+/// Get all users with pagination (admin only)
+#[utoipa::path(
+    get,
+    path = "/api/v1/admin/users",
+    params(
+        ("role" = Option<String>, Query, description = "Filter users by role (e.g., 'user' or 'admin')"),
+        ("page" = Option<u64>, Query, description = "Page number (default: 1)"),
+        ("limit" = Option<u64>, Query, description = "Items per page (default: 10)")
+    ),
+    responses(
+        (status = 200, description = "List of users retrieved successfully", body = UsersListResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - requires admin role"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "admin"
+)]
+#[get("/users")]
+async fn get_all_users(
+    db: web::Data<Database>,
+    req: HttpRequest,
+    query: web::Query<GetUsersQuery>,
+) -> impl Responder {
+    // The middleware already checks for admin role, but we can double-check here
+    if let Some(claims) = req.extensions().get::<jwt::Claims>() {
+        if claims.role != "admin" {
+            return HttpResponse::Forbidden().json(serde_json::json!({
+                "status": "error",
+                "message": "Admin role required"
+            }));
+        }
+    } else {
+        return HttpResponse::Unauthorized().json(serde_json::json!({
+            "status": "error",
+            "message": "Authentication required"
+        }));
+    }
+
+    // Get paginated users
+    match user_service::get_users_paginated(&db, query.role.as_deref(), query.page, query.limit)
+        .await
+    {
+        Ok((users, total, page)) => {
+            let total_pages = (total as f64 / query.limit as f64).ceil() as u64;
+
+            HttpResponse::Ok().json(serde_json::json!({
+                "status": "success",
+                "data": {
+                    "users": users,
+                    "pagination": {
+                        "total": total,
+                        "page": page,
+                        "limit": query.limit,
+                        "total_pages": total_pages
+                    }
+                }
+            }))
+        }
+        Err(e) => {
+            log::error!("Error fetching users: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
+/// Get a specific user by ID (admin only)
+#[utoipa::path(
+    get,
+    path = "/api/v1/admin/users/{user_id}",
+    params(
+        ("user_id" = String, Path, description = "User ID to retrieve")
+    ),
+    responses(
+        (status = 200, description = "User retrieved successfully", body = UserResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - requires admin role"),
+        (status = 404, description = "User not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "admin"
+)]
+#[get("/users/{user_id}")]
+async fn get_user_by_id_admin(
+    db: web::Data<Database>,
+    path: web::Path<String>,
+    req: HttpRequest,
+) -> impl Responder {
+    // The middleware already checks for admin role
+    let user_id = path.into_inner();
+
+    match user_service::get_user_by_id(&db, &user_id).await {
+        Ok(user) => HttpResponse::Ok().json(user),
+        Err(e) => {
+            log::error!("Error fetching user: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
+/// Update a specific user by ID (admin only)
+#[utoipa::path(
+    put,
+    path = "/api/v1/admin/users/{user_id}",
+    params(
+        ("user_id" = String, Path, description = "User ID to update")
+    ),
+    request_body = UpdateUserProfileDto,
+    responses(
+        (status = 200, description = "User updated successfully", body = UserResponse),
+        (status = 400, description = "Invalid input"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - requires admin role"),
+        (status = 404, description = "User not found"),
+        (status = 409, description = "Email or display name already in use"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "admin"
+)]
+#[put("/users/{user_id}")]
+async fn update_user_admin(
+    db: web::Data<Database>,
+    path: web::Path<String>,
+    update_data: web::Json<UpdateUserProfileDto>,
+    req: HttpRequest,
+) -> impl Responder {
+    // The middleware already checks for admin role
+    let user_id = path.into_inner();
+
+    match user_service::update_user_profile(&db, &user_id, update_data.into_inner()).await {
+        Ok(user) => HttpResponse::Ok().json(user),
+        Err(e) => {
+            log::error!("Error updating user: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
+/// Delete a specific user by ID (admin only)
+#[utoipa::path(
+    delete,
+    path = "/api/v1/admin/users/{user_id}",
+    params(
+        ("user_id" = String, Path, description = "User ID to delete")
+    ),
+    responses(
+        (status = 204, description = "User deleted successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - requires admin role"),
+        (status = 404, description = "User not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "admin"
+)]
+#[delete("/users/{user_id}")]
+async fn delete_user_admin(
+    db: web::Data<Database>,
+    path: web::Path<String>,
+    req: HttpRequest,
+) -> impl Responder {
+    // The middleware already checks for admin role
+    let user_id = path.into_inner();
+
+    match user_service::delete_user(&db, &user_id).await {
+        Ok(_) => HttpResponse::NoContent().finish(),
+        Err(e) => {
+            log::error!("Error deleting user: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     // Public endpoints (no authentication required)
     cfg.service(create_user).service(login);
 
     // User endpoints (require user authentication)
     cfg.service(get_current_user)
-       .service(update_profile)
-       .service(delete_user); // Add the delete user endpoint
+        .service(update_profile)
+        .service(delete_user);
 
     // Admin endpoints (require admin role)
     cfg.service(
         web::scope("/api/v1/admin")
             .wrap(RequireRole::admin()) // Apply admin role middleware
-            .service(create_admin_user), // This service now has a relative path
-                                         // Add other admin endpoints here
+            .service(create_admin_user)
+            .service(get_all_users)
+            .service(get_user_by_id_admin)
+            .service(update_user_admin)
+            .service(delete_user_admin),
     );
 }

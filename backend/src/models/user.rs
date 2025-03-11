@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::IntoParams;
 use utoipa::ToSchema;
 use validator::Validate;
 
@@ -93,6 +94,65 @@ pub struct AuthResponse {
     pub user: UserResponse,
 }
 
+/// Query parameters for getting users
+#[derive(Deserialize, IntoParams, ToSchema)]
+pub struct GetUsersQuery {
+    /// Filter users by role (e.g., 'user' or 'admin')
+    pub role: Option<String>,
+
+    /// Page number (default: 1)
+    #[serde(default = "default_page")]
+    pub page: u64,
+
+    /// Items per page (default: 10)
+    #[serde(default = "default_limit")]
+    pub limit: u64,
+}
+
+fn default_page() -> u64 {
+    1
+}
+
+fn default_limit() -> u64 {
+    10
+}
+
 fn is_api_response(_: &str) -> bool {
     false
+}
+
+/// Response format for paginated users list
+#[derive(Serialize, ToSchema)]
+pub struct UsersListResponse {
+    /// Status of the response
+    pub status: String,
+
+    /// Response data containing users and pagination info
+    pub data: UsersListData,
+}
+
+/// Data structure for users list response
+#[derive(Serialize, ToSchema)]
+pub struct UsersListData {
+    /// List of user objects
+    pub users: Vec<UserResponse>,
+
+    /// Pagination metadata
+    pub pagination: PaginationInfo,
+}
+
+/// Pagination metadata
+#[derive(Serialize, ToSchema)]
+pub struct PaginationInfo {
+    /// Total number of users matching the query
+    pub total: u64,
+
+    /// Current page number
+    pub page: u64,
+
+    /// Number of items per page
+    pub limit: u64,
+
+    /// Total number of pages
+    pub total_pages: u64,
 }

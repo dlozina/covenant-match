@@ -244,3 +244,46 @@ pub async fn delete_user(db: &Database, user_id: &str) -> Result<(), AppError> {
 
     Ok(())
 }
+
+/// Get all users, optionally filtered by role
+pub async fn get_all_users(
+    db: &Database,
+    role: Option<&str>,
+) -> Result<Vec<UserResponse>, AppError> {
+    // Call the repository function to get users
+    let users = user_repository::find_users_by_role(db, role).await?;
+
+    // Convert to UserResponse objects
+    let user_responses = users
+        .into_iter()
+        .map(|user| UserResponse::from(user))
+        .collect();
+
+    Ok(user_responses)
+}
+
+/// Get paginated list of users, optionally filtered by role
+pub async fn get_users_paginated(
+    db: &Database,
+    role: Option<&str>,
+    page: u64,
+    limit: u64,
+) -> Result<(Vec<UserResponse>, u64, u64), AppError> {
+    // Ensure page and limit are valid
+    let page = if page < 1 { 1 } else { page };
+    let limit = if limit < 1 { 10 } else { limit };
+
+    // Get total count for pagination metadata
+    let total = user_repository::count_users_by_role(db, role).await?;
+
+    // Get paginated users
+    let users = user_repository::find_users_by_role_paginated(db, role, page, limit).await?;
+
+    // Convert to UserResponse objects
+    let user_responses = users
+        .into_iter()
+        .map(|user| UserResponse::from(user))
+        .collect();
+
+    Ok((user_responses, total, page))
+}

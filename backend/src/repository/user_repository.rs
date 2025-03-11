@@ -1,6 +1,6 @@
 use crate::models::error::AppError;
 use crate::models::user::User;
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use log::error;
 use mongodb::{
     bson::{self, doc, Document},
@@ -155,6 +155,86 @@ pub async fn find_by_display_name(
 
     collection
         .find_one(filter, None)
+        .await
+        .map_err(AppError::DatabaseError)
+}
+
+/// Find users by role (or all users if role is None)
+pub async fn find_users_by_role(db: &Database, role: Option<&str>) -> Result<Vec<User>, AppError> {
+    let collection = db.collection::<User>("users");
+
+    let filter = match role {
+        Some(role_value) => doc! { "role": role_value },
+        None => doc! {},
+    };
+
+    let mut cursor = collection
+        .find(filter, None)
+        .await
+        .map_err(AppError::DatabaseError)?;
+
+    let mut users = Vec::new();
+    while let Some(result) = cursor.next().await {
+        match result {
+            Ok(user) => users.push(user),
+            Err(e) => return Err(AppError::DatabaseError(e)),
+        }
+    }
+
+    Ok(users)
+}
+
+/// Find users by role with pagination
+pub async fn find_users_by_role_paginated(
+    db: &Database,
+    role: Option<&str>,
+    page: u64,
+    limit: u64,
+) -> Result<Vec<User>, AppError> {
+    let collection = db.collection::<User>("users");
+
+    let filter = match role {
+        Some(role_value) => doc! { "role": role_value },
+        None => doc! {},
+    };
+
+    // Calculate skip value for pagination
+    let skip = (page - 1) * limit;
+
+    // Create find options with skip and limit
+    let find_options = mongodb::options::FindOptions::builder()
+        .skip(Some(skip))
+        .limit(Some(limit as i64))
+        .sort(Some(doc! { "created_at": -1 })) // Sort by creation date, newest first
+        .build();
+
+    let mut cursor = collection
+        .find(filter, find_options)
+        .await
+        .map_err(AppError::DatabaseError)?;
+
+    let mut users = Vec::new();
+    while let Some(result) = cursor.next().await {
+        match result {
+            Ok(user) => users.push(user),
+            Err(e) => return Err(AppError::DatabaseError(e)),
+        }
+    }
+
+    Ok(users)
+}
+
+/// Count total users by role
+pub async fn count_users_by_role(db: &Database, role: Option<&str>) -> Result<u64, AppError> {
+    let collection = db.collection::<User>("users");
+
+    let filter = match role {
+        Some(role_value) => doc! { "role": role_value },
+        None => doc! {},
+    };
+
+    collection
+        .count_documents(filter, None)
         .await
         .map_err(AppError::DatabaseError)
 }
