@@ -6,7 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { toast } from "sonner"
-
+import { MainLayout } from "@/components/layout"
+import { Footer } from "@/components/layout/Footer"
 import { Button } from "@/components/ui/button"
 import {
   Form,
@@ -177,96 +178,98 @@ export default function EditProfilePage() {
   }
 
   return (
-    <div className="container max-w-2xl py-10">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Edit Profile</h1>
-          <p className="text-muted-foreground">
-            Update your profile information
-          </p>
-        </div>
+    <MainLayout footer={<Footer />}>
+      <div className="container max-w-2xl py-10 mx-auto">
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold">Edit Profile</h1>
+            <p className="text-muted-foreground">
+              Update your profile information
+            </p>
+          </div>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="username"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Username</FormLabel>
-                  <FormControl>
-                    <Input placeholder="username" {...field} readOnly disabled className="bg-muted" />
-                  </FormControl>
-                  <FormDescription>
-                    Your username cannot be changed.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Username</FormLabel>
+                    <FormControl>
+                      <Input placeholder="username" {...field} readOnly disabled className="bg-muted" />
+                    </FormControl>
+                    <FormDescription>
+                      Your username cannot be changed.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input placeholder="email@example.com" type="email" {...field} />
-                  </FormControl>
-                  <FormDescription>
-                    Your email address will be used for notifications and recovery.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input placeholder="email@example.com" type="email" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Your email address will be used for notifications and recovery.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="displayName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Display Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Display Name" {...field} />
-                  </FormControl>
-                  <FormDescription>
-                    This is how other users will see you.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="displayName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Display Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Display Name" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      This is how other users will see you.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <div className="flex justify-between">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => router.push('/profile')}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSaving}>
-                {isSaving ? "Saving..." : "Save Changes"}
-              </Button>
-            </div>
-          </form>
-        </Form>
+              <div className="flex justify-between">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => router.push('/profile')}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSaving}>
+                  {isSaving ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </form>
+          </Form>
 
-        <div className="border-t pt-6">
-          <h2 className="text-xl font-semibold text-red-600 mb-4">Danger Zone</h2>
-          <p className="text-muted-foreground mb-4">
-            Once you delete your profile, there is no going back. Please be certain.
-          </p>
-          <Button 
-            variant="destructive" 
-            onClick={handleDeleteProfile}
-          >
-            Delete Profile
-          </Button>
+          <div className="border-t pt-6">
+            <h2 className="text-xl font-semibold text-red-600 mb-4">Danger Zone</h2>
+            <p className="text-muted-foreground mb-4">
+              Once you delete your profile, there is no going back. Please be certain.
+            </p>
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteProfile}
+            >
+              Delete Profile
+            </Button>
+          </div>
         </div>
       </div>
-    </div>
+    </MainLayout>
   )
 } 

@@ -6,7 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { toast } from "sonner"
-
+import { MainLayout } from "@/components/layout"
+import { Footer } from "@/components/layout/Footer"
 import { Button } from "@/components/ui/button"
 import {
   Form,
@@ -90,91 +91,93 @@ export default function CreateProfilePage() {
   }
 
   return (
-    <div className="container max-w-2xl py-10">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Create Profile</h1>
-          <p className="text-muted-foreground">
-            Fill in your details to create your profile
-          </p>
+    <MainLayout footer={<Footer />}>
+      <div className="container max-w-2xl py-10 mx-auto">
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold">Create Profile</h1>
+            <p className="text-muted-foreground">
+              Fill in your details to create your profile
+            </p>
+          </div>
+
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Username</FormLabel>
+                    <FormControl>
+                      <Input placeholder="username" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      This is your unique username on the platform.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input placeholder="email@example.com" type="email" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Your email address will be used for notifications and recovery.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <Input placeholder="********" type="password" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Choose a strong password with at least 8 characters.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="displayName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Display Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Display Name" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      This is how other users will see you.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? "Creating..." : "Create Profile"}
+              </Button>
+            </form>
+          </Form>
         </div>
-
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="username"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Username</FormLabel>
-                  <FormControl>
-                    <Input placeholder="username" {...field} />
-                  </FormControl>
-                  <FormDescription>
-                    This is your unique username on the platform.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input placeholder="email@example.com" type="email" {...field} />
-                  </FormControl>
-                  <FormDescription>
-                    Your email address will be used for notifications and recovery.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <Input placeholder="********" type="password" {...field} />
-                  </FormControl>
-                  <FormDescription>
-                    Choose a strong password with at least 8 characters.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="displayName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Display Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Display Name" {...field} />
-                  </FormControl>
-                  <FormDescription>
-                    This is how other users will see you.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Creating..." : "Create Profile"}
-            </Button>
-          </form>
-        </Form>
       </div>
-    </div>
+    </MainLayout>
   )
 } 

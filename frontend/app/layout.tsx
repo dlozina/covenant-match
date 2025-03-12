@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { SiteHeader, Footer } from "@/components/layout";
+import { SiteHeader } from "@/components/layout";
 import { ThemeProvider } from "@/app/providers";
 import { Toaster } from "@/components/ui/sonner"
 
@@ -18,12 +18,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className="dark">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
       </head>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} forcedTheme="dark">
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <div className="min-h-screen bg-background text-foreground">
             <SiteHeader />
             <main className="flex-1 w-full">
