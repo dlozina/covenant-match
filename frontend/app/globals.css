@@ -2,75 +2,244 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 0 0% 98%;
-    
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 0 0% 98%;
-    
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-    
-    --radius: 0.5rem;
-  }
+:root {
+  --background: 250 15% 2.5%;
+  --foreground: 246 10% 92%;
   
-  .light {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 0 0% 98%;
-    
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 10% 3.9%;
-  }
+  --card: 250 15% 4%;
+  --card-foreground: 246 10% 92%;
+  
+  --popover: 250 15% 3%;
+  --popover-foreground: 246 10% 92%;
+  
+  --primary: 267 75% 50%;
+  --primary-foreground: 246 10% 95%;
+  
+  --secondary: 260 30% 15%;
+  --secondary-foreground: 246 10% 95%;
+  
+  --muted: 250 15% 10%;
+  --muted-foreground: 246 10% 65%;
+  
+  --accent: 260 25% 18%;
+  --accent-foreground: 246 10% 95%;
+  
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 246 10% 95%;
+  
+  --border: 260 15% 12%;
+  --input: 260 15% 12%;
+  --ring: 267 75% 40%;
+  
+  --radius: 0.5rem;
 }
 
-@layer base {
-  * * {
-    @apply border-[hsl(var(--border))];
+.dark {
+  --background: 250 15% 2.5%;
+  --foreground: 246 10% 92%;
+  
+  --card: 250 15% 4%;
+  --card-foreground: 246 10% 92%;
+  
+  --popover: 250 15% 3%;
+  --popover-foreground: 246 10% 92%;
+  
+  --primary: 267 75% 50%;
+  --primary-foreground: 246 10% 95%;
+  
+  --secondary: 260 30% 15%;
+  --secondary-foreground: 246 10% 95%;
+  
+  --muted: 250 15% 10%;
+  --muted-foreground: 246 10% 65%;
+  
+  --accent: 260 25% 18%;
+  --accent-foreground: 246 10% 95%;
+  
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 246 10% 95%;
+  
+  --border: 260 15% 12%;
+  --input: 260 15% 12%;
+  --ring: 267 75% 40%;
+}
+
+.light {
+  --background: 246 30% 98%;
+  --foreground: 250 15% 3%;
+  
+  --card: 246 30% 100%;
+  --card-foreground: 250 15% 3%;
+  
+  --popover: 246 30% 100%;
+  --popover-foreground: 250 15% 3%;
+  
+  --primary: 267 75% 40%;
+  --primary-foreground: 246 10% 95%;
+  
+  --secondary: 260 20% 92%;
+  --secondary-foreground: 260 30% 15%;
+  
+  --muted: 260 20% 92%;
+  --muted-foreground: 260 15% 40%;
+  
+  --accent: 260 20% 92%;
+  --accent-foreground: 260 30% 15%;
+  
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 246 10% 95%;
+  
+  --border: 260 20% 85%;
+  --input: 260 20% 85%;
+  --ring: 267 75% 40%;
+}
+
+/* Base styles */
+* {
+  border-color: hsl(var(--border));
+}
+  
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  letter-spacing: 0.01em;
+}
+  
+h1, h2, h3, h4, h5, h6 {
+  letter-spacing: 0.02em;
+}
+  
+::selection {
+  background-color: rgba(88, 28, 135, 0.7);
+  color: #f5f3ff;
+}
+
+/* Gothic inspired utility classes */
+.glow-sm {
+  box-shadow: 0 0 8px 0 rgba(139, 92, 246, 0.5), 0 0 2px 0 rgba(139, 92, 246, 0.3);
+}
+  
+.glow-md {
+  box-shadow: 0 0 16px 0 rgba(139, 92, 246, 0.5), 0 0 4px 0 rgba(139, 92, 246, 0.3);
+}
+  
+.glow-lg {
+  box-shadow: 0 0 24px 0 rgba(139, 92, 246, 0.5), 0 0 6px 0 rgba(139, 92, 246, 0.3);
+}
+  
+.glow-blue-sm {
+  box-shadow: 0 0 8px 0 rgba(96, 165, 250, 0.5), 0 0 2px 0 rgba(96, 165, 250, 0.3);
+}
+  
+.glow-red-sm {
+  box-shadow: 0 0 8px 0 rgba(220, 38, 38, 0.5), 0 0 2px 0 rgba(220, 38, 38, 0.3);
+}
+
+/* Gothic text effects */
+.text-shadow-sm {
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+  
+.text-shadow-md {
+  text-shadow: 0 4px 8px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+  
+.text-shadow-glow {
+  text-shadow: 0 0 4px rgba(139, 92, 246, 0.5);
+}
+  
+/* Custom components */
+.gothic-card {
+  position: relative;
+  background-color: rgba(23, 21, 29, 0.8);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(88, 28, 135, 0.2);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+  
+.gothic-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(88, 28, 135, 0.1);
+}
+  
+.gothic-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom right, rgba(167, 139, 250, 0.05), rgba(99, 102, 241, 0.05));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+  
+.gothic-card:hover::before {
+  opacity: 1;
+}
+  
+.gothic-input {
+  background-color: rgba(18, 17, 24, 0.7);
+  border: 1px solid rgba(88, 28, 135, 0.3);
+  backdrop-filter: blur(4px);
+  transition: all 0.3s ease;
+}
+  
+.gothic-input:focus {
+  border-color: rgba(168, 85, 247, 0.5);
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2);
+}
+  
+.gothic-button {
+  background: linear-gradient(to bottom right, rgb(59, 7, 100), rgb(55, 48, 163), rgb(0, 0, 0));
+  transition: all 0.2s ease;
+}
+  
+.gothic-button:hover {
+  box-shadow: 0 4px 6px -1px rgba(88, 28, 135, 0.2);
+  transform: scale(1.02);
+}
+  
+.gothic-button:active {
+  transform: scale(0.98);
+}
+  
+.divider {
+  height: 1px;
+  width: 100%;
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+  background: linear-gradient(to right, transparent, rgba(126, 34, 206, 0.3), transparent);
+}
+  
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(88, 28, 135, 0.2);
+  letter-spacing: 0.05em;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+@media (max-width: 640px) {
+  .section-title {
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
   }
-  body {
-    @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground))];
+  
+  .divider {
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .gothic-button {
+    padding: 0.75rem 1rem;
+    min-height: 3rem;
+  }
+  
+  /* Increase spacing between interactive elements */
+  .gothic-card {
+    margin-bottom: 1rem;
   }
 }
