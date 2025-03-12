@@ -29,7 +29,6 @@ export default function RootLayout({
             <main className="flex-1 w-full">
               {children}
             </main>
-            <Footer />
           </div>
           <Toaster />
         </ThemeProvider>

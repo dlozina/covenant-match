@@ -4,6 +4,7 @@ import { MainLayout } from "@/components/layout";
 import { Sword, Shield, Timer, Users, Trophy, Skull, ScrollText, Compass } from "lucide-react";
 import { TestStyled } from "@/components/ui/test-styled";
 import { BasicTest } from "@/components/ui/basic-test";
+import { Footer } from "@/components/layout/Footer";
 
 export default function Home() {
   // Add custom sidebars with improved styling
@@ -67,8 +68,17 @@ export default function Home() {
     </div>
   );
 
+  // Create a footer to pass to the layout
+  const footer = (
+    <Footer />
+  );
+
   return (
-    <MainLayout leftSidebar={leftSidebar} rightSidebar={rightSidebar}>
+    <MainLayout 
+      leftSidebar={leftSidebar} 
+      rightSidebar={rightSidebar}
+      footer={footer}
+    >
       {/* Hero Section */}
       <div className="relative rounded-lg overflow-hidden mb-12">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900/80 to-indigo-900/80 z-10"></div>
@@ -179,8 +189,9 @@ export default function Home() {
           </div>
         </div>
       </div>
+      {/* Test the styles if their are not working
       <TestStyled />
-      <BasicTest />
+      <BasicTest /> */}
     </MainLayout>
   );
 }
