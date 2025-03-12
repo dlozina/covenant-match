@@ -2,8 +2,9 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { MainLayout } from "@/components/layout";
 import { Sword, Shield, Timer, Users, Trophy, Skull, ScrollText, Compass } from "lucide-react";
-import { TestStyled } from "@/components/ui/test-styled";
-import { BasicTest } from "@/components/ui/basic-test";
+// Use for test if css config is not working
+// import { TestStyled } from "@/components/ui/test-styled";
+// import { BasicTest } from "@/components/ui/basic-test";
 import { Footer } from "@/components/layout/Footer";
 
 export default function Home() {
