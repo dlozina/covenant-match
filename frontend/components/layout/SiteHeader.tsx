@@ -46,8 +46,10 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-accent/20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center">
-        <div className="flex gap-6 md:gap-10 flex-1">
+      {/* Full-width flex container with height */}
+      <div className="w-full flex h-16 px-4 sm:px-6 lg:px-8 justify-between items-center">
+        {/* Left section: Logo and navigation */}
+        <div className="flex items-center">
           <Link href="/" className="flex items-center space-x-2 group">
             <div className="relative h-8 w-8 overflow-hidden">
               <div className="absolute inset-0 rounded-full bg-gradient-to-br from-purple-700 to-indigo-900 
@@ -62,7 +64,7 @@ export function SiteHeader() {
               CovenantMatch
             </span>
           </Link>
-          <nav className="hidden md:flex gap-6">
+          <nav className="hidden md:flex md:ml-10 gap-6">
             {routes.map((route) => (
               <Link
                 key={route.href}
@@ -80,6 +82,8 @@ export function SiteHeader() {
             ))}
           </nav>
         </div>
+
+        {/* Right section: buttons */}
         <div className="flex items-center gap-2">
           <Button 
             variant="outline" 
