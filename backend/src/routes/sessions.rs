@@ -1,7 +1,8 @@
+use crate::middleware::auth::Auth;
 use crate::models::session::{CreateSessionDto, JoinSessionDto, RateSessionDto, SubmitResultDto};
 use crate::services::session_service;
 use crate::utils::jwt;
-use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder};
+use actix_web::{delete, get, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use mongodb::Database;
 use utoipa::ToSchema;
 
@@ -63,36 +64,9 @@ async fn create_session(
     session_data: web::Json<CreateSessionDto>,
     req: HttpRequest,
 ) -> impl Responder {
-    // Extract the user ID from the authentication token
-    let auth_header = req.headers().get("Authorization");
-    let user_id = match auth_header {
-        Some(header) => {
-            let auth_str = header.to_str().unwrap_or("");
-            if auth_str.starts_with("Bearer ") {
-                let token = auth_str.trim_start_matches("Bearer ");
-                match jwt::get_user_id_from_token(token) {
-                    Ok(id) => id,
-                    Err(e) => {
-                        return HttpResponse::Unauthorized().json(serde_json::json!({
-                            "status": "error",
-                            "message": e.to_string()
-                        }));
-                    }
-                }
-            } else {
-                return HttpResponse::Unauthorized().json(serde_json::json!({
-                    "status": "error",
-                    "message": "Invalid authorization header format"
-                }));
-            }
-        }
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "status": "error",
-                "message": "Authentication required"
-            }));
-        }
-    };
+    let extensions = req.extensions();
+    let claims = extensions.get::<jwt::Claims>().unwrap();
+    let user_id = claims.sub.clone();
 
     // Create a new session with the authenticated user as host
     let mut session_data = session_data.into_inner();
@@ -131,21 +105,12 @@ async fn get_session(
     req: HttpRequest,
 ) -> impl Responder {
     let id = path.into_inner();
-
-    // Extract user ID from token (if present)
-    let user_id = if let Some(auth_header) = req.headers().get("Authorization") {
-        let auth_str = auth_header.to_str().unwrap_or("");
-        if auth_str.starts_with("Bearer ") {
-            let token = auth_str.trim_start_matches("Bearer ");
-            jwt::get_user_id_from_token(token).ok()
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-
-    match session_service::get_session_by_id(&db, &id, user_id.as_deref()).await {
+    
+    let extensions = req.extensions();
+    let claims = extensions.get::<jwt::Claims>().unwrap();
+    let user_id = claims.sub.clone();
+        
+    match session_service::get_session_by_id(&db, &id, Some(&user_id)).await {
         Ok(Some(session)) => HttpResponse::Ok().json(session),
         Ok(None) => HttpResponse::NotFound().json(serde_json::json!({
             "status": "error",
@@ -186,44 +151,10 @@ async fn join_session(
     db: web::Data<Database>,
     path: web::Path<String>,
     join_data: web::Json<JoinSessionDto>,
-    req: HttpRequest,
 ) -> impl Responder {
     let id = path.into_inner();
-
-    // Extract the user ID from the authentication token
-    let auth_header = req.headers().get("Authorization");
-    let user_id = match auth_header {
-        Some(header) => {
-            let auth_str = header.to_str().unwrap_or("");
-            if auth_str.starts_with("Bearer ") {
-                let token = auth_str.trim_start_matches("Bearer ");
-                match jwt::get_user_id_from_token(token) {
-                    Ok(id) => id,
-                    Err(e) => {
-                        return HttpResponse::Unauthorized().json(serde_json::json!({
-                            "status": "error",
-                            "message": e.to_string()
-                        }));
-                    }
-                }
-            } else {
-                return HttpResponse::Unauthorized().json(serde_json::json!({
-                    "status": "error",
-                    "message": "Invalid authorization header format"
-                }));
-            }
-        }
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "status": "error",
-                "message": "Authentication required"
-            }));
-        }
-    };
-
-    // Update join data with user ID
-    let mut join_data = join_data.into_inner();
-    join_data.user_id = user_id;
+            
+    let join_data = join_data.into_inner();
 
     match session_service::join_session(&db, &id, join_data).await {
         Ok(session) => HttpResponse::Ok().json(session),
@@ -266,35 +197,10 @@ async fn start_session(
     let id = path.into_inner();
 
     // Extract the user ID from the authentication token
-    let auth_header = req.headers().get("Authorization");
-    let user_id = match auth_header {
-        Some(header) => {
-            let auth_str = header.to_str().unwrap_or("");
-            if auth_str.starts_with("Bearer ") {
-                let token = auth_str.trim_start_matches("Bearer ");
-                match jwt::get_user_id_from_token(token) {
-                    Ok(id) => id,
-                    Err(e) => {
-                        return HttpResponse::Unauthorized().json(serde_json::json!({
-                            "status": "error",
-                            "message": e.to_string()
-                        }));
-                    }
-                }
-            } else {
-                return HttpResponse::Unauthorized().json(serde_json::json!({
-                    "status": "error",
-                    "message": "Invalid authorization header format"
-                }));
-            }
-        }
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "status": "error",
-                "message": "Authentication required"
-            }));
-        }
-    };
+    let extensions = req.extensions();
+    let claims = extensions.get::<jwt::Claims>().unwrap();
+    let user_id = claims.sub.clone();
+            
 
     match session_service::start_session(&db, &id, &user_id).await {
         Ok(session) => HttpResponse::Ok().json(session),
@@ -334,37 +240,11 @@ async fn cancel_session(
     req: HttpRequest,
 ) -> impl Responder {
     let id = path.into_inner();
-
-    // Extract the user ID from the authentication token
-    let auth_header = req.headers().get("Authorization");
-    let user_id = match auth_header {
-        Some(header) => {
-            let auth_str = header.to_str().unwrap_or("");
-            if auth_str.starts_with("Bearer ") {
-                let token = auth_str.trim_start_matches("Bearer ");
-                match jwt::get_user_id_from_token(token) {
-                    Ok(id) => id,
-                    Err(e) => {
-                        return HttpResponse::Unauthorized().json(serde_json::json!({
-                            "status": "error",
-                            "message": e.to_string()
-                        }));
-                    }
-                }
-            } else {
-                return HttpResponse::Unauthorized().json(serde_json::json!({
-                    "status": "error",
-                    "message": "Invalid authorization header format"
-                }));
-            }
-        }
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "status": "error",
-                "message": "Authentication required"
-            }));
-        }
-    };
+    
+    let extensions = req.extensions();
+    let claims = extensions.get::<jwt::Claims>().unwrap();
+    let user_id = claims.sub.clone();
+            
 
     match session_service::cancel_session(&db, &id, &user_id).await {
         Ok(_) => HttpResponse::Ok().json(serde_json::json!({
@@ -407,44 +287,10 @@ async fn submit_result(
     db: web::Data<Database>,
     path: web::Path<String>,
     result_data: web::Json<SubmitResultDto>,
-    req: HttpRequest,
 ) -> impl Responder {
     let id = path.into_inner();
 
-    // Extract the user ID from the authentication token
-    let auth_header = req.headers().get("Authorization");
-    let user_id = match auth_header {
-        Some(header) => {
-            let auth_str = header.to_str().unwrap_or("");
-            if auth_str.starts_with("Bearer ") {
-                let token = auth_str.trim_start_matches("Bearer ");
-                match jwt::get_user_id_from_token(token) {
-                    Ok(id) => id,
-                    Err(e) => {
-                        return HttpResponse::Unauthorized().json(serde_json::json!({
-                            "status": "error",
-                            "message": e.to_string()
-                        }));
-                    }
-                }
-            } else {
-                return HttpResponse::Unauthorized().json(serde_json::json!({
-                    "status": "error",
-                    "message": "Invalid authorization header format"
-                }));
-            }
-        }
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "status": "error",
-                "message": "Authentication required"
-            }));
-        }
-    };
-
-    // Update result data with user ID
-    let mut result_data = result_data.into_inner();
-    result_data.user_id = user_id;
+    let result_data = result_data.into_inner();
 
     match session_service::submit_result(&db, &id, result_data).await {
         Ok(_) => HttpResponse::Ok().json(serde_json::json!({
@@ -488,36 +334,9 @@ async fn get_results(
 ) -> impl Responder {
     let id = path.into_inner();
 
-    // Extract the user ID from the authentication token
-    let auth_header = req.headers().get("Authorization");
-    let user_id = match auth_header {
-        Some(header) => {
-            let auth_str = header.to_str().unwrap_or("");
-            if auth_str.starts_with("Bearer ") {
-                let token = auth_str.trim_start_matches("Bearer ");
-                match jwt::get_user_id_from_token(token) {
-                    Ok(id) => id,
-                    Err(e) => {
-                        return HttpResponse::Unauthorized().json(serde_json::json!({
-                            "status": "error",
-                            "message": e.to_string()
-                        }));
-                    }
-                }
-            } else {
-                return HttpResponse::Unauthorized().json(serde_json::json!({
-                    "status": "error",
-                    "message": "Invalid authorization header format"
-                }));
-            }
-        }
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "status": "error",
-                "message": "Authentication required"
-            }));
-        }
-    };
+    let extensions = req.extensions();
+    let claims = extensions.get::<jwt::Claims>().unwrap();
+    let user_id = claims.sub.clone();
 
     match session_service::get_session_results(&db, &id, &user_id).await {
         Ok(results) => HttpResponse::Ok().json(results),
@@ -561,36 +380,9 @@ async fn rate_session(
 ) -> impl Responder {
     let id = path.into_inner();
 
-    // Extract the user ID from the authentication token
-    let auth_header = req.headers().get("Authorization");
-    let user_id = match auth_header {
-        Some(header) => {
-            let auth_str = header.to_str().unwrap_or("");
-            if auth_str.starts_with("Bearer ") {
-                let token = auth_str.trim_start_matches("Bearer ");
-                match jwt::get_user_id_from_token(token) {
-                    Ok(id) => id,
-                    Err(e) => {
-                        return HttpResponse::Unauthorized().json(serde_json::json!({
-                            "status": "error",
-                            "message": e.to_string()
-                        }));
-                    }
-                }
-            } else {
-                return HttpResponse::Unauthorized().json(serde_json::json!({
-                    "status": "error",
-                    "message": "Invalid authorization header format"
-                }));
-            }
-        }
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "status": "error",
-                "message": "Authentication required"
-            }));
-        }
-    };
+    let extensions = req.extensions();
+    let claims = extensions.get::<jwt::Claims>().unwrap();
+    let user_id = claims.sub.clone();
 
     // Update rating data with user ID
     let mut rating_data = rating_data.into_inner();
@@ -611,14 +403,22 @@ async fn rate_session(
     }
 }
 
+#[get("/api/v1/sessions/test")]
+async fn test_session_route() -> impl Responder {
+    HttpResponse::Ok().body("Sessions route test working!")
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
-    cfg.service(get_sessions)
-        .service(create_session)
-        .service(get_session)
-        .service(join_session)
-        .service(start_session)
-        .service(cancel_session)
-        .service(submit_result)
-        .service(get_results)
-        .service(rate_session);
+    log::info!("Configuring sessions routes");
+    // Public route (no auth needed)
+    cfg.service(test_session_route);
+    cfg.service(get_sessions);
+    cfg.service(create_session);
+    cfg.service(get_session);
+    cfg.service(join_session);
+    cfg.service(start_session);
+    cfg.service(cancel_session);
+    cfg.service(submit_result);
+    cfg.service(get_results);
+    cfg.service(rate_session);
 }

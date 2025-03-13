@@ -1,25 +1,51 @@
+// in auth.rs
 use crate::models::error::AppError;
 use crate::utils::jwt;
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-    Error, HttpMessage,
+    http::Method,
+    web, Error, HttpMessage,
 };
-use futures::future::{ok, ready, Ready};
+use futures::future::{ready, Ready};
+use regex::Regex;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-// Authentication middleware
-pub struct Authentication;
+// Define excluded paths similar to EXCLUDE_PATTERNS
+pub const EXCLUDE_PATTERNS: [(&str, Option<Method>, bool); 5] = [
+    ("/api/v1/auth/login", Some(Method::POST), false),
+    ("/api/v1/register", Some(Method::POST), false),
+    ("/api/v1/sessions/test", Some(Method::GET), false),
+    ("/api/docs/.*", Some(Method::GET), true), 
+    ("/api-docs/.*", Some(Method::GET), true),
+    //("/api/public/.*", Some(Method::GET), true),  
+    //("/favicon.ico", Some(Method::GET), false),
+];
 
-impl Authentication {
-    pub fn new() -> Self {
-        Authentication
+// Authentication middleware with optional role requirement
+pub struct Auth {
+    require_role: Option<String>,
+}
+
+impl Auth {
+    // Just verify the user is authenticated without role check
+    pub fn user() -> Self {
+        Auth { require_role: None }
+    }
+    
+    // Verify user has admin role
+    pub fn admin() -> Self {
+        Auth { require_role: Some("admin".to_string()) }
+    }
+    
+    // Verify user has a specific role
+    pub fn role(role: &str) -> Self {
+        Auth { require_role: Some(role.to_string()) }
     }
 }
 
-// Middleware factory for Authentication
-impl<S, B> Transform<S, ServiceRequest> for Authentication
+impl<S, B> Transform<S, ServiceRequest> for Auth
 where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
@@ -27,20 +53,60 @@ where
 {
     type Response = ServiceResponse<B>;
     type Error = Error;
-    type Transform = AuthenticationMiddleware<S>;
+    type Transform = AuthMiddleware<S>;
     type InitError = ();
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ok(AuthenticationMiddleware { service })
+        ready(Ok(AuthMiddleware {
+            service,
+            require_role: self.require_role.clone(),
+        }))
     }
 }
 
-pub struct AuthenticationMiddleware<S> {
+pub struct AuthMiddleware<S> {
     service: S,
+    require_role: Option<String>,
 }
 
-impl<S, B> Service<ServiceRequest> for AuthenticationMiddleware<S>
+// Helper function to check if a path should be excluded from authentication
+fn is_path_excluded(path: &str, method: &Method) -> bool {
+    // Skip auth check for OPTIONS requests (for CORS preflight)
+    if method == Method::OPTIONS {
+        return true;
+    }
+    
+    // Check against defined exclusion patterns
+    EXCLUDE_PATTERNS
+        .iter()
+        .any(|(pattern, excluded_method, is_regex)| {
+            let method_matches = match excluded_method {
+                Some(excluded) => method == excluded,
+                None => true, // If no method specified, match any method
+            };
+            
+            if !method_matches {
+                return false;
+            }
+            
+            if *is_regex {
+                // Use regex matching for patterns marked as regex
+                match Regex::new(pattern) {
+                    Ok(regex) => regex.is_match(path),
+                    Err(_) => {
+                        log::error!("Invalid regex pattern: {}", pattern);
+                        false
+                    }
+                }
+            } else {
+                // Use simple path matching
+                path.starts_with(*pattern)
+            }
+        })
+}
+
+impl<S, B> Service<ServiceRequest> for AuthMiddleware<S>
 where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
     S::Future: 'static,
@@ -53,21 +119,53 @@ where
     forward_ready!(service);
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
-        // Extract the token from headers
+        let path = req.path().to_string();
+        let method = req.method().clone();
+        
+        log::info!("Auth middleware called for path: {}", path);
+        
+        // Check if the path is excluded from authentication
+        if is_path_excluded(&path, &method) {
+            log::info!("Path excluded from authentication: {}", path);
+            let fut = self.service.call(req);
+            return Box::pin(async move {
+                fut.await
+            });
+        }
+        
+        let require_role = self.require_role.clone();
+        // Extract token from headers
         let auth_header = req.headers().get("Authorization");
+        log::info!("Auth header: {:?}", auth_header);
         let auth_result = match auth_header {
             Some(header) => {
                 let auth_str = header.to_str().unwrap_or("");
                 if auth_str.starts_with("Bearer ") {
                     let token = auth_str.trim_start_matches("Bearer ");
-                    // Validate token and extract user_id
+                    
+                    // Validate token and extract claims
                     match jwt::validate_token(token) {
                         Ok(claims) => {
-                            // Store claims in request extensions
-                            req.extensions_mut().insert(claims);
-                            Ok(())
+                            // Check role if required
+                            log::info!("Token validated successfully for user: {}, role: {}", claims.sub, claims.role);
+                            if let Some(required_role) = &require_role {
+                                if &claims.role != required_role && !(required_role == "user" && claims.role == "admin") {
+                                    Err(AppError::InsufficientPermissions)
+                                } else {
+                                    // Store claims in request extensions
+                                    req.extensions_mut().insert(claims);
+                                    Ok(())
+                                }
+                            } else {
+                                // Just authenticate without role check
+                                req.extensions_mut().insert(claims);
+                                Ok(())
+                            }
                         }
-                        Err(e) => Err(e),
+                        Err(e) => { 
+                            log::error!("Token validation error: {}", e);
+                            Err(e)
+                        },
                     }
                 } else {
                     Err(AppError::InvalidToken)
@@ -76,9 +174,8 @@ where
             None => Err(AppError::AuthenticationRequired),
         };
 
-        // If token is valid, call the next middleware
         let fut = self.service.call(req);
-
+        
         Box::pin(async move {
             match auth_result {
                 Ok(_) => fut.await,
@@ -102,6 +199,11 @@ where
                                 "status": "error",
                                 "message": "Authentication required"
                             })),
+                        AppError::InsufficientPermissions => actix_web::HttpResponse::Forbidden()
+                            .json(serde_json::json!({
+                                "status": "error",
+                                "message": "Insufficient permissions"
+                            })),
                         _ => {
                             actix_web::HttpResponse::InternalServerError().json(serde_json::json!({
                                 "status": "error",
@@ -111,99 +213,6 @@ where
                     };
                     Err(actix_web::error::InternalError::from_response("", error_response).into())
                 }
-            }
-        })
-    }
-}
-
-// Simplified RequireRole middleware
-pub struct RequireRole(pub String);
-
-impl RequireRole {
-    pub fn admin() -> Self {
-        RequireRole("admin".to_string())
-    }
-
-    pub fn user() -> Self {
-        RequireRole("user".to_string())
-    }
-}
-
-impl<S, B> Transform<S, ServiceRequest> for RequireRole
-where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
-    S::Future: 'static,
-    B: 'static,
-{
-    type Response = ServiceResponse<B>;
-    type Error = Error;
-    type Transform = RequireRoleMiddleware<S>;
-    type InitError = ();
-    type Future = Ready<Result<Self::Transform, Self::InitError>>;
-
-    fn new_transform(&self, service: S) -> Self::Future {
-        ready(Ok(RequireRoleMiddleware {
-            service,
-            role: self.0.clone(),
-        }))
-    }
-}
-
-pub struct RequireRoleMiddleware<S> {
-    service: S,
-    role: String,
-}
-
-impl<S, B> Service<ServiceRequest> for RequireRoleMiddleware<S>
-where
-    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
-    S::Future: 'static,
-    B: 'static,
-{
-    type Response = ServiceResponse<B>;
-    type Error = Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
-
-    forward_ready!(service);
-
-    fn call(&self, mut req: ServiceRequest) -> Self::Future {
-        let role = self.role.clone();
-        
-        // Check for JWT in the Authorization header
-        let auth_header = req.headers().get("Authorization");
-        let auth_result = match auth_header {
-            Some(header) => {
-                let auth_str = header.to_str().unwrap_or("");
-                if auth_str.starts_with("Bearer ") {
-                    let token = auth_str.trim_start_matches("Bearer ");
-                    // Validate token and extract claims
-                    match jwt::validate_token(token) {
-                        Ok(claims) => {
-                            // Store claims in request extensions
-                            req.extensions_mut().insert(claims.clone());
-                            
-                            // Check role
-                            if claims.role == role || (role == "user" && claims.role == "admin") {
-                                Ok(())
-                            } else {
-                                Err(actix_web::error::ErrorForbidden("Insufficient permissions"))
-                            }
-                        }
-                        Err(e) => Err(actix_web::error::ErrorUnauthorized(format!("Invalid token: {}", e))),
-                    }
-                } else {
-                    Err(actix_web::error::ErrorUnauthorized("Invalid authorization header format"))
-                }
-            }
-            None => Err(actix_web::error::ErrorUnauthorized("Authentication required")),
-        };
-
-        let fut = self.service.call(req);
-        
-        Box::pin(async move {
-            match auth_result {
-                Ok(_) => fut.await,
-                Err(e) => Err(e),
             }
         })
     }

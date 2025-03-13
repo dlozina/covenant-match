@@ -1,4 +1,4 @@
-use crate::middleware::auth::RequireRole;
+use crate::middleware::auth::Auth;
 use crate::models::error::AppError;
 use crate::models::user::{
     CreateUserDto, GetUsersQuery, LoginUserDto, UpdateUserProfileDto, UserResponse,
@@ -14,7 +14,7 @@ use utoipa::{IntoParams, ToSchema};
 /// Create a new user
 #[utoipa::path(
     post,
-    path = "/api/v1/users",
+    path = "/api/v1/register",
     request_body = CreateUserDto,
     responses(
         (status = 201, description = "User created successfully", body = UserResponse),
@@ -24,7 +24,7 @@ use utoipa::{IntoParams, ToSchema};
     ),
     tag = "users"
 )]
-#[post("/api/v1/users")]
+#[post("/api/v1/register")]
 async fn create_user(
     db: web::Data<Database>,
     user_data: web::Json<CreateUserDto>,
@@ -98,34 +98,13 @@ async fn login(db: web::Data<Database>, credentials: web::Json<LoginUserDto>) ->
 )]
 #[get("/api/v1/users/me")]
 async fn get_current_user(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
-    // Extract the user ID from the authentication token
-    let auth_header = req.headers().get("Authorization");
-    let user_id = match auth_header {
-        Some(header) => {
-            let auth_str = header.to_str().unwrap_or("");
-            if auth_str.starts_with("Bearer ") {
-                let token = auth_str.trim_start_matches("Bearer ");
-                match jwt::get_user_id_from_token(token) {
-                    Ok(id) => id,
-                    Err(e) => return e.error_response(),
-                }
-            } else {
-                return HttpResponse::Unauthorized().json(serde_json::json!({
-                    "status": "error",
-                    "message": "Invalid authorization header format"
-                }));
-            }
-        }
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "status": "error",
-                "message": "Authentication required"
-            }));
-        }
-    };
+    // Get claims from request extensions (set by middleware)
+    let extensions = req.extensions();
+    let claims = extensions.get::<jwt::Claims>().unwrap();
+    let user_id = &claims.sub;
 
     // Get the user from the database
-    match user_service::get_user_by_id(&db, &user_id).await {
+    match user_service::get_user_by_id(&db, user_id).await {
         Ok(user) => HttpResponse::Ok().json(user),
         Err(e) => {
             log::error!("Error fetching user: {:?}", e);
@@ -158,34 +137,13 @@ async fn update_profile(
     req: HttpRequest,
     update_data: web::Json<UpdateUserProfileDto>,
 ) -> impl Responder {
-    // Extract the user ID from the authentication token
-    let auth_header = req.headers().get("Authorization");
-    let user_id = match auth_header {
-        Some(header) => {
-            let auth_str = header.to_str().unwrap_or("");
-            if auth_str.starts_with("Bearer ") {
-                let token = auth_str.trim_start_matches("Bearer ");
-                match jwt::get_user_id_from_token(token) {
-                    Ok(id) => id,
-                    Err(e) => return e.error_response(),
-                }
-            } else {
-                return HttpResponse::Unauthorized().json(serde_json::json!({
-                    "status": "error",
-                    "message": "Invalid authorization header format"
-                }));
-            }
-        }
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "status": "error",
-                "message": "Authentication required"
-            }));
-        }
-    };
+    // Get claims from request extensions (set by middleware)
+    let extensions = req.extensions();
+    let claims = extensions.get::<jwt::Claims>().unwrap();
+    let user_id = &claims.sub;
 
     // Update the user profile
-    match user_service::update_user_profile(&db, &user_id, update_data.into_inner()).await {
+    match user_service::update_user_profile(&db, user_id, update_data.into_inner()).await {
         Ok(user) => HttpResponse::Ok().json(user),
         Err(e) => {
             log::error!("Error updating user profile: {:?}", e);
@@ -211,34 +169,13 @@ async fn update_profile(
 )]
 #[delete("/api/v1/users/me")]
 async fn delete_user(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
-    // Extract the user ID from the authentication token
-    let auth_header = req.headers().get("Authorization");
-    let user_id = match auth_header {
-        Some(header) => {
-            let auth_str = header.to_str().unwrap_or("");
-            if auth_str.starts_with("Bearer ") {
-                let token = auth_str.trim_start_matches("Bearer ");
-                match jwt::get_user_id_from_token(token) {
-                    Ok(id) => id,
-                    Err(e) => return e.error_response(),
-                }
-            } else {
-                return HttpResponse::Unauthorized().json(serde_json::json!({
-                    "status": "error",
-                    "message": "Invalid authorization header format"
-                }));
-            }
-        }
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "status": "error",
-                "message": "Authentication required"
-            }));
-        }
-    };
+    // Get claims from request extensions (set by middleware)
+    let extensions = req.extensions();
+    let claims = extensions.get::<jwt::Claims>().unwrap();
+    let user_id = &claims.sub;
 
     // Delete the user
-    match user_service::delete_user(&db, &user_id).await {
+    match user_service::delete_user(&db, user_id).await {
         Ok(_) => HttpResponse::NoContent().finish(),
         Err(e) => {
             log::error!("Error deleting user: {:?}", e);
@@ -265,29 +202,23 @@ async fn delete_user(db: web::Data<Database>, req: HttpRequest) -> impl Responde
     ),
     tag = "admin"
 )]
-// Changed path to be relative to the scope ("/users" instead of "/api/v1/admin/users")
-#[post("/users")]
+#[post("/api/v1/admin/users")]
 async fn create_admin_user(
     db: web::Data<Database>,
     user_data: web::Json<CreateUserDto>,
     req: HttpRequest,
 ) -> impl Responder {
-    // Extract claims from the request extensions (set by middleware)
-    let claims = match req.extensions().get::<jwt::Claims>() {
-        Some(claims) if claims.role == "admin" => claims,
-        Some(_) => {
-            return HttpResponse::Forbidden().json(serde_json::json!({
-                "status": "error",
-                "message": "Admin role required"
-            }));
-        }
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "status": "error",
-                "message": "Authentication required"
-            }));
-        }
-    };
+    // Get claims from request extensions (set by middleware)
+    let extensions = req.extensions();
+    let claims = extensions.get::<jwt::Claims>().unwrap();
+    
+    // Middleware already checked admin role, but we can double-check here
+    if claims.role != "admin" {
+        return HttpResponse::Forbidden().json(serde_json::json!({
+            "status": "error",
+            "message": "Admin role required"
+        }));
+    }
 
     // Create a new user with admin role
     let mut admin_user_data = user_data.into_inner();
@@ -322,24 +253,21 @@ async fn create_admin_user(
     ),
     tag = "admin"
 )]
-#[get("/users")]
+#[get("/api/v1/admin/users")]
 async fn get_all_users(
     db: web::Data<Database>,
     req: HttpRequest,
     query: web::Query<GetUsersQuery>,
 ) -> impl Responder {
-    // The middleware already checks for admin role, but we can double-check here
-    if let Some(claims) = req.extensions().get::<jwt::Claims>() {
-        if claims.role != "admin" {
-            return HttpResponse::Forbidden().json(serde_json::json!({
-                "status": "error",
-                "message": "Admin role required"
-            }));
-        }
-    } else {
-        return HttpResponse::Unauthorized().json(serde_json::json!({
+    // Get claims from request extensions (set by middleware)
+    let extensions = req.extensions();
+    let claims = extensions.get::<jwt::Claims>().unwrap();
+    
+    // Middleware already checked admin role, but we can double-check here
+    if claims.role != "admin" {
+        return HttpResponse::Forbidden().json(serde_json::json!({
             "status": "error",
-            "message": "Authentication required"
+            "message": "Admin role required"
         }));
     }
 
@@ -389,13 +317,13 @@ async fn get_all_users(
     ),
     tag = "admin"
 )]
-#[get("/users/{user_id}")]
+#[get("/api/v1/admin/users/{user_id}")]
 async fn get_user_by_id_admin(
     db: web::Data<Database>,
     path: web::Path<String>,
     req: HttpRequest,
 ) -> impl Responder {
-    // The middleware already checks for admin role
+    // Middleware already checks for admin role
     let user_id = path.into_inner();
 
     match user_service::get_user_by_id(&db, &user_id).await {
@@ -429,14 +357,14 @@ async fn get_user_by_id_admin(
     ),
     tag = "admin"
 )]
-#[put("/users/{user_id}")]
+#[put("/api/v1/admin/users/{user_id}")]
 async fn update_user_admin(
     db: web::Data<Database>,
     path: web::Path<String>,
     update_data: web::Json<UpdateUserProfileDto>,
     req: HttpRequest,
 ) -> impl Responder {
-    // The middleware already checks for admin role
+    // Middleware already checks for admin role
     let user_id = path.into_inner();
 
     match user_service::update_user_profile(&db, &user_id, update_data.into_inner()).await {
@@ -467,13 +395,13 @@ async fn update_user_admin(
     ),
     tag = "admin"
 )]
-#[delete("/users/{user_id}")]
+#[delete("/api/v1/admin/users/{user_id}")]
 async fn delete_user_admin(
     db: web::Data<Database>,
     path: web::Path<String>,
     req: HttpRequest,
 ) -> impl Responder {
-    // The middleware already checks for admin role
+    // Middleware already checks for admin role
     let user_id = path.into_inner();
 
     match user_service::delete_user(&db, &user_id).await {
@@ -486,22 +414,15 @@ async fn delete_user_admin(
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {
-    // Public endpoints (no authentication required)
-    cfg.service(create_user).service(login);
-
-    // User endpoints (require user authentication)
-    cfg.service(get_current_user)
-        .service(update_profile)
-        .service(delete_user);
-
-    // Admin endpoints (require admin role)
-    cfg.service(
-        web::scope("/api/v1/admin")
-            .wrap(RequireRole::admin()) // Apply admin role middleware
-            .service(create_admin_user)
-            .service(get_all_users)
-            .service(get_user_by_id_admin)
-            .service(update_user_admin)
-            .service(delete_user_admin),
-    );
+    log::info!("Configuring user routes");
+    cfg.service(create_user);
+    cfg.service(login);
+    cfg.service(get_current_user);
+    cfg.service(update_profile);
+    cfg.service(delete_user);
+    cfg.service(create_admin_user);
+    cfg.service(get_all_users);
+    cfg.service(get_user_by_id_admin);
+    cfg.service(update_user_admin);
+    cfg.service(delete_user_admin);
 }

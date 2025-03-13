@@ -14,6 +14,7 @@ use actix_web::web::Data;
 use actix_web::{middleware::Logger, App, HttpServer};
 use dotenv::dotenv;
 use log::{info, warn};
+use middleware::auth::Auth;
 use mongodb::{options::ClientOptions, Client};
 use routes::sessions;
 use services::user_service;
@@ -80,10 +81,11 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(Logger::default())
             .wrap(cors)
+            .wrap(Auth::user())
             .app_data(Data::new(db.clone()))
-            // Register routes
-            .configure(users::config)
+            // Register routes directly (not inside a scope) -> scope has issues
             .configure(health::config)
+            .configure(users::config)
             .configure(sessions::config)
             //TODO: Add statistics routes
             //.configure(statistics::config)
