@@ -83,7 +83,7 @@ export default function Home() {
       {/* Hero Section */}
       <div className="relative rounded-lg overflow-hidden mb-12">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900/80 to-indigo-900/80 z-10"></div>
-        <div className="absolute inset-0 bg-[url('/nightreign-bg.jpg')] bg-cover bg-center opacity-30"></div>
+        <div className="absolute inset-0 bg-[url('/nightreign-bg.jpeg')] bg-cover bg-center opacity-100"></div>
         <div className="relative z-20 px-6 py-16 md:py-24 max-w-4xl mx-auto text-center">
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-purple-300 to-indigo-200">
             Welcome to CovenantMatch
