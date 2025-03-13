@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct PlayerInfo {
     pub user_id: String,
     pub username: String,
@@ -11,6 +12,7 @@ pub struct PlayerInfo {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct SessionResult {
     pub user_id: String,
     pub result: GameResult,
@@ -51,12 +53,14 @@ pub struct GameSession {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateSessionDto {
     pub host_id: String,
     pub character: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct JoinSessionDto {
     pub user_id: String,
     pub username: String,
@@ -64,6 +68,7 @@ pub struct JoinSessionDto {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct SubmitResultDto {
     pub user_id: String,
     pub result: GameResult,
@@ -103,6 +108,7 @@ impl From<GameSession> for SessionResponseDto {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct RateSessionDto {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user_id: Option<String>,
@@ -114,6 +120,7 @@ pub struct RateSessionDto {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ResultsResponseDto {
     pub session_id: String,
     pub results: Vec<SessionResult>,

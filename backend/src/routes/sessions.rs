@@ -401,15 +401,9 @@ async fn rate_session(
     }
 }
 
-#[get("/api/v1/sessions/test")]
-async fn test_session_route() -> impl Responder {
-    HttpResponse::Ok().body("Sessions route test working!")
-}
-
 pub fn config(cfg: &mut web::ServiceConfig) {
     log::info!("Configuring sessions routes");
     // Public route (no auth needed)
-    cfg.service(test_session_route);
     cfg.service(get_sessions);
     cfg.service(create_session);
     cfg.service(get_session);
