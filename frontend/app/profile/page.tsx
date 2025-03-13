@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-
+import { MainLayout } from "@/components/layout"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -13,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Footer } from "@/components/layout/Footer"
 
 interface UserProfile {
   username: string
@@ -64,11 +65,13 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="container max-w-2xl py-10">
-        <div className="flex justify-center">
-          <p>Loading profile...</p>
+      <MainLayout footer={<Footer />}>
+        <div className="container max-w-2xl py-10 mx-auto">
+          <div className="flex justify-center">
+            <p>Loading profile...</p>
+          </div>
         </div>
-      </div>
+      </MainLayout>
     )
   }
 
@@ -77,56 +80,58 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="container max-w-2xl py-10">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Your Profile</h1>
-          <p className="text-muted-foreground">
-            View and manage your profile information
-          </p>
-        </div>
+    <MainLayout footer={<Footer />}>
+      <div className="container max-w-2xl py-10 mx-auto">
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold">Your Profile</h1>
+            <p className="text-muted-foreground">
+              View and manage your profile information
+            </p>
+          </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{profile.displayName}</CardTitle>
-            <CardDescription>@{profile.username}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h3 className="font-medium">Email</h3>
-              <p className="text-muted-foreground">{profile.email}</p>
-            </div>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                // Verify token exists before navigation
-                const token = localStorage.getItem('token');
-                if (token) {
-                  router.push('/edit-profile');
-                } else {
-                  toast.error("Authentication required");
+          <Card>
+            <CardHeader>
+              <CardTitle>{profile.displayName}</CardTitle>
+              <CardDescription>@{profile.username}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <h3 className="font-medium">Email</h3>
+                <p className="text-muted-foreground">{profile.email}</p>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  // Verify token exists before navigation
+                  const token = localStorage.getItem('token');
+                  if (token) {
+                    router.push('/edit-profile');
+                  } else {
+                    toast.error("Authentication required");
+                    router.push('/login');
+                  }
+                }}
+              >
+                Edit Profile
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={() => {
+                  // Implement logout functionality
+                  localStorage.removeItem('token');
+                  toast.success("Logged out successfully");
                   router.push('/login');
-                }
-              }}
-            >
-              Edit Profile
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={() => {
-                // Implement logout functionality
-                localStorage.removeItem('token');
-                toast.success("Logged out successfully");
-                router.push('/login');
-              }}
-            >
-              Logout
-            </Button>
-          </CardFooter>
-        </Card>
+                }}
+              >
+                Logout
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
       </div>
-    </div>
+    </MainLayout>
   )
 } 
