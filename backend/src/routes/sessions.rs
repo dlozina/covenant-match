@@ -1,10 +1,8 @@
-use crate::middleware::auth::Auth;
 use crate::models::session::{CreateSessionDto, JoinSessionDto, RateSessionDto, SubmitResultDto};
 use crate::services::session_service;
 use crate::utils::jwt;
 use actix_web::{delete, get, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use mongodb::Database;
-use utoipa::ToSchema;
 
 /// Get all sessions with optional status filter
 #[utoipa::path(

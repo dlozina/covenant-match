@@ -70,6 +70,7 @@ pub struct SubmitResultDto {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct SessionResponseDto {
     pub id: String,
     pub host_id: String,

@@ -400,14 +400,14 @@ pub async fn get_session_results(
 
     // Prepare results response
     let response = serde_json::json!({
-        "session_id": session.id,
+        "sessionId": session.id,
         "status": session.status,
         "results": session.results,
         "consensus": {
-            "has_consensus": consensus_result.is_some(),
+            "hasConsensus": consensus_result.is_some(),
             "result": consensus_result,
-            "submitted_count": session.results.len(),
-            "total_players": session.joined_players.len()
+            "submittedCount": session.results.len(),
+            "totalPlayers": session.joined_players.len()
         },
         "completed": session.status == SessionStatus::Completed
     });
