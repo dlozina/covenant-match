@@ -39,7 +39,21 @@ export default function SessionResultsPage() {
   
   // Add state for result selection and rating
   const [selectedResult, setSelectedResult] = useState<'win' | 'loss' | 'dc'>('win');
-  const [rating, setRating] = useState<number>(3);
+  const [rating, setRating] = useState<number>(5);
+  
+  // Add state to track which players are added as friends
+  const [friendStatus, setFriendStatus] = useState<{[key: string]: boolean}>({
+    'player2': false,
+    'player3': false
+  });
+  
+  // Add friend function (one-way only)
+  const addFriend = (playerId: string) => {
+    setFriendStatus(prev => ({
+      ...prev,
+      [playerId]: true // Only set to true, never back to false
+    }));
+  };
 
   // Format seconds to HH:MM:SS
   const formatTime = (totalSeconds: number): string => {
@@ -322,9 +336,38 @@ export default function SessionResultsPage() {
                     <div className="bg-secondary/50 px-3 py-2 rounded-md">
                       <span className="text-foreground">Ice Maiden</span>
                     </div>
-                    <Badge variant="outline" className="text-emerald-500 border-emerald-500 ml-auto">
-                      Reported
-                    </Badge>
+                    <div className="flex items-center gap-2 ml-auto">
+                      {isSessionFinished && (
+                        <button 
+                          onClick={() => addFriend('player2')}
+                          disabled={friendStatus.player2}
+                          className={`flex items-center justify-center h-8 w-8 rounded-full transition-colors ${
+                            friendStatus.player2 
+                              ? 'bg-emerald-500 text-white cursor-default' 
+                              : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                          }`}
+                          title={friendStatus.player2 ? "Friend Added" : "Add Friend"}
+                        >
+                          {friendStatus.player2 ? (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                              <circle cx="9" cy="7" r="4"></circle>
+                              <polyline points="16 11 18 13 22 9"></polyline>
+                            </svg>
+                          ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                              <circle cx="9" cy="7" r="4"></circle>
+                              <line x1="19" y1="8" x2="19" y2="14"></line>
+                              <line x1="16" y1="11" x2="22" y2="11"></line>
+                            </svg>
+                          )}
+                        </button>
+                      )}
+                      <Badge variant="outline" className="text-emerald-500 border-emerald-500">
+                        Reported
+                      </Badge>
+                    </div>
                   </div>
                 </div>
 
@@ -340,9 +383,38 @@ export default function SessionResultsPage() {
                     <div className="bg-secondary/50 px-3 py-2 rounded-md">
                       <span className="text-foreground">Fire Knight</span>
                     </div>
-                    <Badge variant="outline" className="text-muted-foreground border-muted-foreground ml-auto">
-                      Pending
-                    </Badge>
+                    <div className="flex items-center gap-2 ml-auto">
+                      {isSessionFinished && (
+                        <button 
+                          onClick={() => addFriend('player3')}
+                          disabled={friendStatus.player3}
+                          className={`flex items-center justify-center h-8 w-8 rounded-full transition-colors ${
+                            friendStatus.player3 
+                              ? 'bg-emerald-500 text-white cursor-default' 
+                              : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
+                          }`}
+                          title={friendStatus.player3 ? "Friend Added" : "Add Friend"}
+                        >
+                          {friendStatus.player3 ? (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                              <circle cx="9" cy="7" r="4"></circle>
+                              <polyline points="16 11 18 13 22 9"></polyline>
+                            </svg>
+                          ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                              <circle cx="9" cy="7" r="4"></circle>
+                              <line x1="19" y1="8" x2="19" y2="14"></line>
+                              <line x1="16" y1="11" x2="22" y2="11"></line>
+                            </svg>
+                          )}
+                        </button>
+                      )}
+                      <Badge variant="outline" className="text-muted-foreground border-muted-foreground">
+                        Pending
+                      </Badge>
+                    </div>
                   </div>
                 </div>
               </CardContent>
