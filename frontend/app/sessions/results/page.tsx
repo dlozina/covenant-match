@@ -260,7 +260,7 @@ export default function SessionResultsPage() {
     <MainLayout footer={<Footer />}>
       <div className="container py-10 mx-auto">
         {/* Header */}
-        <div className="bg-card rounded-lg p-4 mb-6 flex justify-between items-center">
+        <div className="bg-card rounded-lg p-4 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <h1 className="text-2xl font-bold">Nightreign Session Results</h1>
           <span className="text-muted-foreground">Session ID: {SESSION_ID}</span>
         </div>
@@ -276,8 +276,8 @@ export default function SessionResultsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Player 1 (You) */}
-                <div className="flex items-center space-x-4">
-                  <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary">
+                <div className="flex items-start sm:items-center space-x-4">
+                  <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary mt-1 sm:mt-0">
                     <span>You</span>
                   </Avatar>
                   <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
@@ -343,22 +343,26 @@ export default function SessionResultsPage() {
                         className="flex-1 h-14 text-lg"
                         onClick={resetSession}
                       >
-                        Start New Session With Same Team
+                        <span className="sm:hidden flex flex-col items-center">
+                          <span>New Session</span>
+                          <span className="text-xs text-muted-foreground">with same team</span>
+                        </span>
+                        <span className="hidden sm:inline">Start New Session With Same Team</span>
                       </Button>
                     </div>
                     
                     {/* Navigation buttons - only shown after session is finished */}
-                    <div className="flex gap-4">
+                    <div className="flex flex-col sm:flex-row gap-4">
                       <Button 
                         variant="outline" 
-                        className="flex-1"
+                        className="flex-1 h-12"
                         asChild
                       >
                         <Link href="/sessions">Back to Sessions</Link>
                       </Button>
                       <Button 
                         variant="outline" 
-                        className="flex-1"
+                        className="flex-1 h-12"
                         asChild
                       >
                         <Link href="/sessions/create">Create New Session</Link>
@@ -366,7 +370,7 @@ export default function SessionResultsPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex gap-4">
+                  <div className="flex flex-col sm:flex-row gap-4">
                     <Button 
                       size="lg" 
                       className="flex-1 h-14 text-lg"
@@ -425,17 +429,17 @@ export default function SessionResultsPage() {
                   {/* Session Timer */}
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Session Duration:</span>
-                    <span className="text-foreground">{formatTime(finalDuration || elapsedSeconds)}</span>
+                    <span className="text-foreground font-medium">{formatTime(finalDuration || elapsedSeconds)}</span>
                   </div>
 
                   {/* Rating Stars */}
                   <div>
                     <p className="text-muted-foreground mb-2">Rate Experience:</p>
-                    <div className="flex space-x-2">
+                    <div className="flex justify-between sm:justify-start sm:space-x-2">
                       {[1, 2, 3, 4, 5].map((star, index) => (
                         <button 
                           key={star} 
-                          className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          className={`w-12 h-12 sm:w-10 sm:h-10 rounded-full flex items-center justify-center ${
                             index < 3 ? 'bg-amber-500 text-white' : 'bg-secondary text-muted-foreground'
                           }`}
                         >
