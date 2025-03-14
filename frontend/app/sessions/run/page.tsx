@@ -144,6 +144,19 @@ export default function SessionResultsPage() {
 
   // Check for existing session on component mount
   useEffect(() => {
+    // Check if this is a page refresh by using a timestamp in sessionStorage
+    const lastLoadTime = sessionStorage.getItem('lastPageLoadTime');
+    const currentTime = Date.now().toString();
+    
+    // If lastLoadTime exists and it's recent (within last 3 seconds), it's likely a refresh
+    if (lastLoadTime && (Date.now() - parseInt(lastLoadTime, 10)) < 3000) {
+      // Clear session data on refresh
+      clearSessionData();
+    }
+    
+    // Update the last load time
+    sessionStorage.setItem('lastPageLoadTime', currentTime);
+    
     const storedSessionId = localStorage.getItem('sessionId');
     const storedStartTime = localStorage.getItem('sessionStartTime');
     const sessionFinished = localStorage.getItem('sessionFinished') === 'true';

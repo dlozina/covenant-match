@@ -81,7 +81,7 @@ export default function CreateSessionPage() {
 
             <div className="pt-4">
               <Button className="w-full" size="lg" asChild>
-                <Link href="/sessions/results">
+                <Link href="/sessions/run">
                   Create Session
                 </Link>
               </Button>
