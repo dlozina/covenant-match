@@ -47,17 +47,18 @@ interface PlayerSectionProps {
   sessionData?: SessionData;
 }
 
-interface PlayerRowProps {
-  avatarText: string;
-  username: string;
-  characterName: string;
-  playerId: string;
-  friendState: FriendState;
-  addFriend: (playerId: string) => void;
-  sessionFinished: boolean;
-  badgeText: string;
-  badgeVariant: string;
-}
+//todo: check if this is used
+// interface PlayerRowProps {
+//   avatarText: string;
+//   username: string;
+//   characterName: string;
+//   playerId: string;
+//   friendState: FriendState;
+//   addFriend: (playerId: string) => void;
+//   sessionFinished: boolean;
+//   badgeText: string;
+//   badgeVariant: string;
+// }
 
 interface FriendButtonProps {
   playerId: string;
@@ -289,47 +290,48 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, frie
   );
 };
 
+//todo: check if this is used
 // Player row component (used within PlayerSection)
-const PlayerRow: React.FC<PlayerRowProps> = ({ 
-  avatarText, 
-  username, 
-  characterName, 
-  playerId, 
-  friendState, 
-  addFriend, 
-  sessionFinished,
-  badgeText,
-  badgeVariant
-}) => (
-  <div className="flex items-center space-x-4">
-    <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary">
-      <span>{avatarText}</span>
-    </Avatar>
-    <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
-      <div className="bg-secondary/50 px-3 py-2 rounded-md">
-        <span className="text-foreground">{username}</span>
-      </div>
-      <div className="bg-secondary/50 px-3 py-2 rounded-md">
-        <span className="text-foreground">{characterName}</span>
-      </div>
-      <div className="flex items-center gap-2 ml-auto">
-        {sessionFinished && (
-          <FriendButton 
-            playerId={playerId} 
-            isFriend={friendState[playerId]} 
-            onAddFriend={addFriend} 
-          />
-        )}
-        <Badge 
-          variant="outline" 
-          className={`text-${badgeVariant}-500 border-${badgeVariant}-500`}
-        >
-          {badgeText}
-        </Badge>
-      </div>
-    </div>
-  </div>
-);
+// const PlayerRow: React.FC<PlayerRowProps> = ({ 
+//   avatarText, 
+//   username, 
+//   characterName, 
+//   playerId, 
+//   friendState, 
+//   addFriend, 
+//   sessionFinished,
+//   badgeText,
+//   badgeVariant
+// }) => (
+//   <div className="flex items-center space-x-4">
+//     <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary">
+//       <span>{avatarText}</span>
+//     </Avatar>
+//     <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
+//       <div className="bg-secondary/50 px-3 py-2 rounded-md">
+//         <span className="text-foreground">{username}</span>
+//       </div>
+//       <div className="bg-secondary/50 px-3 py-2 rounded-md">
+//         <span className="text-foreground">{characterName}</span>
+//       </div>
+//       <div className="flex items-center gap-2 ml-auto">
+//         {sessionFinished && (
+//           <FriendButton 
+//             playerId={playerId} 
+//             isFriend={friendState[playerId]} 
+//             onAddFriend={addFriend} 
+//           />
+//         )}
+//         <Badge 
+//           variant="outline" 
+//           className={`text-${badgeVariant}-500 border-${badgeVariant}-500`}
+//         >
+//           {badgeText}
+//         </Badge>
+//       </div>
+//     </div>
+//   </div>
+// );
 
 // Friend button component (used within PlayerRow)
 const FriendButton: React.FC<FriendButtonProps> = ({ playerId, isFriend, onAddFriend }) => (
