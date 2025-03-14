@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,10 +18,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+// Mock session ID - in a real app, this would come from the URL or props
+const SESSION_ID = "28571";
+
 export default function SessionResultsPage() {
   // State to track if session is finished and reporting is visible
   const [isSessionFinished, setIsSessionFinished] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showWarningDialog, setShowWarningDialog] = useState(false);
   
   // Session timer states
   const [isSessionStarted, setIsSessionStarted] = useState(false);
@@ -28,6 +33,9 @@ export default function SessionResultsPage() {
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const sessionStartTimeRef = useRef<number | null>(null);
   const lastSyncTimeRef = useRef<number | null>(null);
+  
+  // Store the final duration when session is finished
+  const [finalDuration, setFinalDuration] = useState<number | null>(null);
 
   // Format seconds to HH:MM:SS
   const formatTime = (totalSeconds: number): string => {
@@ -45,6 +53,10 @@ export default function SessionResultsPage() {
   const startSession = () => {
     if (isSessionStarted) return;
     
+    // Reset any previous finished session
+    setIsSessionFinished(false);
+    setFinalDuration(null);
+    
     // Set session as started
     setIsSessionStarted(true);
     
@@ -55,6 +67,8 @@ export default function SessionResultsPage() {
     
     // Store in localStorage for persistence
     localStorage.setItem('sessionStartTime', startTime.toString());
+    localStorage.setItem('sessionId', SESSION_ID);
+    localStorage.removeItem('sessionFinished');
     
     // Start the timer interval
     timerIntervalRef.current = setInterval(() => {
@@ -74,7 +88,7 @@ export default function SessionResultsPage() {
     // Example: 
     // fetch('/api/sessions/start', {
     //   method: 'POST',
-    //   body: JSON.stringify({ sessionId: '28571' })
+    //   body: JSON.stringify({ sessionId: SESSION_ID })
     // })
     // .then(response => response.json())
     // .then(data => {
@@ -88,7 +102,7 @@ export default function SessionResultsPage() {
     // TODO: Implement server sync
     // This would be an API call to get the current session time from your backend
     // Example:
-    // fetch('/api/sessions/28571/elapsed')
+    // fetch(`/api/sessions/${SESSION_ID}/elapsed`)
     //   .then(response => response.json())
     //   .then(data => {
     //     // Update elapsed time from server
@@ -100,6 +114,10 @@ export default function SessionResultsPage() {
 
   // Handle finish session
   const handleFinishSession = () => {
+    // Store the final duration
+    setFinalDuration(elapsedSeconds);
+    
+    // Update state
     setIsSessionFinished(true);
     setShowConfirmDialog(false);
     
@@ -109,12 +127,16 @@ export default function SessionResultsPage() {
       timerIntervalRef.current = null;
     }
     
+    // Mark session as finished in localStorage
+    localStorage.setItem('sessionFinished', 'true');
+    localStorage.setItem('finalDuration', elapsedSeconds.toString());
+    
     // TODO: Send API request to end session on server
     // Example:
     // fetch('/api/sessions/end', {
     //   method: 'POST',
     //   body: JSON.stringify({ 
-    //     sessionId: '28571',
+    //     sessionId: SESSION_ID,
     //     duration: elapsedSeconds
     //   })
     // });
@@ -122,8 +144,26 @@ export default function SessionResultsPage() {
 
   // Check for existing session on component mount
   useEffect(() => {
+    const storedSessionId = localStorage.getItem('sessionId');
     const storedStartTime = localStorage.getItem('sessionStartTime');
+    const sessionFinished = localStorage.getItem('sessionFinished') === 'true';
+    const storedFinalDuration = localStorage.getItem('finalDuration');
     
+    // If the session ID doesn't match, reset everything
+    if (storedSessionId && storedSessionId !== SESSION_ID) {
+      resetSession();
+      return;
+    }
+    
+    // If there's a finished session, just show the results
+    if (sessionFinished && storedFinalDuration) {
+      setIsSessionFinished(true);
+      setFinalDuration(parseInt(storedFinalDuration, 10));
+      setIsSessionStarted(true);
+      return;
+    }
+    
+    // Otherwise check for an active session
     if (storedStartTime) {
       const startTime = parseInt(storedStartTime, 10);
       const now = Date.now();
@@ -153,17 +193,68 @@ export default function SessionResultsPage() {
         syncWithServer();
       } else {
         // Clear old session data
-        localStorage.removeItem('sessionStartTime');
+        resetSession();
       }
     }
     
-    // Cleanup interval on unmount
+    // Add beforeunload event listener to warn about active sessions
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isSessionStarted && !isSessionFinished) {
+        // Standard way to show a confirmation dialog when leaving the page
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // Show warning dialog once when the page loads if there's an active session
+    if (isSessionStarted && !isSessionFinished && !sessionFinished) {
+      setShowWarningDialog(true);
+    }
+    
+    // Cleanup interval and event listener on unmount
     return () => {
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
       }
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      
+      // Clear all session data from localStorage when component unmounts
+      // This ensures a clean state when navigating away
+      clearSessionData();
     };
   }, []);
+
+  // Function to clear all session data from localStorage
+  const clearSessionData = () => {
+    localStorage.removeItem('sessionStartTime');
+    localStorage.removeItem('sessionFinished');
+    localStorage.removeItem('finalDuration');
+    localStorage.removeItem('sessionId');
+  };
+
+  // Reset session function
+  const resetSession = () => {
+    // Clear all session data
+    clearSessionData();
+    
+    // Reset state
+    setIsSessionStarted(false);
+    setIsSessionFinished(false);
+    setElapsedSeconds(0);
+    setFinalDuration(null);
+    
+    // Clear any running timer
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    
+    sessionStartTimeRef.current = null;
+    lastSyncTimeRef.current = null;
+  };
 
   return (
     <MainLayout footer={<Footer />}>
@@ -171,7 +262,7 @@ export default function SessionResultsPage() {
         {/* Header */}
         <div className="bg-card rounded-lg p-4 mb-6 flex justify-between items-center">
           <h1 className="text-2xl font-bold">Nightreign Session Results</h1>
-          <span className="text-muted-foreground">Session ID: #28571</span>
+          <span className="text-muted-foreground">Session ID: {SESSION_ID}</span>
         </div>
 
         {/* Main Content */}
@@ -243,25 +334,58 @@ export default function SessionResultsPage() {
             {/* Session Control Buttons in separate card */}
             <Card className="mt-6">
               <CardContent className="py-6">
-                <div className="flex gap-4">
-                  <Button 
-                    size="lg" 
-                    className="flex-1 h-14 text-lg"
-                    onClick={startSession}
-                    disabled={isSessionStarted}
-                  >
-                    {isSessionStarted ? 'Session Started' : 'Start Session'}
-                  </Button>
-                  <Button 
-                    size="lg" 
-                    variant="destructive" 
-                    className="flex-1 h-14 text-lg"
-                    onClick={() => setShowConfirmDialog(true)}
-                    disabled={!isSessionStarted || isSessionFinished}
-                  >
-                    Finish Session
-                  </Button>
-                </div>
+                {isSessionFinished ? (
+                  <div className="space-y-4">
+                    {/* Primary action button */}
+                    <div className="flex">
+                      <Button 
+                        size="lg" 
+                        className="flex-1 h-14 text-lg"
+                        onClick={resetSession}
+                      >
+                        Start New Session With Same Team
+                      </Button>
+                    </div>
+                    
+                    {/* Navigation buttons - only shown after session is finished */}
+                    <div className="flex gap-4">
+                      <Button 
+                        variant="outline" 
+                        className="flex-1"
+                        asChild
+                      >
+                        <Link href="/sessions">Back to Sessions</Link>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        className="flex-1"
+                        asChild
+                      >
+                        <Link href="/sessions/create">Create New Session</Link>
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-4">
+                    <Button 
+                      size="lg" 
+                      className="flex-1 h-14 text-lg"
+                      onClick={startSession}
+                      disabled={isSessionStarted}
+                    >
+                      {isSessionStarted ? 'Session Started' : 'Start Session'}
+                    </Button>
+                    <Button 
+                      size="lg" 
+                      variant="destructive" 
+                      className="flex-1 h-14 text-lg"
+                      onClick={() => setShowConfirmDialog(true)}
+                      disabled={!isSessionStarted || isSessionFinished}
+                    >
+                      Finish Session
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -301,7 +425,7 @@ export default function SessionResultsPage() {
                   {/* Session Timer */}
                   <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Session Duration:</span>
-                    <span className="text-foreground">{formatTime(elapsedSeconds)}</span>
+                    <span className="text-foreground">{formatTime(finalDuration || elapsedSeconds)}</span>
                   </div>
 
                   {/* Rating Stars */}
@@ -368,7 +492,7 @@ export default function SessionResultsPage() {
                     <p className="text-sm text-muted-foreground mt-4">
                       {!isSessionStarted 
                         ? 'Click "Start Session" to begin the game timer.'
-                        : 'Click "Finish Session" when you\'re ready to report your results.'}
+                        : 'Click "Finish Session" when you&apos;re ready to report your results.'}
                     </p>
                   </CardContent>
                 </Card>
@@ -380,7 +504,7 @@ export default function SessionResultsPage() {
         </div>
       </div>
 
-      {/* Confirmation Dialog */}
+      {/* Finish Session Confirmation Dialog */}
       <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -394,6 +518,22 @@ export default function SessionResultsPage() {
             <AlertDialogAction onClick={handleFinishSession}>
               Yes, Finish Session
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* Warning Dialog about session state */}
+      <AlertDialog open={showWarningDialog} onOpenChange={setShowWarningDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Session State Warning</AlertDialogTitle>
+            <AlertDialogDescription>
+              Please note that if you navigate away from this page or refresh the browser, your session state will be lost. 
+              It&apos;s recommended to complete your session before leaving this page.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction>I Understand</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
