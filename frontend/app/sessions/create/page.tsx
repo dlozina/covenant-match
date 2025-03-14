@@ -8,8 +8,18 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { useAuth } from "@/lib/auth-context";
 
 export default function CreateSessionPage() {
+  return (
+    <ProtectedRoute>
+      <CreateSessionContent />
+    </ProtectedRoute>
+  );
+}
+
+function CreateSessionContent() {
   const [selectedLord, setSelectedLord] = useState<string | null>(null);
   const [selectedFarer, setSelectedFarer] = useState<string | null>(null);
   const [sessionName, setSessionName] = useState<string>("");
@@ -44,12 +54,7 @@ export default function CreateSessionPage() {
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       const token = localStorage.getItem('token');
-      // todo: maybe not needed?  
-      if (!token) {
-        toast.error("Authentication required");
-        router.push('/login');
-        return;
-      }
+      
       const response = await fetch(`${apiBaseUrl}/api/v1/sessions`, {
         method: 'POST',
         headers: {

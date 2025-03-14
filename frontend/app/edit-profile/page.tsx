@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
@@ -19,6 +19,8 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute"
+import { useAuth } from "@/lib/auth-context"
 
 const profileFormSchema = z.object({
   username: z
@@ -37,62 +39,27 @@ const profileFormSchema = z.object({
 type ProfileFormValues = z.infer<typeof profileFormSchema>
 
 export default function EditProfilePage() {
+  return (
+    <ProtectedRoute>
+      <EditProfileContent />
+    </ProtectedRoute>
+  );
+}
+
+function EditProfileContent() {
   const router = useRouter()
-  const [isLoading, setIsLoading] = useState(true)
+  const { userData, refreshUserData } = useAuth()
+  const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
-      username: "",
-      email: "",
-      displayName: "",
+      username: userData?.username || "",
+      email: userData?.email || "",
+      displayName: userData?.displayName || "",
     },
   })
-
-  useEffect(() => {
-    async function fetchProfile() {
-      try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-        const token = localStorage.getItem('token');
-        
-        if (!token) {
-          toast.error("Authentication required");
-          router.push('/login');
-          return;
-        }
-
-        const response = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-        })
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch profile')
-        }
-
-        const data = await response.json()
-        
-        // Set form values with the fetched profile data
-        form.reset({
-          username: data.username,
-          email: data.email,
-          displayName: data.displayName,
-        })
-      } catch (error: unknown) {
-        toast.error(error instanceof Error ? error.message : "Failed to load profile")
-        // Redirect to login if not authenticated
-        router.push('/login')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchProfile()
-  }, [form, router])
 
   async function onSubmit(data: ProfileFormValues) {
     setIsSaving(true)
@@ -100,12 +67,6 @@ export default function EditProfilePage() {
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       const token = localStorage.getItem('token');
-      
-      if (!token) {
-        toast.error("Authentication required");
-        router.push('/login');
-        return;
-      }
       
       const response = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
         method: 'PUT',
@@ -122,6 +83,9 @@ export default function EditProfilePage() {
         throw new Error(errorData.message || 'Failed to update profile');
       }
 
+      // Refresh user data in the auth context
+      await refreshUserData();
+      
       toast.success("Profile updated successfully!")
       router.push('/profile')
     } catch (error: unknown) {
@@ -136,12 +100,6 @@ export default function EditProfilePage() {
       try {
         const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
         const token = localStorage.getItem('token');
-        
-        if (!token) {
-          toast.error("Authentication required");
-          router.push('/login');
-          return;
-        }
         
         const response = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
           method: 'DELETE',

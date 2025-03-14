@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import Link from "next/link"
 import { MainLayout } from "@/components/layout"
 import { Footer } from "@/components/layout/Footer"
+import { useAuth } from "@/lib/auth-context"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -31,6 +32,7 @@ type LoginFormValues = z.infer<typeof loginFormSchema>
 
 export default function LoginPage() {
   const router = useRouter()
+  const { login } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm<LoginFormValues>({
@@ -61,9 +63,9 @@ export default function LoginPage() {
 
       const responseData = await response.json()
       
-      // Store the token in localStorage
+      // Use the login function from auth context
       if (responseData.token) {
-        localStorage.setItem('token', responseData.token)
+        login(responseData.token)
         toast.success("Login successful!")
         router.push('/profile')
       } else {

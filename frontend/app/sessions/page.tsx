@@ -208,7 +208,7 @@ export default function SessionsPage() {
         <div className="mb-6 p-4 border rounded-lg bg-card">
           <h3 className="text-base font-medium mb-3">Filter Sessions</h3>
           <div className="flex flex-col sm:flex-row gap-4">
-            <div className="w-full sm:w-1/2">
+            <div className="w-full">
               <label htmlFor="status-filter" className="block text-sm font-medium mb-1">Status</label>
               <select 
                 id="status-filter"
@@ -222,7 +222,7 @@ export default function SessionsPage() {
                 <option value="Completed">Completed</option>
               </select>
             </div>
-            <div className="w-full sm:w-1/2">
+            <div className="w-full">
               <label htmlFor="friend-filter" className="block text-sm font-medium mb-1">Players</label>
               <select 
                 id="friend-filter"
@@ -253,7 +253,8 @@ export default function SessionsPage() {
           </div>
         ) : (
           <>
-            <div className="rounded-md border">
+            {/* Desktop view - Table */}
+            <div className="hidden md:block rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -294,6 +295,41 @@ export default function SessionsPage() {
               </Table>
             </div>
 
+            {/* Mobile view - Cards */}
+            <div className="grid grid-cols-1 gap-4 md:hidden">
+              {filteredSessions
+                .slice((currentPage - 1) * limit, currentPage * limit)
+                .map((session) => (
+                <div key={session.id} className="p-4 border rounded-lg bg-card shadow-sm">
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="font-medium text-base truncate">{session.name}</h3>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(session.status)}`}>
+                      {session.status}
+                    </span>
+                  </div>
+                  <div className="text-sm text-muted-foreground mb-3">
+                    <p>Host: {getHostName(session)}</p>
+                  </div>
+                  <div className="mt-3">
+                    {session.status === 'Open' ? (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="w-full"
+                        onClick={() => handleJoinSession(session.id)}
+                      >
+                        Join Session
+                      </Button>
+                    ) : (
+                      <div className="text-center text-xs text-muted-foreground py-1">
+                        Not Available
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
             <div className="mt-4">
               <Pagination>
                 <PaginationContent>
@@ -309,21 +345,31 @@ export default function SessionsPage() {
                     />
                   </PaginationItem>
                   
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <PaginationItem key={page}>
-                      <PaginationLink 
-                        href="#" 
-                        size="default"
-                        onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                          e.preventDefault();
-                          setCurrentPage(page);
-                        }}
-                        isActive={currentPage === page}
-                      >
-                        {page}
-                      </PaginationLink>
-                    </PaginationItem>
-                  ))}
+                  {/* Hide page numbers on small screens */}
+                  <div className="hidden sm:flex">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <PaginationItem key={page}>
+                        <PaginationLink 
+                          href="#" 
+                          size="default"
+                          onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                            e.preventDefault();
+                            setCurrentPage(page);
+                          }}
+                          isActive={currentPage === page}
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ))}
+                  </div>
+                  
+                  {/* Show current page indicator on mobile */}
+                  <div className="flex sm:hidden items-center px-2">
+                    <span className="text-sm">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                  </div>
                   
                   <PaginationItem>
                     <PaginationNext 

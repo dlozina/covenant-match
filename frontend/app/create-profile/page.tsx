@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import { MainLayout } from "@/components/layout"
 import { Footer } from "@/components/layout/Footer"
 import { Button } from "@/components/ui/button"
+import { useAuth } from "@/lib/auth-context"
 import {
   Form,
   FormControl,
@@ -41,6 +42,7 @@ type ProfileFormValues = z.infer<typeof profileFormSchema>
 
 export default function CreateProfilePage() {
   const router = useRouter()
+  const { login } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm<ProfileFormValues>({
@@ -73,9 +75,9 @@ export default function CreateProfilePage() {
       // Parse the response to get the token
       const responseData = await response.json()
       
-      // Store the token in localStorage
+      // Use the login function from auth context
       if (responseData.token) {
-        localStorage.setItem('token', responseData.token)
+        login(responseData.token)
         toast.success("Profile created successfully!")
         router.push('/profile')
       } else {

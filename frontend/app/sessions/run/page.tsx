@@ -3,7 +3,7 @@ import { MainLayout } from "@/components/layout";
 import { Footer } from "@/components/layout/Footer";
 import { useEffect, useRef, useCallback, useReducer, useState } from "react";
 import { useSearchParams } from "next/navigation";
-//import Link from "next/link";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { 
   PlayerSection,
   SessionControlButtons,
@@ -49,6 +49,14 @@ interface SessionData {
 }
 
 export default function SessionRunPage(): JSX.Element {
+  return (
+    <ProtectedRoute>
+      <SessionRunContent />
+    </ProtectedRoute>
+  );
+}
+
+function SessionRunContent(): JSX.Element {
   // Get session ID from query parameters
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('id') || "unknown";
@@ -206,13 +214,6 @@ export default function SessionRunPage(): JSX.Element {
 
         const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
         const token = localStorage.getItem('token');
-        
-        //todo: add toast
-        // if (!token) {
-        //   toast.error("Authentication required");
-        //   router.push('/login');
-        //   return;
-        // }
         
         // Fetch session data from API
         const response = await fetch(`${apiBaseUrl}/api/v1/sessions/${sessionId}`, {

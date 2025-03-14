@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu, UserPlus, Sword, Users, LayoutDashboard, User, LogOut, LogIn } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
@@ -18,61 +18,15 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useAuth } from "@/lib/auth-context";
 
 export function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userData, setUserData] = useState<{ username: string; displayName: string } | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    async function checkAuthStatus() {
-      try {
-        const token = localStorage.getItem('token');
-        
-        if (!token) {
-          setIsLoggedIn(false);
-          setUserData(null);
-          return;
-        }
-
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-        const response = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-        });
-
-        if (!response.ok) {
-          // Token might be invalid or expired
-          localStorage.removeItem('token');
-          setIsLoggedIn(false);
-          setUserData(null);
-          return;
-        }
-
-        const data = await response.json();
-        setUserData(data);
-        setIsLoggedIn(true);
-      } catch (error) {
-        console.error("Auth check failed:", error);
-        setIsLoggedIn(false);
-        setUserData(null);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    checkAuthStatus();
-  }, [pathname]); // Re-check when pathname changes
+  const { isLoggedIn, userData, logout, isLoading } = useAuth();
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    setIsLoggedIn(false);
-    setUserData(null);
+    logout();
     toast.success("Logged out successfully");
     router.push('/');
   };

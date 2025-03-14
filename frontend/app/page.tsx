@@ -1,3 +1,5 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { MainLayout } from "@/components/layout";
@@ -6,8 +8,11 @@ import { Sword, Shield, Timer, Users, Trophy, Skull, ScrollText, Compass } from 
 // import { TestStyled } from "@/components/ui/test-styled";
 // import { BasicTest } from "@/components/ui/basic-test";
 import { Footer } from "@/components/layout/Footer";
+import { useAuth } from "@/lib/auth-context";
 
 export default function Home() {
+  const { isLoggedIn, isLoading } = useAuth();
+
   // Add custom sidebars with improved styling
   const leftSidebar = (
     <div className="h-full space-y-6 py-4">
@@ -92,18 +97,24 @@ export default function Home() {
             Find worthy allies, forge unbreakable covenants, and rise through the ranks in Nightreign.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center">
-            <Button size="lg" className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white">
-              <Link href="/create-profile" className="flex items-center">
-                <Users className="mr-2 h-5 w-5" />
-                Join Now
-              </Link>
-            </Button>
-            <Button size="lg" variant="outline" className="border-purple-500 text-purple-300 hover:bg-purple-950/50">
-              <Link href="/sessions" className="flex items-center">
-                <Compass className="mr-2 h-5 w-5" />
-                Explore Sessions
-              </Link>
-            </Button>
+            {!isLoading && (
+              <>
+                {!isLoggedIn && (
+                  <Button size="lg" className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white">
+                    <Link href="/create-profile" className="flex items-center">
+                      <Users className="mr-2 h-5 w-5" />
+                      Join Now
+                    </Link>
+                  </Button>
+                )}
+                <Button size="lg" variant="outline" className="border-purple-500 text-purple-300 hover:bg-purple-950/50">
+                  <Link href="/sessions" className="flex items-center">
+                    <Compass className="mr-2 h-5 w-5" />
+                    Explore Sessions
+                  </Link>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>
