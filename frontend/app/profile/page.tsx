@@ -66,7 +66,7 @@ export default function ProfilePage() {
   if (isLoading) {
     return (
       <MainLayout footer={<Footer />}>
-        <div className="container max-w-2xl py-10 mx-auto">
+        <div className="container max-w-2xl py-6 md:py-10 px-4 mx-auto">
           <div className="flex justify-center">
             <p>Loading profile...</p>
           </div>
@@ -81,29 +81,30 @@ export default function ProfilePage() {
 
   return (
     <MainLayout footer={<Footer />}>
-      <div className="container max-w-2xl py-10 mx-auto">
-        <div className="space-y-6">
+      <div className="container max-w-2xl py-6 md:py-10 px-4 mx-auto">
+        <div className="space-y-4 md:space-y-6">
           <div>
-            <h1 className="text-2xl font-bold">Your Profile</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-xl md:text-2xl font-bold">Your Profile</h1>
+            <p className="text-sm md:text-base text-muted-foreground">
               View and manage your profile information
             </p>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>{profile.displayName}</CardTitle>
-              <CardDescription>@{profile.username}</CardDescription>
+          <Card className="overflow-hidden">
+            <CardHeader className="px-4 md:px-6 py-4 md:py-6">
+              <CardTitle className="text-lg md:text-xl">{profile.displayName}</CardTitle>
+              <CardDescription className="text-sm">@{profile.username}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 px-4 md:px-6 py-2 md:py-4">
               <div>
-                <h3 className="font-medium">Email</h3>
-                <p className="text-muted-foreground">{profile.email}</p>
+                <h3 className="text-sm md:text-base font-medium">Email</h3>
+                <p className="text-sm md:text-base text-muted-foreground break-words">{profile.email}</p>
               </div>
             </CardContent>
-            <CardFooter className="flex justify-between">
+            <CardFooter className="flex flex-col sm:flex-row justify-between gap-3 px-4 md:px-6 py-4 md:py-6">
               <Button 
                 variant="outline" 
+                className="w-full sm:w-auto"
                 onClick={() => {
                   // Verify token exists before navigation
                   const token = localStorage.getItem('token');
@@ -119,6 +120,7 @@ export default function ProfilePage() {
               </Button>
               <Button 
                 variant="destructive" 
+                className="w-full sm:w-auto"
                 onClick={() => {
                   // Implement logout functionality
                   localStorage.removeItem('token');

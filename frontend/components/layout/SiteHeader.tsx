@@ -6,7 +6,8 @@ import { Menu, UserPlus, Sword, Users, LayoutDashboard, User } from "lucide-reac
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/theme/theme-toggle";
+// Add theme toggle back in
+// import { ThemeToggle } from "@/components/theme/theme-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -96,7 +97,8 @@ export function SiteHeader() {
               <span className="hidden sm:inline">Create Profile</span>
             </Link>
           </Button>
-          <ThemeToggle />
+          {/* Change theme toggle to be on the right side of the header */}
+          {/* <ThemeToggle /> */}
           <div className="md:hidden">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

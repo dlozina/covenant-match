@@ -408,34 +408,34 @@ export default function SessionResultsPage() {
           </div>
 
           {/* Right Column */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 flex flex-col h-full">
             {/* Report Your Result Section - Only shown after session is finished */}
             {isSessionFinished ? (
-              <Card>
+              <Card className="flex flex-col flex-grow">
                 <CardHeader>
                   <CardTitle>Report Your Result</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-6 flex-grow flex flex-col justify-between">
                   {/* Result Options */}
                   <div className="grid grid-cols-3 gap-3">
                     <Button 
                       variant="outline" 
-                      className="h-20 bg-emerald-950 text-emerald-500 border-emerald-500 border-2 flex flex-col"
+                      className="h-20 lg:h-24 bg-emerald-950 text-emerald-500 border-emerald-500 border-2 flex flex-col"
                     >
                       <span>WIN</span>
                       <span className="text-xs text-muted-foreground">Selected</span>
                     </Button>
                     <Button 
                       variant="outline" 
-                      className="h-20 bg-secondary/50 text-foreground"
+                      className="h-20 lg:h-24 bg-secondary/50 text-foreground"
                     >
                       LOSS
                     </Button>
                     <Button 
                       variant="outline" 
-                      className="h-20 bg-secondary/50 text-foreground"
+                      className="h-20 lg:h-24 bg-secondary/50 text-foreground"
                     >
-                      DRAW
+                      DISCONNECT
                     </Button>
                   </div>
 
@@ -463,16 +463,16 @@ export default function SessionResultsPage() {
                   </div>
 
                   {/* Submit Button */}
-                  <Button className="w-full">Submit Results</Button>
+                  <Button className="w-full h-12 mt-auto">Submit Results</Button>
                 </CardContent>
               </Card>
             ) : (
               <>
-                <Card>
+                <Card className="flex flex-col flex-grow">
                   <CardHeader>
                     <CardTitle>Session Information</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-4 flex-grow flex flex-col">
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">Night Lord:</span>
                       <span className="text-foreground">Tricephalos</span>
@@ -502,15 +502,14 @@ export default function SessionResultsPage() {
                           : '0m 00s'}
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-4">
+                    <p className="text-sm text-muted-foreground mt-auto">
                       {!isSessionStarted 
                         ? 'Click "Start Session" to begin the game timer.'
-                        : 'Click "Finish Session" when you&apos;re ready to report your results.'}
+                        : 'Click "Finish Session" when you\`re ready to report your results.'}
                     </p>
                   </CardContent>
                 </Card>
-                {/* Empty space to match the height of the buttons card */}
-                <div className="h-[102px] mt-6"></div>
+                {/* Remove the empty space div since we're using flex-grow now */}
               </>
             )}
           </div>

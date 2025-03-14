@@ -169,40 +169,42 @@ export default function EditProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="container max-w-2xl py-10">
-        <div className="flex justify-center">
-          <p>Loading profile...</p>
+      <MainLayout footer={<Footer />}>
+        <div className="container max-w-2xl py-6 md:py-10 px-4 mx-auto">
+          <div className="flex justify-center">
+            <p>Loading profile...</p>
+          </div>
         </div>
-      </div>
+      </MainLayout>
     )
   }
 
   return (
     <MainLayout footer={<Footer />}>
-      <div className="container max-w-2xl py-10 mx-auto">
-        <div className="space-y-6">
+      <div className="container max-w-2xl py-6 md:py-10 px-4 mx-auto">
+        <div className="space-y-4 md:space-y-6">
           <div>
-            <h1 className="text-2xl font-bold">Edit Profile</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-xl md:text-2xl font-bold">Edit Profile</h1>
+            <p className="text-sm md:text-base text-muted-foreground">
               Update your profile information
             </p>
           </div>
 
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 md:space-y-6">
               <FormField
                 control={form.control}
                 name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Username</FormLabel>
+                    <FormLabel className="text-sm md:text-base">Username</FormLabel>
                     <FormControl>
-                      <Input placeholder="username" {...field} readOnly disabled className="bg-muted" />
+                      <Input placeholder="username" {...field} readOnly disabled className="bg-muted h-10" />
                     </FormControl>
-                    <FormDescription>
+                    <FormDescription className="text-xs md:text-sm">
                       Your username cannot be changed.
                     </FormDescription>
-                    <FormMessage />
+                    <FormMessage className="text-xs md:text-sm" />
                   </FormItem>
                 )}
               />
@@ -212,14 +214,14 @@ export default function EditProfilePage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel className="text-sm md:text-base">Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="email@example.com" type="email" {...field} />
+                      <Input placeholder="email@example.com" type="email" {...field} className="h-10" />
                     </FormControl>
-                    <FormDescription>
+                    <FormDescription className="text-xs md:text-sm">
                       Your email address will be used for notifications and recovery.
                     </FormDescription>
-                    <FormMessage />
+                    <FormMessage className="text-xs md:text-sm" />
                   </FormItem>
                 )}
               />
@@ -229,41 +231,47 @@ export default function EditProfilePage() {
                 name="displayName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Display Name</FormLabel>
+                    <FormLabel className="text-sm md:text-base">Display Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Display Name" {...field} />
+                      <Input placeholder="Display Name" {...field} className="h-10" />
                     </FormControl>
-                    <FormDescription>
+                    <FormDescription className="text-xs md:text-sm">
                       This is how other users will see you.
                     </FormDescription>
-                    <FormMessage />
+                    <FormMessage className="text-xs md:text-sm" />
                   </FormItem>
                 )}
               />
 
-              <div className="flex justify-between">
+              <div className="flex flex-col sm:flex-row justify-between gap-3 pt-2">
                 <Button 
                   type="button" 
                   variant="outline" 
                   onClick={() => router.push('/profile')}
+                  className="w-full sm:w-auto order-2 sm:order-1"
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSaving}>
+                <Button 
+                  type="submit" 
+                  disabled={isSaving}
+                  className="w-full sm:w-auto order-1 sm:order-2"
+                >
                   {isSaving ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
             </form>
           </Form>
 
-          <div className="border-t pt-6">
-            <h2 className="text-xl font-semibold text-red-600 mb-4">Danger Zone</h2>
-            <p className="text-muted-foreground mb-4">
+          <div className="border-t pt-4 md:pt-6 mt-4 md:mt-6">
+            <h2 className="text-lg md:text-xl font-semibold text-red-600 mb-2 md:mb-4">Danger Zone</h2>
+            <p className="text-sm md:text-base text-muted-foreground mb-4">
               Once you delete your profile, there is no going back. Please be certain.
             </p>
             <Button 
               variant="destructive" 
               onClick={handleDeleteProfile}
+              className="w-full sm:w-auto"
             >
               Delete Profile
             </Button>

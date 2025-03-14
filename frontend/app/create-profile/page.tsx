@@ -92,30 +92,30 @@ export default function CreateProfilePage() {
 
   return (
     <MainLayout footer={<Footer />}>
-      <div className="container max-w-2xl py-10 mx-auto">
-        <div className="space-y-6">
+      <div className="container max-w-2xl py-6 md:py-10 px-4 mx-auto">
+        <div className="space-y-4 md:space-y-6">
           <div>
-            <h1 className="text-2xl font-bold">Create Profile</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-xl md:text-2xl font-bold">Create Profile</h1>
+            <p className="text-sm md:text-base text-muted-foreground">
               Fill in your details to create your profile
             </p>
           </div>
 
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 md:space-y-6">
               <FormField
                 control={form.control}
                 name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Username</FormLabel>
+                    <FormLabel className="text-sm md:text-base">Username</FormLabel>
                     <FormControl>
-                      <Input placeholder="username" {...field} />
+                      <Input placeholder="username" {...field} className="h-10" />
                     </FormControl>
-                    <FormDescription>
+                    <FormDescription className="text-xs md:text-sm">
                       This is your unique username on the platform.
                     </FormDescription>
-                    <FormMessage />
+                    <FormMessage className="text-xs md:text-sm" />
                   </FormItem>
                 )}
               />
@@ -125,14 +125,14 @@ export default function CreateProfilePage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel className="text-sm md:text-base">Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="email@example.com" type="email" {...field} />
+                      <Input placeholder="email@example.com" type="email" {...field} className="h-10" />
                     </FormControl>
-                    <FormDescription>
+                    <FormDescription className="text-xs md:text-sm">
                       Your email address will be used for notifications and recovery.
                     </FormDescription>
-                    <FormMessage />
+                    <FormMessage className="text-xs md:text-sm" />
                   </FormItem>
                 )}
               />
@@ -142,14 +142,14 @@ export default function CreateProfilePage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel className="text-sm md:text-base">Password</FormLabel>
                     <FormControl>
-                      <Input placeholder="********" type="password" {...field} />
+                      <Input placeholder="********" type="password" {...field} className="h-10" />
                     </FormControl>
-                    <FormDescription>
+                    <FormDescription className="text-xs md:text-sm">
                       Choose a strong password with at least 8 characters.
                     </FormDescription>
-                    <FormMessage />
+                    <FormMessage className="text-xs md:text-sm" />
                   </FormItem>
                 )}
               />
@@ -159,19 +159,23 @@ export default function CreateProfilePage() {
                 name="displayName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Display Name</FormLabel>
+                    <FormLabel className="text-sm md:text-base">Display Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Display Name" {...field} />
+                      <Input placeholder="Display Name" {...field} className="h-10" />
                     </FormControl>
-                    <FormDescription>
+                    <FormDescription className="text-xs md:text-sm">
                       This is how other users will see you.
                     </FormDescription>
-                    <FormMessage />
+                    <FormMessage className="text-xs md:text-sm" />
                   </FormItem>
                 )}
               />
 
-              <Button type="submit" disabled={isLoading}>
+              <Button 
+                type="submit" 
+                disabled={isLoading}
+                className="w-full md:w-auto h-10 mt-2"
+              >
                 {isLoading ? "Creating..." : "Create Profile"}
               </Button>
             </form>
