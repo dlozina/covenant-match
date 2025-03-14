@@ -6,12 +6,79 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export default function CreateSessionPage() {
   const [selectedLord, setSelectedLord] = useState<string | null>(null);
   const [selectedFarer, setSelectedFarer] = useState<string | null>(null);
   const [sessionName, setSessionName] = useState<string>("");
   const [password, setPassword] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const router = useRouter();
+  
+  const handleCreateSession = async () => {
+    // Validate inputs
+    if (!sessionName) {
+      toast.error("Please enter a session name");
+      return;
+    }
+    
+    if (!password) {
+      toast.error("Please enter a password");
+      return;
+    }
+    
+    if (!selectedFarer) {
+      toast.error("Please select a Nightfarer");
+      return;
+    }
+    
+    if (!selectedLord) {
+      toast.error("Please select a Night Lord");
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const token = localStorage.getItem('token');
+      // todo: maybe not needed?  
+      if (!token) {
+        toast.error("Authentication required");
+        router.push('/login');
+        return;
+      }
+      const response = await fetch(`${apiBaseUrl}/api/v1/sessions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          gamePassword: password,
+          name: sessionName,
+          nightLord: selectedLord,
+          nightfarer: selectedFarer
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        toast.success("Session created successfully");
+        router.push(`/sessions/run?id=${data.id}`);
+      } else {
+        toast.error(data.message || "Failed to create session");
+      }
+    } catch (error) {
+      toast.error("An unexpected error occurred");
+      console.error("Error creating session:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   return (
     <MainLayout footer={<Footer />}>
@@ -115,10 +182,13 @@ export default function CreateSessionPage() {
             </div>
 
             <div className="pt-4">
-              <Button className="w-full" size="lg" asChild>
-                <Link href="/sessions/run">
-                  Create Session
-                </Link>
+              <Button 
+                className="w-full" 
+                size="lg" 
+                onClick={handleCreateSession}
+                disabled={isLoading}
+              >
+                {isLoading ? "Creating..." : "Create Session"}
               </Button>
             </div>
           </CardContent>
