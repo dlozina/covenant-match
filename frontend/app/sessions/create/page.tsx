@@ -1,11 +1,16 @@
+"use client";
 import { MainLayout } from "@/components/layout";
 import { Footer } from "@/components/layout/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
+import { useState } from "react";
 
 export default function CreateSessionPage() {
+  const [selectedLord, setSelectedLord] = useState<string | null>(null);
+  const [selectedFarer, setSelectedFarer] = useState<string | null>(null);
+  
   return (
     <MainLayout footer={<Footer />}>
       <div className="container py-6 px-4 mx-auto">
@@ -34,25 +39,59 @@ export default function CreateSessionPage() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">
+                Select Nightfarer
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  "Wylder", 
+                  "Guardian", 
+                  "Recluse", 
+                  "Duchess", 
+                  "Patces", 
+                  "Jolan", 
+                  "Igon", 
+                  "Alexander"
+                ].map(farer => (
+                  <Button 
+                    key={farer} 
+                    variant="outline" 
+                    className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
+                      selectedFarer === farer ? "border-purple-500 bg-purple-950/20" : ""
+                    }`}
+                    style={{ whiteSpace: 'normal' }}
+                    onClick={() => setSelectedFarer(farer)}
+                  >
+                    <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{farer}</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
                 Select Night Lord
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                 {[
                   "Tricephalos", 
-                  "Shang", 
-                  "Vandred", 
-                  "Zso Sahaal", 
-                  "Krieg Acerbus", 
-                  "Talos Valcoran", 
-                  "Lucoryphus", 
-                  "Ruven"
+                  "PCR", 
+                  "Malenia, Blade of Miquella", 
+                  "Maliketh", 
+                  "Mohg", 
+                  "Midra", 
+                  "Bayle", 
+                  "Messmer"
                 ].map(lord => (
                   <Button 
                     key={lord} 
                     variant="outline" 
-                    className="h-16 flex flex-col items-center justify-center hover:border-purple-500 hover:bg-purple-950/20"
+                    className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
+                      selectedLord === lord ? "border-purple-500 bg-purple-950/20" : ""
+                    }`}
+                    style={{ whiteSpace: 'normal' }}
+                    onClick={() => setSelectedLord(lord)}
                   >
-                    {lord}
+                    <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{lord}</span>
                   </Button>
                 ))}
               </div>
