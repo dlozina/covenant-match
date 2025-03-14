@@ -7,6 +7,7 @@ import { MainLayout } from "@/components/layout";
 import { Footer } from "@/components/layout/Footer";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 import {
   Table,
   TableBody,
@@ -50,6 +51,7 @@ type FriendFilter = "All" | "Friends";
 
 export default function SessionsPage() {
   const router = useRouter();
+  const { isLoggedIn } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [filteredSessions, setFilteredSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -97,21 +99,23 @@ export default function SessionsPage() {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       const token = localStorage.getItem('token');
       
-      if (!token) {
-        toast.error("Authentication required");
-        router.push('/login');
-        return;
-      }
-
       const offset = (currentPage - 1) * limit;
       // Add status parameter to only fetch sessions with the current status filter
       const statusParam = statusFilter !== 'All' ? `&status=${statusFilter}` : '';
+      
+      // Set up headers based on authentication status
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Add authorization header if user is logged in
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const response = await fetch(`${apiBaseUrl}/api/v1/sessions?limit=${limit}&offset=${offset}${statusParam}`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
+        headers,
       });
 
       if (!response.ok) {
@@ -133,16 +137,17 @@ export default function SessionsPage() {
   }
 
   async function handleJoinSession(sessionId: string) {
+    // Require authentication to join a session
+    if (!isLoggedIn) {
+      toast.error("Authentication required to join a session");
+      router.push('/login');
+      return;
+    }
+
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       const token = localStorage.getItem('token');
       
-      if (!token) {
-        toast.error("Authentication required");
-        router.push('/login');
-        return;
-      }
-
       // Check if the session is open before attempting to join
       const session = sessions.find(s => s.id === sessionId);
       if (!session || session.status !== 'Open') {
@@ -200,7 +205,7 @@ export default function SessionsPage() {
             <h2 className="text-lg md:text-xl font-semibold">Looking for a session?</h2>
           </div>
           <Button className="w-full sm:w-auto" asChild>
-            <Link href="/sessions/create">Create Session</Link>
+            <Link href={isLoggedIn ? "/sessions/create" : "/login?redirect=/sessions/create"}>Create Session</Link>
           </Button>
         </div>
         
