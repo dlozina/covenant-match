@@ -39,6 +39,7 @@ pub enum SessionStatus {
 pub struct GameSession {
     #[serde(rename = "_id")]
     pub id: String,
+    pub name: String,
     pub host_id: String,
     pub password: String,
     pub night_lord: String,
@@ -80,6 +81,7 @@ pub struct SubmitResultDto {
 #[serde(rename_all = "camelCase")]
 pub struct SessionResponseDto {
     pub id: String,
+    pub name: String,
     pub host_id: String,
     pub status: SessionStatus,
     pub night_lord: String,
@@ -88,14 +90,14 @@ pub struct SessionResponseDto {
     pub updated_at: DateTime<Utc>,
     pub started_at: Option<DateTime<Utc>>,
     pub completed_at: Option<DateTime<Utc>>,
-    // Password is only included if user is part of the session
-    pub password: Option<String>,
+    pub password: String,
 }
 
 impl From<GameSession> for SessionResponseDto {
     fn from(session: GameSession) -> Self {
         Self {
             id: session.id,
+            name: session.name,
             host_id: session.host_id,
             status: session.status,
             night_lord: session.night_lord,
@@ -104,7 +106,7 @@ impl From<GameSession> for SessionResponseDto {
             updated_at: session.updated_at,
             started_at: session.started_at,
             completed_at: session.completed_at,
-            password: None, // Default to not showing password
+            password: session.password,
         }
     }
 }

@@ -35,6 +35,7 @@ interface JoinedPlayer {
 
 interface SessionData {
   id: string;
+  name: string;
   hostId: string;
   status: string;
   nightLord: string;
@@ -129,10 +130,14 @@ export default function SessionRunPage(): JSX.Element {
     
     // Send API request to start session on server
     if (sessionData) {
-      fetch(`/api/v1/sessions/${sessionId}/start`, {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const token = localStorage.getItem('token');
+      
+      fetch(`${apiBaseUrl}/api/v1/sessions/${sessionId}/start`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         }
       }).catch(err => {
         console.error('Error starting session:', err);
@@ -151,10 +156,14 @@ export default function SessionRunPage(): JSX.Element {
     
     // Send API request to end session on server
     if (sessionData) {
-      fetch(`/api/v1/sessions/${sessionId}/complete`, {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const token = localStorage.getItem('token');
+      
+      fetch(`${apiBaseUrl}/api/v1/sessions/${sessionId}/complete`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           duration: sessionState.elapsedSeconds
@@ -339,7 +348,7 @@ export default function SessionRunPage(): JSX.Element {
         <div className="bg-card rounded-lg p-4 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <h1 className="text-2xl font-bold">
             {sessionData 
-              ? `${sessionData.nightLord} Session` 
+              ? `${sessionData.name}` 
               : 'Nightreign Session'}
           </h1>
           <span className="text-muted-foreground">Session ID: {isValidSessionId ? `#${sessionId.substring(0, 8)}` : ''}</span>

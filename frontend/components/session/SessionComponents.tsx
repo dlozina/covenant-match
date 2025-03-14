@@ -27,6 +27,7 @@ interface JoinedPlayer {
 
 interface SessionData {
   id: string;
+  name: string;
   hostId: string;
   status: string;
   nightLord: string;
@@ -153,31 +154,88 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, frie
         </div>
       )}
 
-      {/* Player 2 */}
-      <PlayerRow 
-        avatarText="P2" 
-        username="FrostQueen" 
-        characterName="Ice Maiden"
-        playerId="player2"
-        friendState={friendState}
-        addFriend={addFriend}
-        sessionFinished={sessionState.isSessionFinished}
-        badgeText="Reported"
-        badgeVariant="emerald"
-      />
+      {/* Additional players from joinedPlayers array (starting from index 1) */}
+      {sessionData && sessionData.joinedPlayers.slice(1).map((player, index) => (
+        <div key={player.userId} className="flex items-center space-x-4">
+          <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary">
+            <span>P{index + 2}</span>
+          </Avatar>
+          <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
+            <div className="bg-secondary/50 px-3 py-2 rounded-md">
+              <span className="text-foreground">{player.username}</span>
+            </div>
+            <div className="bg-secondary/50 px-3 py-2 rounded-md">
+              <span className="text-foreground">{player.nightfarer}</span>
+            </div>
+            <div className="flex items-center gap-2 ml-auto">
+              {sessionState.isSessionFinished && (
+                <FriendButton 
+                  playerId={player.userId} 
+                  isFriend={friendState[player.userId]} 
+                  onAddFriend={addFriend} 
+                />
+              )}
+              <Badge 
+                variant="outline" 
+                className="text-muted-foreground border-muted-foreground ml-auto"
+              >
+                Pending
+              </Badge>
+            </div>
+          </div>
+        </div>
+      ))}
 
-      {/* Player 3 */}
-      <PlayerRow 
-        avatarText="P3" 
-        username="FlameWarrior" 
-        characterName="Fire Knight"
-        playerId="player3"
-        friendState={friendState}
-        addFriend={addFriend}
-        sessionFinished={sessionState.isSessionFinished}
-        badgeText="Pending"
-        badgeVariant="muted"
-      />
+      {/* Empty player slots to maintain layout */}
+      {(!sessionData || sessionData.joinedPlayers.length < 3) && (
+        <div className="space-y-4 opacity-50">
+          {/* If we have 0 or 1 players, show 2 empty slots */}
+          {(!sessionData || sessionData.joinedPlayers.length <= 1) && (
+            <div className="flex items-center space-x-4">
+              <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary/50">
+                <span>P2</span>
+              </Avatar>
+              <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
+                <div className="bg-secondary/30 px-3 py-2 rounded-md">
+                  <span className="text-muted-foreground">Empty Slot</span>
+                </div>
+                <div className="bg-secondary/30 px-3 py-2 rounded-md">
+                  <span className="text-muted-foreground">Not Joined</span>
+                </div>
+                <Badge 
+                  variant="outline" 
+                  className="text-muted-foreground border-muted-foreground ml-auto"
+                >
+                  Waiting
+                </Badge>
+              </div>
+            </div>
+          )}
+          
+          {/* If we have 0, 1, or 2 players, show the last empty slot */}
+          {(!sessionData || sessionData.joinedPlayers.length <= 2) && (
+            <div className="flex items-center space-x-4">
+              <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary/50">
+                <span>P3</span>
+              </Avatar>
+              <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
+                <div className="bg-secondary/30 px-3 py-2 rounded-md">
+                  <span className="text-muted-foreground">Empty Slot</span>
+                </div>
+                <div className="bg-secondary/30 px-3 py-2 rounded-md">
+                  <span className="text-muted-foreground">Not Joined</span>
+                </div>
+                <Badge 
+                  variant="outline" 
+                  className="text-muted-foreground border-muted-foreground ml-auto"
+                >
+                  Waiting
+                </Badge>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </CardContent>
   </Card>
 );
@@ -335,6 +393,10 @@ export const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({ sessionS
       <CardTitle>Session Information</CardTitle>
     </CardHeader>
     <CardContent className="space-y-4 flex-grow flex flex-col">
+      <div className="flex justify-between items-center">
+        <span className="text-muted-foreground">Session Name:</span>
+        <span className="text-foreground">{sessionData?.name || 'Unnamed Session'}</span>
+      </div>
       <div className="flex justify-between items-center">
         <span className="text-muted-foreground">Night Lord:</span>
         <span className="text-foreground">{sessionData ? sessionData.nightLord : 'Tricephalos'}</span>

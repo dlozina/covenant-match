@@ -24,6 +24,7 @@ pub async fn create_session(
     let now = Utc::now();
     let session = GameSession {
         id: Uuid::new_v4().to_string(),
+        name: session_data.name,
         host_id: user_id.to_string(),
         password: session_data.game_password,
         status: SessionStatus::Open,
@@ -76,7 +77,6 @@ pub async fn get_sessions(
         .into_iter()
         .map(|s| {
             let mut response = SessionResponseDto::from(s);
-            response.password = None; // Don't include password in listings
             response
         })
         .collect())
@@ -91,15 +91,12 @@ pub async fn get_session_by_id(
 
     // Convert to response DTO
     Ok(session.map(|s| {
-        let mut response = SessionResponseDto::from(s);
+        let response = SessionResponseDto::from(s);
 
         // Only include password if user is a participant
         if let Some(user_id) = user_id {
             if !response.joined_players.iter().any(|p| p.user_id == user_id) {
-                response.password = None;
             }
-        } else {
-            response.password = None;
         }
 
         response
@@ -162,10 +159,7 @@ pub async fn join_session(
     session_repository::update_session(db, &session).await?;
 
     // Create response DTO
-    let mut response = SessionResponseDto::from(session);
-
-    // Always include password for participant
-    response.password = Some(response.password.unwrap_or_default());
+    let response = SessionResponseDto::from(session);
 
     Ok(response)
 }
