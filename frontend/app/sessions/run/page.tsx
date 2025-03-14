@@ -36,6 +36,10 @@ export default function SessionResultsPage() {
   
   // Store the final duration when session is finished
   const [finalDuration, setFinalDuration] = useState<number | null>(null);
+  
+  // Add state for result selection and rating
+  const [selectedResult, setSelectedResult] = useState<'win' | 'loss' | 'dc'>('win');
+  const [rating, setRating] = useState<number>(3);
 
   // Format seconds to HH:MM:SS
   const formatTime = (totalSeconds: number): string => {
@@ -420,23 +424,46 @@ export default function SessionResultsPage() {
                   <div className="grid grid-cols-3 gap-3">
                     <Button 
                       variant="outline" 
-                      className="h-20 lg:h-24 bg-emerald-950 text-emerald-500 border-emerald-500 border-2 flex flex-col"
+                      className={`h-20 lg:h-24 ${
+                        selectedResult === 'win' 
+                          ? 'bg-emerald-950 text-emerald-500 border-emerald-500 border-2' 
+                          : 'bg-secondary/50 text-foreground'
+                      } flex flex-col`}
+                      onClick={() => setSelectedResult('win')}
                     >
                       <span>WIN</span>
-                      <span className="text-xs text-muted-foreground">Selected</span>
+                      {selectedResult === 'win' && (
+                        <span className="text-xs text-muted-foreground">Selected</span>
+                      )}
                     </Button>
                     <Button 
                       variant="outline" 
-                      className="h-20 lg:h-24 bg-secondary/50 text-foreground"
+                      className={`h-20 lg:h-24 ${
+                        selectedResult === 'loss' 
+                          ? 'bg-emerald-950 text-emerald-500 border-emerald-500 border-2' 
+                          : 'bg-secondary/50 text-foreground'
+                      } flex flex-col`}
+                      onClick={() => setSelectedResult('loss')}
                     >
-                      LOSS
+                      <span>LOSS</span>
+                      {selectedResult === 'loss' && (
+                        <span className="text-xs text-muted-foreground">Selected</span>
+                      )}
                     </Button>
                     <Button 
                       variant="outline" 
-                      className="h-20 lg:h-24 bg-secondary/50 text-foreground"
+                      className={`h-20 lg:h-24 ${
+                        selectedResult === 'dc' 
+                          ? 'bg-emerald-950 text-emerald-500 border-emerald-500 border-2' 
+                          : 'bg-secondary/50 text-foreground'
+                      } flex flex-col`}
+                      onClick={() => setSelectedResult('dc')}
                       title="Disconnect"
                     >
-                      D/C
+                      <span>D/C</span>
+                      {selectedResult === 'dc' && (
+                        <span className="text-xs text-muted-foreground">Selected</span>
+                      )}
                     </Button>
                   </div>
 
@@ -450,12 +477,13 @@ export default function SessionResultsPage() {
                   <div>
                     <p className="text-muted-foreground mb-2">Rate Experience:</p>
                     <div className="flex justify-between sm:justify-start sm:space-x-2">
-                      {[1, 2, 3, 4, 5].map((star, index) => (
+                      {[1, 2, 3, 4, 5].map((star) => (
                         <button 
                           key={star} 
                           className={`w-12 h-12 sm:w-10 sm:h-10 rounded-full flex items-center justify-center ${
-                            index < 3 ? 'bg-amber-500 text-white' : 'bg-secondary text-muted-foreground'
+                            star <= rating ? 'bg-amber-500 text-white' : 'bg-secondary text-muted-foreground'
                           }`}
+                          onClick={() => setRating(star)}
                         >
                           ★
                         </button>
