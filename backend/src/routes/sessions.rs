@@ -62,9 +62,12 @@ async fn create_session(
     session_data: web::Json<CreateSessionDto>,
     req: HttpRequest,
 ) -> impl Responder {
-    let extensions = req.extensions();
-    let claims = extensions.get::<jwt::Claims>().unwrap();
-    let user_id = claims.sub.clone();
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.sub.clone()
+    };
 
     // Create a new session with the authenticated user as host
     let session_data = session_data.into_inner();
@@ -102,11 +105,14 @@ async fn get_session(
     req: HttpRequest,
 ) -> impl Responder {
     let id = path.into_inner();
-    
-    let extensions = req.extensions();
-    let claims = extensions.get::<jwt::Claims>().unwrap();
-    let user_id = claims.sub.clone();
-        
+
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.sub.clone()
+    };
+
     match session_service::get_session_by_id(&db, &id, Some(&user_id)).await {
         Ok(Some(session)) => HttpResponse::Ok().json(session),
         Ok(None) => HttpResponse::NotFound().json(serde_json::json!({
@@ -150,7 +156,7 @@ async fn join_session(
     join_data: web::Json<JoinSessionDto>,
 ) -> impl Responder {
     let id = path.into_inner();
-            
+
     let join_data = join_data.into_inner();
 
     match session_service::join_session(&db, &id, join_data).await {
@@ -193,11 +199,12 @@ async fn start_session(
 ) -> impl Responder {
     let id = path.into_inner();
 
-    // Extract the user ID from the authentication token
-    let extensions = req.extensions();
-    let claims = extensions.get::<jwt::Claims>().unwrap();
-    let user_id = claims.sub.clone();
-            
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.sub.clone()
+    };
 
     match session_service::start_session(&db, &id, &user_id).await {
         Ok(session) => HttpResponse::Ok().json(session),
@@ -237,11 +244,13 @@ async fn cancel_session(
     req: HttpRequest,
 ) -> impl Responder {
     let id = path.into_inner();
-    
-    let extensions = req.extensions();
-    let claims = extensions.get::<jwt::Claims>().unwrap();
-    let user_id = claims.sub.clone();
-            
+
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.sub.clone()
+    };
 
     match session_service::cancel_session(&db, &id, &user_id).await {
         Ok(_) => HttpResponse::Ok().json(serde_json::json!({
@@ -331,9 +340,12 @@ async fn get_results(
 ) -> impl Responder {
     let id = path.into_inner();
 
-    let extensions = req.extensions();
-    let claims = extensions.get::<jwt::Claims>().unwrap();
-    let user_id = claims.sub.clone();
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.sub.clone()
+    };
 
     match session_service::get_session_results(&db, &id, &user_id).await {
         Ok(results) => HttpResponse::Ok().json(results),
@@ -377,9 +389,12 @@ async fn rate_session(
 ) -> impl Responder {
     let id = path.into_inner();
 
-    let extensions = req.extensions();
-    let claims = extensions.get::<jwt::Claims>().unwrap();
-    let user_id = claims.sub.clone();
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.sub.clone()
+    };
 
     // Update rating data with user ID
     let mut rating_data = rating_data.into_inner();
