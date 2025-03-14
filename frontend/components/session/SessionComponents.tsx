@@ -17,10 +17,32 @@ import {
 import { storageUtils } from '@/components/session/SessionUtils';
 import { SessionState, FriendState, ResultState, ResultAction } from '@/components/session/SessionReducers';
 
+// Define the session data interface
+interface JoinedPlayer {
+  userId: string;
+  username: string;
+  nightfarer: string;
+  joinedAt: string;
+}
+
+interface SessionData {
+  id: string;
+  hostId: string;
+  status: string;
+  nightLord: string;
+  joinedPlayers: JoinedPlayer[];
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  password: string | null;
+}
+
 interface PlayerSectionProps {
   sessionState: SessionState;
   friendState: FriendState;
   addFriend: (playerId: string) => void;
+  sessionData?: SessionData;
 }
 
 interface PlayerRowProps {
@@ -46,11 +68,13 @@ interface SessionControlButtonsProps {
   startSession: () => void;
   resetSession: () => void;
   showConfirmDialog: () => void;
+  disabled?: boolean;
 }
 
 interface SessionInfoSectionProps {
   sessionState: SessionState;
   formatTime: (seconds: number) => string;
+  sessionData?: SessionData;
 }
 
 interface RatingStarsProps {
@@ -83,29 +107,51 @@ interface WarningDialogProps {
 }
 
 // Player section component
-export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, friendState, addFriend }) => (
+export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, friendState, addFriend, sessionData }) => (
   <Card>
     <CardHeader>
       <CardTitle>Players</CardTitle>
     </CardHeader>
     <CardContent className="space-y-4">
-      {/* Player 1 (You) */}
-      <div className="flex items-start sm:items-center space-x-4">
-        <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary mt-1 sm:mt-0">
-          <span>You</span>
-        </Avatar>
-        <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
-          <div className="bg-secondary/50 px-3 py-2 rounded-md">
-            <span className="text-foreground">DarkKnight88</span>
+      {/* Player 1 (You) - Host */}
+      {sessionData && sessionData.joinedPlayers.length > 0 && (
+        <div className="flex items-start sm:items-center space-x-4">
+          <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary mt-1 sm:mt-0">
+            <span>You</span>
+          </Avatar>
+          <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
+            <div className="bg-secondary/50 px-3 py-2 rounded-md">
+              <span className="text-foreground">{sessionData.joinedPlayers[0].username}</span>
+            </div>
+            <div className="bg-secondary/50 px-3 py-2 rounded-md">
+              <span className="text-foreground">{sessionData.joinedPlayers[0].nightfarer}</span>
+            </div>
+            <Badge variant="outline" className="text-emerald-500 border-emerald-500 ml-auto">
+              Reported
+            </Badge>
           </div>
-          <div className="bg-secondary/50 px-3 py-2 rounded-md">
-            <span className="text-foreground">Shadow Lord</span>
-          </div>
-          <Badge variant="outline" className="text-emerald-500 border-emerald-500 ml-auto">
-            Reported
-          </Badge>
         </div>
-      </div>
+      )}
+
+      {/* If no session data, show default player */}
+      {(!sessionData || sessionData.joinedPlayers.length === 0) && (
+        <div className="flex items-start sm:items-center space-x-4">
+          <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary mt-1 sm:mt-0">
+            <span>You</span>
+          </Avatar>
+          <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
+            <div className="bg-secondary/50 px-3 py-2 rounded-md">
+              <span className="text-foreground">DarkKnight88</span>
+            </div>
+            <div className="bg-secondary/50 px-3 py-2 rounded-md">
+              <span className="text-foreground">Shadow Lord</span>
+            </div>
+            <Badge variant="outline" className="text-emerald-500 border-emerald-500 ml-auto">
+              Reported
+            </Badge>
+          </div>
+        </div>
+      )}
 
       {/* Player 2 */}
       <PlayerRow 
@@ -212,7 +258,8 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
   sessionState, 
   startSession, 
   resetSession, 
-  showConfirmDialog 
+  showConfirmDialog, 
+  disabled
 }) => (
   <Card className="mt-6">
     <CardContent className="py-6">
@@ -224,6 +271,7 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
               size="lg" 
               className="flex-1 h-14 text-lg"
               onClick={resetSession}
+              disabled={disabled}
             >
               <span className="sm:hidden flex flex-col items-center">
                 <span>New Session</span>
@@ -240,6 +288,7 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
               className="flex-1 h-12"
               onClick={() => storageUtils.clearSessionData()}
               asChild
+              disabled={disabled}
             >
               <Link href="/sessions">Back to Sessions</Link>
             </Button>
@@ -248,6 +297,7 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
               className="flex-1 h-12"
               onClick={() => storageUtils.clearSessionData()}
               asChild
+              disabled={disabled}
             >
               <Link href="/sessions/create">Create New Session</Link>
             </Button>
@@ -259,7 +309,7 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
             size="lg" 
             className="flex-1 h-14 text-lg"
             onClick={startSession}
-            disabled={sessionState.isSessionStarted}
+            disabled={sessionState.isSessionStarted || disabled}
           >
             {sessionState.isSessionStarted ? 'Session Started' : 'Start Session'}
           </Button>
@@ -268,7 +318,7 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
             variant="destructive" 
             className="flex-1 h-14 text-lg"
             onClick={showConfirmDialog}
-            disabled={!sessionState.isSessionStarted || sessionState.isSessionFinished}
+            disabled={!sessionState.isSessionStarted || sessionState.isSessionFinished || disabled}
           >
             Finish Session
           </Button>
@@ -279,7 +329,7 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
 );
 
 // Session information section component
-export const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({ sessionState, formatTime }) => (
+export const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({ sessionState, formatTime, sessionData }) => (
   <Card className="flex flex-col flex-grow">
     <CardHeader>
       <CardTitle>Session Information</CardTitle>
@@ -287,21 +337,43 @@ export const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({ sessionS
     <CardContent className="space-y-4 flex-grow flex flex-col">
       <div className="flex justify-between items-center">
         <span className="text-muted-foreground">Night Lord:</span>
-        <span className="text-foreground">Tricephalos</span>
+        <span className="text-foreground">{sessionData ? sessionData.nightLord : 'Tricephalos'}</span>
       </div>
       <div className="flex justify-between items-center">
         <span className="text-muted-foreground">Created By:</span>
-        <span className="text-foreground">DarkKnight88</span>
+        <span className="text-foreground">
+          {sessionData && sessionData.joinedPlayers.length > 0 
+            ? sessionData.joinedPlayers[0].username 
+            : 'DarkKnight88'}
+        </span>
       </div>
       <div className="flex justify-between items-center">
         <span className="text-muted-foreground">Status:</span>
         <Badge 
           variant="outline" 
-          className={`${sessionState.isSessionStarted 
-            ? "bg-amber-950/30 text-amber-500 border-amber-500" 
-            : "bg-secondary/50 text-muted-foreground border-muted-foreground"}`}
+          className={`${
+            sessionData 
+              ? (sessionData.status === 'Open' 
+                ? "bg-secondary/50 text-muted-foreground border-muted-foreground"
+                : sessionData.status === 'InProgress' 
+                  ? "bg-amber-950/30 text-amber-500 border-amber-500"
+                  : sessionData.status === 'Completed'
+                    ? "bg-emerald-950/30 text-emerald-500 border-emerald-500"
+                    : "bg-secondary/50 text-muted-foreground border-muted-foreground")
+              : (sessionState.isSessionStarted 
+                ? "bg-amber-950/30 text-amber-500 border-amber-500" 
+                : "bg-secondary/50 text-muted-foreground border-muted-foreground")
+          }`}
         >
-          {sessionState.isSessionStarted ? 'In Progress' : 'Not Started'}
+          {sessionData 
+            ? (sessionData.status === 'Open' 
+              ? 'Not Started' 
+              : sessionData.status === 'InProgress' 
+                ? 'In Progress' 
+                : sessionData.status === 'Completed'
+                  ? 'Completed'
+                  : sessionData.status)
+            : (sessionState.isSessionStarted ? 'In Progress' : 'Not Started')}
         </Badge>
       </div>
       <div className="flex justify-between items-center">

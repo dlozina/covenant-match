@@ -1,7 +1,8 @@
 'use client'
 import { MainLayout } from "@/components/layout";
 import { Footer } from "@/components/layout/Footer";
-import { useEffect, useRef, useCallback, useReducer } from "react";
+import { useEffect, useRef, useCallback, useReducer, useState } from "react";
+import { useSearchParams } from "next/navigation";
 //import Link from "next/link";
 import { 
   PlayerSection,
@@ -24,10 +25,40 @@ import {
 import { storageUtils } from "@/components/session/SessionUtils";
 import { useSessionTimer } from "@/components/session/SessionHooks";
 
-// Mock session ID - in a real app, this would come from the URL or props
-const SESSION_ID = "28571";
+// Define the session data interface
+interface JoinedPlayer {
+  userId: string;
+  username: string;
+  nightfarer: string;
+  joinedAt: string;
+}
+
+interface SessionData {
+  id: string;
+  hostId: string;
+  status: string;
+  nightLord: string;
+  joinedPlayers: JoinedPlayer[];
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  password: string | null;
+}
 
 export default function SessionRunPage(): JSX.Element {
+  // Get session ID from query parameters
+  const searchParams = useSearchParams();
+  const sessionId = searchParams.get('id') || "unknown";
+  
+  // Check if session ID is valid
+  const isValidSessionId = sessionId !== "unknown" && sessionId.length > 0;
+  
+  // State for session data from API
+  const [sessionData, setSessionData] = useState<SessionData | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  
   // Use reducers for related state groups
   const [sessionState, dispatchSession] = useReducer(sessionReducer, initialSessionState);
   const [friendState, dispatchFriend] = useReducer(friendStatusReducer, {
@@ -83,7 +114,7 @@ export default function SessionRunPage(): JSX.Element {
   
   // Start session (memoized)
   const startSession = useCallback(() => {
-    if (sessionState.isSessionStarted) return;
+    if (sessionState.isSessionStarted || !isValidSessionId) return;
     
     // Set session as started
     dispatchSession({ type: 'START_SESSION' });
@@ -94,10 +125,20 @@ export default function SessionRunPage(): JSX.Element {
     lastSyncTimeRef.current = startTime;
     
     // Store in localStorage for persistence
-    storageUtils.saveSessionStart(startTime);
+    storageUtils.saveSessionStart(startTime, sessionId);
     
-    // TODO: Send API request to start session on server
-  }, [sessionState.isSessionStarted]);
+    // Send API request to start session on server
+    if (sessionData) {
+      fetch(`/api/v1/sessions/${sessionId}/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }).catch(err => {
+        console.error('Error starting session:', err);
+      });
+    }
+  }, [sessionState.isSessionStarted, sessionId, isValidSessionId, sessionData]);
   
   // Handle finish session (memoized)
   const handleFinishSession = useCallback(() => {
@@ -108,8 +149,21 @@ export default function SessionRunPage(): JSX.Element {
     // Mark session as finished in localStorage
     storageUtils.saveSessionFinish(sessionState.elapsedSeconds);
     
-    // TODO: Send API request to end session on server
-  }, [sessionState.elapsedSeconds]);
+    // Send API request to end session on server
+    if (sessionData) {
+      fetch(`/api/v1/sessions/${sessionId}/complete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          duration: sessionState.elapsedSeconds
+        })
+      }).catch(err => {
+        console.error('Error completing session:', err);
+      });
+    }
+  }, [sessionState.elapsedSeconds, sessionId, sessionData]);
   
   // Reset session (memoized)
   const resetSession = useCallback(() => {
@@ -127,6 +181,54 @@ export default function SessionRunPage(): JSX.Element {
   const addFriend = useCallback((playerId: string) => {
     dispatchFriend({ type: 'ADD_FRIEND', payload: playerId });
   }, []);
+  
+  // Effect to fetch session data from API
+  useEffect(() => {
+    if (!isValidSessionId) {
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchSessionData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+        const token = localStorage.getItem('token');
+        
+        //todo: add toast
+        // if (!token) {
+        //   toast.error("Authentication required");
+        //   router.push('/login');
+        //   return;
+        // }
+        
+        // Fetch session data from API
+        const response = await fetch(`${apiBaseUrl}/api/v1/sessions/${sessionId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch session data: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        setSessionData(data);
+      } catch (err) {
+        console.error('Error fetching session data:', err);
+        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSessionData();
+  }, [sessionId, isValidSessionId]);
   
   // Effect to handle page refresh detection
   useEffect(() => {
@@ -146,10 +248,10 @@ export default function SessionRunPage(): JSX.Element {
   
   // Effect to restore session from localStorage
   useEffect(() => {
-    const { sessionId, startTime, isFinished, finalDuration } = storageUtils.getStoredSession();
+    const { sessionId: storedSessionId, startTime, isFinished, finalDuration } = storageUtils.getStoredSession();
     
     // If the session ID doesn't match, reset everything
-    if (sessionId && sessionId !== SESSION_ID) {
+    if (storedSessionId && storedSessionId !== sessionId) {
       resetSession();
       return;
     }
@@ -192,7 +294,7 @@ export default function SessionRunPage(): JSX.Element {
         resetSession();
       }
     }
-  }, [resetSession, syncWithServer]);
+  }, [resetSession, syncWithServer, sessionId]);
   
   // Effect to handle beforeunload warning
   useEffect(() => {
@@ -235,48 +337,84 @@ export default function SessionRunPage(): JSX.Element {
       <div className="container py-10 mx-auto">
         {/* Header */}
         <div className="bg-card rounded-lg p-4 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <h1 className="text-2xl font-bold">Nightreign Session Results</h1>
-          <span className="text-muted-foreground">Session ID: {SESSION_ID}</span>
+          <h1 className="text-2xl font-bold">
+            {sessionData 
+              ? `${sessionData.nightLord} Session` 
+              : 'Nightreign Session'}
+          </h1>
+          <span className="text-muted-foreground">Session ID: {isValidSessionId ? `#${sessionId.substring(0, 8)}` : ''}</span>
         </div>
 
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column */}
-          <div className="lg:col-span-2">
-            {/* Players Section */}
-            <PlayerSection 
-              sessionState={sessionState} 
-              friendState={friendState} 
-              addFriend={addFriend} 
-            />
-
-            {/* Session Control Buttons */}
-            <SessionControlButtons 
-              sessionState={sessionState}
-              startSession={startSession}
-              resetSession={resetSession}
-              showConfirmDialog={() => dispatchDialog({ type: 'SHOW_CONFIRM' })}
-            />
+        {!isValidSessionId && (
+          <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6" role="alert">
+            <p className="font-bold">Invalid Session</p>
+            <p>No valid session ID was provided. Please check the URL and try again.</p>
           </div>
+        )}
 
-          {/* Right Column */}
-          <div className="lg:col-span-1 flex flex-col h-full">
-            {/* Report Your Result Section - Only shown after session is finished */}
-            {sessionState.isSessionFinished ? (
-              <ResultReportingSection
-                resultState={resultState}
-                dispatchResult={dispatchResult}
-                sessionState={sessionState}
-                formatTime={formatTime}
-              />
-            ) : (
-              <SessionInfoSection
-                sessionState={sessionState}
-                formatTime={formatTime}
-              />
-            )}
+        {isLoading && (
+          <div className="flex justify-center items-center p-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
-        </div>
+        )}
+
+        {error && (
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6" role="alert">
+            <p className="font-bold">Error</p>
+            <p>{error}</p>
+          </div>
+        )}
+
+        {!isLoading && !error && sessionData && (
+          /* Main Content */
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column */}
+            <div className="lg:col-span-2">
+              {/* Players Section */}
+              <PlayerSection 
+                sessionState={sessionState} 
+                friendState={friendState} 
+                addFriend={addFriend}
+                sessionData={sessionData}
+              />
+
+              {/* Session Control Buttons */}
+              <SessionControlButtons 
+                sessionState={sessionState}
+                startSession={startSession}
+                resetSession={resetSession}
+                showConfirmDialog={() => dispatchDialog({ type: 'SHOW_CONFIRM' })}
+                disabled={!isValidSessionId}
+              />
+            </div>
+
+            {/* Right Column */}
+            <div className="lg:col-span-1 flex flex-col h-full">
+              {/* Report Your Result Section - Only shown after session is finished */}
+              {sessionState.isSessionFinished ? (
+                <ResultReportingSection
+                  resultState={resultState}
+                  dispatchResult={dispatchResult}
+                  sessionState={sessionState}
+                  formatTime={formatTime}
+                />
+              ) : (
+                <SessionInfoSection
+                  sessionState={sessionState}
+                  formatTime={formatTime}
+                  sessionData={sessionData}
+                />
+              )}
+            </div>
+          </div>
+        )}
+
+        {!isLoading && !error && !sessionData && isValidSessionId && (
+          <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6" role="alert">
+            <p className="font-bold">Session Not Found</p>
+            <p>The requested session could not be found. Please check the session ID and try again.</p>
+          </div>
+        )}
       </div>
 
       {/* Dialogs */}

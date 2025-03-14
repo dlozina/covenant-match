@@ -1,7 +1,4 @@
-// Get the SESSION_ID from a constant or a configuration file
-// This would normally be imported but we're defining it here for simplicity
-const SESSION_ID = "28571";
-
+// Interface for stored session data
 interface StoredSession {
   sessionId: string | null;
   startTime: string | null;
@@ -11,9 +8,9 @@ interface StoredSession {
 
 // Local storage utility functions
 export const storageUtils = {
-  saveSessionStart: (startTime: number): void => {
+  saveSessionStart: (startTime: number, sessionId: string): void => {
     localStorage.setItem('sessionStartTime', startTime.toString());
-    localStorage.setItem('sessionId', SESSION_ID);
+    localStorage.setItem('sessionId', sessionId);
     localStorage.removeItem('sessionFinished');
   },
   
