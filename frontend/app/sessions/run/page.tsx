@@ -474,16 +474,12 @@ export default function SessionResultsPage() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Session Type:</span>
-                      <span className="text-foreground">Standard (1v1)</span>
+                      <span className="text-muted-foreground">Night Lord:</span>
+                      <span className="text-foreground">Tricephalos</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">Created By:</span>
                       <span className="text-foreground">DarkKnight88</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Time Limit:</span>
-                      <span className="text-foreground">45 minutes</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">Status:</span>
@@ -498,12 +494,12 @@ export default function SessionResultsPage() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">
-                        {isSessionStarted ? 'Session Duration:' : 'Time remaining:'}
+                        Session Duration:
                       </span>
                       <span className="text-foreground font-medium">
                         {isSessionStarted 
                           ? formatTime(elapsedSeconds)
-                          : '45m 00s'}
+                          : '0m 00s'}
                       </span>
                     </div>
                     <p className="text-sm text-muted-foreground mt-4">

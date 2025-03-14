@@ -24,7 +24,7 @@ export function MainLayout({
         )}
 
         {/* Main content area - takes remaining space */}
-        <div className="flex-grow p-6">
+        <div className="flex-grow p-4 md:p-6">
           <div className="max-w-5xl mx-auto">
             {children}
           </div>
@@ -33,6 +33,20 @@ export function MainLayout({
         {/* Right sidebar - fixed width on desktop */}
         {rightSidebar && (
           <div className="hidden md:block w-64 bg-muted p-4 shrink-0">
+            {rightSidebar}
+          </div>
+        )}
+      </div>
+      
+      {/* Mobile sidebars - shown at the bottom on small screens */}
+      <div className="md:hidden px-4 pb-6 space-y-6">
+        {leftSidebar && (
+          <div className="bg-muted/50 rounded-lg">
+            {leftSidebar}
+          </div>
+        )}
+        {rightSidebar && (
+          <div className="bg-muted/50 rounded-lg">
             {rightSidebar}
           </div>
         )}

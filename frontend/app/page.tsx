@@ -81,17 +81,17 @@ export default function Home() {
       footer={footer}
     >
       {/* Hero Section */}
-      <div className="relative rounded-lg overflow-hidden mb-12">
+      <div className="relative rounded-lg overflow-hidden mb-8 md:mb-12">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900/80 to-indigo-900/80 z-10"></div>
         <div className="absolute inset-0 bg-[url('/nightreign-bg.jpeg')] bg-cover bg-center opacity-100"></div>
-        <div className="relative z-20 px-6 py-16 md:py-24 max-w-4xl mx-auto text-center">
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-purple-300 to-indigo-200">
+        <div className="relative z-20 px-4 py-12 md:px-6 md:py-24 max-w-4xl mx-auto text-center">
+          <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 bg-clip-text text-transparent bg-gradient-to-r from-purple-300 to-indigo-200">
             Welcome to CovenantMatch
           </h1>
-          <p className="text-xl mb-8 text-slate-300">
+          <p className="text-lg md:text-xl mb-6 md:mb-8 text-slate-300">
             Find worthy allies, forge unbreakable covenants, and rise through the ranks in Nightreign.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center">
             <Button size="lg" className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white">
               <Users className="mr-2 h-5 w-5" />
               Join Now
@@ -105,16 +105,16 @@ export default function Home() {
       </div>
       
       {/* Feature Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-12">
-        <div className="group bg-gradient-to-br from-background to-purple-950/10 rounded-lg p-6 border border-purple-900/20 shadow-md hover:shadow-purple-900/5 transition-all relative overflow-hidden">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 my-8 md:my-12">
+        <div className="group bg-gradient-to-br from-background to-purple-950/10 rounded-lg p-4 md:p-6 border border-purple-900/20 shadow-md hover:shadow-purple-900/5 transition-all relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-purple-600/5 to-indigo-600/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-          <div className="flex items-start gap-4">
-            <div className="bg-purple-900/30 p-3 rounded-lg">
-              <Sword className="h-6 w-6 text-purple-400" />
+          <div className="flex items-start gap-3 md:gap-4">
+            <div className="bg-purple-900/30 p-2 md:p-3 rounded-lg">
+              <Sword className="h-5 w-5 md:h-6 md:w-6 text-purple-400" />
             </div>
             <div className="flex-1">
-              <h2 className="text-2xl font-semibold mb-2">Find Sessions</h2>
-              <p className="mb-4 text-muted-foreground">Join other Ashen Ones looking for allies and begin your hunt immediately.</p>
+              <h2 className="text-xl md:text-2xl font-semibold mb-2">Find Sessions</h2>
+              <p className="mb-4 text-sm md:text-base text-muted-foreground">Join other Ashen Ones looking for allies and begin your hunt immediately.</p>
               <Button asChild variant="outline" className="border-purple-700/50 hover:bg-purple-950/50 hover:text-purple-300">
                 <Link href="/sessions" className="flex items-center">
                   Browse Sessions
@@ -125,15 +125,15 @@ export default function Home() {
           </div>
         </div>
         
-        <div className="group bg-gradient-to-br from-background to-indigo-950/10 rounded-lg p-6 border border-indigo-900/20 shadow-md hover:shadow-indigo-900/5 transition-all relative overflow-hidden">
+        <div className="group bg-gradient-to-br from-background to-indigo-950/10 rounded-lg p-4 md:p-6 border border-indigo-900/20 shadow-md hover:shadow-indigo-900/5 transition-all relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/5 to-blue-600/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-          <div className="flex items-start gap-4">
-            <div className="bg-indigo-900/30 p-3 rounded-lg">
-              <Users className="h-6 w-6 text-indigo-400" />
+          <div className="flex items-start gap-3 md:gap-4">
+            <div className="bg-indigo-900/30 p-2 md:p-3 rounded-lg">
+              <Users className="h-5 w-5 md:h-6 md:w-6 text-indigo-400" />
             </div>
             <div className="flex-1">
-              <h2 className="text-2xl font-semibold mb-2">Create Session</h2>
-              <p className="mb-4 text-muted-foreground">Host a new covenant and summon fellow hunters to join your quest.</p>
+              <h2 className="text-xl md:text-2xl font-semibold mb-2">Create Session</h2>
+              <p className="mb-4 text-sm md:text-base text-muted-foreground">Host a new covenant and summon fellow hunters to join your quest.</p>
               <Button asChild variant="outline" className="border-indigo-700/50 hover:bg-indigo-950/50 hover:text-indigo-300">
                 <Link href="/sessions/create" className="flex items-center">
                   Create Session
@@ -146,9 +146,9 @@ export default function Home() {
       </div>
       
       {/* Features Section */}
-      <div className="bg-card/30 border border-accent/20 p-6 rounded-lg mt-8 backdrop-blur-sm">
-        <h2 className="text-2xl font-semibold mb-6 pb-2 border-b border-purple-900/20">The Dark Covenant Awaits</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="bg-card/30 border border-accent/20 p-4 md:p-6 rounded-lg mt-6 md:mt-8 backdrop-blur-sm">
+        <h2 className="text-xl md:text-2xl font-semibold mb-4 md:mb-6 pb-2 border-b border-purple-900/20">The Dark Covenant Awaits</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
           <div className="flex items-start gap-3">
             <div className="bg-purple-900/30 p-2 rounded-lg">
               <Users className="h-4 w-4 text-purple-400" />

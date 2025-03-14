@@ -78,15 +78,15 @@ export default function LoginPage() {
 
   return (
     <MainLayout footer={<Footer />}>
-      <div className="container flex items-center justify-center min-h-[80vh]">
-        <Card className="w-full max-w-sm">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold">Login</CardTitle>
-            <CardDescription>
+      <div className="container flex items-center justify-center min-h-[80vh] px-4 py-6 md:py-8">
+        <Card className="w-full max-w-sm mx-auto">
+          <CardHeader className="space-y-1 px-4 sm:px-6">
+            <CardTitle className="text-xl sm:text-2xl font-bold">Login</CardTitle>
+            <CardDescription className="text-sm">
               Enter your credentials to access your account
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 sm:px-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
@@ -94,11 +94,15 @@ export default function LoginPage() {
                   name="username"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Username</FormLabel>
+                      <FormLabel className="text-sm">Username</FormLabel>
                       <FormControl>
-                        <Input placeholder="username" {...field} />
+                        <Input 
+                          placeholder="username" 
+                          {...field} 
+                          className="h-10 text-base" 
+                        />
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="text-xs sm:text-sm" />
                     </FormItem>
                   )}
                 />
@@ -108,23 +112,32 @@ export default function LoginPage() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Password</FormLabel>
+                      <FormLabel className="text-sm">Password</FormLabel>
                       <FormControl>
-                        <Input placeholder="********" type="password" {...field} />
+                        <Input 
+                          placeholder="********" 
+                          type="password" 
+                          {...field} 
+                          className="h-10 text-base" 
+                        />
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="text-xs sm:text-sm" />
                     </FormItem>
                   )}
                 />
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
+                <Button 
+                  type="submit" 
+                  className="w-full h-10 text-sm sm:text-base" 
+                  disabled={isLoading}
+                >
                   {isLoading ? "Logging in..." : "Login"}
                 </Button>
               </form>
             </Form>
           </CardContent>
-          <CardFooter className="flex flex-col items-center justify-center space-y-2">
-            <div className="text-sm text-muted-foreground">
+          <CardFooter className="flex flex-col items-center justify-center space-y-2 px-4 sm:px-6 pb-6">
+            <div className="text-xs sm:text-sm text-muted-foreground">
               Don&apos;t have an account?{" "}
               <Link href="/create-profile" className="text-primary hover:underline">
                 Create one
