@@ -291,6 +291,7 @@ export default function SessionsPage() {
                   <PaginationItem>
                     <PaginationPrevious 
                       href="#" 
+                      size="default"
                       onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
                         e.preventDefault();
                         if (currentPage > 1) setCurrentPage(currentPage - 1);
@@ -303,6 +304,7 @@ export default function SessionsPage() {
                     <PaginationItem key={page}>
                       <PaginationLink 
                         href="#" 
+                        size="default"
                         onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
                           e.preventDefault();
                           setCurrentPage(page);
@@ -317,6 +319,7 @@ export default function SessionsPage() {
                   <PaginationItem>
                     <PaginationNext 
                       href="#" 
+                      size="default"
                       onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
                         e.preventDefault();
                         if (currentPage < totalPages) setCurrentPage(currentPage + 1);

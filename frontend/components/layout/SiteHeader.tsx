@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Menu, UserPlus, Sword, Users, LayoutDashboard, User } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Menu, UserPlus, Sword, Users, LayoutDashboard, User, LogOut, LogIn } from "lucide-react";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -13,10 +15,67 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 export function SiteHeader() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userData, setUserData] = useState<{ username: string; displayName: string } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function checkAuthStatus() {
+      try {
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+          setIsLoggedIn(false);
+          setUserData(null);
+          return;
+        }
+
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+        const response = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+        });
+
+        if (!response.ok) {
+          // Token might be invalid or expired
+          localStorage.removeItem('token');
+          setIsLoggedIn(false);
+          setUserData(null);
+          return;
+        }
+
+        const data = await response.json();
+        setUserData(data);
+        setIsLoggedIn(true);
+      } catch (error) {
+        console.error("Auth check failed:", error);
+        setIsLoggedIn(false);
+        setUserData(null);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    checkAuthStatus();
+  }, [pathname]); // Re-check when pathname changes
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setIsLoggedIn(false);
+    setUserData(null);
+    toast.success("Logged out successfully");
+    router.push('/');
+  };
 
   const routes = [
     {
@@ -62,7 +121,7 @@ export function SiteHeader() {
             </div>
             <span className="inline-block font-bold text-xl tracking-tight bg-clip-text text-transparent 
               bg-gradient-to-r from-purple-400 to-indigo-300">
-              CovenantMatch
+              Covenant Match
             </span>
           </Link>
           <nav className="hidden md:flex md:ml-10 gap-6">
@@ -86,17 +145,71 @@ export function SiteHeader() {
 
         {/* Right section: buttons */}
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="hover:bg-purple-500/10 hover:text-purple-400 hover:border-purple-500/50 transition-all"
-            asChild
-          >
-            <Link href="/create-profile" className="flex items-center gap-2">
-              <UserPlus className="h-4 w-4" />
-              <span className="hidden sm:inline">Create Profile</span>
-            </Link>
-          </Button>
+          {!isLoading && (
+            <>
+              {isLoggedIn && userData ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      className="flex items-center gap-2 hover:bg-purple-500/10 hover:text-purple-400 transition-all"
+                    >
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="bg-gradient-to-br from-purple-700 to-indigo-900 text-white text-xs">
+                          {userData.displayName?.substring(0, 2) || userData.username?.substring(0, 2)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="hidden sm:inline font-medium">{userData.displayName || userData.username}</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[200px]">
+                    <DropdownMenuItem asChild>
+                      <Link href="/profile" className="w-full flex items-center">
+                        <User className="h-4 w-4 mr-2" />
+                        Profile
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/edit-profile" className="w-full flex items-center">
+                        <User className="h-4 w-4 mr-2" />
+                        Edit Profile
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout} className="w-full flex items-center text-red-500 focus:text-red-500">
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Logout
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="hover:bg-purple-500/10 hover:text-purple-400 hover:border-purple-500/50 transition-all"
+                    asChild
+                  >
+                    <Link href="/login" className="flex items-center gap-2">
+                      <LogIn className="h-4 w-4" />
+                      <span className="hidden sm:inline">Login</span>
+                    </Link>
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="hover:bg-purple-500/10 hover:text-purple-400 hover:border-purple-500/50 transition-all"
+                    asChild
+                  >
+                    <Link href="/create-profile" className="flex items-center gap-2">
+                      <UserPlus className="h-4 w-4" />
+                      <span className="hidden sm:inline">Create Profile</span>
+                    </Link>
+                  </Button>
+                </>
+              )}
+            </>
+          )}
           {/* Change theme toggle to be on the right side of the header */}
           {/* <ThemeToggle /> */}
           <div className="md:hidden">
@@ -126,12 +239,28 @@ export function SiteHeader() {
                     </Link>
                   </DropdownMenuItem>
                 ))}
-                <DropdownMenuItem asChild>
-                  <Link href="/create-profile" className="w-full flex items-center">
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Create Profile
-                  </Link>
-                </DropdownMenuItem>
+                {!isLoggedIn && (
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link href="/login" className="w-full flex items-center">
+                        <LogIn className="h-4 w-4 mr-2" />
+                        Login
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/create-profile" className="w-full flex items-center">
+                        <UserPlus className="h-4 w-4 mr-2" />
+                        Create Profile
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {isLoggedIn && (
+                  <DropdownMenuItem onClick={handleLogout} className="w-full flex items-center text-red-500 focus:text-red-500">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Logout
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

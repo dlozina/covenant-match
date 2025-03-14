@@ -86,7 +86,7 @@ export default function Home() {
         <div className="absolute inset-0 bg-[url('/nightreign-bg.jpeg')] bg-cover bg-center opacity-100"></div>
         <div className="relative z-20 px-4 py-12 md:px-6 md:py-24 max-w-4xl mx-auto text-center">
           <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 bg-clip-text text-transparent bg-gradient-to-r from-purple-300 to-indigo-200">
-            Welcome to CovenantMatch
+            Welcome to Covenant Match
           </h1>
           <p className="text-lg md:text-xl mb-6 md:mb-8 text-slate-300">
             Find worthy allies, forge unbreakable covenants, and rise through the ranks in Nightreign.
