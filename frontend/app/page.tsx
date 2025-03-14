@@ -93,12 +93,16 @@ export default function Home() {
           </p>
           <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center">
             <Button size="lg" className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white">
-              <Users className="mr-2 h-5 w-5" />
-              Join Now
+              <Link href="/create-profile" className="flex items-center">
+                <Users className="mr-2 h-5 w-5" />
+                Join Now
+              </Link>
             </Button>
             <Button size="lg" variant="outline" className="border-purple-500 text-purple-300 hover:bg-purple-950/50">
-              <Compass className="mr-2 h-5 w-5" />
-              Explore Sessions
+              <Link href="/sessions" className="flex items-center">
+                <Compass className="mr-2 h-5 w-5" />
+                Explore Sessions
+              </Link>
             </Button>
           </div>
         </div>
