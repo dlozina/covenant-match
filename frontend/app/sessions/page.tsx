@@ -56,25 +56,22 @@ export default function SessionsPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("Open");
   const [friendFilter, setFriendFilter] = useState<FriendFilter>("All");
   const limit = 10;
 
   useEffect(() => {
     fetchSessions();
-  }, [currentPage]);
+  }, [currentPage, statusFilter]);
 
   useEffect(() => {
     applyFilters();
-  }, [sessions, statusFilter, friendFilter]);
+  }, [sessions, friendFilter]);
 
   function applyFilters() {
-    let result = [...sessions];
+    const result = [...sessions];
     
-    // Apply status filter
-    if (statusFilter !== "All") {
-      result = result.filter(session => session.status === statusFilter);
-    }
+    // Status filtering is now handled at the API level
     
     // Apply friend filter (placeholder for future implementation)
     if (friendFilter === "Friends") {
@@ -107,7 +104,9 @@ export default function SessionsPage() {
       }
 
       const offset = (currentPage - 1) * limit;
-      const response = await fetch(`${apiBaseUrl}/api/v1/sessions?limit=${limit}&offset=${offset}`, {
+      // Add status parameter to only fetch sessions with the current status filter
+      const statusParam = statusFilter !== 'All' ? `&status=${statusFilter}` : '';
+      const response = await fetch(`${apiBaseUrl}/api/v1/sessions?limit=${limit}&offset=${offset}${statusParam}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -141,6 +140,13 @@ export default function SessionsPage() {
       if (!token) {
         toast.error("Authentication required");
         router.push('/login');
+        return;
+      }
+
+      // Check if the session is open before attempting to join
+      const session = sessions.find(s => s.id === sessionId);
+      if (!session || session.status !== 'Open') {
+        toast.error("You can only join open sessions");
         return;
       }
 
@@ -270,14 +276,17 @@ export default function SessionsPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleJoinSession(session.id)}
-                          disabled={session.status !== 'Open'}
-                        >
-                          {session.status === 'Open' ? 'Join Session' : 'View Session'}
-                        </Button>
+                        {session.status === 'Open' ? (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleJoinSession(session.id)}
+                          >
+                            Join Session
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Not Available</span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
