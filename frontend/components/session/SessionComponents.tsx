@@ -23,6 +23,7 @@ interface JoinedPlayer {
   username: string;
   nightfarer: string;
   joinedAt: string;
+  hasReported?: boolean;
 }
 
 interface SessionData {
@@ -70,6 +71,7 @@ interface SessionControlButtonsProps {
   resetSession: () => void;
   showConfirmDialog: () => void;
   disabled?: boolean;
+  sessionData?: SessionData;
 }
 
 interface SessionInfoSectionProps {
@@ -107,8 +109,49 @@ interface WarningDialogProps {
   onClose: () => void;
 }
 
+// Helper function to determine player status badge
+const getPlayerStatusBadge = (
+  isHost: boolean, 
+  sessionState: SessionState, 
+  hasReported: boolean = false
+) => {
+  // For finished sessions
+  if (sessionState.isSessionFinished) {
+    // The host is assumed to have reported (since they finish the session)
+    if (isHost || hasReported) {
+      return {
+        color: "bg-emerald-950/30 text-emerald-500 border-emerald-500",
+        text: "Reported"
+      };
+    } else {
+      return {
+        color: "bg-red-950/30 text-red-500 border-red-500",
+        text: "Result Pending"
+      };
+    }
+  }
+  
+  // For sessions in progress
+  if (sessionState.isSessionStarted) {
+    return {
+      color: "bg-purple-950/30 text-purple-500 border-purple-500",
+      text: "Running"
+    };
+  }
+  
+  // For sessions not yet started
+  return {
+    color: "bg-amber-950/30 text-amber-500 border-amber-500",
+    text: "Ready"
+  };
+};
+
 // Player section component
-export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, friendState, addFriend, sessionData }) => (
+export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, friendState, addFriend, sessionData }) => {
+  // Get status for host player
+  const hostStatus = getPlayerStatusBadge(true, sessionState);
+  
+  return (
   <Card>
     <CardHeader>
       <CardTitle>Players</CardTitle>
@@ -127,8 +170,8 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, frie
             <div className="bg-secondary/50 px-3 py-2 rounded-md">
               <span className="text-foreground">{sessionData.joinedPlayers[0].nightfarer}</span>
             </div>
-            <Badge variant="outline" className="text-emerald-500 border-emerald-500 ml-auto">
-              Reported
+            <Badge variant="outline" className={`ml-auto ${hostStatus.color}`}>
+              {hostStatus.text}
             </Badge>
           </div>
         </div>
@@ -147,44 +190,49 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, frie
             <div className="bg-secondary/50 px-3 py-2 rounded-md">
               <span className="text-foreground">Shadow Lord</span>
             </div>
-            <Badge variant="outline" className="text-emerald-500 border-emerald-500 ml-auto">
-              Reported
+            <Badge variant="outline" className={`ml-auto ${hostStatus.color}`}>
+              {hostStatus.text}
             </Badge>
           </div>
         </div>
       )}
 
       {/* Additional players from joinedPlayers array (starting from index 1) */}
-      {sessionData && sessionData.joinedPlayers.slice(1).map((player, index) => (
-        <div key={player.userId} className="flex items-center space-x-4">
-          <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary">
-            <span>P{index + 2}</span>
-          </Avatar>
-          <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
-            <div className="bg-secondary/50 px-3 py-2 rounded-md">
-              <span className="text-foreground">{player.username}</span>
-            </div>
-            <div className="bg-secondary/50 px-3 py-2 rounded-md">
-              <span className="text-foreground">{player.nightfarer}</span>
-            </div>
-            <div className="flex items-center gap-2 ml-auto">
-              {sessionState.isSessionFinished && (
-                <FriendButton 
-                  playerId={player.userId} 
-                  isFriend={friendState[player.userId]} 
-                  onAddFriend={addFriend} 
-                />
-              )}
-              <Badge 
-                variant="outline" 
-                className="text-muted-foreground border-muted-foreground ml-auto"
-              >
-                Pending
-              </Badge>
+      {sessionData && sessionData.joinedPlayers.slice(1).map((player, index) => {
+        // Get status for this player
+        const playerStatus = getPlayerStatusBadge(false, sessionState, player.hasReported);
+        
+        return (
+          <div key={player.userId} className="flex items-center space-x-4">
+            <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary">
+              <span>P{index + 2}</span>
+            </Avatar>
+            <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
+              <div className="bg-secondary/50 px-3 py-2 rounded-md">
+                <span className="text-foreground">{player.username}</span>
+              </div>
+              <div className="bg-secondary/50 px-3 py-2 rounded-md">
+                <span className="text-foreground">{player.nightfarer}</span>
+              </div>
+              <div className="flex items-center gap-2 ml-auto">
+                {sessionState.isSessionFinished && (
+                  <FriendButton 
+                    playerId={player.userId} 
+                    isFriend={friendState[player.userId]} 
+                    onAddFriend={addFriend} 
+                  />
+                )}
+                <Badge 
+                  variant="outline" 
+                  className={`ml-auto ${playerStatus.color}`}
+                >
+                  {playerStatus.text}
+                </Badge>
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       {/* Empty player slots to maintain layout */}
       {(!sessionData || sessionData.joinedPlayers.length < 3) && (
@@ -204,7 +252,7 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, frie
                 </div>
                 <Badge 
                   variant="outline" 
-                  className="text-muted-foreground border-muted-foreground ml-auto"
+                  className="bg-secondary/50 text-muted-foreground border-muted-foreground ml-auto"
                 >
                   Waiting
                 </Badge>
@@ -227,7 +275,7 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, frie
                 </div>
                 <Badge 
                   variant="outline" 
-                  className="text-muted-foreground border-muted-foreground ml-auto"
+                  className="bg-secondary/50 text-muted-foreground border-muted-foreground ml-auto"
                 >
                   Waiting
                 </Badge>
@@ -238,7 +286,8 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, frie
       )}
     </CardContent>
   </Card>
-);
+  );
+};
 
 // Player row component (used within PlayerSection)
 const PlayerRow: React.FC<PlayerRowProps> = ({ 
@@ -317,8 +366,14 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
   startSession, 
   resetSession, 
   showConfirmDialog, 
-  disabled
-}) => (
+  disabled,
+  sessionData
+}) => {
+  // Check if we have enough players to start (3 players required)
+  const hasEnoughPlayers = sessionData && sessionData.joinedPlayers.length >= 3;
+  const startButtonDisabled = sessionState.isSessionStarted || disabled || !hasEnoughPlayers;
+  
+  return (
   <Card className="mt-6">
     <CardContent className="py-6">
       {sessionState.isSessionFinished ? (
@@ -362,29 +417,39 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
           </div>
         </div>
       ) : (
-        <div className="flex flex-col sm:flex-row gap-4">
-          <Button 
-            size="lg" 
-            className="flex-1 h-14 text-lg"
-            onClick={startSession}
-            disabled={sessionState.isSessionStarted || disabled}
-          >
-            {sessionState.isSessionStarted ? 'Session Started' : 'Start Session'}
-          </Button>
-          <Button 
-            size="lg" 
-            variant="destructive" 
-            className="flex-1 h-14 text-lg"
-            onClick={showConfirmDialog}
-            disabled={!sessionState.isSessionStarted || sessionState.isSessionFinished || disabled}
-          >
-            Finish Session
-          </Button>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 flex flex-col">
+              <Button 
+                size="lg" 
+                className="h-14 text-lg w-full"
+                onClick={startSession}
+                disabled={startButtonDisabled}
+              >
+                {sessionState.isSessionStarted ? 'Session Started' : 'Start Session'}
+              </Button>
+              {!hasEnoughPlayers && !sessionState.isSessionStarted && sessionData && (
+                <p className="text-xs text-red-500 mt-1 text-center">
+                  3 players required ({sessionData.joinedPlayers.length}/3 joined)
+                </p>
+              )}
+            </div>
+            <Button 
+              size="lg" 
+              variant="destructive" 
+              className="flex-1 h-14 text-lg"
+              onClick={showConfirmDialog}
+              disabled={!sessionState.isSessionStarted || sessionState.isSessionFinished || disabled}
+            >
+              Finish Session
+            </Button>
+          </div>
         </div>
       )}
     </CardContent>
   </Card>
-);
+  );
+};
 
 // Session information section component
 export const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({ sessionState, formatTime, sessionData }) => (
@@ -394,8 +459,8 @@ export const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({ sessionS
     </CardHeader>
     <CardContent className="space-y-4 flex-grow flex flex-col">
       <div className="flex justify-between items-center">
-        <span className="text-muted-foreground">Session Name:</span>
-        <span className="text-foreground">{sessionData?.name || 'Unnamed Session'}</span>
+        <span className="text-muted-foreground">In-Game Password:</span>
+        <span className="text-foreground">{sessionData?.password || 'No Password'}</span>
       </div>
       <div className="flex justify-between items-center">
         <span className="text-muted-foreground">Night Lord:</span>
@@ -416,15 +481,15 @@ export const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({ sessionS
           className={`${
             sessionData 
               ? (sessionData.status === 'Open' 
-                ? "bg-secondary/50 text-muted-foreground border-muted-foreground"
+                ? "bg-amber-950/30 text-amber-500 border-amber-500"
                 : sessionData.status === 'InProgress' 
-                  ? "bg-amber-950/30 text-amber-500 border-amber-500"
+                  ? "bg-purple-950/30 text-purple-500 border-purple-500"
                   : sessionData.status === 'Completed'
                     ? "bg-emerald-950/30 text-emerald-500 border-emerald-500"
                     : "bg-secondary/50 text-muted-foreground border-muted-foreground")
               : (sessionState.isSessionStarted 
-                ? "bg-amber-950/30 text-amber-500 border-amber-500" 
-                : "bg-secondary/50 text-muted-foreground border-muted-foreground")
+                ? "bg-purple-950/30 text-purple-500 border-purple-500"
+                : "bg-amber-950/30 text-amber-500 border-amber-500")
           }`}
         >
           {sessionData 

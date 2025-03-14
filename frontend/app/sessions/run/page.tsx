@@ -31,6 +31,7 @@ interface JoinedPlayer {
   username: string;
   nightfarer: string;
   joinedAt: string;
+  hasReported?: boolean;
 }
 
 interface SessionData {
@@ -394,6 +395,7 @@ export default function SessionRunPage(): JSX.Element {
                 resetSession={resetSession}
                 showConfirmDialog={() => dispatchDialog({ type: 'SHOW_CONFIRM' })}
                 disabled={!isValidSessionId}
+                sessionData={sessionData}
               />
             </div>
 
