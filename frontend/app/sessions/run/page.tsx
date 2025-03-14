@@ -434,8 +434,9 @@ export default function SessionResultsPage() {
                     <Button 
                       variant="outline" 
                       className="h-20 lg:h-24 bg-secondary/50 text-foreground"
+                      title="Disconnect"
                     >
-                      DISCONNECT
+                      D/C
                     </Button>
                   </div>
 
