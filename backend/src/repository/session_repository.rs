@@ -50,7 +50,7 @@ pub async fn update_session(db: &Database, session: &GameSession) -> Result<(), 
         "$set": {
             "host_id": &session.host_id,
             "password": &session.password,
-            "character": &session.character,
+            "night_lord": &session.night_lord,
             "status": to_bson(&session.status)?,
             "joined_players": to_bson(&session.joined_players)?,
             "results": to_bson(&session.results)?,

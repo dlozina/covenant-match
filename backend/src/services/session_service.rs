@@ -12,35 +12,28 @@ use uuid::Uuid;
 
 pub async fn create_session(
     db: &Database,
+    user_id: &str,
     session_data: CreateSessionDto,
 ) -> Result<SessionResponseDto, AppError> {
+    
     // Verify host user exists
-    let host_id = session_data.host_id.clone();
-
-    let user = user_repository::find_user_by_id(db, &host_id)
+    let user = user_repository::find_user_by_id(db, &user_id)
         .await?
         .ok_or(AppError::UserNotFound)?;
-
-    // Generate session password (6 alphanumeric characters)
-    let password: String = thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(6)
-        .map(char::from)
-        .collect();
 
     let now = Utc::now();
     let session = GameSession {
         id: Uuid::new_v4().to_string(),
-        host_id: host_id.clone(),
-        password: password.clone(),
+        host_id: user_id.to_string(),
+        password: session_data.game_password,
         status: SessionStatus::Open,
         joined_players: vec![PlayerInfo {
             user_id: user.id.clone(),
             username: user.display_name.unwrap_or(user.username),
-            character: session_data.character.clone(),
+            nightfarer: session_data.nightfarer,
             joined_at: now,
         }],
-        character: session_data.character,
+        night_lord: session_data.night_lord,
         results: vec![],
         ratings: vec![],
         created_at: now,
@@ -53,8 +46,7 @@ pub async fn create_session(
     session_repository::create_session(db, &session).await?;
 
     // Convert to response DTO
-    let mut response = SessionResponseDto::from(session);
-    response.password = Some(password);
+    let response = SessionResponseDto::from(session);
 
     Ok(response)
 }
@@ -155,7 +147,7 @@ pub async fn join_session(
     session.joined_players.push(PlayerInfo {
         user_id: user_id.clone(),
         username: user.display_name.unwrap_or(user.username),
-        character: join_data.character,
+        nightfarer: join_data.nightfarer,
         joined_at: now,
     });
 
@@ -340,7 +332,7 @@ pub async fn submit_result(
                     db,
                     &player.user_id,
                     &player.username,
-                    &player.character,
+                    &player.nightfarer,
                     &player_result,
                 )
                 .await?;

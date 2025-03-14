@@ -10,6 +10,8 @@ import { useState } from "react";
 export default function CreateSessionPage() {
   const [selectedLord, setSelectedLord] = useState<string | null>(null);
   const [selectedFarer, setSelectedFarer] = useState<string | null>(null);
+  const [sessionName, setSessionName] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
   
   return (
     <MainLayout footer={<Footer />}>
@@ -34,6 +36,21 @@ export default function CreateSessionPage() {
                 id="sessionName" 
                 placeholder="Enter a name for your session" 
                 className="w-full"
+                value={sessionName}
+                onChange={(e) => setSessionName(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="password" className="text-sm font-medium">
+                In Game Password
+              </label>
+              <Input 
+                id="password" 
+                placeholder="Enter an in-game password for your session" 
+                className="w-full"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
               />
             </div>
 

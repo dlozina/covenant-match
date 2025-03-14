@@ -67,10 +67,9 @@ async fn create_session(
     let user_id = claims.sub.clone();
 
     // Create a new session with the authenticated user as host
-    let mut session_data = session_data.into_inner();
-    session_data.host_id = user_id;
+    let session_data = session_data.into_inner();
 
-    match session_service::create_session(&db, session_data).await {
+    match session_service::create_session(&db, &user_id, session_data).await {
         Ok(session) => HttpResponse::Created().json(session),
         Err(e) => {
             log::error!("Error creating session: {:?}", e);

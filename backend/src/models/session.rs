@@ -7,7 +7,7 @@ use utoipa::ToSchema;
 pub struct PlayerInfo {
     pub user_id: String,
     pub username: String,
-    pub character: String,
+    pub nightfarer: String,
     pub joined_at: DateTime<Utc>,
 }
 
@@ -41,7 +41,7 @@ pub struct GameSession {
     pub id: String,
     pub host_id: String,
     pub password: String,
-    pub character: String,
+    pub night_lord: String,
     pub status: SessionStatus,
     pub joined_players: Vec<PlayerInfo>,
     pub results: Vec<SessionResult>,
@@ -55,8 +55,10 @@ pub struct GameSession {
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateSessionDto {
-    pub host_id: String,
-    pub character: String,
+    pub name: String,
+    pub game_password: String,
+    pub nightfarer: String,
+    pub night_lord: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -64,7 +66,7 @@ pub struct CreateSessionDto {
 pub struct JoinSessionDto {
     pub user_id: String,
     pub username: String,
-    pub character: String,
+    pub nightfarer: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -80,7 +82,7 @@ pub struct SessionResponseDto {
     pub id: String,
     pub host_id: String,
     pub status: SessionStatus,
-    pub character: String,
+    pub night_lord: String,
     pub joined_players: Vec<PlayerInfo>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -96,7 +98,7 @@ impl From<GameSession> for SessionResponseDto {
             id: session.id,
             host_id: session.host_id,
             status: session.status,
-            character: session.character,
+            night_lord: session.night_lord,
             joined_players: session.joined_players,
             created_at: session.created_at,
             updated_at: session.updated_at,
