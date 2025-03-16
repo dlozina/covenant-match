@@ -50,6 +50,7 @@ use utoipa::{
         join_session,
         start_session,
         cancel_session,
+        complete_session,
         submit_result,
         get_results,
         rate_session,
