@@ -24,6 +24,7 @@ import {
 } from "@/components/session/SessionReducers";
 import { storageUtils } from "@/components/session/SessionUtils";
 import { useSessionTimer } from "@/components/session/SessionHooks";
+import { useAuth } from "@/lib/auth-context";
 
 // Define the session data interface
 interface JoinedPlayer {
@@ -68,6 +69,15 @@ function SessionRunContent(): JSX.Element {
   const [sessionData, setSessionData] = useState<SessionData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Get user data from auth context
+  const { userData } = useAuth();
+  
+  // Function to check if current user is the host
+  const isHost = useCallback(() => {
+    if (!sessionData || !userData) return false;
+    return sessionData.hostId === userData.id;
+  }, [sessionData, userData]);
   
   // Use reducers for related state groups
   const [sessionState, dispatchSession] = useReducer(sessionReducer, initialSessionState);
@@ -397,6 +407,7 @@ function SessionRunContent(): JSX.Element {
                 showConfirmDialog={() => dispatchDialog({ type: 'SHOW_CONFIRM' })}
                 disabled={!isValidSessionId}
                 sessionData={sessionData}
+                isHost={isHost()}
               />
             </div>
 

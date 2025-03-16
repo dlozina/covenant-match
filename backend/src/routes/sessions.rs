@@ -267,6 +267,57 @@ async fn cancel_session(
     }
 }
 
+/// Complete a session (host only)
+#[utoipa::path(
+    post,
+    path = "/api/v1/sessions/{id}/complete",
+    params(
+        ("id" = String, Path, description = "Session ID to complete")
+    ),
+    responses(
+        (status = 200, description = "Session completed successfully", body = SessionResponseDto),
+        (status = 400, description = "Cannot complete session (not in progress)"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Only the host can complete the session"),
+        (status = 404, description = "Session not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "sessions"
+)]
+#[post("/api/v1/sessions/{id}/complete")]
+async fn complete_session(
+    db: web::Data<Database>,
+    path: web::Path<String>,
+    req: HttpRequest,
+    body: Option<web::Json<serde_json::Value>>,
+) -> impl Responder {
+    let id = path.into_inner();
+
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.sub.clone()
+    };
+
+    // Extract duration from request body if provided
+    let duration = body.and_then(|b| b.get("duration").and_then(|d| d.as_i64()));
+
+    match session_service::complete_session(&db, &id, &user_id, duration).await {
+        Ok(session) => HttpResponse::Ok().json(session),
+        Err(e) => {
+            log::error!("Error completing session: {:?}", e);
+            HttpResponse::BadRequest().json(serde_json::json!({
+                "status": "error",
+                "message": e.to_string()
+            }))
+        }
+    }
+}
+
 /// Submit game result
 #[utoipa::path(
     post,
@@ -424,6 +475,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(join_session);
     cfg.service(start_session);
     cfg.service(cancel_session);
+    cfg.service(complete_session);
     cfg.service(submit_result);
     cfg.service(get_results);
     cfg.service(rate_session);

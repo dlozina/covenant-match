@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 
 // Define the user data type
 type UserData = {
+  id: string;  // Add user ID
   username: string;
   displayName: string;
   email: string;

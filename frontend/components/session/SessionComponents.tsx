@@ -73,6 +73,7 @@ interface SessionControlButtonsProps {
   showConfirmDialog: () => void;
   disabled?: boolean;
   sessionData?: SessionData;
+  isHost?: boolean;
 }
 
 interface SessionInfoSectionProps {
@@ -152,6 +153,11 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, frie
   // Get status for host player
   const hostStatus = getPlayerStatusBadge(true, sessionState);
   
+  // Function to check if a player is the host
+  const isPlayerHost = (playerId: string) => {
+    return sessionData && sessionData.hostId === playerId;
+  };
+  
   return (
   <Card>
     <CardHeader>
@@ -171,9 +177,16 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, frie
             <div className="bg-secondary/50 px-3 py-2 rounded-md">
               <span className="text-foreground">{sessionData.joinedPlayers[0].nightfarer}</span>
             </div>
-            <Badge variant="outline" className={`ml-auto ${hostStatus.color}`}>
-              {hostStatus.text}
-            </Badge>
+            <div className="flex items-center gap-2 ml-auto">
+              {isPlayerHost(sessionData.joinedPlayers[0].userId) && (
+                <Badge variant="outline" className="bg-blue-950/30 text-blue-500 border-blue-500">
+                  Host
+                </Badge>
+              )}
+              <Badge variant="outline" className={hostStatus.color}>
+                {hostStatus.text}
+              </Badge>
+            </div>
           </div>
         </div>
       )}
@@ -191,9 +204,14 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, frie
             <div className="bg-secondary/50 px-3 py-2 rounded-md">
               <span className="text-foreground">Shadow Lord</span>
             </div>
-            <Badge variant="outline" className={`ml-auto ${hostStatus.color}`}>
-              {hostStatus.text}
-            </Badge>
+            <div className="flex items-center gap-2 ml-auto">
+              <Badge variant="outline" className="bg-blue-950/30 text-blue-500 border-blue-500">
+                Host
+              </Badge>
+              <Badge variant="outline" className={hostStatus.color}>
+                {hostStatus.text}
+              </Badge>
+            </div>
           </div>
         </div>
       )}
@@ -216,6 +234,11 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, frie
                 <span className="text-foreground">{player.nightfarer}</span>
               </div>
               <div className="flex items-center gap-2 ml-auto">
+                {isPlayerHost(player.userId) && (
+                  <Badge variant="outline" className="bg-blue-950/30 text-blue-500 border-blue-500">
+                    Host
+                  </Badge>
+                )}
                 {sessionState.isSessionFinished && (
                   <FriendButton 
                     playerId={player.userId} 
@@ -225,7 +248,7 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, frie
                 )}
                 <Badge 
                   variant="outline" 
-                  className={`ml-auto ${playerStatus.color}`}
+                  className={playerStatus.color}
                 >
                   {playerStatus.text}
                 </Badge>
@@ -369,11 +392,24 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
   resetSession, 
   showConfirmDialog, 
   disabled,
-  sessionData
+  sessionData,
+  isHost = false // Default to false if not provided
 }) => {
   // Check if we have enough players to start (3 players required)
   const hasEnoughPlayers = sessionData && sessionData.joinedPlayers.length >= 3;
-  const startButtonDisabled = sessionState.isSessionStarted || disabled || !hasEnoughPlayers;
+  
+  // Disable buttons based on session state and host status
+  const startButtonDisabled = sessionState.isSessionStarted || disabled || !hasEnoughPlayers || !isHost;
+  const finishButtonDisabled = !sessionState.isSessionStarted || sessionState.isSessionFinished || disabled || !isHost;
+  
+  // Create tooltips for the buttons
+  const startButtonTooltip = !isHost ? "Only the host can start the session" : 
+                            !hasEnoughPlayers ? "Need at least 3 players to start" : 
+                            sessionState.isSessionStarted ? "Session already started" : "";
+                            
+  const finishButtonTooltip = !isHost ? "Only the host can finish the session" : 
+                             !sessionState.isSessionStarted ? "Session must be started first" : 
+                             sessionState.isSessionFinished ? "Session already finished" : "";
   
   return (
   <Card className="mt-6">
@@ -386,7 +422,8 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
               size="lg" 
               className="flex-1 h-14 text-lg"
               onClick={resetSession}
-              disabled={disabled}
+              disabled={disabled || !isHost}
+              title={!isHost ? "Only the host can start a new session" : ""}
             >
               <span className="sm:hidden flex flex-col items-center">
                 <span>New Session</span>
@@ -427,6 +464,7 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
                 className="h-14 text-lg w-full"
                 onClick={startSession}
                 disabled={startButtonDisabled}
+                title={startButtonTooltip}
               >
                 {sessionState.isSessionStarted ? 'Session Started' : 'Start Session'}
               </Button>
@@ -435,13 +473,19 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
                   3 players required ({sessionData.joinedPlayers.length}/3 joined)
                 </p>
               )}
+              {!isHost && !sessionState.isSessionStarted && (
+                <p className="text-xs text-amber-500 mt-1 text-center">
+                  Only the host can start the session
+                </p>
+              )}
             </div>
             <Button 
               size="lg" 
               variant="destructive" 
               className="flex-1 h-14 text-lg"
               onClick={showConfirmDialog}
-              disabled={!sessionState.isSessionStarted || sessionState.isSessionFinished || disabled}
+              disabled={finishButtonDisabled}
+              title={finishButtonTooltip}
             >
               Finish Session
             </Button>

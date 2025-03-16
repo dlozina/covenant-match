@@ -15,7 +15,6 @@ pub async fn create_session(
     user_id: &str,
     session_data: CreateSessionDto,
 ) -> Result<SessionResponseDto, AppError> {
-    
     // Verify host user exists
     let user = user_repository::find_user_by_id(db, &user_id)
         .await?
@@ -95,8 +94,7 @@ pub async fn get_session_by_id(
 
         // Only include password if user is a participant
         if let Some(user_id) = user_id {
-            if !response.joined_players.iter().any(|p| p.user_id == user_id) {
-            }
+            if !response.joined_players.iter().any(|p| p.user_id == user_id) {}
         }
 
         response
@@ -455,4 +453,41 @@ pub async fn rate_session(
     session_repository::update_session(db, &session).await?;
 
     Ok(())
+}
+
+pub async fn complete_session(
+    db: &Database,
+    session_id: &str,
+    user_id: &str,
+    duration: Option<i64>,
+) -> Result<SessionResponseDto, AppError> {
+    // Get the session
+    let mut session = session_repository::find_by_id(db, session_id)
+        .await?
+        .ok_or(AppError::SessionNotFound)?;
+
+    // Check if user is the host
+    if session.host_id != user_id {
+        return Err(AppError::Forbidden(
+            "Only the host can complete the session".to_string(),
+        ));
+    }
+
+    // Check if session can be completed (must be InProgress)
+    if session.status != SessionStatus::InProgress {
+        return Err(AppError::BadRequest(
+            "Only in-progress sessions can be completed".to_string(),
+        ));
+    }
+
+    // Update session status
+    let now = Utc::now();
+    session.status = SessionStatus::Completed;
+    session.completed_at = Some(now);
+    session.updated_at = now;
+
+    // Update the session in the database
+    session_repository::update_session(db, &session).await?;
+
+    Ok(SessionResponseDto::from(session))
 }
