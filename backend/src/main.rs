@@ -6,9 +6,11 @@ mod repository;
 mod routes;
 mod services;
 mod utils;
+mod ws;
 
 use crate::config::get_config;
 use crate::routes::{health, users};
+use actix::Actor;
 use actix_cors::Cors;
 use actix_web::web::Data;
 use actix_web::{middleware::Logger, App, HttpServer};
@@ -17,8 +19,10 @@ use log::{info, warn};
 use middleware::auth::Auth;
 use mongodb::{options::ClientOptions, Client};
 use routes::sessions;
+use services::session_service;
 use services::user_service;
 use utoipa_swagger_ui::SwaggerUi;
+use ws::SessionManager;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -69,6 +73,13 @@ async fn main() -> std::io::Result<()> {
         info!("Users collection doesn't exist yet - it will be created on first user registration");
     }
 
+    // Start session manager actor
+    let session_manager = SessionManager::default().start();
+
+    // Set the session manager in the session service
+    session_service::set_session_manager(session_manager.clone());
+    info!("WebSocket session manager initialized");
+
     info!("Starting HTTP server on port {}", server_port);
     HttpServer::new(move || {
         // Configure CORS
@@ -76,14 +87,22 @@ async fn main() -> std::io::Result<()> {
             .allow_any_origin() // For development - restrict in production
             .allow_any_method()
             .allow_any_header()
+            .expose_headers(vec!["content-disposition"])
+            .supports_credentials()
             .max_age(3600);
 
         App::new()
             .wrap(Logger::default())
             .wrap(cors)
-            .wrap(Auth::user())
             .app_data(Data::new(db.clone()))
+            .app_data(Data::new(session_manager.clone()))
+            // WebSocket route - exempt from Auth middleware
+            .service(
+                actix_web::web::resource("/ws/{session_id}")
+                    .route(actix_web::web::get().to(ws::ws_route)),
+            )
             // Register routes directly (not inside a scope) -> scope has issues
+            .wrap(Auth::user())
             .configure(health::config)
             .configure(users::config)
             .configure(sessions::config)

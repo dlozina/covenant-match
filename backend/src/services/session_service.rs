@@ -4,11 +4,33 @@ use crate::models::session::{
     SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto,
 };
 use crate::repository::{session_repository, statistics_repository, user_repository};
+use crate::ws::messages::{Broadcast, ServerMessage};
+use crate::ws::SessionManager;
+use actix::Addr;
 use chrono::Utc;
 use mongodb::Database;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
+use serde_json::json;
+use std::sync::LazyLock;
+use std::sync::Mutex;
 use uuid::Uuid;
+
+// Global session manager reference
+static SESSION_MANAGER: LazyLock<Mutex<Option<Addr<SessionManager>>>> =
+    LazyLock::new(|| Mutex::new(None));
+
+// Function to set the session manager
+pub fn set_session_manager(addr: Addr<SessionManager>) {
+    let mut manager = SESSION_MANAGER.lock().unwrap();
+    *manager = Some(addr);
+}
+
+// Function to get the session manager
+pub fn get_session_manager() -> Option<Addr<SessionManager>> {
+    let manager = SESSION_MANAGER.lock().unwrap();
+    manager.clone()
+}
 
 pub async fn create_session(
     db: &Database,
@@ -137,12 +159,16 @@ pub async fn join_session(
         return Err(AppError::BadRequest("Session is full".to_string()));
     }
 
+    // Get the username and nightfarer for broadcasting
+    let username = user.display_name.clone().unwrap_or(user.username.clone());
+    let nightfarer = join_data.nightfarer.clone();
+
     // Add player to session
     let now = Utc::now();
     session.joined_players.push(PlayerInfo {
         user_id: user_id.clone(),
-        username: user.display_name.unwrap_or(user.username),
-        nightfarer: join_data.nightfarer,
+        username,
+        nightfarer: nightfarer.clone(),
         joined_at: now,
     });
 
@@ -155,6 +181,32 @@ pub async fn join_session(
 
     // Update the session in the database
     session_repository::update_session(db, &session).await?;
+
+    // Broadcast join event to all clients in the session
+    if let Some(session_manager) = get_session_manager() {
+        // Create the message to broadcast
+        let message = ServerMessage {
+            message_type: "join".to_string(),
+            data: json!({
+                "userId": user_id,
+                "username": user.display_name.unwrap_or(user.username),
+                "nightfarer": nightfarer,
+                "sessionId": session_id
+            }),
+        };
+
+        // Broadcast to all clients in the session except the one who just joined
+        let broadcast = Broadcast {
+            session_id: session_id.to_string(),
+            message,
+            exclude_client_id: Some(user_id.clone()),
+        };
+
+        // Send the broadcast message
+        if let Err(err) = session_manager.send(broadcast).await {
+            log::error!("Failed to broadcast join event: {:?}", err);
+        }
+    }
 
     // Create response DTO
     let response = SessionResponseDto::from(session);

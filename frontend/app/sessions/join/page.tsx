@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/lib/auth-context";
 import { jwtDecode } from "jwt-decode";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 // Define a type for session details
 interface SessionDetails {
@@ -17,6 +18,7 @@ interface SessionDetails {
   name: string;
   nightLord: string;
   nightfarer?: string;
+  players?: { userId: string; username: string; nightfarer: string }[];
   // Add other fields as needed
 }
 
@@ -45,6 +47,9 @@ function JoinSessionContent() {
   const sessionId = searchParams.get('id');
   const { userData } = useAuth();
   
+  // Initialize WebSocket connection
+  const { subscribe } = useWebSocket(sessionId);
+  
   useEffect(() => {
     // Fetch session details when component mounts
     if (sessionId) {
@@ -52,7 +57,44 @@ function JoinSessionContent() {
     } else {
       toast.error("No session ID provided");
     }
-  }, [sessionId]);
+    
+    // Subscribe to session updates
+    const unsubscribe = subscribe('join', (data) => {
+      // Update session details when a new player joins
+      toast.info(`${data.username} joined as ${data.nightfarer}`);
+      
+      // Update the session details with the new player
+      setSessionDetails(prevDetails => {
+        if (!prevDetails) return null;
+        
+        // Create a new players array if it doesn't exist
+        const players = prevDetails.players || [];
+        
+        // Add the new player if they don't already exist
+        const playerExists = players.some(p => p.userId === data.userId);
+        if (!playerExists) {
+          return {
+            ...prevDetails,
+            players: [
+              ...players,
+              {
+                userId: data.userId as string,
+                username: data.username as string,
+                nightfarer: data.nightfarer as string
+              }
+            ]
+          };
+        }
+        
+        return prevDetails;
+      });
+    });
+    
+    // Cleanup subscription on unmount
+    return () => {
+      unsubscribe();
+    };
+  }, [sessionId, subscribe]);
   
   const fetchSessionDetails = async () => {
     try {
@@ -152,6 +194,26 @@ function JoinSessionContent() {
     }
   };
   
+  // Render players list
+  const renderPlayers = () => {
+    if (!sessionDetails || !sessionDetails.players || sessionDetails.players.length === 0) {
+      return <p className="text-sm text-muted-foreground">No players have joined yet.</p>;
+    }
+    
+    return (
+      <div className="space-y-2 mt-4">
+        <h3 className="text-sm font-medium">Players:</h3>
+        <ul className="space-y-1">
+          {sessionDetails.players.map((player) => (
+            <li key={player.userId} className="text-sm">
+              {player.username} - {player.nightfarer}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  };
+  
   return (
     <MainLayout footer={<Footer />}>
       <div className="container py-6 px-4 mx-auto">
@@ -172,6 +234,7 @@ function JoinSessionContent() {
             {sessionDetails && (
               <div className="space-y-2">
                 <p className="text-sm font-medium">Night Lord: {sessionDetails.nightLord}</p>
+                {renderPlayers()}
               </div>
             )}
 

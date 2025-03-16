@@ -13,13 +13,14 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 // Define excluded paths similar to EXCLUDE_PATTERNS
-pub const EXCLUDE_PATTERNS: [(&str, Option<Method>, bool); 5] = [
+pub const EXCLUDE_PATTERNS: [(&str, Option<Method>, bool); 6] = [
     ("/api/v1/auth/login", Some(Method::POST), false),
     ("/api/v1/register", Some(Method::POST), false),
     ("/api/v1/sessions/test", Some(Method::GET), false),
-    ("/api/docs/.*", Some(Method::GET), true), 
+    ("/api/docs/.*", Some(Method::GET), true),
     ("/api-docs/.*", Some(Method::GET), true),
-    //("/api/public/.*", Some(Method::GET), true),  
+    ("/ws/.*", Some(Method::GET), true),
+    //("/api/public/.*", Some(Method::GET), true),
     //("/favicon.ico", Some(Method::GET), false),
 ];
 
@@ -33,15 +34,19 @@ impl Auth {
     pub fn user() -> Self {
         Auth { require_role: None }
     }
-    
+
     // Verify user has admin role
     pub fn admin() -> Self {
-        Auth { require_role: Some("admin".to_string()) }
+        Auth {
+            require_role: Some("admin".to_string()),
+        }
     }
-    
+
     // Verify user has a specific role
     pub fn role(role: &str) -> Self {
-        Auth { require_role: Some(role.to_string()) }
+        Auth {
+            require_role: Some(role.to_string()),
+        }
     }
 }
 
@@ -76,7 +81,7 @@ fn is_path_excluded(path: &str, method: &Method) -> bool {
     if method == Method::OPTIONS {
         return true;
     }
-    
+
     // Check against defined exclusion patterns
     EXCLUDE_PATTERNS
         .iter()
@@ -85,11 +90,11 @@ fn is_path_excluded(path: &str, method: &Method) -> bool {
                 Some(excluded) => method == excluded,
                 None => true, // If no method specified, match any method
             };
-            
+
             if !method_matches {
                 return false;
             }
-            
+
             if *is_regex {
                 // Use regex matching for patterns marked as regex
                 match Regex::new(pattern) {
@@ -121,18 +126,16 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let path = req.path().to_string();
         let method = req.method().clone();
-        
+
         log::info!("Auth middleware called for path: {}", path);
-        
+
         // Check if the path is excluded from authentication
         if is_path_excluded(&path, &method) {
             log::info!("Path excluded from authentication: {}", path);
             let fut = self.service.call(req);
-            return Box::pin(async move {
-                fut.await
-            });
+            return Box::pin(async move { fut.await });
         }
-        
+
         let require_role = self.require_role.clone();
         // Extract token from headers
         let auth_header = req.headers().get("Authorization");
@@ -142,14 +145,20 @@ where
                 let auth_str = header.to_str().unwrap_or("");
                 if auth_str.starts_with("Bearer ") {
                     let token = auth_str.trim_start_matches("Bearer ");
-                    
+
                     // Validate token and extract claims
                     match jwt::validate_token(token) {
                         Ok(claims) => {
                             // Check role if required
-                            log::info!("Token validated successfully for user: {}, role: {}", claims.sub, claims.role);
+                            log::info!(
+                                "Token validated successfully for user: {}, role: {}",
+                                claims.sub,
+                                claims.role
+                            );
                             if let Some(required_role) = &require_role {
-                                if &claims.role != required_role && !(required_role == "user" && claims.role == "admin") {
+                                if &claims.role != required_role
+                                    && !(required_role == "user" && claims.role == "admin")
+                                {
                                     Err(AppError::InsufficientPermissions)
                                 } else {
                                     // Store claims in request extensions
@@ -162,10 +171,10 @@ where
                                 Ok(())
                             }
                         }
-                        Err(e) => { 
+                        Err(e) => {
                             log::error!("Token validation error: {}", e);
                             Err(e)
-                        },
+                        }
                     }
                 } else {
                     Err(AppError::InvalidToken)
@@ -175,7 +184,7 @@ where
         };
 
         let fut = self.service.call(req);
-        
+
         Box::pin(async move {
             match auth_result {
                 Ok(_) => fut.await,
