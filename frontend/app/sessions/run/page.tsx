@@ -25,6 +25,8 @@ import {
 import { storageUtils } from "@/components/session/SessionUtils";
 import { useSessionTimer } from "@/components/session/SessionHooks";
 import { useAuth } from "@/lib/auth-context";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import { toast } from "sonner";
 
 // Define the session data interface
 interface JoinedPlayer {
@@ -72,6 +74,12 @@ function SessionRunContent(): JSX.Element {
   
   // Get user data from auth context
   const { userData } = useAuth();
+  
+  // Initialize WebSocket connection
+  const { subscribe, isConnected, reconnect } = useWebSocket(sessionId);
+  
+  // State for WebSocket connection status
+  const [wsConnected, setWsConnected] = useState<boolean>(false);
   
   // Function to check if current user is the host
   const isHost = useCallback(() => {
@@ -210,13 +218,15 @@ function SessionRunContent(): JSX.Element {
     dispatchFriend({ type: 'ADD_FRIEND', payload: playerId });
   }, []);
   
-  // Effect to fetch session data from API
+  // Fetch session data on mount and set up polling
   useEffect(() => {
     if (!isValidSessionId) {
       setIsLoading(false);
+      setError("Invalid session ID");
       return;
     }
-
+    
+    // Function to fetch session data
     const fetchSessionData = async () => {
       try {
         setIsLoading(true);
@@ -247,9 +257,49 @@ function SessionRunContent(): JSX.Element {
         setIsLoading(false);
       }
     };
-
+    
+    // Initial fetch
     fetchSessionData();
-  }, [sessionId, isValidSessionId]);
+    
+    // Subscribe to WebSocket events
+    const unsubscribeJoin = subscribe('join', (data) => {
+      toast.info(`${data.username} joined as ${data.nightfarer}`);
+      
+      // Update the session data with the new player
+      setSessionData(prevData => {
+        if (!prevData) return null;
+        
+        // Create a new players array if it doesn't exist
+        const players = prevData.joinedPlayers || [];
+        
+        // Add the new player if they don't already exist
+        const playerExists = players.some(p => p.userId === data.userId);
+        if (!playerExists) {
+          return {
+            ...prevData,
+            joinedPlayers: [
+              ...players,
+              {
+                userId: data.userId as string,
+                username: data.username as string,
+                nightfarer: data.nightfarer as string,
+                joinedAt: new Date().toISOString()
+              }
+            ]
+          };
+        }
+        
+        return prevData;
+      });
+    });
+    
+    // No polling - rely solely on WebSockets for updates
+    
+    // Cleanup function
+    return () => {
+      unsubscribeJoin(); // Unsubscribe from WebSocket events
+    };
+  }, [isValidSessionId, sessionId, subscribe]);
   
   // Effect to handle page refresh detection
   useEffect(() => {
@@ -353,6 +403,23 @@ function SessionRunContent(): JSX.Element {
     };
   }, [sessionState.isSessionFinished]);
 
+  // Check WebSocket connection status periodically
+  useEffect(() => {
+    if (!isValidSessionId) return;
+    
+    // Initial check
+    setWsConnected(isConnected());
+    
+    // Check connection status every 5 seconds
+    const statusInterval = setInterval(() => {
+      setWsConnected(isConnected());
+    }, 5000);
+    
+    return () => {
+      clearInterval(statusInterval);
+    };
+  }, [isConnected, isValidSessionId]);
+
   return (
     <MainLayout footer={<Footer />}>
       <div className="container py-10 mx-auto">
@@ -363,7 +430,23 @@ function SessionRunContent(): JSX.Element {
               ? `${sessionData.name}` 
               : 'Nightreign Session'}
           </h1>
-          <span className="text-muted-foreground">Session ID: {isValidSessionId ? `#${sessionId.substring(0, 8)}` : ''}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-muted-foreground">Session ID: {isValidSessionId ? `#${sessionId.substring(0, 8)}` : ''}</span>
+            
+            {/* WebSocket connection status */}
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <span className="text-xs text-muted-foreground">{wsConnected ? 'Connected' : 'Disconnected'}</span>
+              {!wsConnected && (
+                <button 
+                  onClick={reconnect}
+                  className="text-xs text-blue-500 hover:text-blue-700"
+                >
+                  Reconnect
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         {!isValidSessionId && (

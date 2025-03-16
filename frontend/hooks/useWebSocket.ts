@@ -33,10 +33,19 @@ class WebSocketService {
     }
     
     this.sessionId = sessionId;
+    
+    // Ensure token is available
     const token = localStorage.getItem('token');
     if (!token) {
       console.error('No authentication token found');
       toast.error('Authentication token not found');
+      
+      // Schedule a retry after a short delay - token might not be loaded yet
+      this.reconnectTimer = setTimeout(() => {
+        console.log('Retrying connection - token might be available now');
+        this.connect(sessionId);
+      }, 1000);
+      
       return;
     }
     
@@ -65,13 +74,24 @@ class WebSocketService {
       console.log('No API base URL provided, using default WebSocket host:', wsHost);
     }
     
-    const wsUrl = `${wsProtocol}//${wsHost}/ws/${sessionId}?token=${token}`;
+    const wsUrl = `${wsProtocol}//${wsHost}/ws/${sessionId}?token=${encodeURIComponent(token)}`;
     console.log('Connecting to WebSocket:', wsUrl);
     
     try {
+      // Create WebSocket with a timeout
       this.socket = new WebSocket(wsUrl);
       
+      // Set connection timeout
+      const connectionTimeout = setTimeout(() => {
+        if (this.socket && this.socket.readyState !== WebSocket.OPEN) {
+          console.error('WebSocket connection timeout');
+          this.socket.close();
+          // The onclose handler will handle reconnection
+        }
+      }, 5000); // 5 second connection timeout
+      
       this.socket.onopen = () => {
+        clearTimeout(connectionTimeout);
         console.log('WebSocket connected successfully');
         toast.success('WebSocket connected');
         this.reconnectAttempts = 0; // Reset reconnect attempts on successful connection
@@ -80,9 +100,18 @@ class WebSocketService {
       this.socket.onmessage = (event) => {
         try {
           console.log('WebSocket message received:', event.data);
-          const message: WebSocketMessage = JSON.parse(event.data);
-          const handlers = this.messageHandlers.get(message.type) || [];
-          handlers.forEach(handler => handler(message.data));
+          const message = JSON.parse(event.data);
+          
+          // Handle different message formats (backend sends message_type, frontend expects type)
+          const messageType = message.type || message.message_type;
+          const messageData = message.data;
+          
+          if (messageType && messageData) {
+            const handlers = this.messageHandlers.get(messageType) || [];
+            handlers.forEach(handler => handler(messageData));
+          } else {
+            console.warn('Received WebSocket message with invalid format:', message);
+          }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
         }
@@ -137,11 +166,15 @@ class WebSocketService {
       return;
     }
     
-    // Exponential backoff: 1s, 2s, 4s, 8s, 16s
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    // Exponential backoff with jitter: 1-2s, 2-4s, 4-8s, 8-16s, 16-32s
+    const baseDelay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    // Add jitter (±20%) to prevent reconnection storms
+    const jitter = baseDelay * 0.2 * (Math.random() - 0.5);
+    const delay = Math.max(1000, baseDelay + jitter);
+    
     this.reconnectAttempts++;
     
-    console.log(`Scheduling reconnect attempt ${this.reconnectAttempts} in ${delay}ms`);
+    console.log(`Scheduling reconnect attempt ${this.reconnectAttempts} in ${Math.round(delay)}ms`);
     
     this.reconnectTimer = setTimeout(() => {
       if (this.sessionId) {
@@ -179,6 +212,23 @@ class WebSocketService {
     console.log('Sending WebSocket message:', message);
     this.socket.send(JSON.stringify(message));
   }
+  
+  // Add a method to check connection status
+  isConnected(): boolean {
+    return this.socket !== null && this.socket.readyState === WebSocket.OPEN;
+  }
+  
+  // Add a method to manually reconnect
+  reconnect(): void {
+    if (this.sessionId) {
+      console.log('Manual reconnection requested');
+      this.disconnect();
+      this.reconnectAttempts = 0; // Reset attempts for manual reconnection
+      this.connect(this.sessionId);
+    } else {
+      console.error('Cannot reconnect: No session ID available');
+    }
+  }
 }
 
 // Create a singleton instance
@@ -194,11 +244,16 @@ export function useWebSocket(sessionId: string | null) {
     
     console.log('useWebSocket hook initializing with session ID:', sessionId);
     
-    // Connect to WebSocket
-    websocketService.connect(sessionId);
+    // Add a small delay before connecting to ensure token is loaded
+    // and server is ready to accept connections
+    const connectionTimer = setTimeout(() => {
+      // Connect to WebSocket
+      websocketService.connect(sessionId);
+    }, 500); // 500ms delay before initial connection
     
     // Cleanup on unmount
     return () => {
+      clearTimeout(connectionTimer);
       console.log('useWebSocket hook cleaning up');
       websocketService.disconnect();
     };
@@ -218,5 +273,13 @@ export function useWebSocket(sessionId: string | null) {
     websocketService.send(type, data);
   }, []);
   
-  return { subscribe, send };
+  const reconnect = useCallback(() => {
+    websocketService.reconnect();
+  }, []);
+  
+  const isConnected = useCallback(() => {
+    return websocketService.isConnected();
+  }, []);
+  
+  return { subscribe, send, reconnect, isConnected };
 } 
