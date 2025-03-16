@@ -407,18 +407,27 @@ function SessionRunContent(): JSX.Element {
   useEffect(() => {
     if (!isValidSessionId) return;
     
-    // Initial check
-    setWsConnected(isConnected());
-    
-    // Check connection status every 5 seconds
-    const statusInterval = setInterval(() => {
+    // Initial check after a short delay to allow connection to establish
+    const initialCheckTimer = setTimeout(() => {
       setWsConnected(isConnected());
+    }, 2000);
+    
+    // Check connection status periodically
+    const statusInterval = setInterval(() => {
+      const connected = isConnected();
+      setWsConnected(connected);
+      
+      // Only log status changes to reduce console noise
+      if (connected !== wsConnected) {
+        console.log(`WebSocket connection status changed: ${connected ? 'Connected' : 'Disconnected'}`);
+      }
     }, 5000);
     
     return () => {
+      clearTimeout(initialCheckTimer);
       clearInterval(statusInterval);
     };
-  }, [isConnected, isValidSessionId]);
+  }, [isConnected, isValidSessionId, wsConnected]);
 
   return (
     <MainLayout footer={<Footer />}>
