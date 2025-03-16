@@ -5,6 +5,7 @@ mod openapi;
 mod repository;
 mod routes;
 mod services;
+mod sse;
 mod utils;
 mod ws;
 
@@ -21,8 +22,10 @@ use mongodb::{options::ClientOptions, Client};
 use routes::sessions;
 use services::session_service;
 use services::user_service;
+use sse::heartbeat::HeartbeatActor;
+use sse::session::SessionManager as SseSessionManager;
 use utoipa_swagger_ui::SwaggerUi;
-use ws::SessionManager;
+use ws::SessionManager as WsSessionManager;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -73,12 +76,20 @@ async fn main() -> std::io::Result<()> {
         info!("Users collection doesn't exist yet - it will be created on first user registration");
     }
 
-    // Start session manager actor
-    let session_manager = SessionManager::default().start();
+    // Start WebSocket session manager actor
+    let ws_session_manager = WsSessionManager::default().start();
 
-    // Set the session manager in the session service
-    session_service::set_session_manager(session_manager.clone());
-    info!("WebSocket session manager initialized");
+    // Start SSE session manager actor with reference to WebSocket manager
+    let sse_session_manager = SseSessionManager::new(ws_session_manager.clone()).start();
+
+    // Start the HeartbeatActor to send periodic heartbeat events (every 3 seconds)
+    let _heartbeat_actor = HeartbeatActor::new(sse_session_manager.clone(), 3).start();
+    info!("Heartbeat actor started with 3-second interval");
+
+    // Set the session managers in the session service
+    session_service::set_session_manager(ws_session_manager.clone());
+    session_service::set_sse_session_manager(sse_session_manager.clone());
+    info!("WebSocket and SSE session managers initialized");
 
     info!("Starting HTTP server on port {}", server_port);
     HttpServer::new(move || {
@@ -95,11 +106,27 @@ async fn main() -> std::io::Result<()> {
             .wrap(Logger::default())
             .wrap(cors)
             .app_data(Data::new(db.clone()))
-            .app_data(Data::new(session_manager.clone()))
+            .app_data(Data::new(ws_session_manager.clone()))
+            .app_data(Data::new(sse_session_manager.clone()))
             // WebSocket route - exempt from Auth middleware
+            // .service(
+            //     actix_web::web::resource("/ws/{session_id}")
+            //         .route(actix_web::web::get().to(ws::ws_route)),
+            // )
+            // SSE route - exempt from Auth middleware
             .service(
-                actix_web::web::resource("/ws/{session_id}")
-                    .route(actix_web::web::get().to(ws::ws_route)),
+                actix_web::web::resource("/api/v1/sessions/{session_id}/events")
+                    .route(actix_web::web::get().to(sse::events_route)),
+            )
+            // New SSE connect route with POST authentication - exempt from Auth middleware
+            // .service(
+            //     actix_web::web::resource("/api/v1/sessions/{session_id}/events/connect")
+            //         .route(actix_web::web::post().to(sse::events_connect_route)),
+            // )
+            // New SSE status route for debugging
+            .service(
+                actix_web::web::resource("/api/v1/sse/status")
+                    .route(actix_web::web::get().to(sse::events_status)),
             )
             // Register routes directly (not inside a scope) -> scope has issues
             .wrap(Auth::user())

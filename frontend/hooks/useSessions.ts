@@ -21,12 +21,8 @@ export function useSessions() {
   }
 
   useEffect(() => {
+    // Load sessions once on component mount
     loadSessions();
-    
-    // Set up polling for real-time updates
-    const intervalId = setInterval(loadSessions, 10000); // Poll every 10 seconds
-    
-    return () => clearInterval(intervalId);
   }, []);
 
   return {

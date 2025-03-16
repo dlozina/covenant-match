@@ -40,21 +40,38 @@ export async function createSession(sessionData: Omit<GameSession, 'id' | 'creat
 
 export async function joinSession(sessionId: string, userData: { userId: string; character: string }): Promise<GameSession> {
   try {
+    console.log(`[DEBUG API] Joining session ${sessionId} with user data:`, userData);
+    
+    const token = localStorage.getItem('token');
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
     const response = await fetch(`${API_URL}/sessions/${sessionId}/join`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(userData),
+      headers,
+      body: JSON.stringify({
+        user_id: userData.userId,
+        nightfarer: userData.character
+      }),
     });
     
     if (!response.ok) {
+      console.error(`[DEBUG API] Error joining session: ${response.status} ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[DEBUG API] Error details:', errorData);
       throw new Error(`Error joining session: ${response.statusText}`);
     }
     
-    return await response.json();
+    const data = await response.json();
+    console.log('[DEBUG API] Successfully joined session:', data);
+    return data;
   } catch (error) {
-    console.error("Failed to join session:", error);
+    console.error("[DEBUG API] Failed to join session:", error);
     throw error;
   }
 }

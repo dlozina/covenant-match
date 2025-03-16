@@ -25,7 +25,7 @@ import {
 import { storageUtils } from "@/components/session/SessionUtils";
 import { useSessionTimer } from "@/components/session/SessionHooks";
 import { useAuth } from "@/lib/auth-context";
-import { useWebSocket } from "@/hooks/useWebSocket";
+import { useRealTimeUpdates } from "@/hooks/useEventSource";
 import { toast } from "sonner";
 
 // Define the session data interface
@@ -75,17 +75,20 @@ function SessionRunContent(): JSX.Element {
   // Get user data from auth context
   const { userData } = useAuth();
   
-  // Initialize WebSocket connection
-  const { subscribe, isConnected, reconnect } = useWebSocket(sessionId);
+  // Initialize real-time updates connection
+  const { subscribe, isConnected, disconnect } = useRealTimeUpdates(sessionId);
   
-  // State for WebSocket connection status
-  const [wsConnected, setWsConnected] = useState<boolean>(false);
+  // State for connection status
+  const [rtConnected, setRtConnected] = useState<boolean>(false);
   
   // Function to check if current user is the host
   const isHost = useCallback(() => {
     if (!sessionData || !userData) return false;
     return sessionData.hostId === userData.id;
   }, [sessionData, userData]);
+  
+  // State for heartbeat indication (for testing real-time updates)
+  const [lastHeartbeat, setLastHeartbeat] = useState<number | null>(null);
   
   // Use reducers for related state groups
   const [sessionState, dispatchSession] = useReducer(sessionReducer, initialSessionState);
@@ -198,8 +201,12 @@ function SessionRunContent(): JSX.Element {
       }).catch(err => {
         console.error('Error completing session:', err);
       });
+      
+      // Explicitly disconnect EventSource when session is finished
+      console.log('Session finished, disconnecting EventSource');
+      disconnect();
     }
-  }, [sessionState.elapsedSeconds, sessionId, sessionData]);
+  }, [sessionState.elapsedSeconds, sessionId, sessionData, disconnect]);
   
   // Reset session (memoized)
   const resetSession = useCallback(() => {
@@ -218,7 +225,7 @@ function SessionRunContent(): JSX.Element {
     dispatchFriend({ type: 'ADD_FRIEND', payload: playerId });
   }, []);
   
-  // Fetch session data on mount and set up polling
+  // Fetch session data on mount
   useEffect(() => {
     if (!isValidSessionId) {
       setIsLoading(false);
@@ -261,47 +268,68 @@ function SessionRunContent(): JSX.Element {
     // Initial fetch
     fetchSessionData();
     
-    // Subscribe to WebSocket events
+  }, [isValidSessionId, sessionId]);
+  
+  // Set up SSE subscriptions
+  useEffect(() => {
+    if (!isValidSessionId) return;
+    
+    console.log(`Setting up SSE subscriptions for session: ${sessionId}`);
+    
+    // Subscribe to the join event
     const unsubscribeJoin = subscribe('join', (data) => {
-      toast.info(`${data.username} joined as ${data.nightfarer}`);
+      console.log('Join event received:', data);
+      
+      // Safely typecast the data
+      const playerData = data as { username: string; nightfarer: string; userId: string };
+      
+      toast.info(`${playerData.username} joined as ${playerData.nightfarer}`);
       
       // Update the session data with the new player
       setSessionData(prevData => {
-        if (!prevData) return null;
+        if (!prevData) {
+          console.log('No previous session data, skipping update');
+          return null;
+        }
+        
+        console.log('Updating session data with new player:', playerData);
         
         // Create a new players array if it doesn't exist
         const players = prevData.joinedPlayers || [];
         
         // Add the new player if they don't already exist
-        const playerExists = players.some(p => p.userId === data.userId);
+        const playerExists = players.some(p => p.userId === playerData.userId);
         if (!playerExists) {
+          console.log('Player not in session yet, adding to joinedPlayers');
           return {
             ...prevData,
             joinedPlayers: [
               ...players,
               {
-                userId: data.userId as string,
-                username: data.username as string,
-                nightfarer: data.nightfarer as string,
+                userId: playerData.userId,
+                username: playerData.username,
+                nightfarer: playerData.nightfarer,
                 joinedAt: new Date().toISOString()
               }
             ]
           };
+        } else {
+          console.log('Player already in session, no update needed');
         }
         
         return prevData;
       });
     });
     
-    // No polling - rely solely on WebSockets for updates
+    // Add additional event subscriptions here as needed
     
-    // Cleanup function
     return () => {
-      unsubscribeJoin(); // Unsubscribe from WebSocket events
+      // Clean up subscriptions
+      unsubscribeJoin();
     };
   }, [isValidSessionId, sessionId, subscribe]);
   
-  // Effect to handle page refresh detection
+  // Effect to handle page refresh detection and disconnect EventSource when truly unloading
   useEffect(() => {
     // Check if this is a page refresh by using a timestamp in sessionStorage
     const lastLoadTime = sessionStorage.getItem('lastPageLoadTime');
@@ -315,7 +343,26 @@ function SessionRunContent(): JSX.Element {
     
     // Update the last load time
     sessionStorage.setItem('lastPageLoadTime', currentTime);
-  }, []);
+    
+    // Add beforeunload event listener to disconnect EventSource when page is actually closing
+    const handleBeforeUnload = () => {
+      console.log('Page is unloading, disconnecting EventSource');
+      if (sessionId) {
+        disconnect();
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      console.log('Run page component unmounting, disconnecting EventSource');
+      // Since we're simplifying for a single-page use case, we can always disconnect when component unmounts
+      if (sessionId) {
+        disconnect();
+      }
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [disconnect, sessionId]);
   
   // Effect to restore session from localStorage
   useEffect(() => {
@@ -403,23 +450,23 @@ function SessionRunContent(): JSX.Element {
     };
   }, [sessionState.isSessionFinished]);
 
-  // Check WebSocket connection status periodically
+  // Check connection status periodically
   useEffect(() => {
     if (!isValidSessionId) return;
     
-    // Initial check after a short delay to allow connection to establish
+    // Initial check after a short delay
     const initialCheckTimer = setTimeout(() => {
-      setWsConnected(isConnected());
+      setRtConnected(isConnected());
     }, 2000);
     
     // Check connection status periodically
     const statusInterval = setInterval(() => {
       const connected = isConnected();
-      setWsConnected(connected);
+      setRtConnected(connected);
       
       // Only log status changes to reduce console noise
-      if (connected !== wsConnected) {
-        console.log(`WebSocket connection status changed: ${connected ? 'Connected' : 'Disconnected'}`);
+      if (connected !== rtConnected) {
+        console.log(`Real-time connection status changed: ${connected ? 'Connected' : 'Disconnected'}`);
       }
     }, 5000);
     
@@ -427,7 +474,21 @@ function SessionRunContent(): JSX.Element {
       clearTimeout(initialCheckTimer);
       clearInterval(statusInterval);
     };
-  }, [isConnected, isValidSessionId, wsConnected]);
+  }, [isConnected, isValidSessionId, rtConnected]);
+
+  // Listen for heartbeat events
+  useEffect(() => {
+    const handleHeartbeat = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      setLastHeartbeat(customEvent.detail.timestamp);
+    };
+    
+    window.addEventListener('sse-heartbeat', handleHeartbeat);
+    
+    return () => {
+      window.removeEventListener('sse-heartbeat', handleHeartbeat);
+    };
+  }, []);
 
   return (
     <MainLayout footer={<Footer />}>
@@ -439,22 +500,24 @@ function SessionRunContent(): JSX.Element {
               ? `${sessionData.name}` 
               : 'Nightreign Session'}
           </h1>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
             <span className="text-muted-foreground">Session ID: {isValidSessionId ? `#${sessionId.substring(0, 8)}` : ''}</span>
             
-            {/* WebSocket connection status */}
+            {/* Connection status */}
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-              <span className="text-xs text-muted-foreground">{wsConnected ? 'Connected' : 'Disconnected'}</span>
-              {!wsConnected && (
-                <button 
-                  onClick={reconnect}
-                  className="text-xs text-blue-500 hover:text-blue-700"
-                >
-                  Reconnect
-                </button>
-              )}
+              <div className={`w-2 h-2 rounded-full ${rtConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <span className="text-xs text-muted-foreground">
+                {rtConnected ? 'Connected (SSE)' : 'Disconnected'}
+              </span>
             </div>
+            
+            {/* Heartbeat indicator */}
+            {lastHeartbeat && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="animate-pulse text-sm text-red-500">❤️</span>
+                <span>Last heartbeat: {new Date(lastHeartbeat * 1000).toLocaleTimeString()}</span>
+              </div>
+            )}
           </div>
         </div>
 

@@ -4,9 +4,11 @@ use crate::models::session::{
     SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto,
 };
 use crate::repository::{session_repository, statistics_repository, user_repository};
-use crate::ws::messages::{Broadcast, ServerMessage};
-use crate::ws::SessionManager;
-use actix::Addr;
+use crate::sse::messages::{BroadcastMessage, ServerMessage as SseServerMessage};
+use crate::sse::session::SessionManager as SseSessionManager;
+use crate::ws::messages::{Broadcast, ServerMessage as WsServerMessage};
+use crate::ws::SessionManager as WsSessionManager;
+use actix::prelude::*;
 use chrono::Utc;
 use mongodb::Database;
 use rand::distributions::Alphanumeric;
@@ -16,20 +18,139 @@ use std::sync::LazyLock;
 use std::sync::Mutex;
 use uuid::Uuid;
 
-// Global session manager reference
-static SESSION_MANAGER: LazyLock<Mutex<Option<Addr<SessionManager>>>> =
+// Global session manager references
+static WS_SESSION_MANAGER: LazyLock<Mutex<Option<Addr<WsSessionManager>>>> =
     LazyLock::new(|| Mutex::new(None));
 
-// Function to set the session manager
-pub fn set_session_manager(addr: Addr<SessionManager>) {
-    let mut manager = SESSION_MANAGER.lock().unwrap();
+static SSE_SESSION_MANAGER: LazyLock<Mutex<Option<Addr<SseSessionManager>>>> =
+    LazyLock::new(|| Mutex::new(None));
+
+// Function to set the WebSocket session manager
+pub fn set_session_manager(addr: Addr<WsSessionManager>) {
+    let mut manager = WS_SESSION_MANAGER.lock().unwrap();
     *manager = Some(addr);
 }
 
-// Function to get the session manager
-pub fn get_session_manager() -> Option<Addr<SessionManager>> {
-    let manager = SESSION_MANAGER.lock().unwrap();
+// Function to set the SSE session manager
+pub fn set_sse_session_manager(addr: Addr<SseSessionManager>) {
+    let mut manager = SSE_SESSION_MANAGER.lock().unwrap();
+    *manager = Some(addr);
+}
+
+// Function to get the WebSocket session manager
+pub fn get_session_manager() -> Option<Addr<WsSessionManager>> {
+    let manager = WS_SESSION_MANAGER.lock().unwrap();
     manager.clone()
+}
+
+// Function to get the SSE session manager
+pub fn get_sse_session_manager() -> Option<Addr<SseSessionManager>> {
+    let manager = SSE_SESSION_MANAGER.lock().unwrap();
+    manager.clone()
+}
+
+// Helper function to broadcast to both WebSocket and SSE clients
+pub fn broadcast_event(
+    session_id: &str,
+    event_type: &str,
+    data: serde_json::Value,
+    exclude_client_id: Option<String>,
+) {
+    // Log the broadcast event
+    log::info!(
+        "Broadcasting event: type={}, session={}, data={}, exclude={}",
+        event_type,
+        session_id,
+        data,
+        exclude_client_id
+            .clone()
+            .unwrap_or_else(|| "none".to_string())
+    );
+
+    // Get current timestamp
+    let now = chrono::Utc::now().timestamp();
+
+    // Broadcast to WebSocket clients
+    if let Some(ws_manager) = get_session_manager() {
+        log::debug!("Broadcasting to WebSocket clients");
+        let message = WsServerMessage {
+            message_type: event_type.to_string(),
+            data: data.clone(),
+        };
+
+        let broadcast = Broadcast {
+            session_id: session_id.to_string(),
+            message,
+            exclude_client_id: exclude_client_id.clone(),
+        };
+
+        // Send the broadcast message
+        ws_manager.do_send(broadcast);
+    } else {
+        log::warn!("WebSocket session manager not available for broadcasting");
+    }
+
+    // Broadcast to SSE clients
+    match get_sse_session_manager() {
+        Some(sse_manager) => {
+            log::debug!("Broadcasting to SSE clients - manager found");
+            let message = SseServerMessage {
+                message_type: event_type.to_string(),
+                data: data.clone(),
+                timestamp: now,
+            };
+
+            let broadcast = BroadcastMessage {
+                session_id: session_id.to_string(),
+                message,
+                exclude_client: exclude_client_id,
+            };
+
+            // Send the broadcast message
+            log::debug!("Sending BroadcastMessage to SSE manager");
+
+            // Use do_send which doesn't wait for a response
+            sse_manager.do_send(broadcast);
+
+            // Log success
+            log::debug!("BroadcastMessage sent to SSE manager");
+        }
+        None => {
+            log::error!("SSE session manager not available for broadcasting - get_sse_session_manager() returned None");
+
+            // Try to reinitialize the SSE session manager if it's not available
+            if let Some(ws_manager) = get_session_manager() {
+                log::warn!("Attempting to reinitialize SSE session manager");
+                // Create a new SSE session manager and start it as an actor
+                let new_sse_manager = SseSessionManager::new(ws_manager.clone()).start();
+
+                // Set the new SSE session manager
+                set_sse_session_manager(new_sse_manager.clone());
+
+                // Try broadcasting again with the new manager
+                let message = SseServerMessage {
+                    message_type: event_type.to_string(),
+                    data: data.clone(),
+                    timestamp: now,
+                };
+
+                let broadcast = BroadcastMessage {
+                    session_id: session_id.to_string(),
+                    message,
+                    exclude_client: exclude_client_id,
+                };
+
+                // Send the broadcast message
+                log::debug!("Sending BroadcastMessage to newly initialized SSE manager");
+                new_sse_manager.do_send(broadcast);
+                log::debug!("BroadcastMessage sent to newly initialized SSE manager");
+            } else {
+                log::error!(
+                    "Cannot reinitialize SSE session manager: WebSocket manager not available"
+                );
+            }
+        }
+    }
 }
 
 pub async fn create_session(
@@ -183,30 +304,17 @@ pub async fn join_session(
     session_repository::update_session(db, &session).await?;
 
     // Broadcast join event to all clients in the session
-    if let Some(session_manager) = get_session_manager() {
-        // Create the message to broadcast
-        let message = ServerMessage {
-            message_type: "join".to_string(),
-            data: json!({
-                "userId": user_id,
-                "username": user.display_name.unwrap_or(user.username),
-                "nightfarer": nightfarer,
-                "sessionId": session_id
-            }),
-        };
-
-        // Broadcast to all clients in the session except the one who just joined
-        let broadcast = Broadcast {
-            session_id: session_id.to_string(),
-            message,
-            exclude_client_id: Some(user_id.clone()),
-        };
-
-        // Send the broadcast message
-        if let Err(err) = session_manager.send(broadcast).await {
-            log::error!("Failed to broadcast join event: {:?}", err);
-        }
-    }
+    broadcast_event(
+        session_id,
+        "join",
+        json!({
+            "userId": user_id,
+            "username": user.display_name.unwrap_or(user.username),
+            "nightfarer": nightfarer,
+            "sessionId": session_id
+        }),
+        Some(user_id.clone()),
+    );
 
     // Create response DTO
     let response = SessionResponseDto::from(session);

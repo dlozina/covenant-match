@@ -392,12 +392,12 @@ export function useWebSocket(sessionId: string | null, options = {
     }
     console.log(`Subscribing to message type: ${messageType}`);
     return websocketService.on(messageType, handler);
-  }, []);
+  }, []); // Empty dependency array is correct since websocketService is a singleton
   
   const send = useCallback((type: string, data: MessageData): void => {
     console.log(`Sending message of type: ${type}`);
     websocketService.send(type, data);
-  }, []);
+  }, []); // Empty dependency array is correct since websocketService is a singleton
   
   const reconnect = useCallback(() => {
     websocketService.reconnect();

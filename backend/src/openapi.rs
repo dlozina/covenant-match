@@ -90,7 +90,8 @@ use utoipa::{
         (name = "users", description = "User management endpoints"),
         (name = "admin", description = "Admin-only endpoints"),
         (name = "sessions", description = "Session management endpoints"),
-        (name = "statistics", description = "Statistics endpoints")
+        (name = "statistics", description = "Statistics endpoints"),
+        (name = "realtime", description = "Real-time communication endpoints")
     ),
     modifiers(&SecurityAddon),
 )]
