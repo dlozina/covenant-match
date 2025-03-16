@@ -9,7 +9,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-import { useAuth } from "@/lib/auth-context";
+//import { useAuth } from "@/lib/auth-context";
 
 export default function CreateSessionPage() {
   return (

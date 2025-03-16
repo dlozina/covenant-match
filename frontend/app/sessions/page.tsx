@@ -145,9 +145,6 @@ export default function SessionsPage() {
     }
 
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const token = localStorage.getItem('token');
-      
       // Check if the session is open before attempting to join
       const session = sessions.find(s => s.id === sessionId);
       if (!session || session.status !== 'Open') {
@@ -155,24 +152,10 @@ export default function SessionsPage() {
         return;
       }
 
-      // This is a placeholder - you'll need to implement the actual join session API call
-      const response = await fetch(`${apiBaseUrl}/api/v1/sessions/${sessionId}/join`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to join session');
-      }
-
-      toast.success("Successfully joined session!");
-      router.push(`/sessions/${sessionId}`);
+      // Navigate to the join page with the session ID
+      router.push(`/sessions/join?id=${sessionId}`);
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Failed to join session");
+      toast.error(error instanceof Error ? error.message : "Failed to process join request");
     }
   }
 
