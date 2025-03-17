@@ -306,9 +306,12 @@ function SessionRunContent(): JSX.Element {
       
       // Extract player data directly from the object
       const playerData = {
-        username: data.username || 'Unknown Player',
-        nightfarer: data.nightfarer || 'Unknown Class',
-        userId: data.userId || `user-${Date.now()}`
+        username: typeof data === 'object' && data !== null && 'username' in data 
+                  ? String(data.username) : 'Unknown Player',
+        nightfarer: typeof data === 'object' && data !== null && 'nightfarer' in data 
+                   ? String(data.nightfarer) : 'Unknown Class',
+        userId: typeof data === 'object' && data !== null && 'userId' in data 
+               ? String(data.userId) : `user-${Date.now()}`
       };
       
       console.log(`Processing join for player: ${playerData.username} as ${playerData.nightfarer}`);

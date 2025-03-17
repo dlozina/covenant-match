@@ -149,7 +149,7 @@ class EventSourceService {
         }
       };
       
-      // Pre-register event handlers for all registered event types
+      // Register standard SSE event handlers for all subscribed event types
       for (const [eventType, handlers] of this.messageHandlers.entries()) {
         newEventSource.addEventListener(eventType, (event) => {
           this.updateActivity();
@@ -159,9 +159,7 @@ class EventSourceService {
             // Call all handlers for this event type
             handlers.forEach(handler => {
               try {
-                // If data has a 'data' field, use that, otherwise use the whole data object
-                const handlerData = data.data !== undefined ? data.data : data;
-                handler(handlerData);
+                handler(data);
               } catch (error) {
                 console.error(`Error in ${eventType} event handler:`, error);
               }
@@ -221,65 +219,30 @@ class EventSourceService {
       newEventSource.onmessage = (event) => {
         this.updateActivity();
         
-        // Parse the event data for logging and processing
+        // Log the raw event for debugging (only log beginning of data to avoid huge logs)
+        console.log('Default message event received:', { 
+          type: event.type,
+          data: typeof event.data === 'string' ? event.data.substring(0, 100) : event.data
+        });
+        
         try {
-          // Check if the data format is non-standard (eventType{jsonData})
-          const eventDataStr = event.data;
-          let eventType = 'message';
-          let parsedData = null;
+          // Parse the JSON data
+          const parsedData = JSON.parse(event.data);
           
-          // Log the raw event for debugging
-          console.log('RAW EVENT received:', { 
-            type: event.type,
-            data: eventDataStr.substring(0, 100),
-            eventSource: 'onmessage' 
-          });
-          
-          // Handle the custom format eventType{jsonData}
-          const customFormatMatch = eventDataStr.match(/^(\w+)({.*})$/);
-          if (customFormatMatch) {
-            eventType = customFormatMatch[1];
-            try {
-              parsedData = JSON.parse(customFormatMatch[2]);
-              console.log(`Detected custom format event: ${eventType}`, parsedData);
-            } catch (jsonError) {
-              console.error(`Error parsing JSON after event type ${eventType}:`, jsonError);
-            }
-          } else {
-            // Standard format - try to parse the whole data as JSON
-            try {
-              parsedData = JSON.parse(eventDataStr);
-              
-              // If the parsed data has a message_type field, use that as the event type
-              if (parsedData && typeof parsedData === 'object' && 'message_type' in parsedData) {
-                eventType = parsedData.message_type;
-              }
-            } catch (jsonError) {
-              console.error('Error parsing event data as JSON:', jsonError);
-              // If we can't parse as JSON, use the raw data
-              parsedData = eventDataStr;
-            }
-          }
-          
-          // Now we have eventType and parsedData, find appropriate handlers
-          const handlers = this.messageHandlers.get(eventType) || [];
+          // Find any handlers registered for 'message' event type
+          const handlers = this.messageHandlers.get('message') || [];
           
           if (handlers.length > 0) {
-            console.log(`Found ${handlers.length} handlers for event type '${eventType}'`);
             handlers.forEach(handler => {
               try {
-                // When passing to handlers, ensure we use the parsed data
                 handler(parsedData);
-                console.log(`Successfully called ${eventType} handler with data`);
               } catch (error) {
-                console.error(`Error executing ${eventType} handler:`, error);
+                console.error('Error executing message handler:', error);
               }
             });
-          } else {
-            console.log(`No handlers registered for event type: ${eventType}`);
           }
         } catch (error) {
-          console.error('Error processing event data:', error);
+          console.error('Error parsing message event data:', error);
         }
       };
       
@@ -341,21 +304,17 @@ class EventSourceService {
     handlers.push(handler);
     this.messageHandlers.set(eventType, handlers);
     
-    // If we already have an active connection, set up the event listener
+    // If we already have an active connection, add the event listener to the EventSource
     if (this.eventSource && this.connectionStatus === 'connected') {
-      // Add a specific event listener for this event type
+      // For standard SSE, the event name in the "event:" field corresponds to the event listener name
       this.eventSource.addEventListener(eventType, (event) => {
         this.updateActivity();
         try {
+          // Parse the JSON data in the "data:" field
           const data = JSON.parse(event.data);
-          
-          try {
-            handler(data);
-          } catch (error) {
-            console.error(`Error executing handler for ${eventType}:`, error);
-          }
+          handler(data);
         } catch (error) {
-          console.error(`Error parsing ${eventType} data:`, error);
+          console.error(`Error handling ${eventType} event:`, error);
         }
       });
     }
