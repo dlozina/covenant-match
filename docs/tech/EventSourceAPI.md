@@ -200,3 +200,32 @@ eventSource.onerror = () => {
   // Show reconnection message
 };
 ```
+
+## Using eventsource-polyfill for Secure Authentication
+
+Let me explain in detail how the eventsource-polyfill approach works, what benefits it provides, and any potential downsides.
+
+### How eventsource-polyfill Works
+
+The standard EventSource API has a major limitation: it doesn't allow you to customize HTTP headers. The eventsource-polyfill library provides an enhanced implementation that extends the native EventSource with the ability to set custom headers, including authorization headers.
+
+https://www.npmjs.com/package/event-source-polyfill
+
+https://www.npmjs.com/package/@types/event-source-polyfill
+
+https://github.com/Yaffle/EventSource
+
+https://security.snyk.io/package/npm/event-source-polyfill
+
+```javascript
+npm install eventsource-polyfill
+```
+
+```javascript
+import EventSource from 'eventsource-polyfill';
+```
+### Benefits of using eventsource-polyfill
+
+- **Customizable Headers**: Allows you to set custom headers, including authorization headers.
+- **Compatibility**: Works with older browsers that don't support the standard EventSource API.
+- **Security**: Provides a secure way to authenticate and authorize EventSource connections.
