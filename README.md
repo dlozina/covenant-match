@@ -136,6 +136,24 @@ covenant-match/
     ├── architecture/           # Architecture diagrams
     └── development/            # Development guidelines
 ```
+
+## Deployment Components
+                  +------------------+
+                  |   Load Balancer  |
+                  |      (Nginx)     |
+                  +--------+---------+
+                           |
+              +------------+------------+
+              |                         |
+    +---------v----------+   +---------v---------+
+    |  Frontend Server   |   |  Backend Server   |
+    |    (Next.js SSR)   |   |    (Rust/Actix)   |
+    +--------------------+   +---------+---------+
+                                       |
+                             +---------v---------+
+                             |    MongoDB Atlas  |
+                             |    (Database)     |
+                             +-------------------+ 
 ## License
 
 Copyright (c) 2025 Dino Lozina
