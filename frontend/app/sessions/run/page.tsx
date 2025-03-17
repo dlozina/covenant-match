@@ -289,39 +289,32 @@ function SessionRunContent(): JSX.Element {
     const unsubscribeJoin = subscribe('join', (data) => {
       console.log('Join event received:', data);
       
-      // DEBUG: Log raw data structure
-      console.log('Join event data structure:', {
-        dataType: typeof data,
-        hasUsername: data && typeof data === 'object' && 'username' in data,
-        hasNightfarer: data && typeof data === 'object' && 'nightfarer' in data,
-        hasUserId: data && typeof data === 'object' && 'userId' in data,
-        rawData: data
-      });
-      
       // Safety check for data structure
       if (!data || typeof data !== 'object') {
         console.error('Join event handler received invalid data:', data);
         return;
       }
       
-      // Extract player data with fallbacks for different possible structures
-      const rawData = data as Record<string, any>;
+      // Log the data structure for debugging
+      console.log('Join event data structure:', {
+        dataType: typeof data,
+        hasUsername: 'username' in data,
+        hasNightfarer: 'nightfarer' in data,
+        hasUserId: 'userId' in data,
+        rawData: data
+      });
+      
+      // Extract player data directly from the object
       const playerData = {
-        username: rawData.username || (rawData.data && rawData.data.username) || 'Unknown Player',
-        nightfarer: rawData.nightfarer || (rawData.data && rawData.data.nightfarer) || 'Unknown Class',
-        userId: rawData.userId || (rawData.data && rawData.data.userId) || `user-${Date.now()}`
+        username: data.username || 'Unknown Player',
+        nightfarer: data.nightfarer || 'Unknown Class',
+        userId: data.userId || `user-${Date.now()}`
       };
       
-      // DEBUG: Check if we can extract the username and nightfarer
-      console.log(`Attempting to display toast for: ${playerData.username} as ${playerData.nightfarer}`);
+      console.log(`Processing join for player: ${playerData.username} as ${playerData.nightfarer}`);
       
-      // DEBUG: Explicitly try/catch the toast
-      try {
-        toast.info(`${playerData.username} joined as ${playerData.nightfarer}`);
-        console.log('Toast notification shown successfully');
-      } catch (error) {
-        console.error('Error showing toast notification:', error);
-      }
+      // Show toast notification
+      toast.info(`${playerData.username} joined as ${playerData.nightfarer}`);
       
       // Update the session data with the new player
       setSessionData(prevData => {
@@ -332,17 +325,14 @@ function SessionRunContent(): JSX.Element {
         
         console.log('Updating session data with new player:', playerData);
         
-        // Create a new players array if it doesn't exist
+        // Check if player already exists
         const players = prevData.joinedPlayers || [];
-        
-        // Add the new player if they don't already exist
         const playerExists = players.some(p => p.userId === playerData.userId);
-        console.log('Does player already exist in session?', playerExists);
         
         if (!playerExists) {
-          console.log('Player not in session yet, adding to joinedPlayers');
+          console.log('Adding new player to joinedPlayers array');
           
-          // Create a new array with the existing players plus the new one
+          // Create new array with the new player
           const updatedPlayers = [
             ...players,
             {
@@ -353,18 +343,15 @@ function SessionRunContent(): JSX.Element {
             }
           ];
           
-          console.log('Updated players list:', updatedPlayers);
-          
-          // Return the new state with updated players
+          // Return updated state object (important to create a new object)
           return {
             ...prevData,
             joinedPlayers: updatedPlayers
           };
         } else {
-          console.log('Player already in session, no update needed');
+          console.log('Player already exists in session');
+          return prevData;
         }
-        
-        return prevData;
       });
     });
     

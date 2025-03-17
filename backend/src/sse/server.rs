@@ -68,7 +68,8 @@ pub async fn events_route(
                     };
 
                     // Log the raw SSE data in a condensed single-line format for debugging
-                    debug!("Raw SSE data: {}", sse_data.replace("\n", "\\n"));
+                    let formatted = format!("event: {}\ndata: {}\n\n", event_type, data);
+                    info!("Sending raw SSE: {:?}", formatted.replace("\n", "\\n"));
 
                     Ok::<Bytes, std::convert::Infallible>(Bytes::from(sse_data))
                 });

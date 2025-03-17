@@ -60,7 +60,7 @@ export default function CreateProfilePage() {
 
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const response = await fetch(`${apiBaseUrl}/api/v1/users`, {
+      const response = await fetch(`${apiBaseUrl}/api/v1/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

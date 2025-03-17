@@ -221,98 +221,65 @@ class EventSourceService {
       newEventSource.onmessage = (event) => {
         this.updateActivity();
         
-        // DEBUG: Log all raw events to help diagnose routing issues
-        console.log('RAW EVENT received in onmessage:', { 
-          type: event.type,
-          data: event.data.substring(0, 100), // Limit data length for readability
-          eventSource: 'onmessage handler' 
-        });
-        
+        // Parse the event data for logging and processing
         try {
-          const data = JSON.parse(event.data);
+          // Check if the data format is non-standard (eventType{jsonData})
+          const eventDataStr = event.data;
+          let eventType = 'message';
+          let parsedData = null;
           
-          // DEBUG: Log parsed data structure
-          console.log('Parsed event data structure:', {
-            hasMessageType: data && typeof data === 'object' && 'message_type' in data,
-            messageType: data?.message_type,
-            hasData: data && typeof data === 'object' && 'data' in data,
-            hasJoinIndicators: data && typeof data === 'object' && 
-              ('username' in data || (data.data && 'username' in data.data)),
-            rawData: JSON.stringify(data).substring(0, 100) // Limit data length for readability
+          // Log the raw event for debugging
+          console.log('RAW EVENT received:', { 
+            type: event.type,
+            data: eventDataStr.substring(0, 100),
+            eventSource: 'onmessage' 
           });
           
-          // Check if this might be a heartbeat that wasn't caught by the heartbeat event listener
-          if (data && (data.message_type === 'heartbeat' || 
-              (data.data && (data.data.message === '❤️ Server heartbeat pulse' || 
-               data.data.message?.includes('heartbeat'))))) {
-            
-            // Handle as heartbeat
-            const heartbeatData = data.data || data;
-            
-            // Create a local timestamp for received time (browser time)
-            const localTime = new Date().toLocaleTimeString();
-            
-            // Dispatch the heartbeat event
-            const heartbeatEvent = new CustomEvent('sse-heartbeat', { 
-              detail: { 
-                timestamp: heartbeatData.timestamp, 
-                formattedTime: heartbeatData.formatted_time || localTime,
-                message: heartbeatData.message || "Server heartbeat",
-                sequence: heartbeatData.sequence || "unknown",
-                sessionId: this.sessionId,
-                receivedAt: localTime,
-                source: "generic-handler"
-              } 
-            });
-            window.dispatchEvent(heartbeatEvent);
-          }
-          
-          // SPECIAL HANDLING FOR JOIN EVENTS:
-          // Check if this might be a join event that wasn't routed correctly
-          if (data && (
-              data.message_type === 'join' || 
-              (data.username && data.nightfarer) ||
-              (data.userId && data.username && data.nightfarer)
-          )) {
-            console.log('Detected join event in onmessage handler:', data);
-            
-            // Find any registered join handlers
-            const joinHandlers = this.messageHandlers.get('join') || [];
-            
-            if (joinHandlers.length > 0) {
-              console.log(`Found ${joinHandlers.length} join handlers, calling them with join data`);
-              joinHandlers.forEach(handler => {
-                try {
-                  handler(data);
-                  console.log('Successfully called join handler with data');
-                } catch (error) {
-                  console.error('Error executing join handler:', error);
-                }
-              });
-            } else {
-              console.log('Received join event but no join handlers are registered');
+          // Handle the custom format eventType{jsonData}
+          const customFormatMatch = eventDataStr.match(/^(\w+)({.*})$/);
+          if (customFormatMatch) {
+            eventType = customFormatMatch[1];
+            try {
+              parsedData = JSON.parse(customFormatMatch[2]);
+              console.log(`Detected custom format event: ${eventType}`, parsedData);
+            } catch (jsonError) {
+              console.error(`Error parsing JSON after event type ${eventType}:`, jsonError);
             }
-            
-            // Don't continue with generic handler processing
-            return;
+          } else {
+            // Standard format - try to parse the whole data as JSON
+            try {
+              parsedData = JSON.parse(eventDataStr);
+              
+              // If the parsed data has a message_type field, use that as the event type
+              if (parsedData && typeof parsedData === 'object' && 'message_type' in parsedData) {
+                eventType = parsedData.message_type;
+              }
+            } catch (jsonError) {
+              console.error('Error parsing event data as JSON:', jsonError);
+              // If we can't parse as JSON, use the raw data
+              parsedData = eventDataStr;
+            }
           }
           
-          // Handle event based on message_type if available
-          const eventType = data.message_type || event.type || 'message';
+          // Now we have eventType and parsedData, find appropriate handlers
           const handlers = this.messageHandlers.get(eventType) || [];
           
           if (handlers.length > 0) {
             console.log(`Found ${handlers.length} handlers for event type '${eventType}'`);
             handlers.forEach(handler => {
               try {
-                handler(data.data || data);
+                // When passing to handlers, ensure we use the parsed data
+                handler(parsedData);
+                console.log(`Successfully called ${eventType} handler with data`);
               } catch (error) {
-                console.error(`Error in ${eventType} event handler:`, error);
+                console.error(`Error executing ${eventType} handler:`, error);
               }
             });
+          } else {
+            console.log(`No handlers registered for event type: ${eventType}`);
           }
         } catch (error) {
-          console.error('Error parsing event data:', error);
+          console.error('Error processing event data:', error);
         }
       };
       
@@ -414,7 +381,7 @@ const eventSourceService = new EventSourceService();
 
 // Custom hook for using EventSource - simplified for single page use case
 export function useRealTimeUpdates(sessionId: string | null, options = {
-  inactivityTimeout: 30 * 60 * 1000, // 30 minutes by default
+  inactivityTimeout: 60 * 60 * 1000, // 30 minutes by default
 }) {
   // Store the current session ID
   const currentSessionIdRef = useRef<string | null>(sessionId);
@@ -444,25 +411,33 @@ export function useRealTimeUpdates(sessionId: string | null, options = {
   }, [sessionId, options.inactivityTimeout]);
   
   // Connect to EventSource on mount and disconnect on unmount
-  useEffect(() => {
-    if (!sessionId) return;
-    
-    // Increment connection counter
-    eventSourceService.incrementConnection();
-    
+  // Replace the existing useEffect hook in your useRealTimeUpdates function with this:
+
+// Connect to EventSource on mount and disconnect on unmount
+useEffect(() => {
+  if (!sessionId) return;
+  
+  // Increment connection counter first
+  eventSourceService.incrementConnection();
+  
+  // Set a small delay to ensure subscriptions are registered before connecting
+  const connectTimer = setTimeout(() => {
     // Connect to the EventSource
+    console.log('Connecting to EventSource after subscriptions are set up');
     eventSourceService.connect(sessionId);
-    
-    // Return a cleanup function that decrements counter and conditionally disconnects
-    return () => {
-      console.log('Component unmounted, checking if we should disconnect EventSource');
-      const shouldDisconnect = eventSourceService.decrementConnection();
-      if (shouldDisconnect) {
-        console.log('No more active connections, disconnecting EventSource');
-        eventSourceService.disconnect();
-      }
-    };
-  }, [sessionId]);
+  }, 50);
+  
+  // Return cleanup function
+  return () => {
+    clearTimeout(connectTimer);
+    console.log('Component unmounted, checking if we should disconnect EventSource');
+    const shouldDisconnect = eventSourceService.decrementConnection();
+    if (shouldDisconnect) {
+      console.log('No more active connections, disconnecting EventSource');
+      eventSourceService.disconnect();
+    }
+  };
+}, [sessionId]);
   
   // Subscribe to events
   const subscribe = useCallback((eventType: string, handler: MessageHandler): UnsubscribeFunction => {
