@@ -12,14 +12,12 @@ pub struct HeartbeatActor {
     sse_manager: Addr<SessionManager>,
 }
 
+const HEARTBEAT_INTERVAL: u64 = 30;
+
 impl HeartbeatActor {
-    pub fn new(sse_manager: Addr<SessionManager>, interval_seconds: u64) -> Self {
+    pub fn new(sse_manager: Addr<SessionManager>) -> Self {
         // Default to 3 seconds if not specified (more frequent to prevent timeouts)
-        let interval = if interval_seconds == 0 {
-            Duration::from_secs(3)
-        } else {
-            Duration::from_secs(interval_seconds)
-        };
+        let interval = Duration::from_secs(HEARTBEAT_INTERVAL);
 
         Self {
             interval,

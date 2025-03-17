@@ -49,7 +49,7 @@ export default function EditProfilePage() {
 function EditProfileContent() {
   const router = useRouter()
   const { userData, refreshUserData } = useAuth()
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
   const form = useForm<ProfileFormValues>({

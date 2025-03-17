@@ -76,20 +76,16 @@ async fn main() -> std::io::Result<()> {
         info!("Users collection doesn't exist yet - it will be created on first user registration");
     }
 
-    // Start WebSocket session manager actor
-    let ws_session_manager = WsSessionManager::default().start();
+    // Start SSE session manager actor (standalone without WebSocket)
+    let sse_session_manager = SseSessionManager::new_standalone().start();
 
-    // Start SSE session manager actor with reference to WebSocket manager
-    let sse_session_manager = SseSessionManager::new(ws_session_manager.clone()).start();
+    // Start the HeartbeatActor to send periodic heartbeat events
+    let _heartbeat_actor = HeartbeatActor::new(sse_session_manager.clone()).start();
+    info!("Heartbeat actor started with interval defined in heartbeat.rs");
 
-    // Start the HeartbeatActor to send periodic heartbeat events (every 3 seconds)
-    let _heartbeat_actor = HeartbeatActor::new(sse_session_manager.clone(), 3).start();
-    info!("Heartbeat actor started with 3-second interval");
-
-    // Set the session managers in the session service
-    session_service::set_session_manager(ws_session_manager.clone());
+    // Set the SSE session manager in the session service
     session_service::set_sse_session_manager(sse_session_manager.clone());
-    info!("WebSocket and SSE session managers initialized");
+    info!("SSE session manager initialized");
 
     info!("Starting HTTP server on port {}", server_port);
     HttpServer::new(move || {
@@ -106,13 +102,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(Logger::default())
             .wrap(cors)
             .app_data(Data::new(db.clone()))
-            .app_data(Data::new(ws_session_manager.clone()))
             .app_data(Data::new(sse_session_manager.clone()))
-            // WebSocket route - exempt from Auth middleware
-            // .service(
-            //     actix_web::web::resource("/ws/{session_id}")
-            //         .route(actix_web::web::get().to(ws::ws_route)),
-            // )
             // SSE route - exempt from Auth middleware
             .service(
                 actix_web::web::resource("/api/v1/sessions/{session_id}/events")

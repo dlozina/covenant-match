@@ -13,6 +13,8 @@ use crate::routes::{
     // statistics::*,
     users::*,
 };
+// Import SSE models
+use crate::sse::messages::{ServerMessage, SessionInfo, SessionStatus as SseSessionStatus};
 
 use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
@@ -82,6 +84,10 @@ use utoipa::{
             SessionStatus,
             GameResult,
             SessionResult,
+            // SSE models
+            ServerMessage,
+            SessionInfo,
+            SseSessionStatus,
             // Add other models as needed
         ),
     ),

@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
+import { EventSourcePolyfill } from 'event-source-polyfill';
 
 // Define types for event messages
 type MessageHandler = (data: unknown) => void;
@@ -78,14 +79,25 @@ class EventSourceService {
     
     try {
       // Create a new EventSource connection with the correct endpoint
-      const url = `${apiBaseUrl}/api/v1/sessions/${sessionId}/events?token=${encodeURIComponent(token)}`;
+      const url = `${apiBaseUrl}/api/v1/sessions/${sessionId}/events`;
       
       // Check for debug mode via URL
       const isDebugMode = typeof window !== 'undefined' && 
                           window.location.search.includes('debug=eventsource');
       
-      // Create the EventSource instance
-      const newEventSource = new EventSource(url);
+                          const token = localStorage.getItem('token');
+      // Create the EventSource instance -> this is the polyfilled EventSource
+      const newEventSource = new EventSourcePolyfill(
+        url, 
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+      
+      // Create the EventSource instance -> this is the original EventSource
+      // const newEventSource = new EventSource(url);
       
       // Add a very low-level event listener to log all raw messages if in debug mode
       if (isDebugMode) {
@@ -151,10 +163,11 @@ class EventSourceService {
       
       // Register standard SSE event handlers for all subscribed event types
       for (const [eventType, handlers] of this.messageHandlers.entries()) {
-        newEventSource.addEventListener(eventType, (event) => {
+        newEventSource.addEventListener(eventType, ((event) => {
           this.updateActivity();
           try {
-            const data = JSON.parse(event.data);
+            // Use type assertion here to tell TypeScript that this event has a data property
+            const data = JSON.parse((event as MessageEvent).data);
             
             // Call all handlers for this event type
             handlers.forEach(handler => {
@@ -167,7 +180,7 @@ class EventSourceService {
           } catch (error) {
             console.error(`Error parsing ${eventType} data:`, error);
           }
-        });
+        }));
       }
       
       // Set up handler for ping events
@@ -177,10 +190,11 @@ class EventSourceService {
       });
       
       // Set up handler for heartbeat events
-      newEventSource.addEventListener('heartbeat', (event) => {
+      newEventSource.addEventListener('heartbeat', ((event) => {
         this.updateActivity();
         try {
-          const data = JSON.parse(event.data);
+          // Use type assertion here to tell TypeScript that this event has a data property
+          const data = JSON.parse((event as MessageEvent).data);
           
           // Create a local timestamp for received time (browser time)
           const localTime = new Date().toLocaleTimeString();
@@ -201,7 +215,7 @@ class EventSourceService {
         } catch (error) {
           console.error('Error parsing heartbeat data:', error);
         }
-      });
+      }));
       
       // Set up handler for welcome events
       newEventSource.addEventListener('welcome', () => {

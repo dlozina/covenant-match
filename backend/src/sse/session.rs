@@ -44,6 +44,17 @@ impl SessionManager {
         }
     }
 
+    // New method that doesn't require a WebSocket manager
+    pub fn new_standalone() -> Self {
+        log::info!("Creating new standalone SSE SessionManager (without WebSocket)");
+        Self {
+            sessions: HashMap::new(),
+            clients: HashMap::new(),
+            ws_session_manager: None,
+            recent_events: HashMap::new(),
+        }
+    }
+
     pub fn store_recent_event(&mut self, session_id: &str, event: ServerMessage) {
         log::debug!("Storing event for session {}: {:?}", session_id, event);
 

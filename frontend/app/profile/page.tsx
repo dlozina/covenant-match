@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { MainLayout } from "@/components/layout"
@@ -28,7 +28,7 @@ export default function ProfilePage() {
 function ProfileContent() {
   const router = useRouter()
   const { userData, logout } = useAuth()
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading] = useState(false)
 
   if (isLoading) {
     return (

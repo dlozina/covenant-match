@@ -3,9 +3,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use tokio::sync::mpsc;
+use utoipa::ToSchema;
 
 // Message sent from server to client
-#[derive(Debug, Deserialize, Serialize, Message, Clone)]
+#[derive(Debug, Deserialize, Serialize, Message, Clone, ToSchema)]
 #[rtype(result = "()")]
 pub struct ServerMessage {
     pub message_type: String,
@@ -61,7 +62,7 @@ pub struct GetRecentEvents {
 pub struct GetSessionStatus {}
 
 // Status of all sessions and clients
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, ToSchema)]
 pub struct SessionStatus {
     pub active_sessions: Vec<SessionInfo>,
     pub total_clients: usize,
@@ -82,7 +83,7 @@ where
 }
 
 // Information about a session
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, ToSchema)]
 pub struct SessionInfo {
     pub session_id: String,
     pub client_count: usize,

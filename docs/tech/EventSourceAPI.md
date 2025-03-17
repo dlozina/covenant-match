@@ -229,3 +229,18 @@ import EventSource from 'eventsource-polyfill';
 - **Customizable Headers**: Allows you to set custom headers, including authorization headers.
 - **Compatibility**: Works with older browsers that don't support the standard EventSource API.
 - **Security**: Provides a secure way to authenticate and authorize EventSource connections.
+
+### Connection Management
+
+Implement the following strategies to manage SSE connections efficiently:
+
+- Client-side reconnection logic with exponential backoff
+- Server-side heartbeats every 30-60 seconds to keep connections alive
+- Connection cleanup for abandoned sessions
+- Monitoring for connection counts and resource usage
+
+### Monitoring
+
+Implement monitoring to track connection counts and resource usage. This helps identify and address issues early.
+
+
