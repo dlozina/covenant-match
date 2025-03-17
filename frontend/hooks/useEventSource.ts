@@ -369,34 +369,32 @@ export function useRealTimeUpdates(sessionId: string | null, options = {
     };
   }, [sessionId, options.inactivityTimeout]);
   
-  // Connect to EventSource on mount and disconnect on unmount
-  // Replace the existing useEffect hook in your useRealTimeUpdates function with this:
 
-// Connect to EventSource on mount and disconnect on unmount
-useEffect(() => {
-  if (!sessionId) return;
-  
-  // Increment connection counter first
-  eventSourceService.incrementConnection();
-  
-  // Set a small delay to ensure subscriptions are registered before connecting
-  const connectTimer = setTimeout(() => {
-    // Connect to the EventSource
-    console.log('Connecting to EventSource after subscriptions are set up');
-    eventSourceService.connect(sessionId);
-  }, 50);
-  
-  // Return cleanup function
-  return () => {
-    clearTimeout(connectTimer);
-    console.log('Component unmounted, checking if we should disconnect EventSource');
-    const shouldDisconnect = eventSourceService.decrementConnection();
-    if (shouldDisconnect) {
-      console.log('No more active connections, disconnecting EventSource');
-      eventSourceService.disconnect();
-    }
-  };
-}, [sessionId]);
+  // Connect to EventSource on mount and disconnect on unmount
+  useEffect(() => {
+    if (!sessionId) return;
+    
+    // Increment connection counter first
+    eventSourceService.incrementConnection();
+    
+    // Set a small delay to ensure subscriptions are registered before connecting
+    const connectTimer = setTimeout(() => {
+      // Connect to the EventSource
+      console.log('Connecting to EventSource after subscriptions are set up');
+      eventSourceService.connect(sessionId);
+    }, 50);
+    
+    // Return cleanup function
+    return () => {
+      clearTimeout(connectTimer);
+      console.log('Component unmounted, checking if we should disconnect EventSource');
+      const shouldDisconnect = eventSourceService.decrementConnection();
+      if (shouldDisconnect) {
+        console.log('No more active connections, disconnecting EventSource');
+        eventSourceService.disconnect();
+      }
+    };
+  }, [sessionId]);
   
   // Subscribe to events
   const subscribe = useCallback((eventType: string, handler: MessageHandler): UnsubscribeFunction => {
