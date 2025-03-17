@@ -16,6 +16,8 @@ class EventSourceService {
   private connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'error' = 'disconnected';
   private lastActiveTime: number = Date.now();
   private isReconnectingFlag: boolean = false;
+  // Track number of active connections to prevent premature disconnection
+  private activeConnections: number = 0;
   
   // Check if EventSource is supported
   isSupported(): boolean {
@@ -219,8 +221,25 @@ class EventSourceService {
       newEventSource.onmessage = (event) => {
         this.updateActivity();
         
+        // DEBUG: Log all raw events to help diagnose routing issues
+        console.log('RAW EVENT received in onmessage:', { 
+          type: event.type,
+          data: event.data.substring(0, 100), // Limit data length for readability
+          eventSource: 'onmessage handler' 
+        });
+        
         try {
           const data = JSON.parse(event.data);
+          
+          // DEBUG: Log parsed data structure
+          console.log('Parsed event data structure:', {
+            hasMessageType: data && typeof data === 'object' && 'message_type' in data,
+            messageType: data?.message_type,
+            hasData: data && typeof data === 'object' && 'data' in data,
+            hasJoinIndicators: data && typeof data === 'object' && 
+              ('username' in data || (data.data && 'username' in data.data)),
+            rawData: JSON.stringify(data).substring(0, 100) // Limit data length for readability
+          });
           
           // Check if this might be a heartbeat that wasn't caught by the heartbeat event listener
           if (data && (data.message_type === 'heartbeat' || 
@@ -248,10 +267,42 @@ class EventSourceService {
             window.dispatchEvent(heartbeatEvent);
           }
           
+          // SPECIAL HANDLING FOR JOIN EVENTS:
+          // Check if this might be a join event that wasn't routed correctly
+          if (data && (
+              data.message_type === 'join' || 
+              (data.username && data.nightfarer) ||
+              (data.userId && data.username && data.nightfarer)
+          )) {
+            console.log('Detected join event in onmessage handler:', data);
+            
+            // Find any registered join handlers
+            const joinHandlers = this.messageHandlers.get('join') || [];
+            
+            if (joinHandlers.length > 0) {
+              console.log(`Found ${joinHandlers.length} join handlers, calling them with join data`);
+              joinHandlers.forEach(handler => {
+                try {
+                  handler(data);
+                  console.log('Successfully called join handler with data');
+                } catch (error) {
+                  console.error('Error executing join handler:', error);
+                }
+              });
+            } else {
+              console.log('Received join event but no join handlers are registered');
+            }
+            
+            // Don't continue with generic handler processing
+            return;
+          }
+          
           // Handle event based on message_type if available
           const eventType = data.message_type || event.type || 'message';
           const handlers = this.messageHandlers.get(eventType) || [];
+          
           if (handlers.length > 0) {
+            console.log(`Found ${handlers.length} handlers for event type '${eventType}'`);
             handlers.forEach(handler => {
               try {
                 handler(data.data || data);
@@ -274,7 +325,25 @@ class EventSourceService {
     }
   }
   
-  disconnect(): void {
+  incrementConnection(): void {
+    this.activeConnections++;
+    console.log(`Active connections: ${this.activeConnections}`);
+  }
+
+  decrementConnection(): boolean {
+    if (this.activeConnections > 0) {
+      this.activeConnections--;
+    }
+    console.log(`Active connections: ${this.activeConnections}`);
+    return this.activeConnections === 0;
+  }
+
+  disconnect(force: boolean = false): void {
+    if (!force && this.activeConnections > 0) {
+      console.log(`Not disconnecting - still has ${this.activeConnections} active connections`);
+      return;
+    }
+
     if (this.eventSource) {
       console.log('Closing EventSource connection');
       this.eventSource.close();
@@ -286,8 +355,10 @@ class EventSourceService {
       this.reconnectTimer = null;
     }
     
-    // Clear message handlers
-    this.messageHandlers.clear();
+    // Clear message handlers only if forced or no active connections
+    if (force) {
+      this.messageHandlers.clear();
+    }
     
     this.reconnectAttempts = 0;
     this.connectionStatus = 'disconnected';
@@ -363,7 +434,7 @@ export function useRealTimeUpdates(sessionId: string | null, options = {
       if (inactiveTime * 1000 > options.inactivityTimeout && 
           eventSourceService.isConnected()) {
         console.log(`Disconnecting EventSource due to inactivity (${Math.round(inactiveTime)} seconds)`);
-        eventSourceService.disconnect();
+        eventSourceService.disconnect(true);
       }
     }, 60000); // Check every minute
     
@@ -376,13 +447,20 @@ export function useRealTimeUpdates(sessionId: string | null, options = {
   useEffect(() => {
     if (!sessionId) return;
     
+    // Increment connection counter
+    eventSourceService.incrementConnection();
+    
     // Connect to the EventSource
     eventSourceService.connect(sessionId);
     
-    // Return a cleanup function that disconnects
+    // Return a cleanup function that decrements counter and conditionally disconnects
     return () => {
-      console.log('Component unmounted, disconnecting EventSource');
-      eventSourceService.disconnect();
+      console.log('Component unmounted, checking if we should disconnect EventSource');
+      const shouldDisconnect = eventSourceService.decrementConnection();
+      if (shouldDisconnect) {
+        console.log('No more active connections, disconnecting EventSource');
+        eventSourceService.disconnect();
+      }
     };
   }, [sessionId]);
   
@@ -402,7 +480,7 @@ export function useRealTimeUpdates(sessionId: string | null, options = {
   
   // Add an explicit disconnect method the consumer can call when truly done
   const disconnect = useCallback(() => {
-    eventSourceService.disconnect();
+    eventSourceService.disconnect(true);
   }, []);
   
   // Return the API
