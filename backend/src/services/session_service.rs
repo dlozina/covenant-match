@@ -355,6 +355,17 @@ pub async fn start_session(
     // Update the session in the database
     session_repository::update_session(db, &session).await?;
 
+    broadcast_event(
+        session_id,
+        "start",
+        json!({
+            "sessionId": session_id,
+            "userId": session.host_id,
+            "sessionStatus": session.status
+        }),
+        Some(session.host_id.clone()),
+    );
+
     Ok(SessionResponseDto::from(session))
 }
 

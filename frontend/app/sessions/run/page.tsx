@@ -357,15 +357,64 @@ function SessionRunContent(): JSX.Element {
         }
       });
     });
+
+    // Subscribe to the start event
+    const unsubscribeStart = subscribe('start', (data) => {
+      console.log('Start event received:', data);
+      
+      // Safety check for data structure
+      if (!data || typeof data !== 'object') {
+        console.error('Start event handler received invalid data:', data);
+        return;
+      }
+      
+      // Log the data structure for debugging
+      console.log('Start event data structure:', {
+        dataType: typeof data,
+        hasSessionId: 'sessionId' in data,
+        hasUserId: 'userId' in data,
+        hasSessionStatus: 'sessionStatus' in data,
+        rawData: data
+      });
+      
+      // Only update session if it's not already started
+      if (!sessionState.isSessionStarted) {
+        // Set session as started
+        dispatchSession({ type: 'START_SESSION' });
+        
+        // Record start time
+        const startTime = Date.now();
+        sessionStartTimeRef.current = startTime;
+        lastSyncTimeRef.current = startTime;
+        
+        // Store in localStorage for persistence
+        storageUtils.saveSessionStart(startTime, sessionId);
+        
+        // Update session data status if available
+        setSessionData(prevData => {
+          if (!prevData) return null;
+          
+          return {
+            ...prevData,
+            status: 'InProgress',
+            startedAt: new Date().toISOString()
+          };
+        });
+        
+        // Show toast notification
+        toast.success('The session has been started!');
+      }
+    });
     
-    //todo Add additional event subscriptions here as needed
+    // Add additional event subscriptions here as needed
     
     return () => {
       // Clean up subscriptions
       unsubscribeJoin();
+      unsubscribeStart();
       unsubscribeMessage(); // DEBUG: Clean up the generic message subscription
     };
-  }, [isValidSessionId, sessionId, subscribe]);
+  }, [isValidSessionId, sessionId, subscribe, sessionState.isSessionStarted]);
   
   // Effect to handle page refresh detection and disconnect EventSource when truly unloading
   useEffect(() => {
