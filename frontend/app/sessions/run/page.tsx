@@ -406,15 +406,63 @@ function SessionRunContent(): JSX.Element {
       }
     });
     
+    // Subscribe to the complete event
+    const unsubscribeComplete = subscribe('complete', (data) => {
+      console.log('Complete event received:', data);
+      
+      // Safety check for data structure
+      if (!data || typeof data !== 'object') {
+        console.error('Complete event handler received invalid data:', data);
+        return;
+      }
+      
+      // Log the data structure for debugging
+      console.log('Complete event data structure:', {
+        dataType: typeof data,
+        hasSessionId: 'sessionId' in data,
+        hasUserId: 'userId' in data,
+        hasSessionStatus: 'sessionStatus' in data,
+        rawData: data
+      });
+      
+      // Only update session if it's not already finished
+      if (sessionState.isSessionStarted && !sessionState.isSessionFinished) {
+        // Store the final duration
+        dispatchSession({ type: 'FINISH_SESSION' });
+        
+        // Mark session as finished in localStorage
+        storageUtils.saveSessionFinish(sessionState.elapsedSeconds);
+        
+        // Update session data status if available
+        setSessionData(prevData => {
+          if (!prevData) return null;
+          
+          return {
+            ...prevData,
+            status: 'Completed',
+            completedAt: new Date().toISOString()
+          };
+        });
+        
+        // Show toast notification
+        toast.success('The session has been completed!');
+        
+        // Disconnect EventSource when session is finished (optional)
+        console.log('Session completed via event, disconnecting EventSource');
+        disconnect();
+      }
+    });
+    
     // Add additional event subscriptions here as needed
     
     return () => {
       // Clean up subscriptions
       unsubscribeJoin();
       unsubscribeStart();
+      unsubscribeComplete();
       unsubscribeMessage(); // DEBUG: Clean up the generic message subscription
     };
-  }, [isValidSessionId, sessionId, subscribe, sessionState.isSessionStarted]);
+  }, [isValidSessionId, sessionId, subscribe, sessionState.isSessionStarted, sessionState.isSessionFinished, sessionState.elapsedSeconds, disconnect]);
   
   // Effect to handle page refresh detection and disconnect EventSource when truly unloading
   useEffect(() => {

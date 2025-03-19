@@ -660,5 +660,16 @@ pub async fn complete_session(
     // Update the session in the database
     session_repository::update_session(db, &session).await?;
 
+    broadcast_event(
+        session_id,
+        "complete",
+        json!({
+            "sessionId": session_id,
+            "userId": user_id,
+            "sessionStatus": session.status
+        }),
+        Some(session.host_id.clone()),
+    );
+
     Ok(SessionResponseDto::from(session))
 }
