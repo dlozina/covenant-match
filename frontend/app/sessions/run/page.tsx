@@ -207,11 +207,13 @@ function SessionRunContent(): JSX.Element {
         console.error('Error completing session:', err);
       });
       
-      // Explicitly disconnect EventSource when session is finished
-      console.log('Session finished, disconnecting EventSource');
-      disconnect();
+      // Keep SSE connection alive for the host to receive real-time updates
+      // about other players submitting their results
+      console.log('Session finished, but keeping SSE connection alive for result updates');
+      
+      // NOTE: We deliberately don't disconnect here so the host can see when other players report results
     }
-  }, [sessionState.elapsedSeconds, sessionId, sessionData, disconnect]);
+  }, [sessionState.elapsedSeconds, sessionId, sessionData]);
   
   // Reset session (memoized)
   const resetSession = useCallback(() => {
@@ -482,7 +484,9 @@ function SessionRunContent(): JSX.Element {
         
         // Log for debugging only
         if (process.env.NODE_ENV !== 'production') {
+          console.log(`Result event received by ${userData?.id === sessionData?.hostId ? 'HOST' : 'PLAYER'}`);
           console.log('Players who have reported:', Array.from(reportedUserIds));
+          console.log(`Current user is ${userData?.id}, Host is ${sessionData?.hostId}`);
         }
         
         // Update the session data to mark players who have reported
@@ -490,10 +494,17 @@ function SessionRunContent(): JSX.Element {
           if (!prevData) return null;
           
           // Create a new array of joined players with updated hasReported property
-          const updatedPlayers = prevData.joinedPlayers.map(player => ({
-            ...player,
-            hasReported: reportedUserIds.has(player.userId)
-          }));
+          const updatedPlayers = prevData.joinedPlayers.map(player => {
+            const hasReported = reportedUserIds.has(player.userId);
+            console.log(`Player ${player.username} (${player.userId}) has ${hasReported ? 'reported' : 'not reported'}`);
+            
+            return {
+              ...player,
+              hasReported: hasReported
+            };
+          });
+          
+          console.log('Updated players data:', updatedPlayers);
           
           return {
             ...prevData,
@@ -515,7 +526,7 @@ function SessionRunContent(): JSX.Element {
       unsubscribeResult();
       unsubscribeMessage(); // DEBUG: Clean up the generic message subscription
     };
-  }, [isValidSessionId, sessionId, subscribe, sessionState.isSessionStarted, sessionState.isSessionFinished, sessionState.elapsedSeconds, disconnect, sessionData]);
+  }, [isValidSessionId, sessionId, subscribe, sessionState.isSessionStarted, sessionState.isSessionFinished, sessionState.elapsedSeconds, disconnect, sessionData, userData]);
   
   // Effect to handle page refresh detection and disconnect EventSource when truly unloading
   useEffect(() => {

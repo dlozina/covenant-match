@@ -413,61 +413,62 @@ async fn get_results(
     }
 }
 
+//tod: not needed for now
 /// Rate a session
-#[utoipa::path(
-    post,
-    path = "/api/v1/sessions/{id}/rate",
-    params(
-        ("id" = String, Path, description = "Session ID to rate")
-    ),
-    request_body = RateSessionDto,
-    responses(
-        (status = 200, description = "Session rated successfully"),
-        (status = 400, description = "Invalid rating or cannot rate (session not completed)"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Only participants can rate the session"),
-        (status = 404, description = "Session not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    security(
-        ("bearer_auth" = [])
-    ),
-    tag = "sessions"
-)]
-#[post("/api/v1/sessions/{id}/rate")]
-async fn rate_session(
-    db: web::Data<Database>,
-    path: web::Path<String>,
-    rating_data: web::Json<RateSessionDto>,
-    req: HttpRequest,
-) -> impl Responder {
-    let id = path.into_inner();
+// #[utoipa::path(
+//     post,
+//     path = "/api/v1/sessions/{id}/rate",
+//     params(
+//         ("id" = String, Path, description = "Session ID to rate")
+//     ),
+//     request_body = RateSessionDto,
+//     responses(
+//         (status = 200, description = "Session rated successfully"),
+//         (status = 400, description = "Invalid rating or cannot rate (session not completed)"),
+//         (status = 401, description = "Unauthorized"),
+//         (status = 403, description = "Only participants can rate the session"),
+//         (status = 404, description = "Session not found"),
+//         (status = 500, description = "Internal server error")
+//     ),
+//     security(
+//         ("bearer_auth" = [])
+//     ),
+//     tag = "sessions"
+// )]
+// #[post("/api/v1/sessions/{id}/rate")]
+// async fn rate_session(
+//     db: web::Data<Database>,
+//     path: web::Path<String>,
+//     rating_data: web::Json<RateSessionDto>,
+//     req: HttpRequest,
+// ) -> impl Responder {
+//     let id = path.into_inner();
 
-    // Extract user_id before any await points
-    let user_id = {
-        let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
-        claims.sub.clone()
-    };
+//     // Extract user_id before any await points
+//     let user_id = {
+//         let extensions = req.extensions();
+//         let claims = extensions.get::<jwt::Claims>().unwrap();
+//         claims.sub.clone()
+//     };
 
-    // Update rating data with user ID
-    let mut rating_data = rating_data.into_inner();
-    rating_data.user_id = Some(user_id);
+//     // Update rating data with user ID
+//     let mut rating_data = rating_data.into_inner();
+//     rating_data.user_id = Some(user_id);
 
-    match session_service::rate_session(&db, &id, rating_data).await {
-        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
-            "status": "success",
-            "message": "Session rated successfully"
-        })),
-        Err(e) => {
-            log::error!("Error rating session: {:?}", e);
-            HttpResponse::BadRequest().json(serde_json::json!({
-                "status": "error",
-                "message": e.to_string()
-            }))
-        }
-    }
-}
+//     match session_service::rate_session(&db, &id, rating_data).await {
+//         Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+//             "status": "success",
+//             "message": "Session rated successfully"
+//         })),
+//         Err(e) => {
+//             log::error!("Error rating session: {:?}", e);
+//             HttpResponse::BadRequest().json(serde_json::json!({
+//                 "status": "error",
+//                 "message": e.to_string()
+//             }))
+//         }
+//     }
+// }
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(get_sessions)
@@ -478,6 +479,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         .service(cancel_session)
         .service(complete_session)
         .service(submit_result)
-        .service(get_results)
-        .service(rate_session);
+        .service(get_results);
+        //tod: not needed for now
+        //.service(rate_session);
 }

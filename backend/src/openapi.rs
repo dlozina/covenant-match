@@ -55,7 +55,8 @@ use utoipa::{
         complete_session,
         submit_result,
         get_results,
-        rate_session,
+        //tod: not needed for now
+        //rate_session,
         // Add statistics routes as they become available
     ),
     components(
