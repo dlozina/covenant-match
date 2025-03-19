@@ -155,8 +155,12 @@ const getPlayerStatusBadge = (
 
 // Player section component
 export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, friendState, addFriend, sessionData }) => {
-  // Get status for host player
-  const hostStatus = getPlayerStatusBadge(true, sessionState);
+  // Get status for host player - get hasReported flag from the host player data
+  const hostStatus = getPlayerStatusBadge(
+    true, 
+    sessionState, 
+    sessionData?.joinedPlayers?.find(p => p.userId === sessionData?.hostId)?.hasReported || false
+  );
   
   // Function to check if a player is the host
   const isPlayerHost = (playerId: string) => {

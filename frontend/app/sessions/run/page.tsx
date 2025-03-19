@@ -481,6 +481,13 @@ function SessionRunContent(): JSX.Element {
           console.log(`Result event received by ${userData?.id === sessionData?.hostId ? 'HOST' : 'PLAYER'}`);
           console.log(`Player ${reportedUserId} has reported with result: ${eventData.result}`);
           console.log(`Current user is ${userData?.id}, Host is ${sessionData?.hostId}`);
+          console.log(`Is host reporting: ${reportedUserId === sessionData?.hostId ? 'YES' : 'NO'}`);
+          
+          // Debug the current reported status of all players
+          console.log('Current reported status of players:');
+          sessionData?.joinedPlayers.forEach(player => {
+            console.log(`Player ${player.username} (${player.userId}): ${player.hasReported ? 'REPORTED' : 'PENDING'}`);
+          });
         }
         
         // Update the session data to mark the player as reported
@@ -735,6 +742,7 @@ function SessionRunContent(): JSX.Element {
       console.log('Submitting session result:', submissionData);
       console.log(`Submission by ${userData.id === sessionData.hostId ? 'HOST' : 'PLAYER'}`);
       console.log(`SSE connection status: ${isConnected() ? 'Connected' : 'Disconnected'}`);
+      console.log(`Is this user the host? ${userData.id === sessionData.hostId ? 'YES' : 'NO'}`);
       
       // Send API request to submit result
       const response = await fetch(`${apiBaseUrl}/api/v1/sessions/${sessionId}/results`, {
@@ -769,6 +777,7 @@ function SessionRunContent(): JSX.Element {
         });
         
         console.log('Updated players data after self-submission:', updatedPlayers);
+        console.log(`Host player is now marked as reported: ${updatedPlayers.find(p => p.userId === sessionData.hostId)?.hasReported ? 'YES' : 'NO'}`);
         
         return {
           ...prevData,
