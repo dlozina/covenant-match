@@ -16,8 +16,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { storageUtils } from '@/components/session/SessionUtils';
 import { SessionState, FriendState, ResultState, ResultAction } from '@/components/session/SessionReducers';
-import { useSearchParams } from 'next/navigation';
-import { toast } from 'sonner';
 
 // Define the session data interface
 interface JoinedPlayer {
