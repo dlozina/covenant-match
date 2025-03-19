@@ -81,10 +81,8 @@ function SessionRunContent(): JSX.Element {
   // State for connection status
   const [rtConnected, setRtConnected] = useState<boolean>(false);
   
-  // State to track which players have reported results
-  // We're not using this directly in rendering, but it's updated for consistency
-  // and could be useful for future features
-  const [reportedResults, setReportedResults] = useState<Set<string>>(new Set());
+  // State to track which players have reported results - not used anymore as we store this directly in sessionData
+  // const [reportedResults, setReportedResults] = useState<Set<string>>(new Set());
   
   // Function to check if current user is the host
   const isHost = useCallback(() => {
@@ -470,33 +468,34 @@ function SessionRunContent(): JSX.Element {
       // Log the data structure for debugging
       console.log('Result event data structure:', data);
       
-      // Use type assertion to access the result property safely
-      const eventData = data as { result?: unknown };
+      // Use type assertion to access the properties safely
+      const eventData = data as { reported?: string; result?: string };
       
-      // Check if we have the results array in the data
-      if (eventData.result && Array.isArray(eventData.result)) {
-        // Extract user IDs of players who have reported
-        const reportedUserIds = new Set<string>(
-          eventData.result.map((result: { user_id?: string; userId?: string }) => 
-            result.user_id || result.userId || ''
-          ).filter(id => id !== '') // Filter out any empty IDs
-        );
+      // Check if we have the reported user ID in the data
+      if (eventData.reported) {
+        // Get the user ID who reported their result
+        const reportedUserId = eventData.reported;
         
         // Log for debugging only
         if (process.env.NODE_ENV !== 'production') {
           console.log(`Result event received by ${userData?.id === sessionData?.hostId ? 'HOST' : 'PLAYER'}`);
-          console.log('Players who have reported:', Array.from(reportedUserIds));
+          console.log(`Player ${reportedUserId} has reported with result: ${eventData.result}`);
           console.log(`Current user is ${userData?.id}, Host is ${sessionData?.hostId}`);
         }
         
-        // Update the session data to mark players who have reported
+        // Update the session data to mark the player as reported
         setSessionData(prevData => {
           if (!prevData) return null;
           
           // Create a new array of joined players with updated hasReported property
           const updatedPlayers = prevData.joinedPlayers.map(player => {
-            const hasReported = reportedUserIds.has(player.userId);
-            console.log(`Player ${player.username} (${player.userId}) has ${hasReported ? 'reported' : 'not reported'}`);
+            // Only update the player who submitted the result
+            const hasReported = player.userId === reportedUserId || 
+                               (player.hasReported === true); // preserve existing reported status
+            
+            if (player.userId === reportedUserId) {
+              console.log(`Marking player ${player.username} (${player.userId}) as reported`);
+            }
             
             return {
               ...player,
@@ -513,6 +512,8 @@ function SessionRunContent(): JSX.Element {
         });
         
         // No toast notification needed - badges provide visual feedback
+      } else {
+        console.warn('Result event missing reported user ID:', eventData);
       }
     });
     
@@ -655,25 +656,30 @@ function SessionRunContent(): JSX.Element {
     
     // Initial check after a short delay
     const initialCheckTimer = setTimeout(() => {
-      setRtConnected(isConnected());
+      const connected = isConnected();
+      setRtConnected(connected);
+      console.log(`Initial SSE connection check: ${connected ? 'Connected' : 'Disconnected'}`);
     }, 2000);
     
     // Check connection status periodically
     const statusInterval = setInterval(() => {
       const connected = isConnected();
-      setRtConnected(connected);
       
       // Only log status changes to reduce console noise
       if (connected !== rtConnected) {
-        console.log(`Real-time connection status changed: ${connected ? 'Connected' : 'Disconnected'}`);
+        console.log(`SSE connection status changed: ${connected ? 'Connected' : 'Disconnected'}`);
+        console.log(`User role: ${userData?.id === sessionData?.hostId ? 'HOST' : 'PLAYER'}`);
+        console.log(`Session status: ${sessionState.isSessionFinished ? 'FINISHED' : 'IN PROGRESS'}`);
       }
+      
+      setRtConnected(connected);
     }, 5000);
     
     return () => {
       clearTimeout(initialCheckTimer);
       clearInterval(statusInterval);
     };
-  }, [isConnected, isValidSessionId, rtConnected]);
+  }, [isConnected, isValidSessionId, rtConnected, userData, sessionData, sessionState.isSessionFinished]);
 
   // Listen for heartbeat events
   useEffect(() => {
@@ -727,6 +733,8 @@ function SessionRunContent(): JSX.Element {
       };
       
       console.log('Submitting session result:', submissionData);
+      console.log(`Submission by ${userData.id === sessionData.hostId ? 'HOST' : 'PLAYER'}`);
+      console.log(`SSE connection status: ${isConnected() ? 'Connected' : 'Disconnected'}`);
       
       // Send API request to submit result
       const response = await fetch(`${apiBaseUrl}/api/v1/sessions/${sessionId}/results`, {
@@ -751,17 +759,24 @@ function SessionRunContent(): JSX.Element {
         if (!prevData) return null;
         
         // Update the joined players array with hasReported flag for current user
-        const updatedPlayers = prevData.joinedPlayers.map(player => 
-          player.userId === userData.id 
+        const updatedPlayers = prevData.joinedPlayers.map(player => {
+          const isCurrentUser = player.userId === userData.id;
+          console.log(`Setting player ${player.username} (${player.userId}) hasReported = ${isCurrentUser || player.hasReported}`);
+          
+          return player.userId === userData.id 
             ? { ...player, hasReported: true }
-            : player
-        );
+            : player;
+        });
+        
+        console.log('Updated players data after self-submission:', updatedPlayers);
         
         return {
           ...prevData,
           joinedPlayers: updatedPlayers
         };
       });
+      
+      console.log('Submission successful - updated UI state');
       
       // Success is indicated by the UI changing to show submitted state
       // No toast notification needed
@@ -772,7 +787,7 @@ function SessionRunContent(): JSX.Element {
       // Keep error toast as it's important for user feedback when things go wrong
       toast.error('Failed to submit result. Please try again.');
     }
-  }, [sessionId, userData, resultState, sessionData, resultSubmitted, setSessionData]);
+  }, [sessionId, userData, resultState, sessionData, resultSubmitted, setSessionData, isConnected]);
 
   return (
     <MainLayout footer={<Footer />}>

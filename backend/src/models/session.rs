@@ -21,7 +21,7 @@ pub struct SessionResult {
     pub submitted_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, ToSchema)]
 pub enum GameResult {
     Win,
     Loss,
@@ -72,7 +72,7 @@ pub struct JoinSessionDto {
     pub nightfarer: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SubmitResultDto {
     pub user_id: String,
