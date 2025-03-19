@@ -16,6 +16,8 @@ pub struct PlayerInfo {
 pub struct SessionResult {
     pub user_id: String,
     pub result: GameResult,
+    pub rating: Option<u8>,
+    pub feedback: Option<String>,
     pub submitted_at: DateTime<Utc>,
 }
 
@@ -75,6 +77,8 @@ pub struct JoinSessionDto {
 pub struct SubmitResultDto {
     pub user_id: String,
     pub result: GameResult,
+    pub rating: Option<u8>,
+    pub feedback: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
@@ -109,6 +113,14 @@ impl From<GameSession> for SessionResponseDto {
             password: session.password,
         }
     }
+}
+
+/// Combined review DTO for submitting results, ratings, and feedback in one request
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct SessionReviewDto {
+    pub result: Option<String>,   // win, loss, etc.
+    pub rating: Option<i32>,      // 1-5 stars
+    pub feedback: Option<String>, // Optional text feedback
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]

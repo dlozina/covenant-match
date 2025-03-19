@@ -1,5 +1,5 @@
 use crate::models::session::{
-    CreateSessionDto, GameResult, JoinSessionDto, RateSessionDto, SubmitResultDto,
+    CreateSessionDto, GameResult, JoinSessionDto, RateSessionDto, SessionReviewDto, SubmitResultDto
 };
 use crate::services::session_service;
 use crate::utils::jwt;
@@ -469,127 +469,6 @@ async fn rate_session(
     }
 }
 
-/// Combined review DTO for submitting results, ratings, and feedback in one request
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SessionReviewDto {
-    pub result: Option<String>,   // win, loss, etc.
-    pub rating: Option<i32>,      // 1-5 stars
-    pub feedback: Option<String>, // Optional text feedback
-}
-
-/// Submit a review for a session (combines results, ratings, and feedback)
-#[utoipa::path(
-    post,
-    path = "/api/v1/sessions/{id}/review",
-    request_body = SessionReviewDto,
-    params(
-        ("id" = String, Path, description = "Session ID")
-    ),
-    responses(
-        (status = 200, description = "Review submitted successfully"),
-        (status = 400, description = "Invalid input"),
-        (status = 404, description = "Session not found"),
-        (status = 500, description = "Internal server error")
-    ),
-    tag = "sessions"
-)]
-#[post("/api/v1/sessions/{id}/review")]
-async fn review_session(
-    db: web::Data<Database>,
-    path: web::Path<String>,
-    review: web::Json<SessionReviewDto>,
-    req: HttpRequest,
-) -> impl Responder {
-    let session_id = path.into_inner();
-
-    // Get user ID from JWT claims
-    let claims = req.extensions().get::<jwt::Claims>().cloned();
-    let claims = match claims {
-        Some(claims) => claims,
-        None => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "status": "error",
-                "message": "Unauthorized"
-            }));
-        }
-    };
-
-    let user_id = &claims.sub;
-
-    // Process result if provided
-    if let Some(result_str) = &review.result {
-        // Convert string to GameResult enum
-        let game_result = match result_str.to_lowercase().as_str() {
-            "win" => GameResult::Win,
-            "loss" => GameResult::Loss,
-            "disconnect" => GameResult::Disconnect,
-            _ => {
-                return HttpResponse::BadRequest().json(serde_json::json!({
-                    "status": "error",
-                    "message": "Invalid result value. Must be 'win', 'loss', or 'disconnect'."
-                }));
-            }
-        };
-
-        let result_data = SubmitResultDto {
-            user_id: user_id.clone(),
-            result: game_result,
-        };
-
-        match session_service::submit_result(&db, &session_id, result_data).await {
-            Ok(_) => {
-                log::info!("Result submitted successfully for session {}", session_id);
-            }
-            Err(e) => {
-                log::error!("Error submitting result: {:?}", e);
-                return HttpResponse::InternalServerError().json(serde_json::json!({
-                    "status": "error",
-                    "message": format!("Failed to submit result: {}", e)
-                }));
-            }
-        }
-    }
-
-    // Process rating if provided
-    if let Some(rating) = review.rating {
-        // Convert i32 to u8 with validation
-        let rating_u8 = match u8::try_from(rating) {
-            Ok(r) if r <= 5 => r,
-            _ => {
-                return HttpResponse::BadRequest().json(serde_json::json!({
-                    "status": "error",
-                    "message": "Rating must be between 1 and 5"
-                }));
-            }
-        };
-
-        let rating_data = RateSessionDto {
-            user_id: Some(user_id.clone()),
-            rating: rating_u8,
-            comment: review.feedback.clone(),
-            created_at: chrono::Utc::now(),
-        };
-
-        match session_service::rate_session(&db, &session_id, rating_data).await {
-            Ok(_) => {
-                log::info!("Rating submitted successfully for session {}", session_id);
-            }
-            Err(e) => {
-                log::error!("Error submitting rating: {:?}", e);
-                return HttpResponse::InternalServerError().json(serde_json::json!({
-                    "status": "error",
-                    "message": format!("Failed to submit rating: {}", e)
-                }));
-            }
-        }
-    }
-
-    HttpResponse::Ok().json(serde_json::json!({
-        "status": "success",
-        "message": "Review submitted successfully"
-    }))
-}
-
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(get_sessions)
         .service(create_session)
@@ -600,6 +479,5 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         .service(complete_session)
         .service(submit_result)
         .service(get_results)
-        .service(rate_session)
-        .service(review_session);
+        .service(rate_session);
 }

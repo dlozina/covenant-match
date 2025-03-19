@@ -81,6 +81,11 @@ function SessionRunContent(): JSX.Element {
   // State for connection status
   const [rtConnected, setRtConnected] = useState<boolean>(false);
   
+  // State to track which players have reported results
+  // We're not using this directly in rendering, but it's updated for consistency
+  // and could be useful for future features
+  const [reportedResults, setReportedResults] = useState<Set<string>>(new Set());
+  
   // Function to check if current user is the host
   const isHost = useCallback(() => {
     if (!sessionData || !userData) return false;
@@ -401,8 +406,7 @@ function SessionRunContent(): JSX.Element {
           };
         });
         
-        // Show toast notification
-        toast.success('The session has been started!');
+        // No toast notification needed - UI changes provide sufficient indication
       }
     });
     
@@ -444,12 +448,60 @@ function SessionRunContent(): JSX.Element {
           };
         });
         
-        // Show toast notification
-        toast.success('The session has been completed!');
+        // No toast notification needed - UI changes clearly indicate status
         
-        // Disconnect EventSource when session is finished (optional)
-        console.log('Session completed via event, disconnecting EventSource');
-        disconnect();
+        // NOTE: We're not disconnecting from SSE here anymore to continue receiving result updates
+        // This allows players to see who has submitted their results in real-time
+      }
+    });
+    
+    // Subscribe to the result event
+    const unsubscribeResult = subscribe('result', (data) => {
+      console.log('Result event received:', data);
+      
+      // Safety check for data structure
+      if (!data || typeof data !== 'object') {
+        console.error('Result event handler received invalid data:', data);
+        return;
+      }
+      
+      // Log the data structure for debugging
+      console.log('Result event data structure:', data);
+      
+      // Use type assertion to access the result property safely
+      const eventData = data as { result?: unknown };
+      
+      // Check if we have the results array in the data
+      if (eventData.result && Array.isArray(eventData.result)) {
+        // Extract user IDs of players who have reported
+        const reportedUserIds = new Set<string>(
+          eventData.result.map((result: { user_id?: string; userId?: string }) => 
+            result.user_id || result.userId || ''
+          ).filter(id => id !== '') // Filter out any empty IDs
+        );
+        
+        // Log for debugging only
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('Players who have reported:', Array.from(reportedUserIds));
+        }
+        
+        // Update the session data to mark players who have reported
+        setSessionData(prevData => {
+          if (!prevData) return null;
+          
+          // Create a new array of joined players with updated hasReported property
+          const updatedPlayers = prevData.joinedPlayers.map(player => ({
+            ...player,
+            hasReported: reportedUserIds.has(player.userId)
+          }));
+          
+          return {
+            ...prevData,
+            joinedPlayers: updatedPlayers
+          };
+        });
+        
+        // No toast notification needed - badges provide visual feedback
       }
     });
     
@@ -460,9 +512,10 @@ function SessionRunContent(): JSX.Element {
       unsubscribeJoin();
       unsubscribeStart();
       unsubscribeComplete();
+      unsubscribeResult();
       unsubscribeMessage(); // DEBUG: Clean up the generic message subscription
     };
-  }, [isValidSessionId, sessionId, subscribe, sessionState.isSessionStarted, sessionState.isSessionFinished, sessionState.elapsedSeconds, disconnect]);
+  }, [isValidSessionId, sessionId, subscribe, sessionState.isSessionStarted, sessionState.isSessionFinished, sessionState.elapsedSeconds, disconnect, sessionData]);
   
   // Effect to handle page refresh detection and disconnect EventSource when truly unloading
   useEffect(() => {
@@ -625,6 +678,91 @@ function SessionRunContent(): JSX.Element {
     };
   }, []);
 
+  // State for result submission feedback
+  const [resultSubmitted, setResultSubmitted] = useState<boolean>(false);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  
+  // Function to handle result submission
+  const handleSubmitResult = useCallback(async () => {
+    if (!sessionData || !userData || resultSubmitted) return;
+    
+    try {
+      setSubmissionError(null);
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const token = localStorage.getItem('token');
+      
+      // Map the UI result value to the backend format
+      let resultValue = '';
+      switch (resultState.selectedResult) {
+        case 'win':
+          resultValue = 'Win';
+          break;
+        case 'loss':
+          resultValue = 'Loss';
+          break;
+        case 'dc':
+          resultValue = 'Disconnect';
+          break;
+        default:
+          resultValue = 'Win'; // Default to Win if somehow we get an unexpected value
+      }
+      
+      // Prepare submission data
+      const submissionData = {
+        userId: userData.id, // Use authenticated user's ID
+        result: resultValue, // Properly mapped result value
+        rating: resultState.rating,
+        feedback: resultState.feedback || ''
+      };
+      
+      console.log('Submitting session result:', submissionData);
+      
+      // Send API request to submit result
+      const response = await fetch(`${apiBaseUrl}/api/v1/sessions/${sessionId}/results`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(submissionData)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to submit result');
+      }
+      
+      // Mark as submitted
+      setResultSubmitted(true);
+      
+      // Update session data to mark current user as reported
+      setSessionData(prevData => {
+        if (!prevData) return null;
+        
+        // Update the joined players array with hasReported flag for current user
+        const updatedPlayers = prevData.joinedPlayers.map(player => 
+          player.userId === userData.id 
+            ? { ...player, hasReported: true }
+            : player
+        );
+        
+        return {
+          ...prevData,
+          joinedPlayers: updatedPlayers
+        };
+      });
+      
+      // Success is indicated by the UI changing to show submitted state
+      // No toast notification needed
+      
+    } catch (err) {
+      console.error('Error submitting result:', err);
+      setSubmissionError(err instanceof Error ? err.message : 'An unknown error occurred');
+      // Keep error toast as it's important for user feedback when things go wrong
+      toast.error('Failed to submit result. Please try again.');
+    }
+  }, [sessionId, userData, resultState, sessionData, resultSubmitted, setSessionData]);
+
   return (
     <MainLayout footer={<Footer />}>
       <div className="container py-10 mx-auto">
@@ -710,6 +848,9 @@ function SessionRunContent(): JSX.Element {
                   dispatchResult={dispatchResult}
                   sessionState={sessionState}
                   formatTime={formatTime}
+                  onSubmitResult={handleSubmitResult}
+                  isSubmitted={resultSubmitted}
+                  submissionError={submissionError}
                 />
               ) : (
                 <SessionInfoSection

@@ -1,6 +1,6 @@
 use crate::models::session::{
     CreateSessionDto, GameResult, JoinSessionDto, PlayerInfo, RateSessionDto, ResultsResponseDto,
-    SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto,
+    SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto
 };
 use crate::models::user::{
     AuthResponse, CreateUserDto, GetUsersQuery, LoginUserDto, PaginationInfo, UpdateUserDto,

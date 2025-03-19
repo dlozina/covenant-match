@@ -33,11 +33,13 @@ export interface SessionState {
   export interface ResultState {
     selectedResult: string;
     rating: number;
+    feedback?: string;
   }
   
   export type ResultAction = 
     | { type: 'SELECT_RESULT'; payload: string }
-    | { type: 'SET_RATING'; payload: number };
+    | { type: 'SET_RATING'; payload: number }
+    | { type: 'SET_FEEDBACK'; payload: string };
   
   // Session state initial value
   export const initialSessionState: SessionState = {
@@ -133,6 +135,11 @@ export interface SessionState {
         return {
           ...state,
           rating: action.payload
+        };
+      case 'SET_FEEDBACK':
+        return {
+          ...state,
+          feedback: action.payload
         };
       default:
         return state;

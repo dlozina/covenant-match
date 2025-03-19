@@ -94,6 +94,9 @@ interface ResultReportingSectionProps {
   dispatchResult: React.Dispatch<ResultAction>;
   sessionState: SessionState;
   formatTime: (seconds: number) => string;
+  onSubmitResult: () => Promise<void>;
+  isSubmitted: boolean;
+  submissionError: string | null;
 }
 
 interface ResultButtonProps {
@@ -121,8 +124,8 @@ const getPlayerStatusBadge = (
 ) => {
   // For finished sessions
   if (sessionState.isSessionFinished) {
-    // The host is assumed to have reported (since they finish the session)
-    if (isHost || hasReported) {
+    // Only show "Reported" if the player has actually submitted a result
+    if (hasReported) {
       return {
         color: "bg-emerald-950/30 text-emerald-500 border-emerald-500",
         text: "Reported"
@@ -609,65 +612,21 @@ export const ResultReportingSection: React.FC<ResultReportingSectionProps> = ({
   resultState, 
   dispatchResult, 
   sessionState, 
-  formatTime 
+  formatTime,
+  onSubmitResult,
+  isSubmitted,
+  submissionError
 }) => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [feedback, setFeedback] = useState<string>('');
-  const searchParams = useSearchParams();
-  const sessionId = searchParams.get('id') || '';
   
+  // Function to handle form submission
   const handleSubmitResults = async () => {
-    if (!sessionId) {
-      toast.error('Session ID is missing');
-      return;
-    }
-    
     setIsSubmitting(true);
-    
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const token = localStorage.getItem('token');
-      
-      // Map the result to the backend format
-      let resultValue = '';
-      switch (resultState.selectedResult) {
-        case 'win':
-          resultValue = 'win';
-          break;
-        case 'loss':
-          resultValue = 'loss';
-          break;
-        case 'dc':
-          resultValue = 'disconnect';
-          break;
-      }
-      
-      // Create the review payload
-      const reviewData = {
-        result: resultValue,
-        rating: resultState.rating,
-        feedback: feedback.trim() || undefined
-      };
-      
-      // Send the review to the backend
-      const response = await fetch(`${apiBaseUrl}/api/v1/sessions/${sessionId}/review`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(reviewData)
-      });
-      
-      if (response.ok) {
-        toast.success('Results submitted successfully');
-      } else {
-        const data = await response.json();
-        toast.error(data.message || 'Failed to submit results');
-      }
+      // Call the provided submit function
+      await onSubmitResult();
     } catch (error) {
-      console.error('Error submitting results:', error);
-      toast.error('An unexpected error occurred');
+      console.error('Error in handleSubmitResults:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -679,61 +638,80 @@ export const ResultReportingSection: React.FC<ResultReportingSectionProps> = ({
         <CardTitle>Report Your Result</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6 flex-grow flex flex-col justify-between">
-        {/* Result Options */}
-        <div className="grid grid-cols-3 gap-3">
-          <ResultButton 
-            type="win" 
-            isSelected={resultState.selectedResult === 'win'}
-            onSelect={() => dispatchResult({ type: 'SELECT_RESULT', payload: 'win' })}
-          />
-          <ResultButton 
-            type="loss" 
-            isSelected={resultState.selectedResult === 'loss'}
-            onSelect={() => dispatchResult({ type: 'SELECT_RESULT', payload: 'loss' })}
-          />
-          <ResultButton 
-            type="dc" 
-            isSelected={resultState.selectedResult === 'dc'}
-            onSelect={() => dispatchResult({ type: 'SELECT_RESULT', payload: 'dc' })}
-          />
-        </div>
+        {isSubmitted ? (
+          <div className="flex flex-col items-center justify-center h-full">
+            <div className="text-green-500 mb-2">✓</div>
+            <h3 className="text-xl font-medium mb-2">Results Submitted</h3>
+            <p className="text-center text-muted-foreground">
+              Thank you for submitting your results. 
+              Once majority of players have reported, the session will be saved in statistics.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Result Options */}
+            <div className="grid grid-cols-3 gap-3">
+              <ResultButton 
+                type="win" 
+                isSelected={resultState.selectedResult === 'win'}
+                onSelect={() => dispatchResult({ type: 'SELECT_RESULT', payload: 'win' })}
+              />
+              <ResultButton 
+                type="loss" 
+                isSelected={resultState.selectedResult === 'loss'}
+                onSelect={() => dispatchResult({ type: 'SELECT_RESULT', payload: 'loss' })}
+              />
+              <ResultButton 
+                type="dc" 
+                isSelected={resultState.selectedResult === 'dc'}
+                onSelect={() => dispatchResult({ type: 'SELECT_RESULT', payload: 'dc' })}
+              />
+            </div>
 
-        {/* Session Timer */}
-        <div className="flex justify-between items-center">
-          <span className="text-muted-foreground">Session Duration:</span>
-          <span className="text-foreground font-medium">
-            {formatTime(sessionState.finalDuration || sessionState.elapsedSeconds)}
-          </span>
-        </div>
+            {/* Session Timer */}
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Session Duration:</span>
+              <span className="text-foreground font-medium">
+                {formatTime(sessionState.finalDuration || sessionState.elapsedSeconds)}
+              </span>
+            </div>
 
-        {/* Rating Stars */}
-        <RatingStars 
-          rating={resultState.rating} 
-          onSetRating={(rating) => dispatchResult({ type: 'SET_RATING', payload: rating })}
-        />
-        
-        {/* Feedback */}
-        <div className="space-y-2">
-          <label htmlFor="feedback" className="text-sm font-medium">
-            Feedback (Optional)
-          </label>
-          <textarea
-            id="feedback"
-            className="w-full min-h-[80px] p-2 border rounded-md bg-background"
-            placeholder="Share your thoughts about the session..."
-            value={feedback}
-            onChange={(e) => setFeedback(e.target.value)}
-          />
-        </div>
+            {/* Rating Stars */}
+            <RatingStars 
+              rating={resultState.rating} 
+              onSetRating={(rating) => dispatchResult({ type: 'SET_RATING', payload: rating })}
+            />
+            
+            {/* Feedback */}
+            <div className="space-y-2">
+              <label htmlFor="feedback" className="text-sm font-medium">
+                Feedback (Optional)
+              </label>
+              <textarea
+                id="feedback"
+                className="w-full min-h-[80px] p-2 border rounded-md bg-background"
+                placeholder="Share your thoughts about the session..."
+                value={resultState.feedback || ''}
+                onChange={(e) => dispatchResult({ type: 'SET_FEEDBACK', payload: e.target.value })}
+              />
+            </div>
 
-        {/* Submit Button */}
-        <Button 
-          className="w-full h-12 mt-auto" 
-          onClick={handleSubmitResults}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? 'Submitting...' : 'Submit Results'}
-        </Button>
+            {submissionError && (
+              <div className="text-red-500 text-sm">
+                Error: {submissionError}
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <Button 
+              className="w-full h-12 mt-auto" 
+              onClick={handleSubmitResults}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Submitting...' : 'Submit Results'}
+            </Button>
+          </>
+        )}
       </CardContent>
     </Card>
   );

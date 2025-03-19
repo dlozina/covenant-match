@@ -415,9 +415,9 @@ pub async fn submit_result(
         .ok_or(AppError::SessionNotFound)?;
 
     // Check if session is in progress
-    if session.status != SessionStatus::InProgress {
+    if session.status != SessionStatus::Completed {
         return Err(AppError::BadRequest(
-            "Results can only be submitted for in-progress sessions".to_string(),
+            "Results can only be submitted for completed sessions".to_string(),
         ));
     }
 
@@ -441,13 +441,16 @@ pub async fn submit_result(
     // Add the result
     let now = Utc::now();
     session.results.push(SessionResult {
-        user_id,
+        user_id: user_id.clone(),
         result: result_data.result,
+        rating: result_data.rating,
+        feedback: result_data.feedback,
         submitted_at: now,
     });
 
     session.updated_at = now;
 
+    //todo important: calculate consensus
     // Check if all players have submitted results
     if session.results.len() >= session.joined_players.len() {
         // Check for result consensus
@@ -472,6 +475,7 @@ pub async fn submit_result(
             session.status = SessionStatus::Completed;
             session.completed_at = Some(now);
 
+            //todo important: update player statistics
             // Update player statistics
             for player in &session.joined_players {
                 // Get player's submitted result or use majority result
@@ -505,6 +509,14 @@ pub async fn submit_result(
 
     // Update the session in the database
     session_repository::update_session(db, &session).await?;
+
+    // Broadcast the result to all clients in the session
+    broadcast_event(
+        session_id,
+        "result",
+        json!({ "result": session.results }),
+        Some(user_id),
+    );
 
     Ok(())
 }
