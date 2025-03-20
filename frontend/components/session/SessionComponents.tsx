@@ -223,72 +223,90 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, frie
         </div>
       )}
 
+      {/* Add first divider after host player */}
+      <div className="border-t border-border"></div>
+
       {/* Additional players from joinedPlayers array (starting from index 1) */}
       {sessionData && sessionData.joinedPlayers.slice(1).map((player, index) => {
         // Get status for this player
         const playerStatus = getPlayerStatusBadge(false, sessionState, player.hasReported);
         
         return (
-          <div key={player.userId} className="flex items-center space-x-4">
-            <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary">
-              <span>P{index + 2}</span>
-            </Avatar>
-            <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
-              <div className="bg-secondary/50 px-3 py-2 rounded-md">
-                <span className="text-foreground">{player.username}</span>
-              </div>
-              <div className="bg-secondary/50 px-3 py-2 rounded-md">
-                <span className="text-foreground">{player.nightfarer}</span>
-              </div>
-              <div className="flex items-center gap-2 ml-auto">
-                {isPlayerHost(player.userId) && (
-                  <Badge variant="outline" className="bg-blue-950/30 text-blue-500 border-blue-500">
-                    Host
+          <React.Fragment key={player.userId}>
+            <div className="flex items-center space-x-4">
+              <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary">
+                <span>P{index + 2}</span>
+              </Avatar>
+              <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
+                <div className="bg-secondary/50 px-3 py-2 rounded-md">
+                  <span className="text-foreground">{player.username}</span>
+                </div>
+                <div className="bg-secondary/50 px-3 py-2 rounded-md">
+                  <span className="text-foreground">{player.nightfarer}</span>
+                </div>
+                <div className="flex items-center gap-2 ml-auto">
+                  {isPlayerHost(player.userId) && (
+                    <Badge variant="outline" className="bg-blue-950/30 text-blue-500 border-blue-500">
+                      Host
+                    </Badge>
+                  )}
+                  {sessionState.isSessionFinished && (
+                    <FriendButton 
+                      playerId={player.userId} 
+                      isFriend={friendState[player.userId]} 
+                      onAddFriend={addFriend} 
+                    />
+                  )}
+                  <Badge 
+                    variant="outline" 
+                    className={playerStatus.color}
+                  >
+                    {playerStatus.text}
                   </Badge>
-                )}
-                {sessionState.isSessionFinished && (
-                  <FriendButton 
-                    playerId={player.userId} 
-                    isFriend={friendState[player.userId]} 
-                    onAddFriend={addFriend} 
-                  />
-                )}
-                <Badge 
-                  variant="outline" 
-                  className={playerStatus.color}
-                >
-                  {playerStatus.text}
-                </Badge>
+                </div>
               </div>
             </div>
-          </div>
+            {/* Add divider after each player except the last one */}
+            {index < sessionData.joinedPlayers.slice(1).length - 1 && (
+              <div className="border-t border-border"></div>
+            )}
+          </React.Fragment>
         );
       })}
+
+      {/* Add divider before empty slots if we have any real players */}
+      {(!sessionData || sessionData.joinedPlayers.length < 3) && sessionData && sessionData.joinedPlayers.length > 0 && (
+        <div className="border-t border-border"></div>
+      )}
 
       {/* Empty player slots to maintain layout */}
       {(!sessionData || sessionData.joinedPlayers.length < 3) && (
         <div className="space-y-4 opacity-50">
           {/* If we have 0 or 1 players, show 2 empty slots */}
           {(!sessionData || sessionData.joinedPlayers.length <= 1) && (
-            <div className="flex items-center space-x-4">
-              <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary/50">
-                <span>P2</span>
-              </Avatar>
-              <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
-                <div className="bg-secondary/30 px-3 py-2 rounded-md">
-                  <span className="text-muted-foreground">Empty Slot</span>
+            <React.Fragment>
+              <div className="flex items-center space-x-4">
+                <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary/50">
+                  <span>P2</span>
+                </Avatar>
+                <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
+                  <div className="bg-secondary/30 px-3 py-2 rounded-md">
+                    <span className="text-muted-foreground">Empty Slot</span>
+                  </div>
+                  <div className="bg-secondary/30 px-3 py-2 rounded-md">
+                    <span className="text-muted-foreground">Not Joined</span>
+                  </div>
+                  <Badge 
+                    variant="outline" 
+                    className="bg-secondary/50 text-muted-foreground border-muted-foreground ml-auto"
+                  >
+                    Waiting
+                  </Badge>
                 </div>
-                <div className="bg-secondary/30 px-3 py-2 rounded-md">
-                  <span className="text-muted-foreground">Not Joined</span>
-                </div>
-                <Badge 
-                  variant="outline" 
-                  className="bg-secondary/50 text-muted-foreground border-muted-foreground ml-auto"
-                >
-                  Waiting
-                </Badge>
               </div>
-            </div>
+              {/* Add divider between empty slots */}
+              <div className="border-t border-border"></div>
+            </React.Fragment>
           )}
           
           {/* If we have 0, 1, or 2 players, show the last empty slot */}
@@ -511,10 +529,17 @@ export const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({ sessionS
       <CardTitle>Session Information</CardTitle>
     </CardHeader>
     <CardContent className="space-y-4 flex-grow flex flex-col">
-      <div className="flex justify-between items-center">
-        <span className="text-muted-foreground">In-Game Password:</span>
-        <span className="text-foreground">{sessionData?.password || 'No Password'}</span>
+      {/* Make password more prominent */}
+      <div className="border border-primary/20 bg-primary/5 p-3 rounded-md">
+        <div className="flex justify-between items-center">
+          <span className="text-muted-foreground font-medium">In-Game Password:</span>
+          <span className="text-foreground font-bold text-lg">{sessionData?.password || 'No Password'}</span>
+        </div>
       </div>
+
+      {/* Add a divider for visual separation */}
+      <div className="border-t border-border"></div>
+
       <div className="flex justify-between items-center">
         <span className="text-muted-foreground">Night Lord:</span>
         <span className="text-foreground">{sessionData ? sessionData.nightLord : 'Tricephalos'}</span>
@@ -528,47 +553,22 @@ export const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({ sessionS
         </span>
       </div>
       <div className="flex justify-between items-center">
-        <span className="text-muted-foreground">Status:</span>
-        <Badge 
-          variant="outline" 
-          className={`${
-            sessionData 
-              ? (sessionData.status === 'Open' 
-                ? "bg-amber-950/30 text-amber-500 border-amber-500"
-                : sessionData.status === 'InProgress' 
-                  ? "bg-purple-950/30 text-purple-500 border-purple-500"
-                  : sessionData.status === 'Completed'
-                    ? "bg-emerald-950/30 text-emerald-500 border-emerald-500"
-                    : "bg-secondary/50 text-muted-foreground border-muted-foreground")
-              : (sessionState.isSessionStarted 
-                ? "bg-purple-950/30 text-purple-500 border-purple-500"
-                : "bg-amber-950/30 text-amber-500 border-amber-500")
-          }`}
-        >
-          {sessionData 
-            ? (sessionData.status === 'Open' 
-              ? 'Not Started' 
-              : sessionData.status === 'InProgress' 
-                ? 'In Progress' 
-                : sessionData.status === 'Completed'
-                  ? 'Completed'
-                  : sessionData.status)
-            : (sessionState.isSessionStarted ? 'In Progress' : 'Not Started')}
-        </Badge>
-      </div>
-      <div className="flex justify-between items-center">
         <span className="text-muted-foreground">
           Session Duration:
         </span>
-        <span className="text-foreground font-medium">
+        <span className={`font-medium ${sessionState.isSessionStarted && !sessionState.isSessionFinished ? 'text-emerald-500 font-bold' : 'text-foreground'}`}>
           {sessionState.isSessionStarted 
             ? formatTime(sessionState.elapsedSeconds)
             : '0m 00s'}
         </span>
       </div>
+      
+      {/* Add a divider for visual separation */}
+      <div className="border-t border-border"></div>
+      
       <p className="text-sm text-muted-foreground mt-auto">
         {!sessionState.isSessionStarted 
-          ? 'Click "Start Session" to begin the game timer.'
+          ? 'Waiting for the host to start the session.'
           : 'Click "Finish Session" when you\'re ready to report your results.'}
       </p>
     </CardContent>
