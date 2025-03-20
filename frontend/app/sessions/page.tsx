@@ -102,8 +102,8 @@ export default function SessionsPage() {
       const offset = (currentPage - 1) * limit;
       // Add status parameter to only fetch sessions with the current status filter
       const statusParam = statusFilter !== 'All' ? `&status=${statusFilter}` : '';
-      // Add isPrivate parameter to only fetch sessions that are not private
-      const isPrivateParam = statusFilter === 'All' ? '' : `&isPrivate=${statusFilter === 'Open' ? false : true}`;
+      // Always set isPrivate=false to ensure we never show private sessions
+      const isPrivateParam = '&isPrivate=false';
       
       // Set up headers based on authentication status
       const headers: Record<string, string> = {

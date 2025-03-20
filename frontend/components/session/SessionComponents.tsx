@@ -685,6 +685,7 @@ export const ResultReportingSection: React.FC<ResultReportingSectionProps> = ({
             />
             
             {/* Feedback */}
+            {/* Commenting out the feedback section to see how UI looks without it
             <div className="space-y-2">
               <label htmlFor="feedback" className="text-sm font-medium">
                 Feedback (Optional)
@@ -697,6 +698,7 @@ export const ResultReportingSection: React.FC<ResultReportingSectionProps> = ({
                 onChange={(e) => dispatchResult({ type: 'SET_FEEDBACK', payload: e.target.value })}
               />
             </div>
+            */}
 
             {submissionError && (
               <div className="text-red-500 text-sm">
