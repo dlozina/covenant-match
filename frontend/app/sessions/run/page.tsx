@@ -863,15 +863,39 @@ function SessionRunContent(): JSX.Element {
         {!isLoading && !error && sessionData && (
           /* Main Content */
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column */}
+            {/* Left Column for Desktop / Main Content for Mobile */}
             <div className="lg:col-span-2">
               {/* Players Section */}
-              <PlayerSection 
-                sessionState={sessionState} 
-                friendState={friendState} 
-                addFriend={addFriend}
-                sessionData={sessionData}
-              />
+              <div className="mb-6">
+                <PlayerSection 
+                  sessionState={sessionState} 
+                  friendState={friendState} 
+                  addFriend={addFriend}
+                  sessionData={sessionData}
+                />
+              </div>
+
+              {/* Mobile-only: Results Section - Only appears here on mobile screens */}
+              <div className="block lg:hidden mb-6">
+                {/* Report Your Result Section - Only shown after session is finished */}
+                {sessionState.isSessionFinished ? (
+                  <ResultReportingSection
+                    resultState={resultState}
+                    dispatchResult={dispatchResult}
+                    sessionState={sessionState}
+                    formatTime={formatTime}
+                    onSubmitResult={handleSubmitResult}
+                    isSubmitted={resultSubmitted}
+                    submissionError={submissionError}
+                  />
+                ) : (
+                  <SessionInfoSection
+                    sessionState={sessionState}
+                    formatTime={formatTime}
+                    sessionData={sessionData}
+                  />
+                )}
+              </div>
 
               {/* Session Control Buttons */}
               <SessionControlButtons 
@@ -885,8 +909,8 @@ function SessionRunContent(): JSX.Element {
               />
             </div>
 
-            {/* Right Column */}
-            <div className="lg:col-span-1 flex flex-col h-full">
+            {/* Right Column for Desktop Only */}
+            <div className="hidden lg:flex lg:col-span-1 flex-col h-full">
               {/* Report Your Result Section - Only shown after session is finished */}
               {sessionState.isSessionFinished ? (
                 <ResultReportingSection
