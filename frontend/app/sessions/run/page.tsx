@@ -175,6 +175,17 @@ function SessionRunContent(): JSX.Element {
       }).catch(err => {
         console.error('Error starting session:', err);
       });
+
+      // Update sessionData for the host to reflect the new status
+      setSessionData(prevData => {
+        if (!prevData) return null;
+        
+        return {
+          ...prevData,
+          status: 'InProgress',
+          startedAt: new Date().toISOString()
+        };
+      });
     }
   }, [sessionState.isSessionStarted, sessionId, isValidSessionId, sessionData]);
   

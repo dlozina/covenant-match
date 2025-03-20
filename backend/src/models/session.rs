@@ -44,6 +44,7 @@ pub struct GameSession {
     pub name: String,
     pub host_id: String,
     pub password: String,
+    pub is_private: bool,
     pub night_lord: String,
     pub status: SessionStatus,
     pub joined_players: Vec<PlayerInfo>,
@@ -62,6 +63,7 @@ pub struct CreateSessionDto {
     pub game_password: String,
     pub nightfarer: String,
     pub night_lord: String,
+    pub is_private: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -95,6 +97,7 @@ pub struct SessionResponseDto {
     pub started_at: Option<DateTime<Utc>>,
     pub completed_at: Option<DateTime<Utc>>,
     pub password: String,
+    pub is_private: bool,
 }
 
 impl From<GameSession> for SessionResponseDto {
@@ -111,6 +114,7 @@ impl From<GameSession> for SessionResponseDto {
             started_at: session.started_at,
             completed_at: session.completed_at,
             password: session.password,
+            is_private: session.is_private,
         }
     }
 }

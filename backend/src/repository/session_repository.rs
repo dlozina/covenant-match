@@ -28,11 +28,16 @@ pub async fn find_sessions(
     status: Option<SessionStatus>,
     limit: Option<u64>,
     offset: Option<u64>,
+    is_private: Option<bool>,
 ) -> Result<Vec<GameSession>, AppError> {
-    let filter = match status {
+    let mut filter = match status {
         Some(status) => doc! { "status": to_bson(&status)? },
         None => doc! {},
     };
+
+    if let Some(is_private) = is_private {
+        filter = doc! { "$and": [filter, doc! { "is_private": is_private }] };
+    }
 
     let options = FindOptions::builder()
         .sort(doc! { "created_at": -1 })

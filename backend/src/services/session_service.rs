@@ -169,6 +169,7 @@ pub async fn create_session(
         name: session_data.name,
         host_id: user_id.to_string(),
         password: session_data.game_password,
+        is_private: session_data.is_private,
         status: SessionStatus::Open,
         joined_players: vec![PlayerInfo {
             user_id: user.id.clone(),
@@ -199,6 +200,7 @@ pub async fn get_sessions(
     status: Option<String>,
     limit: Option<u64>,
     offset: Option<u64>,
+    is_private: Option<bool>,
 ) -> Result<Vec<SessionResponseDto>, AppError> {
     let status_filter = match status {
         Some(s) => match s.to_lowercase().as_str() {
@@ -212,7 +214,7 @@ pub async fn get_sessions(
         None => None,
     };
 
-    let sessions = session_repository::find_sessions(db, status_filter, limit, offset).await?;
+    let sessions = session_repository::find_sessions(db, status_filter, limit, offset, is_private).await?;
 
     // Convert to response DTOs (exclude passwords for listing)
     Ok(sessions

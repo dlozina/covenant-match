@@ -14,7 +14,8 @@ use serde::{Deserialize, Serialize};
     params(
         ("status" = Option<String>, Query, description = "Filter sessions by status (e.g., 'Open', 'InProgress', 'Completed')"),
         ("limit" = Option<u64>, Query, description = "Limit number of results (default: 10)"),
-        ("offset" = Option<u64>, Query, description = "Offset for pagination (default: 0)")
+        ("offset" = Option<u64>, Query, description = "Offset for pagination (default: 0)"),
+        ("isPrivate" = Option<bool>, Query, description = "Filter sessions by private status (default: false)")
     ),
     responses(
         (status = 200, description = "List of sessions retrieved successfully", body = Vec<SessionResponseDto>),
@@ -30,8 +31,9 @@ async fn get_sessions(
     let status = query.get("status").cloned();
     let limit = query.get("limit").and_then(|v| v.parse::<u64>().ok());
     let offset = query.get("offset").and_then(|v| v.parse::<u64>().ok());
+    let is_private = query.get("isPrivate").and_then(|v| v.parse::<bool>().ok());
 
-    match session_service::get_sessions(&db, status, limit, offset).await {
+    match session_service::get_sessions(&db, status, limit, offset, is_private).await {
         Ok(sessions) => HttpResponse::Ok().json(sessions),
         Err(e) => {
             log::error!("Error fetching sessions: {:?}", e);

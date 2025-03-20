@@ -65,7 +65,8 @@ function CreateSessionContent() {
           gamePassword: password,
           name: sessionName,
           nightLord: selectedLord,
-          nightfarer: selectedFarer
+          nightfarer: selectedFarer,
+          isPrivate: false
         }),
       });
       

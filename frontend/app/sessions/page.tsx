@@ -102,6 +102,8 @@ export default function SessionsPage() {
       const offset = (currentPage - 1) * limit;
       // Add status parameter to only fetch sessions with the current status filter
       const statusParam = statusFilter !== 'All' ? `&status=${statusFilter}` : '';
+      // Add isPrivate parameter to only fetch sessions that are not private
+      const isPrivateParam = statusFilter === 'All' ? '' : `&isPrivate=${statusFilter === 'Open' ? false : true}`;
       
       // Set up headers based on authentication status
       const headers: Record<string, string> = {
@@ -113,7 +115,7 @@ export default function SessionsPage() {
         headers['Authorization'] = `Bearer ${token}`;
       }
       
-      const response = await fetch(`${apiBaseUrl}/api/v1/sessions?limit=${limit}&offset=${offset}${statusParam}`, {
+      const response = await fetch(`${apiBaseUrl}/api/v1/sessions?limit=${limit}&offset=${offset}${statusParam}${isPrivateParam}`, {
         method: 'GET',
         headers,
       });
