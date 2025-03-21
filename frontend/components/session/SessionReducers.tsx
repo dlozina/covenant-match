@@ -39,7 +39,8 @@ export interface SessionState {
   export type ResultAction = 
     | { type: 'SELECT_RESULT'; payload: string }
     | { type: 'SET_RATING'; payload: number }
-    | { type: 'SET_FEEDBACK'; payload: string };
+    | { type: 'SET_FEEDBACK'; payload: string }
+    | { type: 'RESET' };
   
   // Session state initial value
   export const initialSessionState: SessionState = {
@@ -140,6 +141,12 @@ export interface SessionState {
         return {
           ...state,
           feedback: action.payload
+        };
+      case 'RESET':
+        return {
+          selectedResult: 'win',
+          rating: 5,
+          feedback: ''
         };
       default:
         return state;

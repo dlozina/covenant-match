@@ -72,6 +72,8 @@ interface SessionControlButtonsProps {
   startSession: () => void;
   resetSession: () => void;
   showConfirmDialog: () => void;
+  onRecreateSession?: () => void;
+  isNewSessionLoading?: boolean;
   disabled?: boolean;
   sessionData?: SessionData;
   isHost?: boolean;
@@ -437,6 +439,8 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
   startSession, 
   resetSession, 
   showConfirmDialog, 
+  onRecreateSession,
+  isNewSessionLoading = false,
   disabled,
   sessionData,
   isHost = false // Default to false if not provided
@@ -447,6 +451,7 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
   // Disable buttons based on session state and host status
   const startButtonDisabled = sessionState.isSessionStarted || disabled || !hasEnoughPlayers || !isHost;
   const finishButtonDisabled = !sessionState.isSessionStarted || sessionState.isSessionFinished || disabled || !isHost;
+  const recreateButtonDisabled = disabled || (!isHost && !onRecreateSession) || isNewSessionLoading;
   
   // Create tooltips for the buttons
   const startButtonTooltip = !isHost ? "Only the host can start the session" : 
@@ -457,6 +462,15 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
                              !sessionState.isSessionStarted ? "Session must be started first" : 
                              sessionState.isSessionFinished ? "Session already finished" : "";
   
+  const recreateButtonTooltip = !isHost && !onRecreateSession 
+                              ? "Wait for the host to create a new session" 
+                              : !isHost && onRecreateSession 
+                              ? "Click to join the new session" 
+                              : "Create a new session with the same team";
+  
+  // Check if a new session is available for non-host players
+  const newSessionAvailable = !isHost && onRecreateSession;
+  
   return (
   <Card className="mt-6">
     <CardContent className="py-6">
@@ -466,16 +480,27 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
           <div className="flex">
             <Button 
               size="lg" 
-              className="flex-1 h-14 text-lg"
-              onClick={resetSession}
-              disabled={disabled || !isHost}
-              title={!isHost ? "Only the host can start a new session" : ""}
+              className={`flex-1 h-14 text-lg ${newSessionAvailable ? 'bg-emerald-600 hover:bg-emerald-700 animate-pulse' : ''}`}
+              onClick={isHost ? onRecreateSession : (onRecreateSession || resetSession)}
+              disabled={recreateButtonDisabled}
+              title={recreateButtonTooltip}
             >
-              <span className="sm:hidden flex flex-col items-center">
-                <span>New Session</span>
-                <span className="text-xs text-muted-foreground">with same team</span>
-              </span>
-              <span className="hidden sm:inline">Start New Session With Same Team</span>
+              {isNewSessionLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
+                  {isHost ? "Creating New Session..." : "Joining New Session..."}
+                </span>
+              ) : (
+                <>
+                  <span className="sm:hidden flex flex-col items-center">
+                    <span>New Session</span>
+                    <span className="text-xs text-muted-foreground">with same team</span>
+                  </span>
+                  <span className="hidden sm:inline">
+                    {newSessionAvailable ? "➤ Join New Session With Same Team" : "Start New Session With Same Team"}
+                  </span>
+                </>
+              )}
             </Button>
           </div>
           

@@ -214,7 +214,8 @@ pub async fn get_sessions(
         None => None,
     };
 
-    let sessions = session_repository::find_sessions(db, status_filter, limit, offset, is_private).await?;
+    let sessions =
+        session_repository::find_sessions(db, status_filter, limit, offset, is_private).await?;
 
     // Convert to response DTOs (exclude passwords for listing)
     Ok(sessions
@@ -516,7 +517,7 @@ pub async fn submit_result(
     broadcast_event(
         session_id,
         "result",
-        json!({ 
+        json!({
             "reported": user_id,
             "result": result_data.result,
         }),
@@ -689,4 +690,99 @@ pub async fn complete_session(
     );
 
     Ok(SessionResponseDto::from(session))
+}
+
+pub async fn recreate_session(
+    db: &Database,
+    session_id: &str,
+    user_id: &str,
+) -> Result<SessionResponseDto, AppError> {
+    // Get the original session
+    let original_session = session_repository::find_by_id(db, session_id)
+        .await?
+        .ok_or(AppError::SessionNotFound)?;
+
+    // Check if user is the host
+    if original_session.host_id != user_id {
+        return Err(AppError::Forbidden(
+            "Only the host can create a new session with the same team".to_string(),
+        ));
+    }
+
+    // Check if session is completed
+    if original_session.status != SessionStatus::Completed {
+        return Err(AppError::BadRequest(
+            "Only completed sessions can be recreated".to_string(),
+        ));
+    }
+
+    // Get the host user
+    let host_user = user_repository::find_user_by_id(db, &user_id)
+        .await?
+        .ok_or(AppError::UserNotFound)?;
+
+    // Get the host's character class from the original session
+    let host_nightfarer = original_session
+        .joined_players
+        .iter()
+        .find(|p| p.user_id == user_id)
+        .map(|p| p.nightfarer.clone())
+        .ok_or(AppError::InternalError(
+            "Host not found in session players".to_string(),
+        ))?;
+
+    let now = Utc::now();
+
+    // Create a new session with the same name and settings
+    let new_session = GameSession {
+        id: Uuid::new_v4().to_string(),
+        name: original_session.name.clone(),
+        host_id: user_id.to_string(),
+        password: original_session.password.clone(),
+        is_private: true, // Always make recreated sessions private it will show in the sessions list
+        status: SessionStatus::Open,
+        joined_players: vec![PlayerInfo {
+            user_id: user_id.to_string(),
+            username: host_user.display_name.unwrap_or(host_user.username),
+            nightfarer: host_nightfarer,
+            joined_at: now,
+        }],
+        night_lord: original_session.night_lord.clone(),
+        results: vec![],
+        ratings: vec![],
+        created_at: now,
+        updated_at: now,
+        started_at: None,
+        completed_at: None,
+    };
+
+    // Save the new session to the database
+    session_repository::create_session(db, &new_session).await?;
+
+    // Create response DTO
+    let response = SessionResponseDto::from(new_session.clone());
+
+    // Notify all players from the original session about the new session
+    for player in original_session.joined_players.iter() {
+        // Skip the host as they already know they created the session
+        if player.user_id == user_id {
+            continue;
+        }
+
+        // Broadcast the notification to the player
+        broadcast_event(
+            // Use the original session ID so players still listening to that session get the notification
+            session_id,
+            "newSession",
+            json!({
+                "sessionId": new_session.id,
+                "name": new_session.name,
+                "hostId": user_id,
+                "originalSessionId": session_id
+            }),
+            None, // Send to all players including the host
+        );
+    }
+
+    Ok(response)
 }

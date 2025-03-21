@@ -2,7 +2,7 @@
 import { MainLayout } from "@/components/layout";
 import { Footer } from "@/components/layout/Footer";
 import { useEffect, useRef, useCallback, useReducer, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { 
   PlayerSection,
@@ -26,7 +26,6 @@ import { storageUtils } from "@/components/session/SessionUtils";
 import { useSessionTimer } from "@/components/session/SessionHooks";
 import { useAuth } from "@/lib/auth-context";
 import { useRealTimeUpdates } from "@/hooks/useEventSource";
-import { toast } from "sonner";
 
 // Define the session data interface
 interface JoinedPlayer {
@@ -92,6 +91,15 @@ function SessionRunContent(): JSX.Element {
   
   // State for heartbeat indication (for testing real-time updates)
   const [lastHeartbeat, setLastHeartbeat] = useState<number | null>(null);
+  
+  // State for tracking recreation of a session
+  const [isCreatingNewSession, setIsCreatingNewSession] = useState<boolean>(false);
+  const [isJoiningNewSession, setIsJoiningNewSession] = useState<boolean>(false);
+  const [newSessionId, setNewSessionId] = useState<string | null>(null);
+  const router = useRouter();
+  
+  // Store original player info to use when auto-joining new sessions
+  const playerInfoRef = useRef<{nightfarer: string} | null>(null);
   
   // Use reducers for related state groups
   const [sessionState, dispatchSession] = useReducer(sessionReducer, initialSessionState);
@@ -217,7 +225,7 @@ function SessionRunContent(): JSX.Element {
       // about other players submitting their results
       console.log('Session finished, but keeping SSE connection alive for result updates');
       
-      // NOTE: We deliberately don't disconnect here so the host can see when other players report results
+      // NOTE: We deliberately don't disconnect here anymore to continue receiving result updates
     }
   }, [sessionState.elapsedSeconds, sessionId, sessionData]);
   
@@ -237,6 +245,51 @@ function SessionRunContent(): JSX.Element {
   const addFriend = useCallback((playerId: string) => {
     dispatchFriend({ type: 'ADD_FRIEND', payload: playerId });
   }, []);
+  
+  // Recreate session with same team (memoized)
+  const recreateSession = useCallback(async () => {
+    if (!isValidSessionId || !isHost() || !userData || !sessionData) return;
+    
+    try {
+      setIsCreatingNewSession(true);
+      
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(`${apiBaseUrl}/api/v1/sessions/${sessionId}/recreate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to create new session: ${response.status}`);
+      }
+      
+      const newSession = await response.json();
+      
+      // Store the new session ID
+      setNewSessionId(newSession.id);
+      
+      // Reset the session timer and state
+      resetSession();
+      dispatchResult({ type: 'RESET' });
+      
+      // No success notification - navigation to new session is sufficient feedback
+      
+      // Redirect to the new session
+      storageUtils.clearSessionData();
+      router.push(`/sessions/run?id=${newSession.id}`);
+      
+    } catch (err) {
+      console.error('Error creating new session:', err);
+      // Error will be shown through the session controls not changing
+    } finally {
+      setIsCreatingNewSession(false);
+    }
+  }, [sessionId, isValidSessionId, isHost, resetSession, userData, sessionData, router]);
   
   // Fetch session data on mount
   useEffect(() => {
@@ -329,8 +382,7 @@ function SessionRunContent(): JSX.Element {
       
       console.log(`Processing join for player: ${playerData.username} as ${playerData.nightfarer}`);
       
-      // Show toast notification
-      toast.info(`${playerData.username} joined as ${playerData.nightfarer}`);
+      // No toast notification - UI will update through session data changes
       
       // Update the session data with the new player
       setSessionData(prevData => {
@@ -801,10 +853,125 @@ function SessionRunContent(): JSX.Element {
     } catch (err) {
       console.error('Error submitting result:', err);
       setSubmissionError(err instanceof Error ? err.message : 'An unknown error occurred');
-      // Keep error toast as it's important for user feedback when things go wrong
-      toast.error('Failed to submit result. Please try again.');
+      // Error is displayed in the UI via submissionError state
     }
   }, [sessionId, userData, resultState, sessionData, resultSubmitted, setSessionData, isConnected]);
+
+  // Add a handler for "newSession" SSE events
+  useEffect(() => {
+    if (!isValidSessionId) return;
+    
+    // Subscribe to the newSession event
+    const unsubscribeNewSession = subscribe('newSession', (data) => {
+      console.log('New session event received:', data);
+      
+      // Safety check for data structure
+      if (!data || typeof data !== 'object') {
+        console.error('New session event handler received invalid data:', data);
+        return;
+      }
+      
+      // Extract the new session ID
+      const newSessionId = typeof data === 'object' && data !== null && 'sessionId' in data 
+                           ? String(data.sessionId) : null;
+      
+      if (newSessionId && newSessionId !== sessionId) {
+        // Store the new session ID in state (for the UI button)
+        setNewSessionId(newSessionId);
+        
+        // We don't need to store in sessionStorage anymore since we're using direct joins
+        console.log(`Host created a new session: ${newSessionId}`);
+      }
+    });
+    
+    return () => {
+      unsubscribeNewSession();
+    };
+  }, [isValidSessionId, subscribe, router]);
+
+  // Store player info when we have session data
+  useEffect(() => {
+    if (sessionData && userData) {
+      const currentPlayer = sessionData.joinedPlayers.find(p => p.userId === userData.id);
+      if (currentPlayer) {
+        playerInfoRef.current = {
+          nightfarer: currentPlayer.nightfarer
+        };
+      }
+    }
+  }, [sessionData, userData]);
+
+  // Add a new function to directly join a session before navigation
+  const directJoinSession = useCallback(async (targetSessionId: string) => {
+    if (!userData || !playerInfoRef.current) {
+      console.error('Cannot join session - missing user data or player info');
+      return false;
+    }
+
+    setIsJoiningNewSession(true);
+    
+    try {
+      console.log(`Directly joining session ${targetSessionId} as ${playerInfoRef.current.nightfarer}`);
+      
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const token = localStorage.getItem('token');
+      
+      // Prepare join data - matching JoinSessionDto structure exactly
+      const joinData = {
+        userId: userData.id,
+        username: userData.username || userData.displayName || 'Unknown User',
+        nightfarer: playerInfoRef.current.nightfarer
+      };
+      
+      console.log('Join data being sent:', joinData);
+      
+      // Make the join API call
+      const response = await fetch(`${apiBaseUrl}/api/v1/sessions/${targetSessionId}/join`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(joinData)
+      });
+      
+      // Log the response status for debugging
+      console.log(`Join session response status: ${response.status}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error response body:', errorData);
+        
+        // Handle case where user is already in the session (consider it a success)
+        if (response.status === 400 && 
+            errorData.message && 
+            errorData.message.includes('User is already in this session')) {
+          console.log('User is already in the session, treating as success');
+          return true;
+        }
+        
+        throw new Error(`Failed to join session: ${response.status} - ${errorData.message || 'Unknown error'}`);
+      }
+      
+      console.log('Successfully joined the new session directly');
+      return true;
+    } catch (err) {
+      console.error('Error directly joining session:', err);
+      return false;
+    } finally {
+      setIsJoiningNewSession(false);
+    }
+  }, [userData]);
+
+  // Add a visual indicator when a new session is available
+  useEffect(() => {
+    // Only non-hosts get the indicator (hosts create the session themselves)
+    if (newSessionId && !isHost()) {
+      console.log('New session available indicator shown');
+      // No action needed here - the UI will update based on newSessionId state
+      // The "Start New Session With Same Team" button will be enabled and highlighted
+    }
+  }, [newSessionId, isHost]);
 
   return (
     <MainLayout footer={<Footer />}>
@@ -901,6 +1068,20 @@ function SessionRunContent(): JSX.Element {
                 startSession={startSession}
                 resetSession={resetSession}
                 showConfirmDialog={() => dispatchDialog({ type: 'SHOW_CONFIRM' })}
+                onRecreateSession={isHost() ? recreateSession : newSessionId ? async () => {
+                  // For non-host players: directly join the new session first, then navigate
+                  if (await directJoinSession(newSessionId)) {
+                    // Reset local state and navigate only after successful join
+                    storageUtils.clearSessionData();
+                    resetSession();
+                    dispatchResult({ type: 'RESET' });
+                    router.push(`/sessions/run?id=${newSessionId}`);
+                  } else {
+                    // If join fails, we don't navigate
+                    console.error('Failed to join the new session, not navigating');
+                  }
+                } : undefined}
+                isNewSessionLoading={isHost() ? isCreatingNewSession : isJoiningNewSession}
                 disabled={!isValidSessionId}
                 sessionData={sessionData}
                 isHost={isHost()}

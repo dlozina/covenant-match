@@ -37,7 +37,7 @@ pub enum SessionStatus {
     Cancelled,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GameSession {
     #[serde(rename = "_id")]
     pub id: String,

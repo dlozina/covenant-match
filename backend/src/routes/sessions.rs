@@ -1,5 +1,5 @@
 use crate::models::session::{
-    CreateSessionDto, GameResult, JoinSessionDto, RateSessionDto, SessionReviewDto, SubmitResultDto
+    CreateSessionDto, GameResult, JoinSessionDto, RateSessionDto, SessionReviewDto, SubmitResultDto,
 };
 use crate::services::session_service;
 use crate::utils::jwt;
@@ -323,6 +323,53 @@ async fn complete_session(
     }
 }
 
+/// Recreate a session with the same team (host only)
+#[utoipa::path(
+    post,
+    path = "/api/v1/sessions/{id}/recreate",
+    params(
+        ("id" = String, Path, description = "Original session ID to recreate")
+    ),
+    responses(
+        (status = 201, description = "New session created successfully with the same team", body = SessionResponseDto),
+        (status = 400, description = "Cannot recreate session (not completed)"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Only the host can recreate the session"),
+        (status = 404, description = "Session not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "sessions"
+)]
+#[post("/api/v1/sessions/{id}/recreate")]
+async fn recreate_session(
+    db: web::Data<Database>,
+    path: web::Path<String>,
+    req: HttpRequest,
+) -> impl Responder {
+    let id = path.into_inner();
+
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.sub.clone()
+    };
+
+    match session_service::recreate_session(&db, &id, &user_id).await {
+        Ok(session) => HttpResponse::Created().json(session),
+        Err(e) => {
+            log::error!("Error recreating session: {:?}", e);
+            HttpResponse::BadRequest().json(serde_json::json!({
+                "status": "error",
+                "message": e.to_string()
+            }))
+        }
+    }
+}
+
 /// Submit game result
 #[utoipa::path(
     post,
@@ -480,8 +527,9 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         .service(start_session)
         .service(cancel_session)
         .service(complete_session)
+        .service(recreate_session)
         .service(submit_result)
         .service(get_results);
-        //tod: not needed for now
-        //.service(rate_session);
+    //tod: not needed for now
+    //.service(rate_session);
 }
