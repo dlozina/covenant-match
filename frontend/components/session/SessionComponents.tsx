@@ -586,6 +586,13 @@ export const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({ sessionS
       {/* Add a divider for visual separation */}
       <div className="border-t border-border"></div>
 
+      <p className="text-sm text-muted-foreground mt-auto">
+        {!sessionState.isSessionStarted 
+          ? 'Waiting for the host to start the session.'
+          : 'After the host ends the session, each player can report their result.'}
+      </p>
+      {/* Add a divider for visual separation */}
+      <div className="border-t border-border"></div>
       <div className="flex justify-between items-center">
         <span className="text-muted-foreground">Night Lord:</span>
         <span className="text-foreground">{sessionData ? sessionData.nightLord : 'Tricephalos'}</span>
@@ -609,14 +616,9 @@ export const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({ sessionS
         </span>
       </div>
       
-      {/* Add a divider for visual separation */}
-      <div className="border-t border-border"></div>
       
-      <p className="text-sm text-muted-foreground mt-auto">
-        {!sessionState.isSessionStarted 
-          ? 'Waiting for the host to start the session.'
-          : 'Click "Finish Session" when you\'re ready to report your results.'}
-      </p>
+      
+      
     </CardContent>
   </Card>
 );
