@@ -98,6 +98,10 @@ function SessionRunContent(): JSX.Element {
   const [newSessionId, setNewSessionId] = useState<string | null>(null);
   const router = useRouter();
   
+  // State for result submission
+  const [resultSubmitted, setResultSubmitted] = useState<boolean>(false);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  
   // Store original player info to use when auto-joining new sessions
   const playerInfoRef = useRef<{nightfarer: string} | null>(null);
   
@@ -277,6 +281,10 @@ function SessionRunContent(): JSX.Element {
       resetSession();
       dispatchResult({ type: 'RESET' });
       
+      // Reset result submission state
+      setResultSubmitted(false);
+      setSubmissionError(null);
+      
       // No success notification - navigation to new session is sufficient feedback
       
       // Redirect to the new session
@@ -289,7 +297,7 @@ function SessionRunContent(): JSX.Element {
     } finally {
       setIsCreatingNewSession(false);
     }
-  }, [sessionId, isValidSessionId, isHost, resetSession, userData, sessionData, router]);
+  }, [sessionId, isValidSessionId, isHost, resetSession, userData, sessionData, router, setResultSubmitted, setSubmissionError]);
   
   // Fetch session data on mount
   useEffect(() => {
@@ -322,6 +330,20 @@ function SessionRunContent(): JSX.Element {
         }
         
         const data = await response.json();
+        
+        // Ensure proper initialization of hasReported flag for all players
+        if (data && data.joinedPlayers) {
+          // Log the players' reported status
+          console.log("Fetched session data - Player reported status:");
+          data.joinedPlayers.forEach((player: JoinedPlayer) => {
+            // Make sure hasReported is explicitly set to false if not provided by API
+            if (player.hasReported === undefined) {
+              player.hasReported = false;
+            }
+            console.log(`Player ${player.username} (${player.userId}): hasReported = ${player.hasReported}`);
+          });
+        }
+        
         setSessionData(data);
       } catch (err) {
         console.error('Error fetching session data:', err);
@@ -407,7 +429,8 @@ function SessionRunContent(): JSX.Element {
               userId: playerData.userId,
               username: playerData.username,
               nightfarer: playerData.nightfarer,
-              joinedAt: new Date().toISOString()
+              joinedAt: new Date().toISOString(),
+              hasReported: false  // Explicitly set to false for new players
             }
           ];
           
@@ -631,6 +654,15 @@ function SessionRunContent(): JSX.Element {
     };
   }, [disconnect, sessionId]);
   
+  // Effect to reset result submission state when the session ID changes
+  useEffect(() => {
+    // Reset result submission state for a new session
+    setResultSubmitted(false);
+    setSubmissionError(null);
+    
+    console.log(`Session ID changed: ${sessionId}, result submission state reset`);
+  }, [sessionId, setResultSubmitted, setSubmissionError]);
+  
   // Effect to restore session from localStorage
   useEffect(() => {
     const { sessionId: storedSessionId, startTime, isFinished, finalDuration } = storageUtils.getStoredSession();
@@ -762,10 +794,18 @@ function SessionRunContent(): JSX.Element {
     };
   }, []);
 
-  // State for result submission feedback
-  const [resultSubmitted, setResultSubmitted] = useState<boolean>(false);
-  const [submissionError, setSubmissionError] = useState<string | null>(null);
-  
+  // Store player info when we have session data
+  useEffect(() => {
+    if (sessionData && userData) {
+      const currentPlayer = sessionData.joinedPlayers.find(p => p.userId === userData.id);
+      if (currentPlayer) {
+        playerInfoRef.current = {
+          nightfarer: currentPlayer.nightfarer
+        };
+      }
+    }
+  }, [sessionData, userData]);
+
   // Function to handle result submission
   const handleSubmitResult = useCallback(async () => {
     if (!sessionData || !userData || resultSubmitted) return;
@@ -873,7 +913,7 @@ function SessionRunContent(): JSX.Element {
       
       // Extract the new session ID
       const newSessionId = typeof data === 'object' && data !== null && 'sessionId' in data 
-                           ? String(data.sessionId) : null;
+                         ? String(data.sessionId) : null;
       
       if (newSessionId && newSessionId !== sessionId) {
         // Store the new session ID in state (for the UI button)
@@ -887,19 +927,7 @@ function SessionRunContent(): JSX.Element {
     return () => {
       unsubscribeNewSession();
     };
-  }, [isValidSessionId, subscribe, router]);
-
-  // Store player info when we have session data
-  useEffect(() => {
-    if (sessionData && userData) {
-      const currentPlayer = sessionData.joinedPlayers.find(p => p.userId === userData.id);
-      if (currentPlayer) {
-        playerInfoRef.current = {
-          nightfarer: currentPlayer.nightfarer
-        };
-      }
-    }
-  }, [sessionData, userData]);
+  }, [isValidSessionId, subscribe, router, sessionId]);
 
   // Add a new function to directly join a session before navigation
   const directJoinSession = useCallback(async (targetSessionId: string) => {
@@ -1075,6 +1103,9 @@ function SessionRunContent(): JSX.Element {
                     storageUtils.clearSessionData();
                     resetSession();
                     dispatchResult({ type: 'RESET' });
+                    // Reset result submission state
+                    setResultSubmitted(false);
+                    setSubmissionError(null);
                     router.push(`/sessions/run?id=${newSessionId}`);
                   } else {
                     // If join fails, we don't navigate
