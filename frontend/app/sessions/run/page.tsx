@@ -629,6 +629,10 @@ function SessionRunContent(): JSX.Element {
     if (lastLoadTime && (Date.now() - parseInt(lastLoadTime, 10)) < 3000) {
       // Clear session data on refresh
       storageUtils.clearSessionData();
+      
+      // Clear any stored new session ID on refresh to prevent stale state
+      setNewSessionId(null);
+      console.log('Page refreshed, cleared newSessionId');
     }
     
     // Update the last load time
@@ -660,7 +664,11 @@ function SessionRunContent(): JSX.Element {
     setResultSubmitted(false);
     setSubmissionError(null);
     
-    console.log(`Session ID changed: ${sessionId}, result submission state reset`);
+    // Reset newSessionId when changing sessions
+    // This prevents showing the "join new session" button if we're already in a new session
+    setNewSessionId(null);
+    
+    console.log(`Session ID changed: ${sessionId}, result submission state reset, newSessionId cleared`);
   }, [sessionId, setResultSubmitted, setSubmissionError]);
   
   // Effect to restore session from localStorage
@@ -911,23 +919,35 @@ function SessionRunContent(): JSX.Element {
         return;
       }
       
-      // Extract the new session ID
+      // Extract the new session ID and original session ID
       const newSessionId = typeof data === 'object' && data !== null && 'sessionId' in data 
                          ? String(data.sessionId) : null;
       
-      if (newSessionId && newSessionId !== sessionId) {
+      const originalSessionId = typeof data === 'object' && data !== null && 'originalSessionId' in data 
+                             ? String(data.originalSessionId) : null;
+      
+      console.log(`Current sessionId: ${sessionId}, Original session: ${originalSessionId}, New session: ${newSessionId}`);
+      
+      // Only set newSessionId if:
+      // 1. We have both a new and original session ID
+      // 2. The current session matches the original session
+      // 3. The new session is different from our current session
+      if (newSessionId && originalSessionId && 
+          originalSessionId === sessionId && 
+          newSessionId !== sessionId) {
+        
+        console.log(`Setting newSessionId to ${newSessionId} for current session ${sessionId}`);
         // Store the new session ID in state (for the UI button)
         setNewSessionId(newSessionId);
-        
-        // We don't need to store in sessionStorage anymore since we're using direct joins
-        console.log(`Host created a new session: ${newSessionId}`);
+      } else {
+        console.log('Not updating newSessionId - criteria not met');
       }
     });
     
     return () => {
       unsubscribeNewSession();
     };
-  }, [isValidSessionId, subscribe, router, sessionId]);
+  }, [isValidSessionId, subscribe, sessionId]);
 
   // Add a new function to directly join a session before navigation
   const directJoinSession = useCallback(async (targetSessionId: string) => {
@@ -995,9 +1015,11 @@ function SessionRunContent(): JSX.Element {
   useEffect(() => {
     // Only non-hosts get the indicator (hosts create the session themselves)
     if (newSessionId && !isHost()) {
-      console.log('New session available indicator shown');
+      console.log(`New session available indicator shown: ${newSessionId}`);
       // No action needed here - the UI will update based on newSessionId state
       // The "Start New Session With Same Team" button will be enabled and highlighted
+    } else if (!newSessionId) {
+      console.log('No new session available, button will appear normal');
     }
   }, [newSessionId, isHost]);
 
@@ -1099,6 +1121,10 @@ function SessionRunContent(): JSX.Element {
                 onRecreateSession={isHost() ? recreateSession : newSessionId ? async () => {
                   // For non-host players: directly join the new session first, then navigate
                   if (await directJoinSession(newSessionId)) {
+                    // Clear the newSessionId since we're joining it
+                    const targetSessionId = newSessionId;
+                    setNewSessionId(null);
+                    
                     // Reset local state and navigate only after successful join
                     storageUtils.clearSessionData();
                     resetSession();
@@ -1106,7 +1132,7 @@ function SessionRunContent(): JSX.Element {
                     // Reset result submission state
                     setResultSubmitted(false);
                     setSubmissionError(null);
-                    router.push(`/sessions/run?id=${newSessionId}`);
+                    router.push(`/sessions/run?id=${targetSessionId}`);
                   } else {
                     // If join fails, we don't navigate
                     console.error('Failed to join the new session, not navigating');
@@ -1116,6 +1142,7 @@ function SessionRunContent(): JSX.Element {
                 disabled={!isValidSessionId}
                 sessionData={sessionData}
                 isHost={isHost()}
+                currentSessionId={sessionId}
               />
             </div>
 

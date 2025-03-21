@@ -77,6 +77,7 @@ interface SessionControlButtonsProps {
   disabled?: boolean;
   sessionData?: SessionData;
   isHost?: boolean;
+  currentSessionId?: string;
 }
 
 interface SessionInfoSectionProps {
@@ -443,7 +444,8 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
   isNewSessionLoading = false,
   disabled,
   sessionData,
-  isHost = false // Default to false if not provided
+  isHost = false, // Default to false if not provided
+  currentSessionId
 }) => {
   // Check if we have enough players to start (3 players required)
   const hasEnoughPlayers = sessionData && sessionData.joinedPlayers.length >= 3;
@@ -471,6 +473,9 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
   // Check if a new session is available for non-host players
   const newSessionAvailable = !isHost && onRecreateSession;
   
+  // Only highlight the button if this is an original session (not a recreated one we've joined)
+  const shouldHighlightButton = newSessionAvailable && sessionData && currentSessionId === sessionData.id;
+  
   return (
   <Card className="mt-6">
     <CardContent className="py-6">
@@ -480,7 +485,7 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
           <div className="flex">
             <Button 
               size="lg" 
-              className={`flex-1 h-14 text-lg ${newSessionAvailable ? 'bg-emerald-600 hover:bg-emerald-700 animate-pulse' : ''}`}
+              className={`flex-1 h-14 text-lg ${shouldHighlightButton ? 'bg-emerald-600 hover:bg-emerald-700 animate-pulse' : ''}`}
               onClick={isHost ? onRecreateSession : (onRecreateSession || resetSession)}
               disabled={recreateButtonDisabled}
               title={recreateButtonTooltip}
@@ -497,7 +502,7 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
                     <span className="text-xs text-muted-foreground">with same team</span>
                   </span>
                   <span className="hidden sm:inline">
-                    {newSessionAvailable ? "➤ Join New Session With Same Team" : "Start New Session With Same Team"}
+                    {shouldHighlightButton ? "➤ Join New Session With Same Team" : "Start New Session With Same Team"}
                   </span>
                 </>
               )}
