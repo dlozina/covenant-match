@@ -95,10 +95,7 @@ function SessionRunContent(): JSX.Element {
   
   // Use reducers for related state groups
   const [sessionState, dispatchSession] = useReducer(sessionReducer, initialSessionState);
-  const [friendState, dispatchFriend] = useReducer(friendStatusReducer, {
-    'player2': false,
-    'player3': false
-  } as FriendState);
+  const [friendState, dispatchFriend] = useReducer(friendStatusReducer, {} as FriendState);
   const [dialogState, dispatchDialog] = useReducer(dialogReducer, {
     showConfirmDialog: false,
     showWarningDialog: false
@@ -872,6 +869,7 @@ function SessionRunContent(): JSX.Element {
                   friendState={friendState} 
                   addFriend={addFriend}
                   sessionData={sessionData}
+                  currentUserId={userData?.id}
                 />
               </div>
 

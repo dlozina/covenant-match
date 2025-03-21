@@ -45,6 +45,7 @@ interface PlayerSectionProps {
   friendState: FriendState;
   addFriend: (playerId: string) => void;
   sessionData?: SessionData;
+  currentUserId?: string;
 }
 
 //todo: check if this is used
@@ -152,7 +153,13 @@ const getPlayerStatusBadge = (
 };
 
 // Player section component
-export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, friendState, addFriend, sessionData }) => {
+export const PlayerSection: React.FC<PlayerSectionProps> = ({ 
+  sessionState, 
+  friendState, 
+  addFriend, 
+  sessionData,
+  currentUserId 
+}) => {
   // Get status for host player - get hasReported flag from the host player data
   const hostStatus = getPlayerStatusBadge(
     true, 
@@ -164,6 +171,11 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, frie
   const isPlayerHost = (playerId: string) => {
     return sessionData && sessionData.hostId === playerId;
   };
+
+  // Function to check if a player is the current user
+  const isCurrentUser = (playerId: string) => {
+    return currentUserId && playerId === currentUserId;
+  };
   
   return (
   <Card>
@@ -171,11 +183,11 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, frie
       <CardTitle>Players</CardTitle>
     </CardHeader>
     <CardContent className="space-y-4">
-      {/* Player 1 (You) - Host */}
+      {/* Player 1 - First player in the session */}
       {sessionData && sessionData.joinedPlayers.length > 0 && (
         <div className="flex items-start sm:items-center space-x-4">
           <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary mt-1 sm:mt-0">
-            <span>You</span>
+            <span>P1</span>
           </Avatar>
           <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
             <div className="bg-secondary/50 px-3 py-2 rounded-md">
@@ -190,6 +202,14 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, frie
                   Host
                 </Badge>
               )}
+              {/* Show "Add Friend" button if session is finished and this is not the current user */}
+              {sessionState.isSessionFinished && !isCurrentUser(sessionData.joinedPlayers[0].userId) && (
+                <FriendButton 
+                  playerId={sessionData.joinedPlayers[0].userId} 
+                  isFriend={friendState[sessionData.joinedPlayers[0].userId]} 
+                  onAddFriend={addFriend} 
+                />
+              )}
               <Badge variant="outline" className={hostStatus.color}>
                 {hostStatus.text}
               </Badge>
@@ -202,7 +222,7 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, frie
       {(!sessionData || sessionData.joinedPlayers.length === 0) && (
         <div className="flex items-start sm:items-center space-x-4">
           <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary mt-1 sm:mt-0">
-            <span>You</span>
+            <span>P1</span>
           </Avatar>
           <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
             <div className="bg-secondary/50 px-3 py-2 rounded-md">
@@ -250,7 +270,8 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({ sessionState, frie
                       Host
                     </Badge>
                   )}
-                  {sessionState.isSessionFinished && (
+                  {/* Show friend button only if session is finished and this is not the current user */}
+                  {sessionState.isSessionFinished && !isCurrentUser(player.userId) && (
                     <FriendButton 
                       playerId={player.userId} 
                       isFriend={friendState[player.userId]} 
