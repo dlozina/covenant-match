@@ -1,9 +1,12 @@
 use crate::models::session::{
-    CreateSessionDto, GameResult, JoinSessionDto, RateSessionDto, SessionReviewDto, SubmitResultDto,
+    CreateSessionDto, GameResult, JoinSessionDto, RateSessionDto, SessionReviewDto,
+    SubmitResultDto, UpdateSessionDto,
 };
 use crate::services::session_service;
 use crate::utils::jwt;
-use actix_web::{delete, get, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder};
+use actix_web::{
+    delete, get, patch, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder,
+};
 use mongodb::Database;
 use serde::{Deserialize, Serialize};
 
@@ -370,6 +373,55 @@ async fn recreate_session(
     }
 }
 
+/// Update session characters (host only)
+#[utoipa::path(
+    patch,
+    path = "/api/v1/sessions/{id}",
+    params(
+        ("id" = String, Path, description = "Session ID to update")
+    ),
+    request_body = UpdateSessionDto,
+    responses(
+        (status = 200, description = "Session updated successfully", body = SessionResponseDto),
+        (status = 400, description = "Invalid input"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Only the host can update the session"),
+        (status = 404, description = "Session not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "sessions"
+)]
+#[patch("/api/v1/sessions/{id}")]
+async fn update_session(
+    db: web::Data<Database>,
+    path: web::Path<String>,
+    update_data: web::Json<UpdateSessionDto>,
+    req: HttpRequest,
+) -> impl Responder {
+    let id = path.into_inner();
+
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.sub.clone()
+    };
+
+    match session_service::update_session(&db, &id, &user_id, update_data.into_inner()).await {
+        Ok(session) => HttpResponse::Ok().json(session),
+        Err(e) => {
+            log::error!("Error updating session: {:?}", e);
+            HttpResponse::BadRequest().json(serde_json::json!({
+                "status": "error",
+                "message": e.to_string()
+            }))
+        }
+    }
+}
+
 /// Submit game result
 #[utoipa::path(
     post,
@@ -528,6 +580,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         .service(cancel_session)
         .service(complete_session)
         .service(recreate_session)
+        .service(update_session)
         .service(submit_result)
         .service(get_results);
     //tod: not needed for now

@@ -1,6 +1,6 @@
 use crate::models::session::{
     CreateSessionDto, GameResult, JoinSessionDto, PlayerInfo, RateSessionDto, ResultsResponseDto,
-    SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto,
+    SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto,
 };
 use crate::models::user::{
     AuthResponse, CreateUserDto, GetUsersQuery, LoginUserDto, PaginationInfo, UpdateUserDto,
@@ -54,6 +54,7 @@ use utoipa::{
         cancel_session,
         complete_session,
         recreate_session,
+        update_session,
         submit_result,
         get_results,
         //tod: not needed for now
@@ -79,6 +80,7 @@ use utoipa::{
             JoinSessionDto,
             RateSessionDto,
             SubmitResultDto,
+            UpdateSessionDto,
             SessionResponseDto,
             ResultsResponseDto,
             // Add the missing schema components

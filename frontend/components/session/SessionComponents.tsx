@@ -467,8 +467,8 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
   const recreateButtonTooltip = !isHost && !onRecreateSession 
                               ? "Wait for the host to create a new session" 
                               : !isHost && onRecreateSession 
-                              ? "Click to join the new session" 
-                              : "Create a new session with the same team";
+                              ? "Click to select your character and join the new session" 
+                              : "Create a new session with the same team and different characters";
   
   // Check if a new session is available for non-host players
   const newSessionAvailable = !isHost && onRecreateSession;
@@ -493,7 +493,7 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
               {isNewSessionLoading ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
-                  {isHost ? "Creating New Session..." : "Joining New Session..."}
+                  {isHost ? "Creating New Session..." : "Navigating..."}
                 </span>
               ) : (
                 <>
@@ -502,7 +502,11 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
                     <span className="text-xs text-muted-foreground">with same team</span>
                   </span>
                   <span className="hidden sm:inline">
-                    {shouldHighlightButton ? "➤ Join New Session With Same Team" : "Start New Session With Same Team"}
+                    {shouldHighlightButton 
+                      ? "➤ Select Character & Join New Session" 
+                      : isHost 
+                        ? "Create New Session With Same Team" 
+                        : "Start New Session With Same Team"}
                   </span>
                 </>
               )}

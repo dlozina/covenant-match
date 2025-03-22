@@ -1,7 +1,8 @@
+use super::user_service;
 use crate::models::error::AppError;
 use crate::models::session::{
     CreateSessionDto, GameResult, GameSession, JoinSessionDto, PlayerInfo, RateSessionDto,
-    SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto,
+    SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto,
 };
 use crate::repository::{session_repository, statistics_repository, user_repository};
 use crate::sse::messages::{BroadcastMessage, ServerMessage as SseServerMessage};
@@ -9,7 +10,8 @@ use crate::sse::session::SessionManager as SseSessionManager;
 use crate::ws::messages::{Broadcast, ServerMessage as WsServerMessage};
 use crate::ws::SessionManager as WsSessionManager;
 use actix::prelude::*;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
+use mongodb::bson::{doc, Document};
 use mongodb::Database;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
@@ -785,4 +787,69 @@ pub async fn recreate_session(
     }
 
     Ok(response)
+}
+
+pub async fn update_session(
+    db: &Database,
+    session_id: &str,
+    user_id: &str,
+    update_data: UpdateSessionDto,
+) -> Result<SessionResponseDto, AppError> {
+    // Find the session
+    let mut session = session_repository::find_by_id(db, session_id)
+        .await?
+        .ok_or(AppError::SessionNotFound)?;
+
+    // Check if user is the host
+    if session.host_id != user_id {
+        return Err(AppError::Forbidden(
+            "Only the host can update the session".to_string(),
+        ));
+    }
+
+    // Check if session is in Open status
+    if session.status != SessionStatus::Open {
+        return Err(AppError::BadRequest(
+            "Only sessions in Open status can be updated".to_string(),
+        ));
+    }
+
+    // Log the update data
+    log::info!(
+        "Updating session with night_lord: {:?}, host_nightfarer: {:?}",
+        update_data.night_lord,
+        update_data.host_nightfarer
+    );
+
+    // Update night lord if provided
+    if let Some(night_lord) = update_data.night_lord {
+        log::info!("Updating night lord to: {}", night_lord);
+        session.night_lord = night_lord;
+    }
+
+    // Update the host's nightfarer if provided
+    if let Some(host_nightfarer) = update_data.host_nightfarer {
+        // Find the player index for the host
+        if let Some(player_index) = session
+            .joined_players
+            .iter()
+            .position(|p| p.user_id == user_id)
+        {
+            log::info!("Updating host nightfarer to: {}", host_nightfarer);
+            session.joined_players[player_index].nightfarer = host_nightfarer;
+        } else {
+            return Err(AppError::InternalError(
+                "Host not found in session players".to_string(),
+            ));
+        }
+    }
+
+    // Update the session's timestamp
+    session.updated_at = Utc::now();
+
+    // Save the updated session
+    session_repository::update_session(db, &session).await?;
+
+    // Return the updated session
+    Ok(SessionResponseDto::from(session))
 }

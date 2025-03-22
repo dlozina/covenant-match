@@ -68,6 +68,13 @@ pub struct CreateSessionDto {
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
+pub struct UpdateSessionDto {
+    pub night_lord: Option<String>,
+    pub host_nightfarer: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct JoinSessionDto {
     pub user_id: String,
     pub username: String,
@@ -83,7 +90,7 @@ pub struct SubmitResultDto {
     pub feedback: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionResponseDto {
     pub id: String,
@@ -139,7 +146,7 @@ pub struct RateSessionDto {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ResultsResponseDto {
     pub session_id: String,

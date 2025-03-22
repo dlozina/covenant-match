@@ -17,9 +17,7 @@ pub async fn create_session(db: &Database, session: &GameSession) -> Result<(), 
 }
 
 pub async fn find_by_id(db: &Database, id: &str) -> Result<Option<GameSession>, AppError> {
-    let session = get_collection(db)
-        .find_one(doc! { "_id": id }, None)
-        .await?;
+    let session = get_collection(db).find_one(doc! { "_id": id }, None).await?;
     Ok(session)
 }
 
@@ -69,6 +67,25 @@ pub async fn update_session(db: &Database, session: &GameSession) -> Result<(), 
     get_collection(db)
         .update_one(doc! { "_id": &session.id }, update, None)
         .await?;
+
+    Ok(())
+}
+
+pub async fn update_player_character(
+    db: &Database,
+    session_id: &str,
+    user_id: &str,
+    new_character: &str,
+) -> Result<(), AppError> {
+    let filter = doc! {
+        "_id": session_id,
+        "joined_players.user_id": user_id
+    };
+    let update = doc! {
+        "$set": { "joined_players.$.nightfarer": new_character }
+    };
+
+    get_collection(db).update_one(filter, update, None).await?;
 
     Ok(())
 }
