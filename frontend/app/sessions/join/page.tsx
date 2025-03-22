@@ -53,43 +53,23 @@ function JoinSessionContent() {
   useEffect(() => {
     // Fetch session details when component mounts
     if (sessionId) {
-      console.log(`Join page: Initializing with session ID: ${sessionId}`);
       fetchSessionDetails();
     } else {
       toast.error("No session ID provided");
     }
     
     // Subscribe to session updates
-    console.log('Join page: Setting up subscription to join events');
-    const unsubscribe = subscribe('join', (data) => {
-      console.log('Join page: Received join event in subscription handler:', data);
-      console.log('Join page: Join event data type:', typeof data);
-      console.log('Join page: Join event data keys:', Object.keys(data));
-      
-      // Check if data has the expected fields
-      if (!data.username || !data.nightfarer) {
-        console.error('Join page: Join event data is missing expected fields:', data);
-      }
-      
-      // Update session details when a new player joins
-      toast.info(`${data.username} joined as ${data.nightfarer}`);
-      
+    const unsubscribe = subscribe('join', () => {
       // Refresh session details to include the new player
-      console.log('Join page: Refreshing session details after join event');
       fetchSessionDetails();
     });
     
-    // Log connection status
-    console.log(`Join page: SSE connection status: ${isConnected() ? 'Connected' : 'Disconnected'}`);
-    
     return () => {
-      console.log('Join page: Cleaning up join event subscription');
       unsubscribe();
     };
   }, [sessionId, subscribe, isConnected]);
   
   const fetchSessionDetails = async () => {
-    console.log(`Join page: Fetching session details for session ID: ${sessionId}`);
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       const token = localStorage.getItem('token');
@@ -102,19 +82,14 @@ function JoinSessionContent() {
       });
       
       const data = await response.json();
-      console.log('Join page: Session details response:', data);
-      
+
       if (response.ok) {
-        console.log('Join page: Updating session details with fetched data');
         setSessionDetails(data);
-        console.log('Join page: Session details updated');
       } else {
-        console.error('Join page: Failed to fetch session details:', data);
         toast.error(data.message || 'Failed to fetch session details');
       }
     } catch (error) {
-      console.error('Join page: Error fetching session details:', error);
-      toast.error('Error fetching session details');
+      toast.error('Error fetching session details: ' + error);
     }
   };
   
@@ -127,7 +102,7 @@ function JoinSessionContent() {
       const decoded = jwtDecode<JwtClaims>(token);
       return decoded.sub;
     } catch (error) {
-      console.error("Error decoding token:", error);
+      toast.error("Error decoding token: " + error);
       return null;
     }
   };
@@ -178,14 +153,12 @@ function JoinSessionContent() {
       const data = await response.json();
       
       if (response.ok) {
-        toast.success("Successfully joined session");
         router.push(`/sessions/run?id=${sessionId}`);
       } else {
         toast.error(data.message || "Failed to join session");
       }
     } catch (error) {
-      toast.error("An unexpected error occurred");
-      console.error("Error joining session:", error);
+      toast.error("An unexpected error occurred: " + error);
     } finally {
       setIsLoading(false);
     }

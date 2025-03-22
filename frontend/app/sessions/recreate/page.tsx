@@ -83,10 +83,8 @@ function RecreateSessionContent() {
       });
       
       const data = await response.json();
-      console.log('Recreate page: Session details response:', data);
       
       if (response.ok) {
-        console.log('Recreate page: Updating session details with fetched data');
         setSessionDetails(data);
         
         // Check if the current user is the host
@@ -98,16 +96,12 @@ function RecreateSessionContent() {
           // If not host, we'll need to handle this differently
           // For non-hosts, this is a "join new session" page
         }
-        
-        console.log('Recreate page: Session details updated');
       } else {
-        console.error('Recreate page: Failed to fetch session details:', data);
         toast.error(data.message || 'Failed to fetch session details');
         router.push('/sessions');
       }
     } catch (error) {
-      console.error('Recreate page: Error fetching session details:', error);
-      toast.error('Error fetching session details');
+      toast.error('Error fetching session details: ' + error);
       router.push('/sessions');
     }
   };
@@ -121,7 +115,7 @@ function RecreateSessionContent() {
       const decoded = jwtDecode<JwtClaims>(token);
       return decoded.sub;
     } catch (error) {
-      console.error("Error decoding token:", error);
+      toast.error("Error decoding token: " + error);
       return null;
     }
   };
@@ -154,8 +148,6 @@ function RecreateSessionContent() {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       const token = localStorage.getItem('token');
       
-      console.log(`Recreating session from original session ID: ${originalSessionId}`);
-      
       // First, recreate the session using the existing API endpoint
       const recreateResponse = await fetch(`${apiBaseUrl}/api/v1/sessions/${originalSessionId}/recreate`, {
         method: 'POST',
@@ -165,18 +157,14 @@ function RecreateSessionContent() {
       });
       
       const recreateData = await recreateResponse.json();
-      console.log('Recreate session response:', recreateData);
       
       if (!recreateResponse.ok) {
         throw new Error(recreateData.message || "Failed to recreate session");
       }
       
       const newSessionId = recreateData.id;
-      console.log(`New session created with ID: ${newSessionId}`);
       
       // Now, update the new session with the selected characters
-      console.log(`Updating session with: nightLord=${selectedLord}, hostNightfarer=${selectedFarer}`);
-      
       const updateResponse = await fetch(`${apiBaseUrl}/api/v1/sessions/${newSessionId}`, {
         method: 'PATCH',
         headers: {
@@ -189,26 +177,17 @@ function RecreateSessionContent() {
         }),
       });
       
-      console.log(`Update response status: ${updateResponse.status}`);
-      
       if (!updateResponse.ok) {
         const updateData = await updateResponse.json();
-        console.error('Update error:', updateData);
         throw new Error(updateData.message || "Failed to update session characters");
       }
-      
-      toast.success("New session created successfully with your selected characters");
-      console.log(`Redirecting to session page: ${newSessionId}`);
-      
       // Set a flag in sessionStorage so the run page knows we came from here
       sessionStorage.setItem('fromRecreatePage', 'true');
       
       router.push(`/sessions/run?id=${newSessionId}`);
-      
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
       toast.error(errorMessage);
-      console.error("Error recreating session:", error);
     } finally {
       setIsLoading(false);
     }
@@ -231,7 +210,6 @@ function RecreateSessionContent() {
     try {
       // We need to get the new session ID from sessionStorage
       const autoJoinSessionId = sessionStorage.getItem('autoJoinSessionId');
-      console.log('Retrieved autoJoinSessionId from sessionStorage:', autoJoinSessionId);
       
       if (!autoJoinSessionId) {
         throw new Error("New session ID not found");
@@ -244,9 +222,7 @@ function RecreateSessionContent() {
       if (!userId || !userData) {
         throw new Error("User information not available");
       }
-      
-      console.log(`Attempting to join session ${autoJoinSessionId} as ${selectedFarer}`);
-      
+       
       const response = await fetch(`${apiBaseUrl}/api/v1/sessions/${autoJoinSessionId}/join`, {
         method: 'POST',
         headers: {
@@ -261,14 +237,11 @@ function RecreateSessionContent() {
       });
       
       const data = await response.json();
-      console.log('Join response:', data);
-      
       if (response.ok) {
         toast.success("Successfully joined new session");
         // Clear the auto-join data from sessionStorage
         sessionStorage.removeItem('autoJoinSessionId');
         sessionStorage.removeItem('autoJoinCharacter');
-        console.log('Redirecting to session run page:', autoJoinSessionId);
         
         // Set a flag in sessionStorage so the run page knows we came from here
         sessionStorage.setItem('fromRecreatePage', 'true');
@@ -280,7 +253,6 @@ function RecreateSessionContent() {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
       toast.error(errorMessage);
-      console.error("Error joining new session:", error);
     } finally {
       setIsLoading(false);
     }
@@ -296,7 +268,7 @@ function RecreateSessionContent() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <h1 className="text-2xl sm:text-3xl font-bold">{pageTitle}</h1>
           <Button variant="outline" asChild>
-            <Link href="/sessions">Back to Sessions</Link>
+            <Link href="/sessions">Back to main sessions page (Quit session)</Link>
           </Button>
         </div>
 
@@ -311,6 +283,7 @@ function RecreateSessionContent() {
               <div className="space-y-2">
                 {isHost ? (
                   <div className="flex flex-col space-y-4">
+                    <p className="text-muted-foreground text-sm">The session name and in-game password will remain the same as the original session.</p>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">
                         Select New Night Lord
@@ -340,7 +313,6 @@ function RecreateSessionContent() {
                         ))}
                       </div>
                     </div>
-                    <p className="text-muted-foreground text-sm">The session name and password will remain the same as the original session.</p>
                   </div>
                 ) : (
                   <div className="flex flex-col space-y-2">

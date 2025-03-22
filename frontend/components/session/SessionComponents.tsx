@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
@@ -676,20 +676,49 @@ export const ResultReportingSection: React.FC<ResultReportingSectionProps> = ({
   isSubmitted,
   submissionError
 }) => {
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  // Track submission state internally as well as from props
+  const [localIsSubmitting, setLocalIsSubmitting] = useState<boolean>(false);
+  const [localIsSubmitted, setLocalIsSubmitted] = useState<boolean>(isSubmitted);
+  
+  // Update local state when prop changes
+  useEffect(() => {
+    if (isSubmitted) {
+      setLocalIsSubmitted(true);
+    }
+  }, [isSubmitted]);
   
   // Function to handle form submission
   const handleSubmitResults = async () => {
-    setIsSubmitting(true);
+    // Check both local and prop states to be absolutely certain
+    if (localIsSubmitted || isSubmitted || localIsSubmitting) {
+      console.log("Preventing duplicate submission");
+      return;
+    }
+    
+    setLocalIsSubmitting(true);
     try {
       // Call the provided submit function
       await onSubmitResult();
+      // Set local submitted state to true
+      setLocalIsSubmitted(true);
     } catch (error) {
       console.error('Error in handleSubmitResults:', error);
+      // If the error indicates already submitted, set local state
+      if (error instanceof Error && 
+          (error.message.toLowerCase().includes('already submitted') || 
+           error.message.toLowerCase().includes('has already submitted'))) {
+        setLocalIsSubmitted(true);
+      }
     } finally {
-      setIsSubmitting(false);
+      setLocalIsSubmitting(false);
     }
   };
+  
+  // Determine if we should show submitted view
+  const showSubmittedView = localIsSubmitted || isSubmitted;
+  
+  // Determine if button should be disabled
+  const isButtonDisabled = localIsSubmitting || localIsSubmitted || isSubmitted;
   
   return (
     <Card className="flex flex-col flex-grow">
@@ -697,7 +726,7 @@ export const ResultReportingSection: React.FC<ResultReportingSectionProps> = ({
         <CardTitle>Report Your Result</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6 flex-grow flex flex-col justify-between">
-        {isSubmitted ? (
+        {showSubmittedView ? (
           <div className="flex flex-col items-center justify-center h-full">
             <div className="text-green-500 mb-2">✓</div>
             <h3 className="text-xl font-medium mb-2">Results Submitted</h3>
@@ -767,9 +796,9 @@ export const ResultReportingSection: React.FC<ResultReportingSectionProps> = ({
             <Button 
               className="w-full h-12 mt-auto" 
               onClick={handleSubmitResults}
-              disabled={isSubmitting}
+              disabled={isButtonDisabled}
             >
-              {isSubmitting ? 'Submitting...' : 'Submit Results'}
+              {localIsSubmitting ? 'Submitting...' : 'Submit Results'}
             </Button>
           </>
         )}

@@ -73,14 +73,12 @@ function CreateSessionContent() {
       const data = await response.json();
       
       if (response.ok) {
-        toast.success("Session created successfully");
         router.push(`/sessions/run?id=${data.id}`);
       } else {
         toast.error(data.message || "Failed to create session");
       }
     } catch (error) {
-      toast.error("An unexpected error occurred");
-      console.error("Error creating session:", error);
+      toast.error("An unexpected error occurred: " + error);
     } finally {
       setIsLoading(false);
     }

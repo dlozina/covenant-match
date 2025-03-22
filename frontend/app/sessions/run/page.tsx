@@ -182,7 +182,7 @@ function SessionRunContent(): JSX.Element {
           'Authorization': `Bearer ${token}`
         }
       }).catch(err => {
-        console.error('Error starting session:', err);
+        toast.error('Error starting session: ' + err);
       });
 
       // Update sessionData for the host to reflect the new status
@@ -222,13 +222,11 @@ function SessionRunContent(): JSX.Element {
           duration: sessionState.elapsedSeconds
         })
       }).catch(err => {
-        console.error('Error completing session:', err);
+        toast.error('Error completing session: ' + err);
       });
       
       // Keep SSE connection alive for the host to receive real-time updates
       // about other players submitting their results
-      console.log('Session finished, but keeping SSE connection alive for result updates');
-      
       // NOTE: We deliberately don't disconnect here anymore to continue receiving result updates
     }
   }, [sessionState.elapsedSeconds, sessionId, sessionData]);
@@ -259,8 +257,7 @@ function SessionRunContent(): JSX.Element {
       // Instead of directly recreating the session, navigate to the character selection page
       router.push(`/sessions/recreate?id=${sessionId}`);
     } catch (err) {
-      console.error('Error navigating to recreate session page:', err);
-      toast.error("Unable to navigate to recreation page");
+      toast.error("Unable to navigate to recreation page: " + err);
     } finally {
       setIsCreatingNewSession(false);
     }
@@ -313,7 +310,7 @@ function SessionRunContent(): JSX.Element {
         
         setSessionData(data);
       } catch (err) {
-        console.error('Error fetching session data:', err);
+        toast.error('Error fetching session data: ' + err);
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
       } finally {
         setIsLoading(false);
@@ -328,36 +325,19 @@ function SessionRunContent(): JSX.Element {
   // Set up SSE subscriptions
   useEffect(() => {
     if (!isValidSessionId) return;
-    
-    console.log(`Setting up SSE subscriptions for session: ${sessionId}`);
-    
     // DEBUG: Subscribe to all message types to catch any events coming in
     const unsubscribeMessage = subscribe('message', (data) => {
-      console.log('Generic message event received:', data);
       // Check if this might be a join event based on data properties
       if (data && typeof data === 'object' && 'username' in data && 'nightfarer' in data) {
-        console.log('This appears to be a join event coming through as a generic message:', data);
       }
     });
     
     // Subscribe to the join event
-    const unsubscribeJoin = subscribe('join', (data) => {
-      console.log('Join event received:', data);
-      
+    const unsubscribeJoin = subscribe('join', (data) => {   
       // Safety check for data structure
       if (!data || typeof data !== 'object') {
-        console.error('Join event handler received invalid data:', data);
         return;
       }
-      
-      // Log the data structure for debugging
-      console.log('Join event data structure:', {
-        dataType: typeof data,
-        hasUsername: 'username' in data,
-        hasNightfarer: 'nightfarer' in data,
-        hasUserId: 'userId' in data,
-        rawData: data
-      });
       
       // Extract player data directly from the object
       const playerData = {
@@ -368,26 +348,19 @@ function SessionRunContent(): JSX.Element {
         userId: typeof data === 'object' && data !== null && 'userId' in data 
                ? String(data.userId) : `user-${Date.now()}`
       };
-      
-      console.log(`Processing join for player: ${playerData.username} as ${playerData.nightfarer}`);
-      
       // No toast notification - UI will update through session data changes
       
       // Update the session data with the new player
       setSessionData(prevData => {
         if (!prevData) {
-          console.log('No previous session data, skipping update');
           return null;
         }
-        
-        console.log('Updating session data with new player:', playerData);
         
         // Check if player already exists
         const players = prevData.joinedPlayers || [];
         const playerExists = players.some(p => p.userId === playerData.userId);
         
         if (!playerExists) {
-          console.log('Adding new player to joinedPlayers array');
           
           // Create new array with the new player
           const updatedPlayers = [
@@ -407,7 +380,6 @@ function SessionRunContent(): JSX.Element {
             joinedPlayers: updatedPlayers
           };
         } else {
-          console.log('Player already exists in session');
           return prevData;
         }
       });
@@ -415,22 +387,11 @@ function SessionRunContent(): JSX.Element {
 
     // Subscribe to the start event
     const unsubscribeStart = subscribe('start', (data) => {
-      console.log('Start event received:', data);
       
       // Safety check for data structure
       if (!data || typeof data !== 'object') {
-        console.error('Start event handler received invalid data:', data);
         return;
       }
-      
-      // Log the data structure for debugging
-      console.log('Start event data structure:', {
-        dataType: typeof data,
-        hasSessionId: 'sessionId' in data,
-        hasUserId: 'userId' in data,
-        hasSessionStatus: 'sessionStatus' in data,
-        rawData: data
-      });
       
       // Only update session if it's not already started
       if (!sessionState.isSessionStarted) {
@@ -462,22 +423,11 @@ function SessionRunContent(): JSX.Element {
     
     // Subscribe to the complete event
     const unsubscribeComplete = subscribe('complete', (data) => {
-      console.log('Complete event received:', data);
-      
+
       // Safety check for data structure
       if (!data || typeof data !== 'object') {
-        console.error('Complete event handler received invalid data:', data);
         return;
       }
-      
-      // Log the data structure for debugging
-      console.log('Complete event data structure:', {
-        dataType: typeof data,
-        hasSessionId: 'sessionId' in data,
-        hasUserId: 'userId' in data,
-        hasSessionStatus: 'sessionStatus' in data,
-        rawData: data
-      });
       
       // Only update session if it's not already finished
       if (sessionState.isSessionStarted && !sessionState.isSessionFinished) {
@@ -507,16 +457,11 @@ function SessionRunContent(): JSX.Element {
     
     // Subscribe to the result event
     const unsubscribeResult = subscribe('result', (data) => {
-      console.log('Result event received:', data);
       
       // Safety check for data structure
       if (!data || typeof data !== 'object') {
-        console.error('Result event handler received invalid data:', data);
         return;
       }
-      
-      // Log the data structure for debugging
-      console.log('Result event data structure:', data);
       
       // Use type assertion to access the properties safely
       const eventData = data as { reported?: string; result?: string };
@@ -526,7 +471,7 @@ function SessionRunContent(): JSX.Element {
         // Get the user ID who reported their result
         const reportedUserId = eventData.reported;
         
-        // Log for debugging only
+        // todo: Log for debugging only
         if (process.env.NODE_ENV !== 'production') {
           console.log(`Result event received by ${userData?.id === sessionData?.hostId ? 'HOST' : 'PLAYER'}`);
           console.log(`Player ${reportedUserId} has reported with result: ${eventData.result}`);
@@ -546,13 +491,8 @@ function SessionRunContent(): JSX.Element {
           
           // Create a new array of joined players with updated hasReported property
           const updatedPlayers = prevData.joinedPlayers.map(player => {
-            // Only update the player who submitted the result
-            const hasReported = player.userId === reportedUserId || 
-                               (player.hasReported === true); // preserve existing reported status
-            
-            if (player.userId === reportedUserId) {
-              console.log(`Marking player ${player.username} (${player.userId}) as reported`);
-            }
+          // Only update the player who submitted the result
+          const hasReported = player.userId === reportedUserId || (player.hasReported === true); // preserve existing reported status
             
             return {
               ...player,
@@ -560,18 +500,14 @@ function SessionRunContent(): JSX.Element {
             };
           });
           
-          console.log('Updated players data:', updatedPlayers);
-          
           return {
             ...prevData,
             joinedPlayers: updatedPlayers
           };
         });
         
-        // No toast notification needed - badges provide visual feedback
-      } else {
-        console.warn('Result event missing reported user ID:', eventData);
-      }
+      // No toast notification needed - badges provide visual feedback
+      } 
     });
     
     // Add additional event subscriptions here as needed
@@ -599,7 +535,6 @@ function SessionRunContent(): JSX.Element {
       
       // Clear any stored new session ID on refresh to prevent stale state
       setNewSessionId(null);
-      console.log('Page refreshed, cleared newSessionId');
     }
     
     // Update the last load time
@@ -607,7 +542,6 @@ function SessionRunContent(): JSX.Element {
     
     // Add beforeunload event listener to disconnect EventSource when page is actually closing
     const handleBeforeUnload = () => {
-      console.log('Page is unloading, disconnecting EventSource');
       if (sessionId) {
         disconnect();
       }
@@ -616,7 +550,6 @@ function SessionRunContent(): JSX.Element {
     window.addEventListener('beforeunload', handleBeforeUnload);
     
     return () => {
-      console.log('Run page component unmounting, disconnecting EventSource');
       // Since we're simplifying for a single-page use case, we can always disconnect when component unmounts
       if (sessionId) {
         disconnect();
@@ -645,7 +578,6 @@ function SessionRunContent(): JSX.Element {
       }
     }
     
-    console.log(`Session ID changed: ${sessionId}, result submission state reset, newSessionId cleared`);
   }, [sessionId, setResultSubmitted, setSubmissionError, sessionData, userData]);
 
   // Effect to handle direct navigations without going through the recreate flow
@@ -656,7 +588,6 @@ function SessionRunContent(): JSX.Element {
     if (!fromRecreatePage) {
       // If we didn't come from the recreate page, clear any autoJoin data
       // This prevents issues when users directly navigate to a session URL
-      console.log('Direct navigation to session page detected, cleaning up any autoJoin data');
       sessionStorage.removeItem('autoJoinSessionId');
       sessionStorage.removeItem('autoJoinCharacter');
     } else {
@@ -759,19 +690,11 @@ function SessionRunContent(): JSX.Element {
     const initialCheckTimer = setTimeout(() => {
       const connected = isConnected();
       setRtConnected(connected);
-      console.log(`Initial SSE connection check: ${connected ? 'Connected' : 'Disconnected'}`);
     }, 2000);
     
     // Check connection status periodically
     const statusInterval = setInterval(() => {
       const connected = isConnected();
-      
-      // Only log status changes to reduce console noise
-      if (connected !== rtConnected) {
-        console.log(`SSE connection status changed: ${connected ? 'Connected' : 'Disconnected'}`);
-        console.log(`User role: ${userData?.id === sessionData?.hostId ? 'HOST' : 'PLAYER'}`);
-        console.log(`Session status: ${sessionState.isSessionFinished ? 'FINISHED' : 'IN PROGRESS'}`);
-      }
       
       setRtConnected(connected);
     }, 5000);
@@ -810,7 +733,14 @@ function SessionRunContent(): JSX.Element {
 
   // Function to handle result submission
   const handleSubmitResult = useCallback(async () => {
-    if (!sessionData || !userData || resultSubmitted) return;
+    // Check for all reasons that would prevent submission
+    if (!sessionData || !userData) return;
+    
+    // Check if already submitted - throw an error to trigger the catch block in ResultReportingSection
+    if (resultSubmitted) {
+      console.log('Result already submitted, ignoring duplicate submission attempt');
+      throw new Error('Result already submitted');
+    }
     
     try {
       setSubmissionError(null);
@@ -841,11 +771,6 @@ function SessionRunContent(): JSX.Element {
         feedback: resultState.feedback || ''
       };
       
-      console.log('Submitting session result:', submissionData);
-      console.log(`Submission by ${userData.id === sessionData.hostId ? 'HOST' : 'PLAYER'}`);
-      console.log(`SSE connection status: ${isConnected() ? 'Connected' : 'Disconnected'}`);
-      console.log(`Is this user the host? ${userData.id === sessionData.hostId ? 'YES' : 'NO'}`);
-      
       // Send API request to submit result
       const response = await fetch(`${apiBaseUrl}/api/v1/sessions/${sessionId}/results`, {
         method: 'POST',
@@ -870,16 +795,11 @@ function SessionRunContent(): JSX.Element {
         
         // Update the joined players array with hasReported flag for current user
         const updatedPlayers = prevData.joinedPlayers.map(player => {
-          const isCurrentUser = player.userId === userData.id;
-          console.log(`Setting player ${player.username} (${player.userId}) hasReported = ${isCurrentUser || player.hasReported}`);
           
           return player.userId === userData.id 
             ? { ...player, hasReported: true }
             : player;
         });
-        
-        console.log('Updated players data after self-submission:', updatedPlayers);
-        console.log(`Host player is now marked as reported: ${updatedPlayers.find(p => p.userId === sessionData.hostId)?.hasReported ? 'YES' : 'NO'}`);
         
         return {
           ...prevData,
@@ -887,15 +807,47 @@ function SessionRunContent(): JSX.Element {
         };
       });
       
-      console.log('Submission successful - updated UI state');
-      
       // Success is indicated by the UI changing to show submitted state
       // No toast notification needed
       
     } catch (err) {
-      console.error('Error submitting result:', err);
-      setSubmissionError(err instanceof Error ? err.message : 'An unknown error occurred');
-      // Error is displayed in the UI via submissionError state
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      
+      // Check if this is an "already submitted" error
+      if (errorMessage.toLowerCase().includes('already submitted') || 
+          errorMessage.toLowerCase().includes('has already submitted')) {
+        console.log('Handling already submitted error:', errorMessage);
+        
+        // Update UI to show submitted state even though we caught an error
+        setResultSubmitted(true);
+        
+        // Update session data to mark current user as reported
+        setSessionData(prevData => {
+          if (!prevData) return null;
+          
+          // Update the joined players array with hasReported flag for current user
+          const updatedPlayers = prevData.joinedPlayers.map(player => {
+            return player.userId === userData.id 
+              ? { ...player, hasReported: true }
+              : player;
+          });
+          
+          return {
+            ...prevData,
+            joinedPlayers: updatedPlayers
+          };
+        });
+        
+        // Rethrow the error so ResultReportingSection can also update its state
+        throw err;
+      } else {
+        // For other errors, show the error toast and set the error message
+        toast.error('Error submitting result: ' + errorMessage);
+        setSubmissionError(errorMessage);
+        
+        // Rethrow all errors to let the component handle them
+        throw err;
+      }
     }
   }, [sessionId, userData, resultState, sessionData, resultSubmitted, setSessionData, isConnected]);
 
@@ -905,11 +857,8 @@ function SessionRunContent(): JSX.Element {
     
     // Subscribe to the newSession event
     const unsubscribeNewSession = subscribe('newSession', (data) => {
-      console.log('New session event received:', data);
-      
       // Safety check for data structure
       if (!data || typeof data !== 'object') {
-        console.error('New session event handler received invalid data:', data);
         return;
       }
       
@@ -920,8 +869,6 @@ function SessionRunContent(): JSX.Element {
       const originalSessionId = typeof data === 'object' && data !== null && 'originalSessionId' in data 
                              ? String(data.originalSessionId) : null;
       
-      console.log(`Current sessionId: ${sessionId}, Original session: ${originalSessionId}, New session: ${newSessionId}`);
-      
       // Only set newSessionId if:
       // 1. We have both a new and original session ID
       // 2. The current session matches the original session
@@ -930,11 +877,8 @@ function SessionRunContent(): JSX.Element {
           originalSessionId === sessionId && 
           newSessionId !== sessionId) {
         
-        console.log(`Setting newSessionId to ${newSessionId} for current session ${sessionId}`);
         // Store the new session ID in state (for the UI button)
         setNewSessionId(newSessionId);
-      } else {
-        console.log('Not updating newSessionId - criteria not met');
       }
     });
     
@@ -956,11 +900,10 @@ function SessionRunContent(): JSX.Element {
   useEffect(() => {
     // Only non-hosts get the indicator (hosts create the session themselves)
     if (newSessionId && !isHost()) {
-      console.log(`New session available indicator shown: ${newSessionId}`);
       // No action needed here - the UI will update based on newSessionId state
       // The "Start New Session With Same Team" button will be enabled and highlighted
     } else if (!newSessionId) {
-      console.log('No new session available, button will appear normal');
+      // No action needed here - the UI will update based on newSessionId state
     }
   }, [newSessionId, isHost]);
 
