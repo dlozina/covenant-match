@@ -5,7 +5,7 @@ interface RatingStarsProps {
   onSetRating: (rating: number) => void;
 }
 
-export const RatingStars: React.FC<RatingStarsProps> = memo(({ rating, onSetRating }) => {
+const RatingStarsComponent = ({ rating, onSetRating }: RatingStarsProps) => {
   return (
     <div>
       <p className="text-muted-foreground mb-2">Rate Experience:</p>
@@ -38,4 +38,8 @@ export const RatingStars: React.FC<RatingStarsProps> = memo(({ rating, onSetRati
       </div>
     </div>
   );
-}); 
+};
+
+RatingStarsComponent.displayName = 'RatingStars';
+
+export const RatingStars = memo(RatingStarsComponent); 

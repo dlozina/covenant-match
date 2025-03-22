@@ -29,7 +29,7 @@ interface PlayerRowProps {
   addFriend: (playerId: string) => void;
 }
 
-const PlayerRow = memo(({ 
+const PlayerRowComponent = ({ 
   player, 
   index, 
   isHost, 
@@ -76,9 +76,16 @@ const PlayerRow = memo(({
       </div>
     </div>
   );
-});
+};
 
-const EmptyPlayerSlot = memo(({ position }: { position: number }) => (
+PlayerRowComponent.displayName = 'PlayerRow';
+const PlayerRow = memo(PlayerRowComponent);
+
+interface EmptyPlayerSlotProps {
+  position: number;
+}
+
+const EmptyPlayerSlotComponent = ({ position }: EmptyPlayerSlotProps) => (
   <div className="flex items-center space-x-4">
     <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary/50">
       <span>P{position}</span>
@@ -98,23 +105,26 @@ const EmptyPlayerSlot = memo(({ position }: { position: number }) => (
       </Badge>
     </div>
   </div>
-));
+);
 
-export const PlayerSection: React.FC<PlayerSectionProps> = memo(({ 
+EmptyPlayerSlotComponent.displayName = 'EmptyPlayerSlot';
+const EmptyPlayerSlot = memo(EmptyPlayerSlotComponent);
+
+const PlayerSectionComponent = ({ 
   sessionState, 
   friendState, 
   addFriend, 
   sessionData,
   currentUserId 
-}) => {
+}: PlayerSectionProps) => {
   // Function to check if a player is the host
-  const isPlayerHost = (playerId: string) => {
-    return sessionData && sessionData.hostId === playerId;
+  const isPlayerHost = (playerId: string): boolean => {
+    return Boolean(sessionData && sessionData.hostId === playerId);
   };
 
   // Function to check if a player is the current user
-  const isCurrentUser = (playerId: string) => {
-    return currentUserId && playerId === currentUserId;
+  const isCurrentUser = (playerId: string): boolean => {
+    return Boolean(currentUserId && playerId === currentUserId);
   };
   
   return (
@@ -193,4 +203,8 @@ export const PlayerSection: React.FC<PlayerSectionProps> = memo(({
       </CardContent>
     </Card>
   );
-}); 
+};
+
+PlayerSectionComponent.displayName = 'PlayerSection';
+
+export const PlayerSection = memo(PlayerSectionComponent); 

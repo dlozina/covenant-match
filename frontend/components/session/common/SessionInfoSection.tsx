@@ -9,7 +9,7 @@ interface SessionInfoSectionProps {
   sessionData?: SessionData;
 }
 
-export const SessionInfoSection: React.FC<SessionInfoSectionProps> = memo(({ 
+const SessionInfoSectionComponent: React.FC<SessionInfoSectionProps> = ({ 
   sessionState, 
   formatTime, 
   sessionData 
@@ -67,4 +67,8 @@ export const SessionInfoSection: React.FC<SessionInfoSectionProps> = memo(({
       </CardContent>
     </Card>
   );
-}); 
+};
+
+SessionInfoSectionComponent.displayName = 'SessionInfoSection';
+
+export const SessionInfoSection = memo(SessionInfoSectionComponent); 

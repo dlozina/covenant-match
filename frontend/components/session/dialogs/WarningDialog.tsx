@@ -14,7 +14,7 @@ interface WarningDialogProps {
   onClose: () => void;
 }
 
-export const WarningDialog: React.FC<WarningDialogProps> = memo(({ isOpen, onClose }) => (
+const WarningDialogComponent = ({ isOpen, onClose }: WarningDialogProps) => (
   <AlertDialog 
     open={isOpen} 
     onOpenChange={(open) => {
@@ -34,4 +34,8 @@ export const WarningDialog: React.FC<WarningDialogProps> = memo(({ isOpen, onClo
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>
-)); 
+);
+
+WarningDialogComponent.displayName = 'WarningDialog';
+
+export const WarningDialog = memo(WarningDialogComponent); 

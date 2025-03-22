@@ -16,7 +16,7 @@ interface ResultReportingSectionProps {
   submissionError: string | null;
 }
 
-export const ResultReportingSection: React.FC<ResultReportingSectionProps> = memo(({ 
+const ResultReportingSectionComponent = ({ 
   resultState, 
   dispatchResult, 
   sessionState, 
@@ -24,7 +24,7 @@ export const ResultReportingSection: React.FC<ResultReportingSectionProps> = mem
   onSubmitResult,
   isSubmitted,
   submissionError
-}) => {
+}: ResultReportingSectionProps) => {
   const { isSubmitting, handleSubmitResults } = useResultReporting({
     resultState,
     dispatchResult,
@@ -102,4 +102,8 @@ export const ResultReportingSection: React.FC<ResultReportingSectionProps> = mem
       </CardContent>
     </Card>
   );
-}); 
+};
+
+ResultReportingSectionComponent.displayName = 'ResultReportingSection';
+
+export const ResultReportingSection = memo(ResultReportingSectionComponent); 

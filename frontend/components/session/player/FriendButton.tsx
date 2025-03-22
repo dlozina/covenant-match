@@ -6,7 +6,7 @@ interface FriendButtonProps {
   onAddFriend: (playerId: string) => void;
 }
 
-export const FriendButton: React.FC<FriendButtonProps> = memo(({ playerId, isFriend, onAddFriend }) => (
+const FriendButtonComponent = ({ playerId, isFriend, onAddFriend }: FriendButtonProps) => (
   <button 
     onClick={() => onAddFriend(playerId)}
     disabled={isFriend}
@@ -32,4 +32,8 @@ export const FriendButton: React.FC<FriendButtonProps> = memo(({ playerId, isFri
       </svg>
     )}
   </button>
-)); 
+);
+
+FriendButtonComponent.displayName = 'FriendButton';
+
+export const FriendButton = memo(FriendButtonComponent); 

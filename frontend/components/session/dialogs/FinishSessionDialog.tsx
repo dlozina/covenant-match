@@ -16,11 +16,11 @@ interface FinishSessionDialogProps {
   onConfirm: () => void;
 }
 
-export const FinishSessionDialog: React.FC<FinishSessionDialogProps> = memo(({ 
+const FinishSessionDialogComponent = ({ 
   isOpen, 
   onClose, 
   onConfirm 
-}) => (
+}: FinishSessionDialogProps) => (
   <AlertDialog 
     open={isOpen} 
     onOpenChange={(open) => {
@@ -42,4 +42,8 @@ export const FinishSessionDialog: React.FC<FinishSessionDialogProps> = memo(({
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>
-)); 
+);
+
+FinishSessionDialogComponent.displayName = 'FinishSessionDialog';
+
+export const FinishSessionDialog = memo(FinishSessionDialogComponent); 

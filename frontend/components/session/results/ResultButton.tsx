@@ -7,7 +7,7 @@ interface ResultButtonProps {
   onSelect: () => void;
 }
 
-export const ResultButton: React.FC<ResultButtonProps> = memo(({ type, isSelected, onSelect }) => {
+const ResultButtonComponent = ({ type, isSelected, onSelect }: ResultButtonProps) => {
   const label = type === 'dc' ? 'D/C' : type.toUpperCase();
   const title = type === 'dc' ? 'Disconnect' : type;
   
@@ -28,4 +28,8 @@ export const ResultButton: React.FC<ResultButtonProps> = memo(({ type, isSelecte
       )}
     </Button>
   );
-}); 
+};
+
+ResultButtonComponent.displayName = 'ResultButton';
+
+export const ResultButton = memo(ResultButtonComponent); 
