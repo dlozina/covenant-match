@@ -101,7 +101,7 @@ export default function Home() {
               <>
                 {!isLoggedIn && (
                   <Button size="lg" className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white">
-                    <Link href="/create-profile" className="flex items-center">
+                    <Link href="/profile/create" className="flex items-center">
                       <Users className="mr-2 h-5 w-5" />
                       Join Now
                     </Link>

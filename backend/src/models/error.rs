@@ -67,6 +67,13 @@ pub enum AppError {
 
     #[error("Forbidden: {0}")]
     Forbidden(String),
+
+    // New CAPTCHA verification error
+    #[error("CAPTCHA verification failed: {0}")]
+    CaptchaVerificationFailed(String),
+
+    #[error("CAPTCHA required: {0}")]
+    CaptchaRequired(String),
 }
 
 impl ResponseError for AppError {
@@ -106,6 +113,9 @@ impl ResponseError for AppError {
 
             AppError::EmailAlreadyInUse => StatusCode::CONFLICT,
             AppError::DisplayNameAlreadyInUse => StatusCode::CONFLICT,
+
+            AppError::CaptchaVerificationFailed(_) => StatusCode::BAD_REQUEST,
+            AppError::CaptchaRequired(_) => StatusCode::BAD_REQUEST,
         }
     }
 }

@@ -49,11 +49,14 @@ pub struct UserResponse {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 pub struct LoginUserDto {
     pub username: String,
     #[schema(format = "password")]
     pub password: String,
+    /// reCAPTCHA token for verification
+    #[serde(rename = "captchaToken")]
+    pub captcha_token: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

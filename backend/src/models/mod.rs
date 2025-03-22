@@ -1,4 +1,5 @@
-pub mod user;
+pub mod auth;
+pub mod error;
 pub mod session;
 pub mod statistics;
-pub mod error;
+pub mod user;

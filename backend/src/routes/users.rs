@@ -3,8 +3,8 @@ use crate::models::error::AppError;
 use crate::models::user::{
     CreateUserDto, GetUsersQuery, LoginUserDto, UpdateUserProfileDto, UserResponse,
 };
-use crate::services::user_service;
-use crate::utils::jwt;
+use crate::services::{auth_service, user_service};
+use crate::utils::{jwt, recaptcha};
 use actix_web::{
     delete, get, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError,
 };
@@ -63,20 +63,90 @@ async fn create_user(
     responses(
         (status = 200, description = "Login successful", body = AuthResponse),
         (status = 401, description = "Invalid credentials"),
+        (status = 400, description = "CAPTCHA verification failed"),
         (status = 500, description = "Internal server error")
     ),
     tag = "users"
 )]
 #[post("/api/v1/auth/login")]
-async fn login(db: web::Data<Database>, credentials: web::Json<LoginUserDto>) -> impl Responder {
-    match user_service::login_user(&db, credentials.into_inner()).await {
-        Ok((token, user)) => HttpResponse::Ok().json(serde_json::json!({
-            "status": "success",
-            "token": token,
-            "user": user
-        })),
+async fn login(
+    db: web::Data<Database>,
+    credentials: web::Json<LoginUserDto>,
+    req: HttpRequest,
+) -> impl Responder {
+    let login_data = credentials.into_inner();
+
+    // Get the client IP address
+    let ip_address = req
+        .connection_info()
+        .peer_addr()
+        .unwrap_or("unknown")
+        .to_string();
+
+    // Verify CAPTCHA if required based on previous login attempts
+    if let Err(e) = auth_service::verify_captcha_if_required(
+        &db,
+        &login_data.username,
+        &ip_address,
+        login_data.captcha_token.as_deref(),
+    )
+    .await
+    {
+        log::warn!(
+            "CAPTCHA verification failed for user {}: {:?}",
+            &login_data.username,
+            e
+        );
+
+        // For CAPTCHA required errors, provide a more helpful response
+        if let AppError::CaptchaRequired(_) = &e {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "status": "error",
+                "message": e.to_string(),
+                "requiresCaptcha": true
+            }));
+        }
+
+        return e.error_response();
+    }
+
+    // Proceed with login after CAPTCHA verification
+    match user_service::login_user(&db, login_data.clone()).await {
+        Ok((token, user)) => {
+            // Record successful login attempt
+            if let Err(e) = auth_service::record_login_attempt(
+                &db,
+                &login_data.username,
+                &ip_address,
+                true, // successful
+            )
+            .await
+            {
+                log::error!("Failed to record successful login attempt: {:?}", e);
+                // Continue anyway since login was successful
+            }
+
+            HttpResponse::Ok().json(serde_json::json!({
+                "status": "success",
+                "token": token,
+                "user": user
+            }))
+        }
         Err(e) => {
-            log::error!("Login error: {:?}", e);
+            // Record failed login attempt
+            if let Err(record_err) = auth_service::record_login_attempt(
+                &db,
+                &login_data.username,
+                &ip_address,
+                false, // failed
+            )
+            .await
+            {
+                log::error!("Failed to record failed login attempt: {:?}", record_err);
+                // Continue with normal error response
+            }
+
+            log::error!("Login error for user {}: {:?}", &login_data.username, e);
             e.error_response()
         }
     }
@@ -211,7 +281,7 @@ async fn create_admin_user(
     // Get claims from request extensions (set by middleware)
     let extensions = req.extensions();
     let claims = extensions.get::<jwt::Claims>().unwrap();
-    
+
     // Middleware already checked admin role, but we can double-check here
     if claims.role != "admin" {
         return HttpResponse::Forbidden().json(serde_json::json!({
@@ -262,7 +332,7 @@ async fn get_all_users(
     // Get claims from request extensions (set by middleware)
     let extensions = req.extensions();
     let claims = extensions.get::<jwt::Claims>().unwrap();
-    
+
     // Middleware already checked admin role, but we can double-check here
     if claims.role != "admin" {
         return HttpResponse::Forbidden().json(serde_json::json!({

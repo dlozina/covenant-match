@@ -124,7 +124,7 @@ export function SiteHeader() {
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/edit-profile" className="w-full flex items-center">
+                      <Link href="/profile/edit" className="w-full flex items-center">
                         <User className="h-4 w-4 mr-2" />
                         Edit Profile
                       </Link>
@@ -155,7 +155,7 @@ export function SiteHeader() {
                     className="hover:bg-purple-500/10 hover:text-purple-400 hover:border-purple-500/50 transition-all"
                     asChild
                   >
-                    <Link href="/create-profile" className="flex items-center gap-2">
+                    <Link href="/profile/create" className="flex items-center gap-2">
                       <UserPlus className="h-4 w-4" />
                       <span className="hidden sm:inline">Create Profile</span>
                     </Link>
@@ -202,7 +202,7 @@ export function SiteHeader() {
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/create-profile" className="w-full flex items-center">
+                      <Link href="/profile/create" className="w-full flex items-center">
                         <UserPlus className="h-4 w-4 mr-2" />
                         Create Profile
                       </Link>

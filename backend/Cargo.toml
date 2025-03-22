@@ -34,6 +34,7 @@ utoipa-swagger-ui = { version = "7.1.0", features = ["actix-web"] }
 regex = "1.11.1"
 mime = "0.3.17"
 bytes = "1.5.0"
+reqwest = { version = "0.12", features = ["json"] }
 
 [dev-dependencies]
 actix-rt = "2.9.0"
