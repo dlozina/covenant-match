@@ -118,7 +118,8 @@ class EventSourceService {
         this.reconnectAttempts = 0;
         this.isReconnectingFlag = false;
         this.updateActivity();
-        toast.success('Real-time updates connected');
+        // todo: Remove this once testing is done
+        //toast.success('Real-time updates connected');
       };
       
       // Handle reconnection

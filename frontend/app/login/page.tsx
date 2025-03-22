@@ -17,6 +17,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -36,7 +37,17 @@ const loginFormSchema = z.object({
     }),
   password: z.string()
     .min(8, { message: "Password must be at least 8 characters" })
-    .max(100, { message: "Password too long" }),
+    .max(100, { message: "Password too long" })
+    .trim()
+    .refine(val => /[0-9]/.test(val), {
+      message: "Password must contain at least one number"
+    })
+    .refine(val => /[^a-zA-Z0-9]/.test(val), {
+      message: "Password must contain at least one special character"
+    })
+    .refine(val => val === val.trim(), {
+      message: "Password cannot contain leading or trailing whitespace"
+    }),
 })
 
 type LoginFormValues = z.infer<typeof loginFormSchema>
@@ -253,7 +264,7 @@ export default function LoginPage() {
                           }}
                         />
                       </FormControl>
-                      <FormMessage className="text-xs sm:text-sm" />
+                      <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
                     </FormItem>
                   )}
                 />
@@ -276,7 +287,7 @@ export default function LoginPage() {
                           }}
                         />
                       </FormControl>
-                      <FormMessage className="text-xs sm:text-sm" />
+                      <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
                     </FormItem>
                   )}
                 />
@@ -284,12 +295,12 @@ export default function LoginPage() {
                 {/* Notification display area */}
                 {notification && (
                   <div className={`
-                    flex items-center gap-2 text-sm p-2 rounded-md 
-                    ${notification.type === 'error' ? 'bg-red-50 text-red-600 border border-red-200' : 
-                     notification.type === 'warning' ? 'bg-amber-50 text-amber-600 border border-amber-200' :
-                     'bg-green-50 text-green-600 border border-green-200'}
+                    flex items-center gap-2 text-sm p-3 rounded-md 
+                    ${notification.type === 'error' ? 'bg-red-100 text-red-700 border border-red-300' : 
+                     notification.type === 'warning' ? 'bg-amber-100 text-amber-700 border border-amber-300' :
+                     'bg-green-100 text-green-700 border border-green-300'}
                   `}>
-                    <AlertCircle size={16} />
+                    <AlertCircle size={16} className="flex-shrink-0" />
                     <span>{notification.message}</span>
                   </div>
                 )}

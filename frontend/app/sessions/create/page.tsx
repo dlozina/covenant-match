@@ -5,11 +5,44 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { AlertCircle } from "lucide-react";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-//import { useAuth } from "@/lib/auth-context";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+// Type for our notification state
+type NotificationType = {
+  message: string;
+  type: 'error' | 'success' | 'warning';
+}
+
+// Session validation schema
+const sessionFormSchema = z.object({
+  sessionName: z
+    .string()
+    .min(1, { message: "Session name is required" })
+    .max(22, { message: "Session name must not be longer than 22 characters" })
+    .trim(),
+  password: z
+    .string()
+    .min(1, { message: "Password is required" })
+    .max(6, { message: "Password must not be longer than 6 characters" })
+    .trim(),
+});
+
+type SessionFormValues = z.infer<typeof sessionFormSchema>;
 
 export default function CreateSessionPage() {
   return (
@@ -22,30 +55,74 @@ export default function CreateSessionPage() {
 function CreateSessionContent() {
   const [selectedLord, setSelectedLord] = useState<string | null>(null);
   const [selectedFarer, setSelectedFarer] = useState<string | null>(null);
-  const [sessionName, setSessionName] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [notification, setNotification] = useState<NotificationType | null>(null);
+  
+  // Character counter states
+  const [sessionNameLength, setSessionNameLength] = useState(0);
+  const [passwordLength, setPasswordLength] = useState(0);
+  
+  // Debounce timer reference
+  const [validationTimeout, setValidationTimeout] = useState<NodeJS.Timeout | null>(null);
+  
   const router = useRouter();
   
-  const handleCreateSession = async () => {
-    // Validate inputs
-    if (!sessionName) {
-      toast.error("Please enter a session name");
-      return;
+  const form = useForm<SessionFormValues>({
+    resolver: zodResolver(sessionFormSchema),
+    defaultValues: {
+      sessionName: "",
+      password: "",
+    },
+    mode: "onBlur", // Only validate on blur and submit for better UX
+  });
+  
+  // Update character counters whenever field values change
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (name === 'sessionName' && value.sessionName) {
+        setSessionNameLength(value.sessionName.length);
+      }
+      if (name === 'password' && value.password) {
+        setPasswordLength(value.password.length);
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [form.watch]);
+  
+  // Handle debounced validation
+  const debouncedValidate = (fieldName: keyof SessionFormValues) => {
+    // Clear any existing timeout
+    if (validationTimeout) {
+      clearTimeout(validationTimeout);
     }
     
-    if (!password) {
-      toast.error("Please enter a password");
-      return;
-    }
+    // Set a new timeout
+    const timeout = setTimeout(() => {
+      form.trigger(fieldName);
+    }, 500); // 500ms debounce
     
+    setValidationTimeout(timeout);
+  };
+  
+  const onSubmit = async (data: SessionFormValues) => {
+    // Reset notification
+    setNotification(null);
+    
+    // Validate character selections
     if (!selectedFarer) {
-      toast.error("Please select a Nightfarer");
+      setNotification({
+        message: "Please select a Nightfarer",
+        type: 'warning'
+      });
       return;
     }
     
     if (!selectedLord) {
-      toast.error("Please select a Night Lord");
+      setNotification({
+        message: "Please select a Night Lord",
+        type: 'warning'
+      });
       return;
     }
     
@@ -55,30 +132,42 @@ function CreateSessionContent() {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       const token = localStorage.getItem('token');
       
+      // Sanitize inputs before submission
+      const sanitizedData = {
+        gamePassword: data.password.trim(),
+        name: data.sessionName.trim(),
+        nightLord: selectedLord,
+        nightfarer: selectedFarer,
+        isPrivate: false
+      };
+      
       const response = await fetch(`${apiBaseUrl}/api/v1/sessions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({
-          gamePassword: password,
-          name: sessionName,
-          nightLord: selectedLord,
-          nightfarer: selectedFarer,
-          isPrivate: false
-        }),
+        body: JSON.stringify(sanitizedData),
       });
       
-      const data = await response.json();
+      const responseData = await response.json();
       
       if (response.ok) {
-        router.push(`/sessions/run?id=${data.id}`);
+        setNotification({
+          message: "Session created successfully!",
+          type: 'success'
+        });
+        setTimeout(() => {
+          router.push(`/sessions/run?id=${responseData.id}`);
+        }, 1000); // Short delay to show success message
       } else {
-        toast.error(data.message || "Failed to create session");
+        throw new Error(responseData.message || "Failed to create session");
       }
     } catch (error) {
-      toast.error("An unexpected error occurred: " + error);
+      setNotification({
+        message: error instanceof Error ? error.message : "An unexpected error occurred",
+        type: 'error'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -99,102 +188,157 @@ function CreateSessionContent() {
             <CardTitle>Session Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <label htmlFor="sessionName" className="text-sm font-medium">
-                Session Name
-              </label>
-              <Input 
-                id="sessionName" 
-                placeholder="Enter a name for your session" 
-                className="w-full"
-                value={sessionName}
-                onChange={(e) => setSessionName(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
-                In Game Password
-              </label>
-              <Input 
-                id="password" 
-                placeholder="Enter an in-game password for your session" 
-                className="w-full"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Select Nightfarer
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                {[
-                  "Wylder", 
-                  "Guardian", 
-                  "Recluse", 
-                  "Duchess", 
-                  "Patces", 
-                  "Jolan", 
-                  "Igon", 
-                  "Alexander"
-                ].map(farer => (
-                  <Button 
-                    key={farer} 
-                    variant="outline" 
-                    className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
-                      selectedFarer === farer ? "border-purple-500 bg-purple-950/20" : ""
-                    }`}
-                    style={{ whiteSpace: 'normal' }}
-                    onClick={() => setSelectedFarer(farer)}
-                  >
-                    <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{farer}</span>
-                  </Button>
-                ))}
+            {/* Notification display area */}
+            {notification && (
+              <div className={`
+                flex items-center gap-2 text-sm p-3 rounded-md 
+                ${notification.type === 'error' ? 'bg-red-100 text-red-700 border border-red-300' : 
+                 notification.type === 'warning' ? 'bg-amber-100 text-amber-700 border border-amber-300' :
+                 'bg-green-100 text-green-700 border border-green-300'}
+              `}>
+                <AlertCircle size={16} className="flex-shrink-0" />
+                <span>{notification.message}</span>
               </div>
-            </div>
+            )}
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Select Night Lord
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                {[
-                  "Tricephalos", 
-                  "PCR", 
-                  "Malenia, Blade of Miquella", 
-                  "Maliketh", 
-                  "Mohg", 
-                  "Midra", 
-                  "Bayle", 
-                  "Messmer"
-                ].map(lord => (
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="sessionName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="flex justify-between items-center">
+                        <FormLabel className="text-sm font-medium">Session Name</FormLabel>
+                        <span className={`text-xs ${sessionNameLength > 22 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                          {sessionNameLength} / 22
+                        </span>
+                      </div>
+                      <FormControl>
+                        <Input 
+                          placeholder="Enter a name for your session" 
+                          className="w-full"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setSessionNameLength(e.target.value.length);
+                            debouncedValidate('sessionName');
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="flex justify-between items-center">
+                        <FormLabel className="text-sm font-medium">In Game Password</FormLabel>
+                        <span className={`text-xs ${passwordLength > 6 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                          {passwordLength} / 6
+                        </span>
+                      </div>
+                      <FormControl>
+                        <Input 
+                          placeholder="Enter an in-game password for your session" 
+                          className="w-full"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setPasswordLength(e.target.value.length);
+                            debouncedValidate('password');
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Select Nightfarer
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    {[
+                      "Wylder", 
+                      "Guardian", 
+                      "Recluse", 
+                      "Duchess", 
+                      "Patces", 
+                      "Jolan", 
+                      "Igon", 
+                      "Alexander"
+                    ].map(farer => (
+                      <Button 
+                        key={farer} 
+                        variant="outline" 
+                        className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
+                          selectedFarer === farer ? "border-purple-500 bg-purple-950/20" : ""
+                        }`}
+                        style={{ whiteSpace: 'normal' }}
+                        onClick={() => setSelectedFarer(farer)}
+                        type="button"
+                      >
+                        <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{farer}</span>
+                      </Button>
+                    ))}
+                  </div>
+                  {!selectedFarer && form.formState.isSubmitted && (
+                    <p className="text-xs sm:text-sm text-red-600 font-medium mt-1">Please select a Nightfarer</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Select Night Lord
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    {[
+                      "Tricephalos", 
+                      "PCR", 
+                      "Malenia, Blade of Miquella", 
+                      "Maliketh", 
+                      "Mohg", 
+                      "Midra", 
+                      "Bayle", 
+                      "Messmer"
+                    ].map(lord => (
+                      <Button 
+                        key={lord} 
+                        variant="outline" 
+                        className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
+                          selectedLord === lord ? "border-purple-500 bg-purple-950/20" : ""
+                        }`}
+                        style={{ whiteSpace: 'normal' }}
+                        onClick={() => setSelectedLord(lord)}
+                        type="button"
+                      >
+                        <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{lord}</span>
+                      </Button>
+                    ))}
+                  </div>
+                  {!selectedLord && form.formState.isSubmitted && (
+                    <p className="text-xs sm:text-sm text-red-600 font-medium mt-1">Please select a Night Lord</p>
+                  )}
+                </div>
+
+                <div className="pt-4">
                   <Button 
-                    key={lord} 
-                    variant="outline" 
-                    className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
-                      selectedLord === lord ? "border-purple-500 bg-purple-950/20" : ""
-                    }`}
-                    style={{ whiteSpace: 'normal' }}
-                    onClick={() => setSelectedLord(lord)}
+                    className="w-full" 
+                    size="lg" 
+                    type="submit"
+                    disabled={isLoading}
                   >
-                    <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{lord}</span>
+                    {isLoading ? "Creating..." : "Create Session"}
                   </Button>
-                ))}
-              </div>
-            </div>
-
-            <div className="pt-4">
-              <Button 
-                className="w-full" 
-                size="lg" 
-                onClick={handleCreateSession}
-                disabled={isLoading}
-              >
-                {isLoading ? "Creating..." : "Create Session"}
-              </Button>
-            </div>
+                </div>
+              </form>
+            </Form>
           </CardContent>
         </Card>
       </div>

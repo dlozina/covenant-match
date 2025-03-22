@@ -221,41 +221,19 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({
         </div>
       )}
 
-      {/* If no session data, show default player */}
-      {(!sessionData || sessionData.joinedPlayers.length === 0) && (
-        <div className="flex items-start sm:items-center space-x-4">
-          <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary mt-1 sm:mt-0">
-            <span>P1</span>
-          </Avatar>
-          <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
-            <div className="bg-secondary/50 px-3 py-2 rounded-md">
-              <span className="text-foreground">DarkKnight88</span>
-            </div>
-            <div className="bg-secondary/50 px-3 py-2 rounded-md">
-              <span className="text-foreground">Shadow Lord</span>
-            </div>
-            <div className="flex items-center gap-2 ml-auto">
-              <Badge variant="outline" className="bg-blue-950/30 text-blue-500 border-blue-500">
-                Host
-              </Badge>
-              <Badge variant="outline" className={hostStatus.color}>
-                {hostStatus.text}
-              </Badge>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add first divider after host player */}
-      <div className="border-t border-border"></div>
-
       {/* Additional players from joinedPlayers array (starting from index 1) */}
       {sessionData && sessionData.joinedPlayers.slice(1).map((player, index) => {
         // Get status for this player
         const playerStatus = getPlayerStatusBadge(false, sessionState, player.hasReported);
         
+        // Add divider before the first additional player (i.e., between host and first additional player)
+        const isFirstAdditionalPlayer = index === 0;
+        
         return (
           <React.Fragment key={player.userId}>
+            {isFirstAdditionalPlayer && (
+              <div className="border-t border-border"></div>
+            )}
             <div className="flex items-center space-x-4">
               <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary">
                 <span>P{index + 2}</span>
@@ -298,8 +276,13 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({
         );
       })}
 
-      {/* Add divider before empty slots if we have any real players */}
-      {(!sessionData || sessionData.joinedPlayers.length < 3) && sessionData && sessionData.joinedPlayers.length > 0 && (
+      {/* Add divider before empty slots only if we have no additional players (only host) */}
+      {sessionData && sessionData.joinedPlayers.length === 1 && (
+        <div className="border-t border-border"></div>
+      )}
+      
+      {/* Add divider after the second player if there are exactly 2 players */}
+      {sessionData && sessionData.joinedPlayers.length === 2 && (
         <div className="border-t border-border"></div>
       )}
 
@@ -691,7 +674,6 @@ export const ResultReportingSection: React.FC<ResultReportingSectionProps> = ({
   const handleSubmitResults = async () => {
     // Check both local and prop states to be absolutely certain
     if (localIsSubmitted || isSubmitted || localIsSubmitting) {
-      console.log("Preventing duplicate submission");
       return;
     }
     
@@ -702,7 +684,6 @@ export const ResultReportingSection: React.FC<ResultReportingSectionProps> = ({
       // Set local submitted state to true
       setLocalIsSubmitted(true);
     } catch (error) {
-      console.error('Error in handleSubmitResults:', error);
       // If the error indicates already submitted, set local state
       if (error instanceof Error && 
           (error.message.toLowerCase().includes('already submitted') || 

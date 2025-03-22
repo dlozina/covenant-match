@@ -26,7 +26,7 @@ import { storageUtils } from "@/components/session/SessionUtils";
 import { useSessionTimer } from "@/components/session/SessionHooks";
 import { useAuth } from "@/lib/auth-context";
 import { useRealTimeUpdates } from "@/hooks/useEventSource";
-import { toast } from "sonner";
+import { Notification, NotificationType } from "@/components/ui/notification";
 
 // Define the session data interface
 interface JoinedPlayer {
@@ -72,6 +72,9 @@ function SessionRunContent(): JSX.Element {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   
+  // State for notifications
+  const [notification, setNotification] = useState<NotificationType | null>(null);
+  
   // Get user data from auth context
   const { userData } = useAuth();
   
@@ -89,6 +92,23 @@ function SessionRunContent(): JSX.Element {
     if (!sessionData || !userData) return false;
     return sessionData.hostId === userData.id;
   }, [sessionData, userData]);
+  
+  // Function to handle notifications
+  const showNotification = useCallback((message: string, type: 'error' | 'success' | 'warning') => {
+    setNotification({ message, type });
+    
+    // Auto-clear success notifications after 5 seconds
+    if (type === 'success') {
+      setTimeout(() => {
+        setNotification(null);
+      }, 5000);
+    }
+  }, []);
+  
+  // Function to clear notification
+  const clearNotification = useCallback(() => {
+    setNotification(null);
+  }, []);
   
   // State for heartbeat indication (for testing real-time updates)
   const [lastHeartbeat, setLastHeartbeat] = useState<number | null>(null);
@@ -182,7 +202,7 @@ function SessionRunContent(): JSX.Element {
           'Authorization': `Bearer ${token}`
         }
       }).catch(err => {
-        toast.error('Error starting session: ' + err);
+        showNotification('Error starting session: ' + err, 'error');
       });
 
       // Update sessionData for the host to reflect the new status
@@ -196,7 +216,7 @@ function SessionRunContent(): JSX.Element {
         };
       });
     }
-  }, [sessionState.isSessionStarted, sessionId, isValidSessionId, sessionData]);
+  }, [sessionState.isSessionStarted, sessionId, isValidSessionId, sessionData, showNotification]);
   
   // Handle finish session (memoized)
   const handleFinishSession = useCallback(() => {
@@ -222,14 +242,14 @@ function SessionRunContent(): JSX.Element {
           duration: sessionState.elapsedSeconds
         })
       }).catch(err => {
-        toast.error('Error completing session: ' + err);
+        showNotification('Error completing session: ' + err, 'error');
       });
       
       // Keep SSE connection alive for the host to receive real-time updates
       // about other players submitting their results
       // NOTE: We deliberately don't disconnect here anymore to continue receiving result updates
     }
-  }, [sessionState.elapsedSeconds, sessionId, sessionData]);
+  }, [sessionState.elapsedSeconds, sessionId, sessionData, showNotification]);
   
   // Reset session (memoized)
   const resetSession = useCallback(() => {
@@ -257,11 +277,11 @@ function SessionRunContent(): JSX.Element {
       // Instead of directly recreating the session, navigate to the character selection page
       router.push(`/sessions/recreate?id=${sessionId}`);
     } catch (err) {
-      toast.error("Unable to navigate to recreation page: " + err);
+      showNotification("Unable to navigate to recreation page: " + err, 'error');
     } finally {
       setIsCreatingNewSession(false);
     }
-  }, [sessionId, isValidSessionId, isHost, userData, sessionData, router, setIsCreatingNewSession]);
+  }, [sessionId, isValidSessionId, isHost, userData, sessionData, router, setIsCreatingNewSession, showNotification]);
   
   // Fetch session data on mount
   useEffect(() => {
@@ -310,7 +330,7 @@ function SessionRunContent(): JSX.Element {
         
         setSessionData(data);
       } catch (err) {
-        toast.error('Error fetching session data: ' + err);
+        showNotification('Error fetching session data: ' + err, 'error');
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
       } finally {
         setIsLoading(false);
@@ -320,7 +340,7 @@ function SessionRunContent(): JSX.Element {
     // Initial fetch
     fetchSessionData();
     
-  }, [isValidSessionId, sessionId]);
+  }, [isValidSessionId, sessionId, showNotification]);
   
   // Set up SSE subscriptions
   useEffect(() => {
@@ -807,8 +827,6 @@ function SessionRunContent(): JSX.Element {
         };
       });
       
-      // Success is indicated by the UI changing to show submitted state
-      // No toast notification needed
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
@@ -841,15 +859,15 @@ function SessionRunContent(): JSX.Element {
         // Rethrow the error so ResultReportingSection can also update its state
         throw err;
       } else {
-        // For other errors, show the error toast and set the error message
-        toast.error('Error submitting result: ' + errorMessage);
+        // For other errors, show the error notification and set the error message
+        showNotification('Error submitting result: ' + errorMessage, 'error');
         setSubmissionError(errorMessage);
         
         // Rethrow all errors to let the component handle them
         throw err;
       }
     }
-  }, [sessionId, userData, resultState, sessionData, resultSubmitted, setSessionData, isConnected]);
+  }, [sessionId, userData, resultState, sessionData, resultSubmitted, setSessionData, showNotification]);
 
   // Add a handler for "newSession" SSE events
   useEffect(() => {
@@ -937,6 +955,13 @@ function SessionRunContent(): JSX.Element {
             )}
           </div>
         </div>
+
+        {/* Notification component */}
+        <Notification 
+          notification={notification} 
+          onDismiss={clearNotification}
+          className="mb-4"
+        />
 
         {!isValidSessionId && (
           <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6" role="alert">

@@ -143,11 +143,6 @@ async fn main() -> std::io::Result<()> {
                 actix_web::web::resource("/api/v1/sessions/{session_id}/events")
                     .route(actix_web::web::get().to(sse::events_route)),
             )
-            // New SSE connect route with POST authentication - exempt from Auth middleware
-            // .service(
-            //     actix_web::web::resource("/api/v1/sessions/{session_id}/events/connect")
-            //         .route(actix_web::web::post().to(sse::events_connect_route)),
-            // )
             // New SSE status route for debugging
             .service(
                 actix_web::web::resource("/api/v1/sse/status")

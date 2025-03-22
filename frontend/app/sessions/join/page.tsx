@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/lib/auth-context";
 import { jwtDecode } from "jwt-decode";
 import { useRealTimeUpdates } from "@/hooks/useEventSource";
+import { Notification, NotificationType } from "@/components/ui/notification";
 
 // Define a type for session details
 interface SessionDetails {
@@ -42,6 +42,7 @@ function JoinSessionContent() {
   const [selectedFarer, setSelectedFarer] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [sessionDetails, setSessionDetails] = useState<SessionDetails | null>(null);
+  const [notification, setNotification] = useState<NotificationType | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('id');
@@ -55,7 +56,10 @@ function JoinSessionContent() {
     if (sessionId) {
       fetchSessionDetails();
     } else {
-      toast.error("No session ID provided");
+      setNotification({
+        type: 'error',
+        message: 'No session ID provided'
+      });
     }
     
     // Subscribe to session updates
@@ -86,10 +90,16 @@ function JoinSessionContent() {
       if (response.ok) {
         setSessionDetails(data);
       } else {
-        toast.error(data.message || 'Failed to fetch session details');
+        setNotification({
+          type: 'error',
+          message: data.message || 'Failed to fetch session details'
+        });
       }
     } catch (error) {
-      toast.error('Error fetching session details: ' + error);
+      setNotification({
+        type: 'error',
+        message: 'Error fetching session details: ' + error
+      });
     }
   };
   
@@ -102,7 +112,10 @@ function JoinSessionContent() {
       const decoded = jwtDecode<JwtClaims>(token);
       return decoded.sub;
     } catch (error) {
-      toast.error("Error decoding token: " + error);
+      setNotification({
+        type: 'error',
+        message: "Error decoding token: " + error
+      });
       return null;
     }
   };
@@ -110,24 +123,36 @@ function JoinSessionContent() {
   const handleJoinSession = async () => {
     // Validate inputs
     if (!selectedFarer) {
-      toast.error("Please select a Nightfarer");
+      setNotification({
+        type: 'error',
+        message: "Please select a Nightfarer"
+      });
       return;
     }
     
     if (!sessionId) {
-      toast.error("No session ID provided");
+      setNotification({
+        type: 'error',
+        message: "No session ID provided"
+      });
       return;
     }
     
     if (!userData || !userData.username) {
-      toast.error("User information is missing");
+      setNotification({
+        type: 'error',
+        message: "User information is missing"
+      });
       return;
     }
     
     // Get user ID from token
     const userId = getUserIdFromToken();
     if (!userId) {
-      toast.error("User ID could not be determined");
+      setNotification({
+        type: 'error',
+        message: "User ID could not be determined"
+      });
       return;
     }
     
@@ -155,13 +180,24 @@ function JoinSessionContent() {
       if (response.ok) {
         router.push(`/sessions/run?id=${sessionId}`);
       } else {
-        toast.error(data.message || "Failed to join session");
+        setNotification({
+          type: 'error',
+          message: data.message || "Failed to join session"
+        });
       }
     } catch (error) {
-      toast.error("An unexpected error occurred: " + error);
+      setNotification({
+        type: 'error',
+        message: "An unexpected error occurred: " + error
+      });
     } finally {
       setIsLoading(false);
     }
+  };
+  
+  // Function to clear notification
+  const clearNotification = () => {
+    setNotification(null);
   };
   
   // Render players list
@@ -201,6 +237,11 @@ function JoinSessionContent() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            <Notification 
+              notification={notification} 
+              onDismiss={clearNotification}
+            />
+            
             {sessionDetails && (
               <div className="space-y-2">
                 <p className="text-sm font-medium">Night Lord: {sessionDetails.nightLord}</p>

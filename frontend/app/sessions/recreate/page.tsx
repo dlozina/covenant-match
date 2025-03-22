@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/lib/auth-context";
 import { jwtDecode } from "jwt-decode";
+import { Notification, NotificationType } from "@/components/ui/notification";
 
 // Define a type for session details
 interface SessionDetails {
@@ -47,6 +47,9 @@ function RecreateSessionContent() {
   // State for original session data
   const [sessionDetails, setSessionDetails] = useState<SessionDetails | null>(null);
   
+  // State for notifications
+  const [notification, setNotification] = useState<NotificationType | null>(null);
+  
   // Navigation
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -64,7 +67,10 @@ function RecreateSessionContent() {
       console.log(`Recreate page: Initializing with original session ID: ${originalSessionId}`);
       fetchSessionDetails();
     } else {
-      toast.error("No session ID provided");
+      setNotification({
+        type: 'error',
+        message: "No session ID provided"
+      });
       router.push('/sessions');
     }
   }, [originalSessionId]);
@@ -97,11 +103,17 @@ function RecreateSessionContent() {
           // For non-hosts, this is a "join new session" page
         }
       } else {
-        toast.error(data.message || 'Failed to fetch session details');
+        setNotification({
+          type: 'error',
+          message: data.message || 'Failed to fetch session details'
+        });
         router.push('/sessions');
       }
     } catch (error) {
-      toast.error('Error fetching session details: ' + error);
+      setNotification({
+        type: 'error',
+        message: 'Error fetching session details: ' + error
+      });
       router.push('/sessions');
     }
   };
@@ -115,30 +127,50 @@ function RecreateSessionContent() {
       const decoded = jwtDecode<JwtClaims>(token);
       return decoded.sub;
     } catch (error) {
-      toast.error("Error decoding token: " + error);
+      setNotification({
+        type: 'error',
+        message: "Error decoding token: " + error
+      });
       return null;
     }
   };
   
+  // Function to clear notification
+  const clearNotification = () => {
+    setNotification(null);
+  };
+  
   const handleRecreateSession = async () => {
     if (!isHost) {
-      toast.error("Only the host can recreate a session");
+      setNotification({
+        type: 'error',
+        message: "Only the host can recreate a session"
+      });
       return;
     }
     
     // Validate inputs
     if (!selectedFarer) {
-      toast.error("Please select a Nightfarer");
+      setNotification({
+        type: 'error',
+        message: "Please select a Nightfarer"
+      });
       return;
     }
     
     if (!selectedLord) {
-      toast.error("Please select a Night Lord");
+      setNotification({
+        type: 'error',
+        message: "Please select a Night Lord"
+      });
       return;
     }
     
     if (!originalSessionId) {
-      toast.error("No original session ID provided");
+      setNotification({
+        type: 'error',
+        message: "No original session ID provided"
+      });
       return;
     }
     
@@ -187,7 +219,10 @@ function RecreateSessionContent() {
       router.push(`/sessions/run?id=${newSessionId}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
-      toast.error(errorMessage);
+      setNotification({
+        type: 'error',
+        message: errorMessage
+      });
     } finally {
       setIsLoading(false);
     }
@@ -196,12 +231,18 @@ function RecreateSessionContent() {
   const handleJoinNewSession = async () => {
     // For non-hosts, they need to join the new session
     if (!selectedFarer) {
-      toast.error("Please select a Nightfarer");
+      setNotification({
+        type: 'error',
+        message: "Please select a Nightfarer"
+      });
       return;
     }
     
     if (!originalSessionId || !sessionDetails) {
-      toast.error("Missing session information");
+      setNotification({
+        type: 'error',
+        message: "Missing session information"
+      });
       return;
     }
     
@@ -238,7 +279,10 @@ function RecreateSessionContent() {
       
       const data = await response.json();
       if (response.ok) {
-        toast.success("Successfully joined new session");
+        setNotification({
+          type: 'success',
+          message: "Successfully joined new session"
+        });
         // Clear the auto-join data from sessionStorage
         sessionStorage.removeItem('autoJoinSessionId');
         sessionStorage.removeItem('autoJoinCharacter');
@@ -248,11 +292,17 @@ function RecreateSessionContent() {
         
         router.push(`/sessions/run?id=${autoJoinSessionId}`);
       } else {
-        toast.error(data.message || "Failed to join session");
+        setNotification({
+          type: 'error',
+          message: data.message || "Failed to join session"
+        });
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
-      toast.error(errorMessage);
+      setNotification({
+        type: 'error',
+        message: errorMessage
+      });
     } finally {
       setIsLoading(false);
     }
@@ -279,6 +329,11 @@ function RecreateSessionContent() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            <Notification 
+              notification={notification} 
+              onDismiss={clearNotification}
+            />
+          
             {sessionDetails && (
               <div className="space-y-2">
                 {isHost ? (

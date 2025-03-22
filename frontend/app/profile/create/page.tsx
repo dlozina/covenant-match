@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { AlertCircle } from "lucide-react"
 import { MainLayout } from "@/components/layout"
 import { Footer } from "@/components/layout/Footer"
 import { Button } from "@/components/ui/button"
@@ -20,12 +19,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-
-// Type for our notification state
-type NotificationType = {
-  message: string;
-  type: 'error' | 'success' | 'warning';
-}
+import { Notification, NotificationType } from "@/components/ui/notification"
 
 // Username and display name validation regex
 const usernameRegex = /^[a-zA-Z0-9_.-]+$/;
@@ -47,7 +41,17 @@ const profileFormSchema = z.object({
   password: z
     .string()
     .min(8, { message: "Password must be at least 8 characters" })
-    .max(100, { message: "Password too long" }),
+    .max(100, { message: "Password too long" })
+    .trim()
+    .refine(val => /[0-9]/.test(val), {
+      message: "Password must contain at least one number"
+    })
+    .refine(val => /[^a-zA-Z0-9]/.test(val), {
+      message: "Password must contain at least one special character"
+    })
+    .refine(val => val === val.trim(), {
+      message: "Password cannot contain leading or trailing whitespace"
+    }),
   displayName: z
     .string()
     .min(3, { message: "Display name must be at least 3 characters" })
@@ -108,6 +112,11 @@ export default function CreateProfilePage() {
     }, 500); // 500ms debounce
     
     setValidationTimeout(timeout);
+  };
+
+  // Function to clear notification
+  const clearNotification = () => {
+    setNotification(null);
   };
 
   async function onSubmit(data: ProfileFormValues) {
@@ -178,17 +187,10 @@ export default function CreateProfilePage() {
           </div>
 
           {/* Notification display area */}
-          {notification && (
-            <div className={`
-              flex items-center gap-2 text-sm p-2 rounded-md 
-              ${notification.type === 'error' ? 'bg-red-50 text-red-600 border border-red-200' : 
-               notification.type === 'warning' ? 'bg-amber-50 text-amber-600 border border-amber-200' :
-               'bg-green-50 text-green-600 border border-green-200'}
-            `}>
-              <AlertCircle size={16} />
-              <span>{notification.message}</span>
-            </div>
-          )}
+          <Notification 
+            notification={notification} 
+            onDismiss={clearNotification}
+          />
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 md:space-y-6">
@@ -218,7 +220,7 @@ export default function CreateProfilePage() {
                     <FormDescription className="text-xs md:text-sm">
                       3-8 characters, can contain letters, numbers, underscores, dots, and hyphens.
                     </FormDescription>
-                    <FormMessage className="text-xs md:text-sm" />
+                    <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
                   </FormItem>
                 )}
               />
@@ -244,7 +246,7 @@ export default function CreateProfilePage() {
                     <FormDescription className="text-xs md:text-sm">
                       Your email address will be used for notifications and recovery.
                     </FormDescription>
-                    <FormMessage className="text-xs md:text-sm" />
+                    <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
                   </FormItem>
                 )}
               />
@@ -268,9 +270,9 @@ export default function CreateProfilePage() {
                       />
                     </FormControl>
                     <FormDescription className="text-xs md:text-sm">
-                      Choose a strong password with at least 8 characters.
+                      Choose a strong password with at least 8 characters, one number, and one special character.
                     </FormDescription>
-                    <FormMessage className="text-xs md:text-sm" />
+                    <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
                   </FormItem>
                 )}
               />
@@ -301,7 +303,7 @@ export default function CreateProfilePage() {
                     <FormDescription className="text-xs md:text-sm">
                       3-8 characters. This is how other users will see you.
                     </FormDescription>
-                    <FormMessage className="text-xs md:text-sm" />
+                    <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
                   </FormItem>
                 )}
               />

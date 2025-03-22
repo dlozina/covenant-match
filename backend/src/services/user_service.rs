@@ -136,7 +136,7 @@ pub async fn ensure_admin_exists(db: &Database) -> Result<(), AppError> {
             std::env::var("ADMIN_USERNAME").unwrap_or_else(|_| "admin".to_string());
         let admin_password = std::env::var("ADMIN_PASSWORD").unwrap_or_else(|_| {
             warn!("ADMIN_PASSWORD not set! Using default password - change this in production!");
-            "changeme123".to_string()
+            "changeme123#".to_string()
         });
         let admin_email =
             std::env::var("ADMIN_EMAIL").unwrap_or_else(|_| "admin@covenantmatch.com".to_string());

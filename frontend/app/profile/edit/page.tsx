@@ -1,11 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { toast } from "sonner"
 import { MainLayout } from "@/components/layout"
 import { Footer } from "@/components/layout/Footer"
 import { Button } from "@/components/ui/button"
@@ -21,19 +20,29 @@ import {
 import { Input } from "@/components/ui/input"
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute"
 import { useAuth } from "@/lib/auth-context"
+import { Notification, NotificationType } from "@/components/ui/notification"
+
+// Username and display name validation regex
+const usernameRegex = /^[a-zA-Z0-9_.-]+$/;
 
 const profileFormSchema = z.object({
   username: z
     .string()
     .min(3, { message: "Username must be at least 3 characters" })
-    .max(30, { message: "Username must not be longer than 30 characters" }),
+    .max(8, { message: "Username must not be longer than 8 characters" })
+    .trim()
+    .refine(val => usernameRegex.test(val), {
+      message: "Username can only contain letters, numbers, underscores, dots, and hyphens"
+    }),
   email: z
     .string()
+    .min(1, { message: "Email is required" })
     .email({ message: "Please enter a valid email address" }),
   displayName: z
     .string()
-    .min(2, { message: "Display name must be at least 2 characters" })
-    .max(30, { message: "Display name must not be longer than 30 characters" }),
+    .min(3, { message: "Display name must be at least 3 characters" })
+    .max(8, { message: "Display name must not be longer than 8 characters" })
+    .trim(),
 })
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>
@@ -51,6 +60,13 @@ function EditProfileContent() {
   const { userData, refreshUserData } = useAuth()
   const [isLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [notification, setNotification] = useState<NotificationType | null>(null)
+  
+  // Character counter state
+  const [displayNameLength, setDisplayNameLength] = useState(0)
+  
+  // Debounce timer reference
+  const [validationTimeout, setValidationTimeout] = useState<NodeJS.Timeout | null>(null)
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -59,12 +75,55 @@ function EditProfileContent() {
       email: userData?.email || "",
       displayName: userData?.displayName || "",
     },
+    mode: "onBlur", // Only validate on blur and submit for better UX
   })
+
+  // Update character counter whenever displayName changes
+  useEffect(() => {
+    const displayName = userData?.displayName || "";
+    setDisplayNameLength(displayName.length);
+
+    const subscription = form.watch((value, { name }) => {
+      if (name === 'displayName' && value.displayName) {
+        setDisplayNameLength(value.displayName.length);
+      }
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [form.watch, userData?.displayName]);
+
+  // Handle debounced validation
+  const debouncedValidate = (fieldName: keyof ProfileFormValues) => {
+    // Clear any existing timeout
+    if (validationTimeout) {
+      clearTimeout(validationTimeout);
+    }
+    
+    // Set a new timeout
+    const timeout = setTimeout(() => {
+      form.trigger(fieldName);
+    }, 500); // 500ms debounce
+    
+    setValidationTimeout(timeout);
+  };
+
+  // Function to clear notification
+  const clearNotification = () => {
+    setNotification(null);
+  };
 
   async function onSubmit(data: ProfileFormValues) {
     setIsSaving(true)
+    setNotification(null)
 
     try {
+      // Sanitize inputs before submission
+      const sanitizedData = {
+        username: data.username.trim().toLowerCase(),
+        email: data.email.trim().toLowerCase(),
+        displayName: data.displayName.trim()
+      };
+    
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       const token = localStorage.getItem('token');
       
@@ -74,7 +133,7 @@ function EditProfileContent() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(sanitizedData),
       });
 
       if (!response.ok) {
@@ -86,10 +145,18 @@ function EditProfileContent() {
       // Refresh user data in the auth context
       await refreshUserData();
       
-      toast.success("Profile updated successfully!")
-      router.push('/profile')
+      setNotification({
+        message: "Profile updated successfully!",
+        type: 'success'
+      })
+      setTimeout(() => {
+        router.push('/profile');
+      }, 1500); // Delay navigation slightly to show success message
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Something went wrong. Please try again.")
+      setNotification({
+        message: error instanceof Error ? error.message : "Something went wrong. Please try again.",
+        type: 'error'
+      })
     } finally {
       setIsSaving(false)
     }
@@ -117,10 +184,18 @@ function EditProfileContent() {
         // Clear token and other stored data
         localStorage.removeItem('token');
         
-        toast.success("Profile deleted successfully");
-        router.push('/');
+        setNotification({
+          message: "Profile deleted successfully",
+          type: 'success'
+        })
+        setTimeout(() => {
+          router.push('/');
+        }, 1500); // Delay navigation slightly to show success message
       } catch (error: unknown) {
-        toast.error(error instanceof Error ? error.message : "Failed to delete profile");
+        setNotification({
+          message: error instanceof Error ? error.message : "Failed to delete profile",
+          type: 'error'
+        })
       }
     }
   }
@@ -148,6 +223,12 @@ function EditProfileContent() {
             </p>
           </div>
 
+          {/* Notification display area */}
+          <Notification 
+            notification={notification} 
+            onDismiss={clearNotification}
+          />
+
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 md:space-y-6">
               <FormField
@@ -162,7 +243,7 @@ function EditProfileContent() {
                     <FormDescription className="text-xs md:text-sm">
                       Your username cannot be changed.
                     </FormDescription>
-                    <FormMessage className="text-xs md:text-sm" />
+                    <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
                   </FormItem>
                 )}
               />
@@ -174,12 +255,21 @@ function EditProfileContent() {
                   <FormItem>
                     <FormLabel className="text-sm md:text-base">Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="email@example.com" type="email" {...field} className="h-10" />
+                      <Input 
+                        placeholder="email@example.com" 
+                        type="email" 
+                        {...field} 
+                        className="h-10"
+                        onChange={(e) => {
+                          field.onChange(e);
+                          debouncedValidate('email');
+                        }}
+                      />
                     </FormControl>
                     <FormDescription className="text-xs md:text-sm">
                       Your email address will be used for notifications and recovery.
                     </FormDescription>
-                    <FormMessage className="text-xs md:text-sm" />
+                    <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
                   </FormItem>
                 )}
               />
@@ -189,14 +279,28 @@ function EditProfileContent() {
                 name="displayName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-sm md:text-base">Display Name</FormLabel>
+                    <div className="flex justify-between items-center">
+                      <FormLabel className="text-sm md:text-base">Display Name</FormLabel>
+                      <span className={`text-xs ${displayNameLength > 8 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                        {displayNameLength} / 8
+                      </span>
+                    </div>
                     <FormControl>
-                      <Input placeholder="Display Name" {...field} className="h-10" />
+                      <Input 
+                        placeholder="Display Name" 
+                        {...field} 
+                        className="h-10"
+                        onChange={(e) => {
+                          field.onChange(e);
+                          setDisplayNameLength(e.target.value.length);
+                          debouncedValidate('displayName');
+                        }}
+                      />
                     </FormControl>
                     <FormDescription className="text-xs md:text-sm">
-                      This is how other users will see you.
+                      3-8 characters. This is how other users will see you.
                     </FormDescription>
-                    <FormMessage className="text-xs md:text-sm" />
+                    <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
                   </FormItem>
                 )}
               />
