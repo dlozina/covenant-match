@@ -1,5 +1,8 @@
 import csv
 
+# How to run:
+# python scripts/country-sorting.py
+
 # Full list of 245 entries (Country Name, Alpha-2 Code)
 countries = [
     ("Afghanistan", "AF"),
