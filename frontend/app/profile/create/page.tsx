@@ -171,10 +171,10 @@ export default function CreateProfilePage() {
         username: data.username.trim().toLowerCase(),
         email: data.email.trim().toLowerCase(),
         password: data.password, // passwords should not be modified
-        display_name: data.displayName.trim(),
+        displayName: data.displayName.trim(),
         region: data.region,
-        auto_region: data.autoRegion,
-        covenant_name: data.covenantName,
+        autoRegion: data.autoRegion,
+        covenantName: data.covenantName,
       };
     
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
