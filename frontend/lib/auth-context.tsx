@@ -12,6 +12,9 @@ type UserData = {
   region?: string;
   autoRegion?: boolean;
   covenantName?: string;
+  preferredSessionName?: string;
+  preferredSessionPassword?: string;
+  preferredNightfarer?: string;
   // Add other user properties as needed
 };
 
@@ -64,6 +67,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const data = await response.json();
       
+      console.log("Raw user data from API:", data);
+      
       // Map the response data to our UserData type
       return {
         id: data.id,
@@ -73,6 +78,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         region: data.region,
         autoRegion: data.autoRegion,
         covenantName: data.covenantName,
+        preferredSessionName: data.preferredSessionName,
+        preferredSessionPassword: data.preferredSessionPassword,
+        preferredNightfarer: data.preferredNightfarer,
       };
     } catch (error) {
       console.error("Error fetching user data:", error);
@@ -87,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const data = await fetchUserData(token);
     if (data) {
+      console.log("Setting user data in state:", data);
       setUserData(data);
       setIsLoggedIn(true);
     }

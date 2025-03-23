@@ -22,6 +22,9 @@ pub struct User {
     pub role: String, // "admin" or "user"
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub preferred_session_name: Option<String>,
+    pub preferred_session_password: Option<String>,
+    pub preferred_nightfarer: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate, ToSchema)]
@@ -40,6 +43,12 @@ pub struct CreateUserDto {
     pub covenant_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub role: Option<String>, // Only used by admins when creating users
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preferred_session_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preferred_session_password: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preferred_nightfarer: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -56,6 +65,9 @@ pub struct UserResponse {
     pub role: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub preferred_session_name: Option<String>,
+    pub preferred_session_password: Option<String>,
+    pub preferred_nightfarer: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
@@ -84,6 +96,7 @@ pub struct UpdateUserProfileDto {
     pub display_name: Option<String>,
     pub region: Option<String>,
     pub auto_region: Option<bool>,
+    pub covenant_name: Option<String>,
     pub avatar_url: Option<String>,
     pub preferred_session_name: Option<String>,
     pub preferred_session_password: Option<String>,
@@ -104,6 +117,9 @@ impl From<User> for UserResponse {
             role: user.role,
             created_at: user.created_at,
             updated_at: user.updated_at,
+            preferred_session_name: user.preferred_session_name,
+            preferred_session_password: user.preferred_session_password,
+            preferred_nightfarer: user.preferred_nightfarer,
         }
     }
 }

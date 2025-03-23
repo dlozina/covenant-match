@@ -54,6 +54,9 @@ pub async fn create_user(
         region: user_data.region,
         auto_region: user_data.auto_region,
         covenant_name: user_data.covenant_name,
+        preferred_session_name: user_data.preferred_session_name,
+        preferred_session_password: user_data.preferred_session_password,
+        preferred_nightfarer: user_data.preferred_nightfarer,
         role,
         created_at: now,
         updated_at: now,
@@ -72,6 +75,9 @@ pub async fn create_user(
         region: user.region,
         auto_region: user.auto_region,
         covenant_name: user.covenant_name,
+        preferred_session_name: user.preferred_session_name,
+        preferred_session_password: user.preferred_session_password,
+        preferred_nightfarer: user.preferred_nightfarer,
         created_at: user.created_at,
         updated_at: user.updated_at,
     })
@@ -108,6 +114,9 @@ pub async fn login_user(
         auto_region: user.auto_region,
         covenant_name: user.covenant_name,
         role: user.role,
+        preferred_session_name: user.preferred_session_name,
+        preferred_session_password: user.preferred_session_password,
+        preferred_nightfarer: user.preferred_nightfarer,
         created_at: user.created_at,
         updated_at: user.updated_at,
     };
@@ -129,6 +138,9 @@ pub async fn get_user_by_id(db: &Database, user_id: &str) -> Result<UserResponse
             auto_region: user.auto_region,
             covenant_name: user.covenant_name,
             role: user.role,
+            preferred_session_name: user.preferred_session_name,
+            preferred_session_password: user.preferred_session_password,
+            preferred_nightfarer: user.preferred_nightfarer,
             created_at: user.created_at,
             updated_at: user.updated_at,
         })
@@ -162,6 +174,9 @@ pub async fn ensure_admin_exists(db: &Database) -> Result<(), AppError> {
             region: "EU".to_string(),
             auto_region: true,
             covenant_name: "Covenant".to_string(),
+            preferred_session_name: None,
+            preferred_session_password: None,
+            preferred_nightfarer: None,
             role: Some("admin".to_string()),
         };
 
@@ -230,6 +245,24 @@ pub async fn update_user_profile(
         let password_hash =
             hash(&password, DEFAULT_COST).map_err(|e| AppError::InternalError(e.to_string()))?;
         update_doc.insert("password_hash", password_hash);
+    }
+    if let Some(region) = update_data.region.clone() {
+        update_doc.insert("region", region);
+    }
+    if let Some(auto_region) = update_data.auto_region {
+        update_doc.insert("auto_region", auto_region);
+    }
+    if let Some(covenant_name) = update_data.covenant_name.clone() {
+        update_doc.insert("covenant_name", covenant_name);
+    }
+    if let Some(preferred_session_name) = update_data.preferred_session_name.clone() {
+        update_doc.insert("preferred_session_name", preferred_session_name);
+    }
+    if let Some(preferred_session_password) = update_data.preferred_session_password.clone() {
+        update_doc.insert("preferred_session_password", preferred_session_password);
+    }
+    if let Some(preferred_nightfarer) = update_data.preferred_nightfarer.clone() {
+        update_doc.insert("preferred_nightfarer", preferred_nightfarer);
     }
 
     // Always update the updated_at field with string timestamp
