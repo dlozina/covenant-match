@@ -329,7 +329,7 @@ export default function LoginPage() {
           <CardFooter className="flex flex-col items-center justify-center space-y-2 px-4 sm:px-6 pb-6">
             <div className="text-xs sm:text-sm text-muted-foreground">
               Don&apos;t have an account?{" "}
-              <Link href="/create-profile" className="text-primary hover:underline">
+              <Link href="/profile/create" className="text-primary hover:underline">
                 Create one
               </Link>
             </div>
