@@ -15,7 +15,6 @@ import * as z from "zod";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -175,172 +174,173 @@ function CreateSessionContent() {
   
   return (
     <MainLayout footer={<Footer />}>
-      <div className="container py-6 px-4 mx-auto">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold">Create New Session</h1>
-          <Button variant="outline" asChild>
-            <Link href="/sessions">Back to Sessions</Link>
-          </Button>
+      <div className="container max-w-2xl py-6 md:py-10 px-4 mx-auto">
+        <div className="space-y-4 md:space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <h1 className="text-xl md:text-2xl font-bold">Create New Session</h1>
+            <Button variant="outline" asChild className="h-10">
+              <Link href="/sessions">Back to Sessions</Link>
+            </Button>
+          </div>
+
+          {/* Notification display area */}
+          {notification && (
+            <div className={`
+              flex items-center gap-2 text-sm p-3 rounded-md 
+              ${notification.type === 'error' ? 'bg-red-100 text-red-700 border border-red-300' : 
+               notification.type === 'warning' ? 'bg-amber-100 text-amber-700 border border-amber-300' :
+               'bg-green-100 text-green-700 border border-green-300'}
+            `}>
+              <AlertCircle size={16} className="flex-shrink-0" />
+              <span>{notification.message}</span>
+            </div>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Session Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="sessionName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex justify-between items-center">
+                          <FormLabel className="text-sm md:text-base font-medium">Session Name</FormLabel>
+                          <span className={`text-xs ${sessionNameLength > 22 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                            {sessionNameLength} / 22
+                          </span>
+                        </div>
+                        <FormControl>
+                          <Input 
+                            placeholder="Enter a name for your session" 
+                            className="w-full h-10"
+                            {...field}
+                            onChange={(e) => {
+                              field.onChange(e);
+                              setSessionNameLength(e.target.value.length);
+                              debouncedValidate('sessionName');
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex justify-between items-center">
+                          <FormLabel className="text-sm md:text-base font-medium">In Game Password</FormLabel>
+                          <span className={`text-xs ${passwordLength > 6 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                            {passwordLength} / 6
+                          </span>
+                        </div>
+                        <FormControl>
+                          <Input 
+                            placeholder="Enter an in-game password for your session" 
+                            className="w-full h-10"
+                            {...field}
+                            onChange={(e) => {
+                              field.onChange(e);
+                              setPasswordLength(e.target.value.length);
+                              debouncedValidate('password');
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="space-y-2">
+                    <label className="text-sm md:text-base font-medium">
+                      Select Nightfarer
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                      {[
+                        "Wylder", 
+                        "Guardian", 
+                        "Recluse", 
+                        "Duchess", 
+                        "Patces", 
+                        "Jolan", 
+                        "Igon", 
+                        "Alexander"
+                      ].map(farer => (
+                        <Button 
+                          key={farer} 
+                          variant="outline" 
+                          className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
+                            selectedFarer === farer ? "border-purple-500 bg-purple-950/20" : ""
+                          }`}
+                          style={{ whiteSpace: 'normal' }}
+                          onClick={() => setSelectedFarer(farer)}
+                          type="button"
+                        >
+                          <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{farer}</span>
+                        </Button>
+                      ))}
+                    </div>
+                    {!selectedFarer && form.formState.isSubmitted && (
+                      <p className="text-xs sm:text-sm text-red-600 font-medium mt-1">Please select a Nightfarer</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm md:text-base font-medium">
+                      Select Night Lord
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                      {[
+                        "Tricephalos", 
+                        "PCR", 
+                        "Malenia, Blade of Miquella", 
+                        "Maliketh", 
+                        "Mohg", 
+                        "Midra", 
+                        "Bayle", 
+                        "Messmer"
+                      ].map(lord => (
+                        <Button 
+                          key={lord} 
+                          variant="outline" 
+                          className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
+                            selectedLord === lord ? "border-purple-500 bg-purple-950/20" : ""
+                          }`}
+                          style={{ whiteSpace: 'normal' }}
+                          onClick={() => setSelectedLord(lord)}
+                          type="button"
+                        >
+                          <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{lord}</span>
+                        </Button>
+                      ))}
+                    </div>
+                    {!selectedLord && form.formState.isSubmitted && (
+                      <p className="text-xs sm:text-sm text-red-600 font-medium mt-1">Please select a Night Lord</p>
+                    )}
+                  </div>
+
+                  <div className="pt-4">
+                    <Button 
+                      className="w-full h-10" 
+                      type="submit"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Creating..." : "Create Session"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
         </div>
-
-        <Card className="max-w-2xl mx-auto">
-          <CardHeader>
-            <CardTitle>Session Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Notification display area */}
-            {notification && (
-              <div className={`
-                flex items-center gap-2 text-sm p-3 rounded-md 
-                ${notification.type === 'error' ? 'bg-red-100 text-red-700 border border-red-300' : 
-                 notification.type === 'warning' ? 'bg-amber-100 text-amber-700 border border-amber-300' :
-                 'bg-green-100 text-green-700 border border-green-300'}
-              `}>
-                <AlertCircle size={16} className="flex-shrink-0" />
-                <span>{notification.message}</span>
-              </div>
-            )}
-
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <FormField
-                  control={form.control}
-                  name="sessionName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="flex justify-between items-center">
-                        <FormLabel className="text-sm font-medium">Session Name</FormLabel>
-                        <span className={`text-xs ${sessionNameLength > 22 ? 'text-red-500' : 'text-muted-foreground'}`}>
-                          {sessionNameLength} / 22
-                        </span>
-                      </div>
-                      <FormControl>
-                        <Input 
-                          placeholder="Enter a name for your session" 
-                          className="w-full"
-                          {...field}
-                          onChange={(e) => {
-                            field.onChange(e);
-                            setSessionNameLength(e.target.value.length);
-                            debouncedValidate('sessionName');
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="flex justify-between items-center">
-                        <FormLabel className="text-sm font-medium">In Game Password</FormLabel>
-                        <span className={`text-xs ${passwordLength > 6 ? 'text-red-500' : 'text-muted-foreground'}`}>
-                          {passwordLength} / 6
-                        </span>
-                      </div>
-                      <FormControl>
-                        <Input 
-                          placeholder="Enter an in-game password for your session" 
-                          className="w-full"
-                          {...field}
-                          onChange={(e) => {
-                            field.onChange(e);
-                            setPasswordLength(e.target.value.length);
-                            debouncedValidate('password');
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    Select Nightfarer
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                    {[
-                      "Wylder", 
-                      "Guardian", 
-                      "Recluse", 
-                      "Duchess", 
-                      "Patces", 
-                      "Jolan", 
-                      "Igon", 
-                      "Alexander"
-                    ].map(farer => (
-                      <Button 
-                        key={farer} 
-                        variant="outline" 
-                        className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
-                          selectedFarer === farer ? "border-purple-500 bg-purple-950/20" : ""
-                        }`}
-                        style={{ whiteSpace: 'normal' }}
-                        onClick={() => setSelectedFarer(farer)}
-                        type="button"
-                      >
-                        <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{farer}</span>
-                      </Button>
-                    ))}
-                  </div>
-                  {!selectedFarer && form.formState.isSubmitted && (
-                    <p className="text-xs sm:text-sm text-red-600 font-medium mt-1">Please select a Nightfarer</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    Select Night Lord
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                    {[
-                      "Tricephalos", 
-                      "PCR", 
-                      "Malenia, Blade of Miquella", 
-                      "Maliketh", 
-                      "Mohg", 
-                      "Midra", 
-                      "Bayle", 
-                      "Messmer"
-                    ].map(lord => (
-                      <Button 
-                        key={lord} 
-                        variant="outline" 
-                        className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
-                          selectedLord === lord ? "border-purple-500 bg-purple-950/20" : ""
-                        }`}
-                        style={{ whiteSpace: 'normal' }}
-                        onClick={() => setSelectedLord(lord)}
-                        type="button"
-                      >
-                        <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{lord}</span>
-                      </Button>
-                    ))}
-                  </div>
-                  {!selectedLord && form.formState.isSubmitted && (
-                    <p className="text-xs sm:text-sm text-red-600 font-medium mt-1">Please select a Night Lord</p>
-                  )}
-                </div>
-
-                <div className="pt-4">
-                  <Button 
-                    className="w-full" 
-                    size="lg" 
-                    type="submit"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Creating..." : "Create Session"}
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
       </div>
     </MainLayout>
   );
