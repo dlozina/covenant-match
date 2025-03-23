@@ -9,6 +9,9 @@ type UserData = {
   username: string;
   displayName: string;
   email: string;
+  region?: string;
+  autoRegion?: boolean;
+  covenantName?: string;
   // Add other user properties as needed
 };
 
@@ -59,7 +62,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error('Failed to fetch user data');
       }
 
-      return await response.json();
+      const data = await response.json();
+      
+      // Map the response data to our UserData type
+      return {
+        id: data.id,
+        username: data.username,
+        email: data.email,
+        displayName: data.displayName,
+        region: data.region,
+        autoRegion: data.autoRegion,
+        covenantName: data.covenantName,
+      };
     } catch (error) {
       console.error("Error fetching user data:", error);
       return null;

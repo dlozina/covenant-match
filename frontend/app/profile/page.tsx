@@ -78,7 +78,7 @@ function ProfileContent() {
               <Button 
                 variant="outline" 
                 className="w-full sm:w-auto"
-                onClick={() => router.push('/edit-profile')}
+                onClick={() => router.push('/profile/edit')}
               >
                 Edit Profile
               </Button>
