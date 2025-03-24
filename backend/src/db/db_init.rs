@@ -1,3 +1,11 @@
+use log::{error, info};
+use mongodb::{
+    bson::{self, doc, Bson, Document},
+    error::Error,
+    options::{IndexOptions, UpdateOptions},
+    Collection, Database, IndexModel,
+};
+
 pub async fn initialize_database(db: &Database) -> Result<(), Error> {
     // Check and create collections
     ensure_collections_exist(db).await?;
@@ -26,12 +34,12 @@ async fn ensure_collections_exist(db: &Database) -> Result<(), Error> {
     ];
 
     // Get existing collections
-    let existing = db.list_collection_names(None).await?;
+    let existing = db.list_collection_names().await?;
 
     // Create any missing collections
     for coll in required_collections {
         if !existing.contains(&coll.to_string()) {
-            db.create_collection(coll, None).await?;
+            db.create_collection(coll).await?;
             info!("Created collection: {}", coll);
         }
     }
@@ -39,31 +47,45 @@ async fn ensure_collections_exist(db: &Database) -> Result<(), Error> {
     Ok(())
 }
 
+async fn create_indexes(db: &Database) -> Result<(), Error> {
+    // Creating an index is idempotent - won't error if it already exists
+    let index = IndexModel::builder()
+        .keys(doc! { "username": 1 })
+        .options(IndexOptions::builder().unique(true).build())
+        .build();
+
+    db.collection::<Document>("users")
+        .create_index(index)
+        .await?;
+
+    Ok(())
+}
+
 async fn seed_default_data(db: &Database) -> Result<(), Error> {
     // Ensure admin user exists
-    let users = db.collection("users");
+    let users: Collection<Document> = db.collection("users");
     let admin_filter = doc! { "username": "admin" };
 
-    let admin_count = users.count_documents(admin_filter.clone(), None).await?;
+    let admin_count = users.count_documents(admin_filter.clone()).await?;
 
     if admin_count == 0 {
+        // Convert DateTime to MongoDB format
+        let now_bson = Bson::DateTime(bson::DateTime::from(std::time::SystemTime::now()));
+
         users
-            .insert_one(
-                doc! {
-                    "username": "admin",
-                    "email": "akri@gmail.com",
-                    "password": "admin",
-                    "display_name": "Akri",
-                    "region": "EU",
-                    "auto_region": true,
-                    "platform": "PlayStation",
-                    "role": "admin",
-                    "covenant_name": "Nightlords",
-                    "created_at": Bson::DateTime(chrono::Utc::now()),
-                    "updated_at": Bson::DateTime(chrono::Utc::now())
-                },
-                None,
-            )
+            .insert_one(doc! {
+                "username": "admin",
+                "email": "akri@gmail.com",
+                "password": "admin",
+                "display_name": "Akri",
+                "region": "EU",
+                "auto_region": true,
+                "platform": "PlayStation",
+                "role": "admin",
+                "covenant_name": "Nightlords",
+                "created_at": now_bson.clone(),
+                "updated_at": now_bson
+            })
             .await?;
         info!("Created default admin user");
     }
@@ -80,34 +102,8 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
         ("Messmer", "Messmer is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
     ];
 
-    // Prepare bulk operations for nightlords
-    let nightlords = db.collection("nightlords");
-    let mut bulk_operations = Vec::new();
-
-    for (name, description) in default_nightlords {
-        let filter = doc! { "name": name };
-        let update = doc! {
-            "$setOnInsert": {
-                "name": name,
-                "description": description,
-                "created_at": Bson::DateTime(chrono::Utc::now()),
-                "updated_at": Bson::DateTime(chrono::Utc::now()),
-                "schema_version": 1
-            }
-        };
-
-        bulk_operations.push(UpdateOne {
-            filter,
-            update,
-            options: UpdateOptions::builder().upsert(true).build(),
-        });
-    }
-
-    // Execute bulk operations
-    if !bulk_operations.is_empty() {
-        nightlords.bulk_write(bulk_operations, None).await?;
-        info!("Seeded default nightlords");
-    }
+    // Seed nightlords collection
+    seed_collection(db, "nightlords", default_nightlords).await?;
 
     // Define default nightfarers
     let default_nightfarers = vec![
@@ -121,11 +117,17 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
         ("Alexander", "Alexander is the nightfarer of the Pact, he is the one who protects the realm from the darkness."),
     ];
 
+    // Seed nightfarers collection
+    seed_collection(db, "nightfarers", default_nightfarers).await?;
+
     let default_platforms = vec![
         ("PlayStation", "PlayStation is a gaming console."),
         ("Xbox", "Xbox is a gaming console."),
         ("PC", "PC is a gaming console."),
     ];
+
+    // Seed platforms collection
+    seed_collection(db, "platforms", default_platforms).await?;
 
     let default_regions = vec![
         ("NA", "North America"),
@@ -136,6 +138,9 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
         ("AF", "Africa"),
         ("ME", "Middle East"),
     ];
+
+    // Seed regions collection
+    seed_collection(db, "regions", default_regions).await?;
 
     let default_covenants = vec![
         ("Warriors of Sunlight", "Nightlords are the guardians of the realm, they are the ones who protect the realm from the darkness."),
@@ -148,128 +153,48 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
         ("Watchdogs of Farron", "Pact is the Covenant of the Pact, they are the ones who protect the realm from the darkness."),   
     ];
 
-    // Prepare bulk operations for nightfarers
-    let nightfarers = db.collection("nightfarers");
-    let mut nightfarer_operations = Vec::new();
-
-    for (name, description) in default_nightfarers {
-        let filter = doc! { "name": name };
-        let update = doc! {
-            "$setOnInsert": {
-                "name": name,
-                "description": description,
-                "created_at": Bson::DateTime(chrono::Utc::now()),
-                "updated_at": Bson::DateTime(chrono::Utc::now()),
-                "schema_version": 1
-            }
-        };
-
-        nightfarer_operations.push(UpdateOne {
-            filter,
-            update,
-            options: UpdateOptions::builder().upsert(true).build(),
-        });
-    }
-
-    // Execute bulk operations for nightfarers
-    if !nightfarer_operations.is_empty() {
-        nightfarers.bulk_write(nightfarer_operations, None).await?;
-        info!("Seeded default nightfarers");
-    }
-
-    // Prepare bulk operations for platforms
-    let platforms = db.collection("platforms");
-    let mut platform_operations = Vec::new();
-
-    for (name, description) in default_platforms {
-        let filter = doc! { "name": name };
-        let update = doc! {
-            "$setOnInsert": {
-                "name": name,
-                "description": description,
-                "created_at": Bson::DateTime(chrono::Utc::now()),
-                "updated_at": Bson::DateTime(chrono::Utc::now()),
-                "schema_version": 1
-            }
-        };
-
-        platform_operations.push(UpdateOne {
-            filter,
-            update,
-            options: UpdateOptions::builder().upsert(true).build(),
-        });
-    }
-
-    // Execute bulk operations for platforms
-    if !platform_operations.is_empty() {
-        platforms.bulk_write(platform_operations, None).await?;
-        info!("Seeded default platforms");
-    }
-
-    // Prepare bulk operations for regions
-    let regions = db.collection("regions");
-    let mut region_operations = Vec::new();
-
-    for (name, description) in default_regions {
-        let filter = doc! { "name": name };
-        let update = doc! {
-            "$setOnInsert": {
-                "name": name,
-                "description": description,
-                "created_at": Bson::DateTime(chrono::Utc::now()),
-                "updated_at": Bson::DateTime(chrono::Utc::now()),
-                "schema_version": 1
-            }
-        };
-
-        region_operations.push(UpdateOne {
-            filter,
-            update,
-            options: UpdateOptions::builder().upsert(true).build(),
-        });
-    }
-
-    // Execute bulk operations for regions
-    if !region_operations.is_empty() {
-        regions.bulk_write(region_operations, None).await?;
-        info!("Seeded default regions");
-    }
-
-    // Prepare bulk operations for covenants
-    let covenants = db.collection("covenants");
-    let mut covenant_operations = Vec::new();
-
-    for (name, description) in default_covenants {
-        let filter = doc! { "name": name };
-        let update = doc! {
-            "$setOnInsert": {
-                "name": name,
-                "description": description,
-                "created_at": Bson::DateTime(chrono::Utc::now()),
-                "updated_at": Bson::DateTime(chrono::Utc::now()),
-                "schema_version": 1
-            }
-        };
-
-        covenant_operations.push(UpdateOne {
-            filter,
-            update,
-            options: UpdateOptions::builder().upsert(true).build(),
-        });
-    }
-
-    // Execute bulk operations for covenants
-    if !covenant_operations.is_empty() {
-        covenants.bulk_write(covenant_operations, None).await?;
-        info!("Seeded default covenants");
-    }
+    // Seed covenants collection
+    seed_collection(db, "covenants", default_covenants).await?;
 
     Ok(())
 }
 
-// todo -> Example for updates
+// Helper function to seed a collection with name-description pairs
+async fn seed_collection(
+    db: &Database,
+    collection_name: &str,
+    items: Vec<(&str, &str)>,
+) -> Result<(), Error> {
+    let collection: Collection<Document> = db.collection(collection_name);
+
+    for (name, description) in items {
+        // Convert to MongoDB datetime format
+        let now_bson = Bson::DateTime(bson::DateTime::from(std::time::SystemTime::now()));
+
+        // Check if document already exists
+        let filter = doc! { "name": name };
+        let count = collection.count_documents(filter.clone()).await?;
+
+        // Only insert if it doesn't exist
+        if count == 0 {
+            let doc = doc! {
+                "name": name,
+                "description": description,
+                "created_at": now_bson.clone(),
+                "updated_at": now_bson,
+                "schema_version": 1
+            };
+
+            collection.insert_one(doc).await?;
+        }
+    }
+
+    info!("Seeded collection: {}", collection_name);
+    Ok(())
+}
+
 async fn update_schemas(db: &Database) -> Result<(), Error> {
-    let settings = db.collection("settings");
+    let settings: Collection<Document> = db.collection("settings");
 
     // Update from v1 to v2 (adding new fields)
     settings
@@ -282,7 +207,6 @@ async fn update_schemas(db: &Database) -> Result<(), Error> {
                     "schema_version": 2  // Bump version
                 }
             },
-            None,
         )
         .await?;
 

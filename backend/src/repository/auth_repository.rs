@@ -5,6 +5,7 @@ use futures::TryStreamExt;
 use log::error;
 use mongodb::{
     bson::{self, doc},
+    options::FindOptions,
     Collection, Database,
 };
 
@@ -17,7 +18,7 @@ fn get_collection(db: &Database) -> Collection<LoginAttempt> {
 /// Add a new login attempt record
 pub async fn add_login_attempt(db: &Database, attempt: &LoginAttempt) -> Result<(), AppError> {
     let collection = get_collection(db);
-    collection.insert_one(attempt, None).await.map_err(|e| {
+    collection.insert_one(attempt).await.map_err(|e| {
         error!("Database error recording login attempt: {:?}", e);
         AppError::DatabaseError(e)
     })?;
@@ -49,13 +50,10 @@ pub async fn count_recent_failed_attempts(
     };
 
     // Count matching documents
-    let count = collection
-        .count_documents(filter, None)
-        .await
-        .map_err(|e| {
-            error!("Database error counting login attempts: {:?}", e);
-            AppError::DatabaseError(e)
-        })?;
+    let count = collection.count_documents(filter).await.map_err(|e| {
+        error!("Database error counting login attempts: {:?}", e);
+        AppError::DatabaseError(e)
+    })?;
 
     Ok(count as usize)
 }
@@ -87,7 +85,7 @@ pub async fn cleanup_old_attempts(db: &Database, retention_days: i64) -> Result<
     };
 
     // Delete old records
-    let result = collection.delete_many(filter, None).await.map_err(|e| {
+    let result = collection.delete_many(filter).await.map_err(|e| {
         error!("Database error cleaning up login attempts: {:?}", e);
         AppError::DatabaseError(e)
     })?;
@@ -99,26 +97,27 @@ pub async fn cleanup_old_attempts(db: &Database, retention_days: i64) -> Result<
 pub async fn get_recent_attempts(db: &Database, limit: i64) -> Result<Vec<LoginAttempt>, AppError> {
     let collection = get_collection(db);
 
-    let mut cursor = collection
-        .find(
-            doc! {},
-            mongodb::options::FindOptions::builder()
-                .sort(doc! { "created_at": -1 })
-                .limit(limit)
-                .build(),
-        )
-        .await
-        .map_err(|e| {
-            error!("Database error fetching recent login attempts: {:?}", e);
-            AppError::DatabaseError(e)
-        })?;
+    // Use find without options first
+    let mut cursor = collection.find(doc! {}).await.map_err(|e| {
+        error!("Database error fetching recent login attempts: {:?}", e);
+        AppError::DatabaseError(e)
+    })?;
 
+    // Then manually process for sorting and limiting
     let mut attempts = Vec::new();
     while let Some(attempt) = cursor.try_next().await.map_err(|e| {
         error!("Database error iterating login attempts: {:?}", e);
         AppError::DatabaseError(e)
     })? {
         attempts.push(attempt);
+    }
+
+    // Sort attempts by created_at, descending
+    attempts.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+    // Limit the results
+    if attempts.len() > limit as usize {
+        attempts.truncate(limit as usize);
     }
 
     Ok(attempts)

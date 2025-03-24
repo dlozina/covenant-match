@@ -1,4 +1,5 @@
 mod config;
+mod db;
 mod middleware;
 mod models;
 mod openapi;
@@ -85,7 +86,7 @@ async fn main() -> std::io::Result<()> {
 
     // Test the connection
     client
-        .list_database_names(None, None)
+        .list_database_names()
         .await
         .expect("Failed to connect to MongoDB");
     info!("Successfully connected to MongoDB!");
@@ -96,6 +97,13 @@ async fn main() -> std::io::Result<()> {
     start_login_attempts_cleanup(db.clone()).await;
     info!("Started periodic cleanup task for login attempts");
 
+    // Initialize database with error handling
+    info!("About to initialize database and seed data...");
+    if let Err(e) = db::db_init::initialize_database(&db).await {
+        warn!("Failed to initialize database: {:?}", e);
+    }
+    info!("Database initialization completed");
+
     // Create admin user if it doesn't exist yet
     if let Err(e) = user_service::ensure_admin_exists(&db).await {
         warn!("Failed to create admin user: {:?}", e);
@@ -103,7 +111,7 @@ async fn main() -> std::io::Result<()> {
 
     // Optional: Check if users collection exists
     let collections = db
-        .list_collection_names(None)
+        .list_collection_names()
         .await
         .expect("Failed to list collections");
 

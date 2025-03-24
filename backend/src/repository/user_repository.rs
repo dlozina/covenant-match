@@ -4,7 +4,7 @@ use futures::{StreamExt, TryStreamExt};
 use log::error;
 use mongodb::{
     bson::{self, doc, Document},
-    options::FindOneOptions,
+    options::{FindOneOptions, FindOptions, UpdateOptions},
     Collection, Database,
 };
 
@@ -16,7 +16,7 @@ fn get_collection(db: &Database) -> Collection<User> {
 
 pub async fn create_user(db: &Database, user: &User) -> Result<(), AppError> {
     let collection = db.collection::<User>(COLLECTION_NAME);
-    collection.insert_one(user, None).await.map_err(|e| {
+    collection.insert_one(user).await.map_err(|e| {
         error!("Database error creating user: {:?}", e);
         AppError::DatabaseError(e)
     })?;
@@ -27,7 +27,7 @@ pub async fn find_by_username(db: &Database, username: &str) -> Result<Option<Us
     let collection = db.collection::<User>(COLLECTION_NAME);
     let filter = doc! { "username": username };
 
-    collection.find_one(filter, None).await.map_err(|e| {
+    collection.find_one(filter).await.map_err(|e| {
         error!("Database error finding user by username: {:?}", e);
         AppError::DatabaseError(e)
     })
@@ -46,7 +46,7 @@ pub async fn find_by_username_or_email(
         ]
     };
 
-    collection.find_one(filter, None).await.map_err(|e| {
+    collection.find_one(filter).await.map_err(|e| {
         error!("Database error finding user by username or email: {:?}", e);
         AppError::DatabaseError(e)
     })
@@ -56,7 +56,7 @@ pub async fn find_user_by_id(db: &Database, id: &str) -> Result<Option<User>, Ap
     let collection = db.collection::<User>(COLLECTION_NAME);
     let filter = doc! { "_id": id };
 
-    collection.find_one(filter, None).await.map_err(|e| {
+    collection.find_one(filter).await.map_err(|e| {
         error!("Database error finding user by id: {:?}", e);
         AppError::DatabaseError(e)
     })
@@ -66,21 +66,16 @@ pub async fn admin_exists(db: &Database) -> Result<bool, AppError> {
     let collection: Collection<User> = db.collection(COLLECTION_NAME);
     let filter = doc! { "role": "admin" };
 
-    let count = collection
-        .count_documents(filter, None)
-        .await
-        .map_err(|e| {
-            error!("Database error checking if admin exists: {:?}", e);
-            AppError::DatabaseError(e)
-        })?;
+    let count = collection.count_documents(filter).await.map_err(|e| {
+        error!("Database error checking if admin exists: {:?}", e);
+        AppError::DatabaseError(e)
+    })?;
 
     Ok(count > 0)
 }
 
 pub async fn find_by_email(db: &Database, email: &str) -> Result<Option<User>, AppError> {
-    let user = get_collection(db)
-        .find_one(doc! { "email": email }, None)
-        .await?;
+    let user = get_collection(db).find_one(doc! { "email": email }).await?;
     Ok(user)
 }
 
@@ -97,7 +92,7 @@ pub async fn update_user(db: &Database, user: &User) -> Result<(), AppError> {
     };
 
     get_collection(db)
-        .update_one(doc! { "_id": &user.id }, update, None)
+        .update_one(doc! { "_id": &user.id }, update)
         .await?;
 
     Ok(())
@@ -107,7 +102,7 @@ pub async fn delete_user(db: &Database, user_id: &str) -> Result<(), AppError> {
     let collection = get_collection(db);
     let filter = doc! { "_id": user_id };
 
-    let result = collection.delete_one(filter, None).await.map_err(|e| {
+    let result = collection.delete_one(filter).await.map_err(|e| {
         error!("Database error deleting user: {:?}", e);
         AppError::DatabaseError(e)
     })?;
@@ -130,13 +125,10 @@ pub async fn update_user_with_doc(
     let filter = doc! { "_id": user_id };
     let update = doc! { "$set": update_doc };
 
-    let result = collection
-        .update_one(filter, update, None)
-        .await
-        .map_err(|e| {
-            error!("Database error updating user: {:?}", e);
-            AppError::DatabaseError(e)
-        })?;
+    let result = collection.update_one(filter, update).await.map_err(|e| {
+        error!("Database error updating user: {:?}", e);
+        AppError::DatabaseError(e)
+    })?;
 
     if result.matched_count == 0 {
         return Ok(None);
@@ -153,7 +145,7 @@ pub async fn find_by_display_name(
     let filter = doc! { "display_name": display_name };
 
     collection
-        .find_one(filter, None)
+        .find_one(filter)
         .await
         .map_err(AppError::DatabaseError)
 }
@@ -168,7 +160,7 @@ pub async fn find_users_by_role(db: &Database, role: Option<&str>) -> Result<Vec
     };
 
     let mut cursor = collection
-        .find(filter, None)
+        .find(filter)
         .await
         .map_err(AppError::DatabaseError)?;
 
@@ -200,22 +192,35 @@ pub async fn find_users_by_role_paginated(
     // Calculate skip value for pagination
     let skip = (page - 1) * limit;
 
-    // Create find options with skip and limit
-    let find_options = mongodb::options::FindOptions::builder()
-        .skip(Some(skip))
-        .limit(Some(limit as i64))
-        .sort(Some(doc! { "created_at": -1 })) // Sort by creation date, newest first
-        .build();
-
+    // Use individual operations for pagination instead of options
     let mut cursor = collection
-        .find(filter, find_options)
+        .find(filter)
         .await
         .map_err(AppError::DatabaseError)?;
 
+    // Skip documents
+    for _ in 0..skip {
+        if cursor.advance().await.map_err(AppError::DatabaseError)? {
+            continue;
+        } else {
+            break;
+        }
+    }
+
+    // Collect results with limit
     let mut users = Vec::new();
+    let mut count = 0;
+
     while let Some(result) = cursor.next().await {
+        if count >= limit {
+            break;
+        }
+
         match result {
-            Ok(user) => users.push(user),
+            Ok(user) => {
+                users.push(user);
+                count += 1;
+            }
             Err(e) => return Err(AppError::DatabaseError(e)),
         }
     }
@@ -233,7 +238,7 @@ pub async fn count_users_by_role(db: &Database, role: Option<&str>) -> Result<u6
     };
 
     collection
-        .count_documents(filter, None)
+        .count_documents(filter)
         .await
         .map_err(AppError::DatabaseError)
 }

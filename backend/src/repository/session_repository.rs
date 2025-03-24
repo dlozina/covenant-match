@@ -3,7 +3,7 @@ use crate::models::session::{GameSession, SessionStatus};
 use futures::TryStreamExt;
 use mongodb::{
     bson::{doc, to_bson, Document},
-    options::FindOptions,
+    options::{FindOptions, ReplaceOptions, UpdateOptions},
     Collection, Database,
 };
 
@@ -12,12 +12,12 @@ fn get_collection(db: &Database) -> Collection<GameSession> {
 }
 
 pub async fn create_session(db: &Database, session: &GameSession) -> Result<(), AppError> {
-    get_collection(db).insert_one(session, None).await?;
+    get_collection(db).insert_one(session).await?;
     Ok(())
 }
 
 pub async fn find_by_id(db: &Database, id: &str) -> Result<Option<GameSession>, AppError> {
-    let session = get_collection(db).find_one(doc! { "_id": id }, None).await?;
+    let session = get_collection(db).find_one(doc! { "_id": id }).await?;
     Ok(session)
 }
 
@@ -37,14 +37,30 @@ pub async fn find_sessions(
         filter = doc! { "$and": [filter, doc! { "is_private": is_private }] };
     }
 
-    let options = FindOptions::builder()
-        .sort(doc! { "created_at": -1 })
-        .limit(limit.map(|l| l as i64))
-        .skip(offset.map(|o| o as u64))
-        .build();
+    // Get all sessions matching the filter
+    let cursor = get_collection(db).find(filter).await?;
+    let mut sessions: Vec<GameSession> = cursor.try_collect().await?;
 
-    let cursor = get_collection(db).find(filter, options).await?;
-    let sessions = cursor.try_collect().await?;
+    // Manual sorting, skip and limit
+    sessions.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+    // Apply offset (skip) and limit if provided
+    if let Some(offset_val) = offset {
+        let offset_idx = offset_val as usize;
+        if offset_idx < sessions.len() {
+            sessions = sessions.into_iter().skip(offset_idx).collect();
+        } else {
+            sessions.clear();
+        }
+    }
+
+    if let Some(limit_val) = limit {
+        let limit_size = limit_val as usize;
+        if sessions.len() > limit_size {
+            sessions.truncate(limit_size);
+        }
+    }
+
     Ok(sessions)
 }
 
@@ -65,7 +81,7 @@ pub async fn update_session(db: &Database, session: &GameSession) -> Result<(), 
     };
 
     get_collection(db)
-        .update_one(doc! { "_id": &session.id }, update, None)
+        .update_one(doc! { "_id": &session.id }, update)
         .await?;
 
     Ok(())
@@ -85,7 +101,7 @@ pub async fn update_player_character(
         "$set": { "joined_players.$.nightfarer": new_character }
     };
 
-    get_collection(db).update_one(filter, update, None).await?;
+    get_collection(db).update_one(filter, update).await?;
 
     Ok(())
 }
