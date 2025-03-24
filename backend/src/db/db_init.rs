@@ -267,7 +267,7 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
     Ok(())
 }
 
-// For updates
+// todo -> Example for updates
 async fn update_schemas(db: &Database) -> Result<(), Error> {
     let settings = db.collection("settings");
 
