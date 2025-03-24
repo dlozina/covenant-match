@@ -1,4 +1,5 @@
-use chrono::{DateTime, Utc};
+use chrono::{Duration, Utc};
+use mongodb::bson::{oid::ObjectId, DateTime};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -8,7 +9,7 @@ pub struct PlayerInfo {
     pub user_id: String,
     pub username: String,
     pub nightfarer: String,
-    pub joined_at: DateTime<Utc>,
+    pub joined_at: DateTime,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
@@ -18,7 +19,7 @@ pub struct SessionResult {
     pub result: GameResult,
     pub rating: Option<u8>,
     pub feedback: Option<String>,
-    pub submitted_at: DateTime<Utc>,
+    pub submitted_at: DateTime,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, ToSchema)]
@@ -40,7 +41,7 @@ pub enum SessionStatus {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GameSession {
     #[serde(rename = "_id")]
-    pub id: String,
+    pub id: ObjectId,
     pub name: String,
     pub host_id: String,
     pub password: String,
@@ -50,10 +51,10 @@ pub struct GameSession {
     pub joined_players: Vec<PlayerInfo>,
     pub results: Vec<SessionResult>,
     pub ratings: Vec<RateSessionDto>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub started_at: Option<DateTime<Utc>>,
-    pub completed_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
+    pub started_at: Option<DateTime>,
+    pub completed_at: Option<DateTime>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -99,10 +100,10 @@ pub struct SessionResponseDto {
     pub status: SessionStatus,
     pub night_lord: String,
     pub joined_players: Vec<PlayerInfo>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub started_at: Option<DateTime<Utc>>,
-    pub completed_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
+    pub started_at: Option<DateTime>,
+    pub completed_at: Option<DateTime>,
     pub password: String,
     pub is_private: bool,
 }
@@ -110,7 +111,7 @@ pub struct SessionResponseDto {
 impl From<GameSession> for SessionResponseDto {
     fn from(session: GameSession) -> Self {
         Self {
-            id: session.id,
+            id: session.id.to_hex(),
             name: session.name,
             host_id: session.host_id,
             status: session.status,
@@ -142,8 +143,7 @@ pub struct RateSessionDto {
     pub rating: u8,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub comment: Option<String>,
-    #[serde(default = "Utc::now")]
-    pub created_at: DateTime<Utc>,
+    pub created_at: DateTime,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

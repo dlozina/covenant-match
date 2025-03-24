@@ -3,10 +3,9 @@ use crate::models::user::{CreateUserDto, LoginUserDto, UpdateUserProfileDto, Use
 use crate::repository::user_repository;
 use crate::utils::jwt;
 use bcrypt::{hash, verify, DEFAULT_COST};
-use chrono::Utc;
 use log::{info, warn};
+use mongodb::bson::oid::ObjectId;
 use mongodb::{bson::doc, Database};
-use uuid::Uuid;
 
 pub async fn create_user(
     db: &Database,
@@ -43,9 +42,9 @@ pub async fn create_user(
         (None, _) => "user".to_string(),    // Default role is user
     };
 
-    let now = Utc::now();
+    let now = mongodb::bson::DateTime::now();
     let user = User {
-        id: Uuid::new_v4().to_string(),
+        id: ObjectId::new(),
         username: user_data.username,
         email: user_data.email,
         password_hash,
@@ -67,7 +66,7 @@ pub async fn create_user(
     user_repository::create_user(db, &user).await?;
 
     Ok(UserResponse {
-        id: user.id,
+        id: user.id.to_hex(),
         username: user.username,
         email: user.email,
         display_name: user.display_name,
@@ -107,7 +106,7 @@ pub async fn login_user(
 
     // Create user response (without password)
     let user_response = UserResponse {
-        id: user.id,
+        id: user.id.to_hex(),
         username: user.username,
         email: user.email,
         display_name: user.display_name,
@@ -132,7 +131,7 @@ pub async fn get_user_by_id(db: &Database, user_id: &str) -> Result<UserResponse
 
     if let Some(user) = user {
         Ok(UserResponse {
-            id: user.id.to_string(),
+            id: user.id.to_hex(),
             username: user.username,
             email: user.email,
             display_name: user.display_name,
@@ -207,10 +206,13 @@ pub async fn update_user_profile(
     user_id: &str,
     update_data: UpdateUserProfileDto,
 ) -> Result<UserResponse, AppError> {
+    // Convert string ID to ObjectId for comparison
+    let object_id = ObjectId::parse_str(user_id).map_err(|_| AppError::InvalidId)?;
+
     // Check if email is being updated and if it's already in use
     if let Some(email) = &update_data.email {
         if let Some(existing_user) = user_repository::find_by_email(db, email).await? {
-            if existing_user.id != user_id {
+            if existing_user.id != object_id {
                 return Err(AppError::EmailAlreadyInUse);
             }
         }
@@ -220,14 +222,14 @@ pub async fn update_user_profile(
     if let Some(display_name) = &update_data.display_name {
         if let Some(existing_user) = user_repository::find_by_display_name(db, display_name).await?
         {
-            if existing_user.id != user_id {
+            if existing_user.id != object_id {
                 return Err(AppError::DisplayNameAlreadyInUse);
             }
         }
     }
 
-    // Get the current timestamp as a string in RFC3339 format
-    let now = chrono::Utc::now().to_rfc3339();
+    // Get the current timestamp as MongoDB DateTime
+    let now = mongodb::bson::DateTime::now();
 
     // Get the user first
     let user = user_repository::find_user_by_id(db, user_id)
@@ -273,7 +275,7 @@ pub async fn update_user_profile(
         update_doc.insert("preferred_nightfarer", preferred_nightfarer);
     }
 
-    // Always update the updated_at field with string timestamp
+    // Always update the updated_at field with MongoDB DateTime
     update_doc.insert("updated_at", now);
 
     // Update the user

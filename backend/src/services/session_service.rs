@@ -10,15 +10,14 @@ use crate::sse::session::SessionManager as SseSessionManager;
 use crate::ws::messages::{Broadcast, ServerMessage as WsServerMessage};
 use crate::ws::SessionManager as WsSessionManager;
 use actix::prelude::*;
-use chrono::{DateTime, Utc};
-use mongodb::bson::{doc, Document};
+use chrono::Utc;
+use mongodb::bson::{doc, oid::ObjectId, DateTime, Document};
 use mongodb::Database;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use serde_json::json;
 use std::sync::LazyLock;
 use std::sync::Mutex;
-use uuid::Uuid;
 
 // Global session manager references
 static WS_SESSION_MANAGER: LazyLock<Mutex<Option<Addr<WsSessionManager>>>> =
@@ -69,8 +68,8 @@ pub fn broadcast_event(
             .unwrap_or_else(|| "none".to_string())
     );
 
-    // Get current timestamp
-    let now = chrono::Utc::now().timestamp();
+    // Get current timestamp - use chrono here as we're just using it for a simple timestamp
+    let now = Utc::now().timestamp();
 
     // Broadcast to WebSocket clients
     if let Some(ws_manager) = get_session_manager() {
@@ -165,16 +164,16 @@ pub async fn create_session(
         .await?
         .ok_or(AppError::UserNotFound)?;
 
-    let now = Utc::now();
+    let now = mongodb::bson::DateTime::now();
     let session = GameSession {
-        id: Uuid::new_v4().to_string(),
+        id: ObjectId::new(),
         name: session_data.name,
         host_id: user_id.to_string(),
         password: session_data.game_password,
         is_private: session_data.is_private,
         status: SessionStatus::Open,
         joined_players: vec![PlayerInfo {
-            user_id: user.id.clone(),
+            user_id: user.id.to_hex(),
             username: user.display_name.unwrap_or(user.username),
             nightfarer: session_data.nightfarer,
             joined_at: now,
@@ -290,7 +289,7 @@ pub async fn join_session(
     let nightfarer = join_data.nightfarer.clone();
 
     // Add player to session
-    let now = Utc::now();
+    let now = mongodb::bson::DateTime::now();
     session.joined_players.push(PlayerInfo {
         user_id: user_id.clone(),
         username,
@@ -352,7 +351,7 @@ pub async fn start_session(
     }
 
     // Update session status
-    let now = Utc::now();
+    let now = mongodb::bson::DateTime::now();
     session.status = SessionStatus::InProgress;
     session.started_at = Some(now);
     session.updated_at = now;
@@ -399,7 +398,7 @@ pub async fn cancel_session(
     }
 
     // Update session status
-    let now = Utc::now();
+    let now = mongodb::bson::DateTime::now();
     session.status = SessionStatus::Cancelled;
     session.updated_at = now;
 
@@ -444,7 +443,7 @@ pub async fn submit_result(
     }
 
     // Add the result
-    let now = Utc::now();
+    let now = mongodb::bson::DateTime::now();
     session.results.push(SessionResult {
         user_id: user_id.clone(),
         result: result_data.result,
@@ -575,7 +574,7 @@ pub async fn get_session_results(
 
     // Prepare results response
     let response = serde_json::json!({
-        "sessionId": session.id,
+        "sessionId": session.id.to_hex(),
         "status": session.status,
         "results": session.results,
         "consensus": {
@@ -631,11 +630,16 @@ pub async fn rate_session(
     }
 
     // Add the rating
-    let now = Utc::now();
+    let now = mongodb::bson::DateTime::now();
 
     // Create a new rating with the proper user_id type
     let mut session_rating = rating_data;
     session_rating.user_id = Some(user_id.clone()); // Ensure it's a String
+
+    // Ensure we use the right DateTime type
+    if session_rating.created_at == mongodb::bson::DateTime::from_millis(0) {
+        session_rating.created_at = now;
+    }
 
     session.ratings.push(session_rating);
     session.updated_at = now;
@@ -672,7 +676,7 @@ pub async fn complete_session(
     }
 
     // Update session status
-    let now = Utc::now();
+    let now = mongodb::bson::DateTime::now();
     session.status = SessionStatus::Completed;
     session.completed_at = Some(now);
     session.updated_at = now;
@@ -733,11 +737,11 @@ pub async fn recreate_session(
             "Host not found in session players".to_string(),
         ))?;
 
-    let now = Utc::now();
+    let now = mongodb::bson::DateTime::now();
 
     // Create a new session with the same name and settings
     let new_session = GameSession {
-        id: Uuid::new_v4().to_string(),
+        id: ObjectId::new(),
         name: original_session.name.clone(),
         host_id: user_id.to_string(),
         password: original_session.password.clone(),
@@ -777,7 +781,7 @@ pub async fn recreate_session(
             session_id,
             "newSession",
             json!({
-                "sessionId": new_session.id,
+                "sessionId": new_session.id.to_hex(),
                 "name": new_session.name,
                 "hostId": user_id,
                 "originalSessionId": session_id
@@ -845,7 +849,7 @@ pub async fn update_session(
     }
 
     // Update the session's timestamp
-    session.updated_at = Utc::now();
+    session.updated_at = mongodb::bson::DateTime::now();
 
     // Save the updated session
     session_repository::update_session(db, &session).await?;

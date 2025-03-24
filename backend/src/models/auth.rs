@@ -1,4 +1,5 @@
-use chrono::{DateTime, Duration, Utc};
+use chrono::{Duration, TimeZone, Utc};
+use mongodb::bson::{oid::ObjectId, DateTime};
 use serde::{Deserialize, Serialize};
 
 /// Structure to track login attempts for security measures
@@ -6,13 +7,13 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LoginAttempt {
     #[serde(rename = "_id")]
-    pub id: String,
+    pub id: ObjectId,
     /// Username that was attempted
     pub username: String,
     /// IP address of the request
     pub ip_address: String,
     /// When the attempt was made
-    pub created_at: DateTime<Utc>,
+    pub created_at: DateTime,
     /// Whether this was a successful login
     pub successful: bool,
 }
@@ -21,10 +22,10 @@ impl LoginAttempt {
     /// Create a new login attempt record
     pub fn new(username: String, ip_address: String, successful: bool) -> Self {
         Self {
-            id: uuid::Uuid::new_v4().to_string(),
+            id: ObjectId::new(),
             username,
             ip_address,
-            created_at: Utc::now(),
+            created_at: DateTime::now(),
             successful,
         }
     }
@@ -32,7 +33,16 @@ impl LoginAttempt {
     /// Check if this attempt is within the relevant time window
     pub fn is_recent(&self, window_minutes: i64) -> bool {
         let window = Utc::now() - Duration::minutes(window_minutes);
-        self.created_at >= window
+
+        // Convert MongoDB DateTime to chrono DateTime for comparison
+        // MongoDB DateTime internally stores time as milliseconds since the Unix epoch
+        let millis = self.created_at.timestamp_millis();
+        let attempt_time = Utc
+            .timestamp_millis_opt(millis)
+            .single()
+            .unwrap_or(Utc::now());
+
+        attempt_time >= window
     }
 }
 

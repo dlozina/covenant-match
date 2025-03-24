@@ -10,6 +10,7 @@ type UserData = {
   displayName: string;
   email: string;
   region?: string;
+  platform?: string;
   autoRegion?: boolean;
   covenantName?: string;
   preferredSessionName?: string;
@@ -76,6 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: data.email,
         displayName: data.displayName,
         region: data.region,
+        platform: data.platform,
         autoRegion: data.autoRegion,
         covenantName: data.covenantName,
         preferredSessionName: data.preferredSessionName,

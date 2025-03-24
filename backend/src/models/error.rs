@@ -25,6 +25,9 @@ pub enum AppError {
     #[error("Invalid credentials")]
     InvalidCredentials,
 
+    #[error("Invalid id format")]
+    InvalidId,
+
     #[error("Session is already full")]
     SessionFull,
 
@@ -116,6 +119,8 @@ impl ResponseError for AppError {
 
             AppError::CaptchaVerificationFailed(_) => StatusCode::BAD_REQUEST,
             AppError::CaptchaRequired(_) => StatusCode::BAD_REQUEST,
+
+            AppError::InvalidId => StatusCode::BAD_REQUEST,
         }
     }
 }

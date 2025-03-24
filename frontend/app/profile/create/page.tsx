@@ -43,6 +43,13 @@ const REGIONS = [
   "Middle East",
 ]
 
+// Platform options
+const PLATFORMS = [
+  "PlayStation",
+  "Xbox",
+  "PC",
+]
+
 // Covenant name options
 const COVENANT_NAMES = [
   "Nightfarer",
@@ -82,6 +89,9 @@ const profileFormSchema = z.object({
     .refine(val => val === val.trim(), {
       message: "Password cannot contain leading or trailing whitespace"
     }),
+  passwordConfirm: z
+    .string()
+    .min(1, { message: "Password confirmation is required" }),
   displayName: z
     .string()
     .min(3, { message: "Display name must be at least 3 characters" })
@@ -90,13 +100,19 @@ const profileFormSchema = z.object({
   region: z
     .string()
     .min(1, { message: "Region is required" }),
+  platform: z
+    .string()
+    .min(1, { message: "Platform is required" }),
   autoRegion: z
     .boolean()
     .default(true),
   covenantName: z
     .string()
     .min(1, { message: "Covenant name is required" }),
-})
+}).refine((data) => data.password === data.passwordConfirm, {
+  message: "Passwords do not match",
+  path: ["passwordConfirm"],
+});
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>
 
@@ -119,8 +135,10 @@ export default function CreateProfilePage() {
       username: "",
       email: "",
       password: "",
+      passwordConfirm: "",
       displayName: "",
       region: REGIONS[0],
+      platform: PLATFORMS[0],
       autoRegion: true,
       covenantName: COVENANT_NAMES[0],
     },
@@ -166,13 +184,14 @@ export default function CreateProfilePage() {
     setNotification(null)
 
     try {
-      // Sanitize inputs before submission
+      // Extract the fields we need for the API
       const sanitizedData = {
         username: data.username.trim().toLowerCase(),
         email: data.email.trim().toLowerCase(),
         password: data.password, // passwords should not be modified
         displayName: data.displayName.trim(),
         region: data.region,
+        platform: data.platform,
         autoRegion: data.autoRegion,
         covenantName: data.covenantName,
       };
@@ -328,6 +347,32 @@ export default function CreateProfilePage() {
 
                 <FormField
                   control={form.control}
+                  name="passwordConfirm"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm md:text-base">Confirm Password</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="********" 
+                          type="password" 
+                          className="h-10"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            debouncedValidate('passwordConfirm');
+                          }}
+                        />
+                      </FormControl>
+                      <FormDescription className="text-xs md:text-sm">
+                        Re-enter your password to confirm.
+                      </FormDescription>
+                      <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="displayName"
                   render={({ field }) => (
                     <FormItem>
@@ -364,7 +409,37 @@ export default function CreateProfilePage() {
               {/* Matchmaking Section */}
               <div className="space-y-4">
                 <h2 className="text-lg font-semibold text-primary">Matchmaking</h2>
-                
+                <FormField
+                  control={form.control}
+                  name="platform"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm md:text-base">Platform</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="h-10">
+                            <SelectValue placeholder="Select your platform" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {PLATFORMS.map((platform) => (
+                            <SelectItem key={platform} value={platform}>
+                              {platform}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription className="text-xs md:text-sm">
+                        Select your gaming platform.
+                      </FormDescription>
+                      <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
+                    </FormItem>
+                  )}
+                />
+
                 <FormField
                   control={form.control}
                   name="region"

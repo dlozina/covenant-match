@@ -46,6 +46,13 @@ const REGIONS = [
   "Middle East",
 ]
 
+// Platform options
+const PLATFORMS = [
+  "PlayStation",
+  "Xbox",
+  "PC",
+]
+
 // Covenant name options
 const COVENANT_NAMES = [
   "Nightfarer",
@@ -79,6 +86,9 @@ const profileFormSchema = z.object({
   region: z
     .string()
     .min(1, { message: "Region is required" }),
+  platform: z
+    .string()
+    .min(1, { message: "Platform is required" }),
   autoRegion: z
     .boolean()
     .default(true),
@@ -136,6 +146,7 @@ function EditProfileContent() {
       email: userData?.email || "",
       displayName: userData?.displayName || "",
       region: userData?.region || REGIONS[0],
+      platform: userData?.platform || PLATFORMS[0],
       autoRegion: userData?.autoRegion !== undefined ? userData.autoRegion : true,
       covenantName: userData?.covenantName || COVENANT_NAMES[0],
       preferredSessionName: "",
@@ -154,6 +165,7 @@ function EditProfileContent() {
         email: userData.email || "",
         displayName: userData.displayName || "",
         region: userData.region || REGIONS[0],
+        platform: userData.platform || PLATFORMS[0],
         autoRegion: userData.autoRegion !== undefined ? userData.autoRegion : true,
         covenantName: userData.covenantName || COVENANT_NAMES[0],
         preferredSessionName: userData.preferredSessionName || "",
@@ -216,6 +228,7 @@ function EditProfileContent() {
         email: data.email.trim().toLowerCase(),
         displayName: data.displayName.trim(),
         region: data.region,
+        platform: data.platform,
         autoRegion: data.autoRegion,
         covenantName: data.covenantName,
         preferredSessionName: data.preferredSessionName,
@@ -458,6 +471,37 @@ function EditProfileContent() {
                           </Select>
                           <FormDescription className="text-xs md:text-sm">
                             Select your geographic region for matchmaking purposes.
+                          </FormDescription>
+                          <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="platform"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm md:text-base">Platform</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-10">
+                                <SelectValue placeholder="Select your platform" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {PLATFORMS.map((platform) => (
+                                <SelectItem key={platform} value={platform}>
+                                  {platform}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription className="text-xs md:text-sm">
+                            Select your gaming platform.
                           </FormDescription>
                           <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
                         </FormItem>

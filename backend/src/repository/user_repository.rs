@@ -3,7 +3,7 @@ use crate::models::user::User;
 use futures::{StreamExt, TryStreamExt};
 use log::error;
 use mongodb::{
-    bson::{self, doc, Document},
+    bson::{self, doc, oid::ObjectId, Document},
     options::{FindOneOptions, FindOptions, UpdateOptions},
     Collection, Database,
 };
@@ -54,7 +54,14 @@ pub async fn find_by_username_or_email(
 
 pub async fn find_user_by_id(db: &Database, id: &str) -> Result<Option<User>, AppError> {
     let collection = db.collection::<User>(COLLECTION_NAME);
-    let filter = doc! { "_id": id };
+
+    // Convert string ID to ObjectId
+    let object_id = ObjectId::parse_str(id).map_err(|e| {
+        error!("Invalid ObjectId format: {:?}", e);
+        AppError::InvalidId
+    })?;
+
+    let filter = doc! { "_id": object_id };
 
     collection.find_one(filter).await.map_err(|e| {
         error!("Database error finding user by id: {:?}", e);
@@ -99,8 +106,15 @@ pub async fn update_user(db: &Database, user: &User) -> Result<(), AppError> {
 }
 
 pub async fn delete_user(db: &Database, user_id: &str) -> Result<(), AppError> {
-    let collection = get_collection(db);
-    let filter = doc! { "_id": user_id };
+    let collection = db.collection::<User>(COLLECTION_NAME);
+
+    // Convert string ID to ObjectId
+    let object_id = ObjectId::parse_str(user_id).map_err(|e| {
+        error!("Invalid ObjectId format: {:?}", e);
+        AppError::InvalidId
+    })?;
+
+    let filter = doc! { "_id": object_id };
 
     let result = collection.delete_one(filter).await.map_err(|e| {
         error!("Database error deleting user: {:?}", e);
@@ -122,7 +136,14 @@ pub async fn update_user_with_doc(
 ) -> Result<Option<User>, AppError> {
     let collection = db.collection::<User>(COLLECTION_NAME);
 
-    let filter = doc! { "_id": user_id };
+    // Convert string ID to ObjectId
+    let object_id = ObjectId::parse_str(user_id).map_err(|e| {
+        error!("Invalid ObjectId format: {:?}", e);
+        AppError::InvalidId
+    })?;
+
+    let filter = doc! { "_id": object_id };
+
     let update = doc! { "$set": update_doc };
 
     let result = collection.update_one(filter, update).await.map_err(|e| {

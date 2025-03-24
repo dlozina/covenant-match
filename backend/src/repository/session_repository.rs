@@ -2,7 +2,7 @@ use crate::models::error::AppError;
 use crate::models::session::{GameSession, SessionStatus};
 use futures::TryStreamExt;
 use mongodb::{
-    bson::{doc, to_bson, Document},
+    bson::{doc, oid::ObjectId, to_bson, Document},
     options::{FindOptions, ReplaceOptions, UpdateOptions},
     Collection, Database,
 };
@@ -17,7 +17,15 @@ pub async fn create_session(db: &Database, session: &GameSession) -> Result<(), 
 }
 
 pub async fn find_by_id(db: &Database, id: &str) -> Result<Option<GameSession>, AppError> {
-    let session = get_collection(db).find_one(doc! { "_id": id }).await?;
+    // Convert string ID to ObjectId
+    let object_id = ObjectId::parse_str(id).map_err(|e| {
+        log::error!("Invalid ObjectId format: {:?}", e);
+        AppError::InvalidId
+    })?;
+
+    let session = get_collection(db)
+        .find_one(doc! { "_id": object_id })
+        .await?;
     Ok(session)
 }
 
@@ -93,8 +101,14 @@ pub async fn update_player_character(
     user_id: &str,
     new_character: &str,
 ) -> Result<(), AppError> {
+    // Convert string ID to ObjectId
+    let object_id = ObjectId::parse_str(session_id).map_err(|e| {
+        log::error!("Invalid ObjectId format: {:?}", e);
+        AppError::InvalidId
+    })?;
+
     let filter = doc! {
-        "_id": session_id,
+        "_id": object_id,
         "joined_players.user_id": user_id
     };
     let update = doc! {

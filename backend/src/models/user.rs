@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use mongodb::bson::{oid::ObjectId, DateTime};
 use serde::{Deserialize, Serialize};
 use utoipa::IntoParams;
 use utoipa::ToSchema;
@@ -7,7 +7,7 @@ use validator::Validate;
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
 pub struct User {
     #[serde(rename = "_id")]
-    pub id: String,
+    pub id: ObjectId,
     pub username: String,
     pub email: String,
     #[serde(rename = "password_hash")]
@@ -21,8 +21,8 @@ pub struct User {
     pub platform: String,
     pub covenant_name: String,
     pub role: String, // "admin" or "user"
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
     pub preferred_session_name: Option<String>,
     pub preferred_session_password: Option<String>,
     pub preferred_nightfarer: Option<String>,
@@ -66,8 +66,8 @@ pub struct UserResponse {
     pub covenant_name: String,
     pub role: String,
     pub platform: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
     pub preferred_session_name: Option<String>,
     pub preferred_session_password: Option<String>,
     pub preferred_nightfarer: Option<String>,
@@ -110,7 +110,7 @@ pub struct UpdateUserProfileDto {
 impl From<User> for UserResponse {
     fn from(user: User) -> Self {
         Self {
-            id: user.id,
+            id: user.id.to_hex(),
             username: user.username,
             email: user.email,
             display_name: user.display_name,

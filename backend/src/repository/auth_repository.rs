@@ -4,7 +4,7 @@ use chrono::{Duration, Utc};
 use futures::TryStreamExt;
 use log::error;
 use mongodb::{
-    bson::{self, doc},
+    bson::{self, doc, DateTime},
     options::FindOptions,
     Collection, Database,
 };
@@ -37,7 +37,7 @@ pub async fn count_recent_failed_attempts(
     // Calculate the time window
     let window_start = Utc::now() - Duration::minutes(window_minutes);
     // Convert to MongoDB DateTime
-    let window_start_bson = bson::DateTime::from_millis(window_start.timestamp_millis());
+    let window_start_bson = DateTime::from_millis(window_start.timestamp_millis());
 
     // Create filter for username OR IP address with recent timestamp and failed attempts
     let filter = doc! {
@@ -77,7 +77,7 @@ pub async fn cleanup_old_attempts(db: &Database, retention_days: i64) -> Result<
     // Calculate retention cutoff date
     let cutoff_date = Utc::now() - Duration::days(retention_days);
     // Convert to MongoDB DateTime
-    let cutoff_date_bson = bson::DateTime::from_millis(cutoff_date.timestamp_millis());
+    let cutoff_date_bson = DateTime::from_millis(cutoff_date.timestamp_millis());
 
     // Create filter for old records
     let filter = doc! {

@@ -1,6 +1,6 @@
 use log::{error, info};
 use mongodb::{
-    bson::{self, doc, Bson, Document},
+    bson::{self, doc, oid::ObjectId, Bson, Document},
     error::Error,
     options::{IndexOptions, UpdateOptions},
     Collection, Database, IndexModel,
@@ -17,7 +17,7 @@ pub async fn initialize_database(db: &Database) -> Result<(), Error> {
     seed_default_data(db).await?;
 
     // Update schemas
-    update_schemas(db).await?;
+    //update_schemas(db).await?;
 
     Ok(())
 }
@@ -69,11 +69,15 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
     let admin_count = users.count_documents(admin_filter.clone()).await?;
 
     if admin_count == 0 {
-        // Convert DateTime to MongoDB format
-        let now_bson = Bson::DateTime(bson::DateTime::from(std::time::SystemTime::now()));
+        // Use MongoDB datetime
+        let now = bson::DateTime::now();
+
+        // Use object ID for admin user
+        let admin_id = ObjectId::new();
 
         users
             .insert_one(doc! {
+                "_id": admin_id,
                 "username": "admin",
                 "email": "akri@gmail.com",
                 "password": "admin",
@@ -83,8 +87,8 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
                 "platform": "PlayStation",
                 "role": "admin",
                 "covenant_name": "Nightlords",
-                "created_at": now_bson.clone(),
-                "updated_at": now_bson
+                "created_at": now,
+                "updated_at": now
             })
             .await?;
         info!("Created default admin user");
@@ -168,8 +172,8 @@ async fn seed_collection(
     let collection: Collection<Document> = db.collection(collection_name);
 
     for (name, description) in items {
-        // Convert to MongoDB datetime format
-        let now_bson = Bson::DateTime(bson::DateTime::from(std::time::SystemTime::now()));
+        // Use MongoDB datetime directly
+        let now_bson = bson::DateTime::now();
 
         // Check if document already exists
         let filter = doc! { "name": name };
@@ -180,7 +184,7 @@ async fn seed_collection(
             let doc = doc! {
                 "name": name,
                 "description": description,
-                "created_at": now_bson.clone(),
+                "created_at": now_bson,
                 "updated_at": now_bson,
                 "schema_version": 1
             };
