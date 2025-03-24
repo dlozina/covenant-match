@@ -20,7 +20,7 @@ use dotenv::dotenv;
 use log::{info, warn};
 use middleware::auth::Auth;
 use mongodb::{options::ClientOptions, Client};
-use routes::sessions;
+use routes::{game_data, sessions};
 use services::{auth_service, session_service, user_service};
 use sse::heartbeat::HeartbeatActor;
 use sse::session::SessionManager as SseSessionManager;
@@ -161,6 +161,7 @@ async fn main() -> std::io::Result<()> {
             .configure(health::config)
             .configure(users::config)
             .configure(sessions::config)
+            .configure(game_data::config)
             //TODO: Add statistics routes
             //.configure(statistics::config)
             // Add Swagger UI with the OpenAPI schema from our new module

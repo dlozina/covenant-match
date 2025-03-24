@@ -13,14 +13,13 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 // Define excluded paths similar to EXCLUDE_PATTERNS
-pub const EXCLUDE_PATTERNS: [(&str, Option<Method>, bool); 5] = [
+pub const EXCLUDE_PATTERNS: [(&str, Option<Method>, bool); 6] = [
     ("/api/v1/auth/login", Some(Method::POST), false),
     ("/api/v1/register", Some(Method::POST), false),
     ("/api/docs/.*", Some(Method::GET), true),
     ("/api-docs/.*", Some(Method::GET), true),
+    ("/api/v1/game-data", Some(Method::GET), false),
     //("/ws/.*", Some(Method::GET), true),
-    // TODO: Add this back in
-    //("/api/v1/sessions/.*/events", Some(Method::GET), true),
     ("/api/v1/sse/status", Some(Method::GET), false),
     //("/api/public/.*", Some(Method::GET), true),
     //("/favicon.ico", Some(Method::GET), false),

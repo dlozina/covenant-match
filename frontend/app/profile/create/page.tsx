@@ -32,34 +32,30 @@ import { Switch } from "@/components/ui/switch"
 // Username and display name validation regex
 const usernameRegex = /^[a-zA-Z0-9_.-]+$/;
 
-// Region options
-const REGIONS = [
-  "North America",
-  "Europe",
-  "Asia",
-  "Oceania",
-  "South America",
-  "Africa",
-  "Middle East",
-]
+// Interface for game data from API
+interface PlatformData {
+  id: string;
+  name: string;
+  description: string;
+}
 
-// Platform options
-const PLATFORMS = [
-  "PlayStation",
-  "Xbox",
-  "PC",
-]
+interface RegionData {
+  id: string;
+  name: string;
+  description: string;
+}
 
-// Covenant name options
-const COVENANT_NAMES = [
-  "Nightfarer",
-  "Shadowkeeper",
-  "Bloodstalker",
-  "Duskwalker",
-  "Moonhunter",
-  "Soulreaper",
-  "Veilwatcher",
-]
+interface CovenantData {
+  id: string;
+  name: string;
+  description: string;
+}
+
+interface GameData {
+  platforms: PlatformData[];
+  regions: RegionData[];
+  covenants: CovenantData[];
+}
 
 // Validation schema with consistent rules
 const profileFormSchema = z.object({
@@ -129,6 +125,71 @@ export default function CreateProfilePage() {
   // Debounce timer references
   const [validationTimeout, setValidationTimeout] = useState<NodeJS.Timeout | null>(null)
 
+  // Game data states from API
+  const [gameData, setGameData] = useState<GameData | null>(null)
+  const [isLoadingGameData, setIsLoadingGameData] = useState(true)
+  const [gameDataError, setGameDataError] = useState<string | null>(null)
+
+  // Fetch game data from API
+  useEffect(() => {
+    const fetchGameData = async () => {
+      setIsLoadingGameData(true)
+      setGameDataError(null)
+      
+      try {
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+        const response = await fetch(`${apiBaseUrl}/api/v1/game-data`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch game data');
+        }
+        
+        const data = await response.json();
+        setGameData(data);
+      } catch (error) {
+        console.error('Error fetching game data:', error);
+        setGameDataError('Could not load game data. Using default values.');
+      } finally {
+        setIsLoadingGameData(false);
+      }
+    };
+    
+    fetchGameData();
+  }, []);
+
+  // Fallback data in case API fails
+  const FALLBACK_REGIONS = [
+    "North America",
+    "Europe",
+    "Asia",
+    "Oceania",
+    "South America",
+    "Africa",
+    "Middle East",
+  ]
+
+  const FALLBACK_PLATFORMS = [
+    "PlayStation",
+    "Xbox",
+    "PC",
+  ]
+
+  const FALLBACK_COVENANT_NAMES = [
+    "Warriors of Sunlight",
+    "Way of White",
+    "Princess Guard",
+    "Way of the Blue",
+    "Heirs of the Sun",
+    "Spears of the Church",
+    "Blades of the Darkmoon",
+    "Watchdogs of Farron",
+  ]
+
+  // Use API data or fallback data
+  const REGIONS = gameData?.regions?.map(r => r.description) || FALLBACK_REGIONS;
+  const PLATFORMS = gameData?.platforms?.map(p => p.name) || FALLBACK_PLATFORMS;
+  const COVENANT_NAMES = gameData?.covenants?.map(c => c.name) || FALLBACK_COVENANT_NAMES;
+
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
@@ -137,13 +198,30 @@ export default function CreateProfilePage() {
       password: "",
       passwordConfirm: "",
       displayName: "",
-      region: REGIONS[0],
-      platform: PLATFORMS[0],
+      region: "",
+      platform: "",
       autoRegion: true,
-      covenantName: COVENANT_NAMES[0],
+      covenantName: "",
     },
     mode: "onBlur",  // Only validate on blur and submit for better UX
-  })
+  });
+
+  // Update form defaults when game data is loaded
+  useEffect(() => {
+    if (!isLoadingGameData && gameData) {
+      form.setValue('region', REGIONS[0]);
+      form.setValue('platform', PLATFORMS[0]);
+      form.setValue('covenantName', COVENANT_NAMES[0]);
+    }
+    
+    // Show notification if there's an error loading game data
+    if (gameDataError) {
+      setNotification({
+        message: gameDataError,
+        type: 'warning'
+      });
+    }
+  }, [isLoadingGameData, gameData, form, gameDataError]);
 
   // Update character counters whenever field values change
   useEffect(() => {
@@ -256,292 +334,299 @@ export default function CreateProfilePage() {
             onDismiss={clearNotification}
           />
 
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 md:space-y-8">
-              {/* Basics Section */}
-              <div className="space-y-4">
-                <h2 className="text-lg font-semibold text-primary">Basics</h2>
-                
-                <FormField
-                  control={form.control}
-                  name="username"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="flex justify-between items-center">
-                        <FormLabel className="text-sm md:text-base">Username</FormLabel>
-                        <span className={`text-xs ${usernameLength > 8 ? 'text-red-500' : 'text-muted-foreground'}`}>
-                          {usernameLength} / 8
-                        </span>
-                      </div>
-                      <FormControl>
-                        <Input 
-                          placeholder="username" 
-                          {...field} 
-                          className="h-10" 
-                          onChange={(e) => {
-                            field.onChange(e);
-                            setUsernameLength(e.target.value.length);
-                            debouncedValidate('username');
-                          }}
-                        />
-                      </FormControl>
-                      <FormDescription className="text-xs md:text-sm">
-                        3-8 characters, can contain letters, numbers, underscores, dots, and hyphens.
-                      </FormDescription>
-                      <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm md:text-base">Email</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="email@example.com" 
-                          type="email" 
-                          {...field} 
-                          className="h-10"
-                          onChange={(e) => {
-                            field.onChange(e);
-                            debouncedValidate('email');
-                          }}
-                        />
-                      </FormControl>
-                      <FormDescription className="text-xs md:text-sm">
-                        Your email address will be used for notifications and recovery.
-                      </FormDescription>
-                      <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm md:text-base">Password</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="********" 
-                          type="password" 
-                          {...field} 
-                          className="h-10"
-                          onChange={(e) => {
-                            field.onChange(e);
-                            debouncedValidate('password');
-                          }}
-                        />
-                      </FormControl>
-                      <FormDescription className="text-xs md:text-sm">
-                        Choose a strong password with at least 8 characters, one number, and one special character.
-                      </FormDescription>
-                      <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="passwordConfirm"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm md:text-base">Confirm Password</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="********" 
-                          type="password" 
-                          className="h-10"
-                          {...field}
-                          onChange={(e) => {
-                            field.onChange(e);
-                            debouncedValidate('passwordConfirm');
-                          }}
-                        />
-                      </FormControl>
-                      <FormDescription className="text-xs md:text-sm">
-                        Re-enter your password to confirm.
-                      </FormDescription>
-                      <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="displayName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="flex justify-between items-center">
-                        <FormLabel className="text-sm md:text-base">Display Name</FormLabel>
-                        <span className={`text-xs ${displayNameLength > 8 ? 'text-red-500' : 'text-muted-foreground'}`}>
-                          {displayNameLength} / 8
-                        </span>
-                      </div>
-                      <FormControl>
-                        <Input 
-                          placeholder="Display Name" 
-                          {...field} 
-                          className="h-10"
-                          onChange={(e) => {
-                            field.onChange(e);
-                            setDisplayNameLength(e.target.value.length);
-                            debouncedValidate('displayName');
-                          }}
-                        />
-                      </FormControl>
-                      <FormDescription className="text-xs md:text-sm">
-                        3-8 characters. This is how other users will see you.
-                      </FormDescription>
-                      <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* Divider */}
-              <div className="border-t border-border"></div>
-
-              {/* Matchmaking Section */}
-              <div className="space-y-4">
-                <h2 className="text-lg font-semibold text-primary">Matchmaking</h2>
-                <FormField
-                  control={form.control}
-                  name="platform"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm md:text-base">Platform</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
+          {isLoadingGameData ? (
+            <div className="flex flex-col items-center justify-center py-10">
+              <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary"></div>
+              <p className="mt-4 text-muted-foreground">Loading game data...</p>
+            </div>
+          ) : (
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 md:space-y-8">
+                {/* Basics Section */}
+                <div className="space-y-4">
+                  <h2 className="text-lg font-semibold text-primary">Basics</h2>
+                  
+                  <FormField
+                    control={form.control}
+                    name="username"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex justify-between items-center">
+                          <FormLabel className="text-sm md:text-base">Username</FormLabel>
+                          <span className={`text-xs ${usernameLength > 8 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                            {usernameLength} / 8
+                          </span>
+                        </div>
                         <FormControl>
-                          <SelectTrigger className="h-10">
-                            <SelectValue placeholder="Select your platform" />
-                          </SelectTrigger>
+                          <Input 
+                            placeholder="username" 
+                            {...field} 
+                            className="h-10" 
+                            onChange={(e) => {
+                              field.onChange(e);
+                              setUsernameLength(e.target.value.length);
+                              debouncedValidate('username');
+                            }}
+                          />
                         </FormControl>
-                        <SelectContent>
-                          {PLATFORMS.map((platform) => (
-                            <SelectItem key={platform} value={platform}>
-                              {platform}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormDescription className="text-xs md:text-sm">
-                        Select your gaming platform.
-                      </FormDescription>
-                      <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="region"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm md:text-base">Region</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger className="h-10">
-                            <SelectValue placeholder="Select your region" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {REGIONS.map((region) => (
-                            <SelectItem key={region} value={region}>
-                              {region}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormDescription className="text-xs md:text-sm">
-                        Select your geographic region for matchmaking purposes.
-                      </FormDescription>
-                      <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="autoRegion"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-sm md:text-base">Auto Region Detection</FormLabel>
                         <FormDescription className="text-xs md:text-sm">
-                          Allow automatic detection of your region based on your location.
+                          3-8 characters, can contain letters, numbers, underscores, dots, and hyphens.
                         </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                      <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                        <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
+                      </FormItem>
+                    )}
+                  />
 
-              {/* Divider */}
-              <div className="border-t border-border"></div>
-
-              {/* Fun Section */}
-              <div className="space-y-4">
-                <h2 className="text-lg font-semibold text-primary">Fun</h2>
-                
-                <FormField
-                  control={form.control}
-                  name="covenantName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm md:text-base">Covenant Name</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm md:text-base">Email</FormLabel>
                         <FormControl>
-                          <SelectTrigger className="h-10">
-                            <SelectValue placeholder="Select your covenant" />
-                          </SelectTrigger>
+                          <Input 
+                            placeholder="email@example.com" 
+                            type="email" 
+                            {...field} 
+                            className="h-10"
+                            onChange={(e) => {
+                              field.onChange(e);
+                              debouncedValidate('email');
+                            }}
+                          />
                         </FormControl>
-                        <SelectContent>
-                          {COVENANT_NAMES.map((covenant) => (
-                            <SelectItem key={covenant} value={covenant}>
-                              {covenant}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormDescription className="text-xs md:text-sm">
-                        Choose your covenant allegiance.
-                      </FormDescription>
-                      <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                        <FormDescription className="text-xs md:text-sm">
+                          Your email address will be used for notifications and recovery.
+                        </FormDescription>
+                        <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
+                      </FormItem>
+                    )}
+                  />
 
-              <Button 
-                type="submit" 
-                disabled={isLoading}
-                className="w-full md:w-auto h-10 mt-6"
-              >
-                {isLoading ? "Creating..." : "Create Profile"}
-              </Button>
-            </form>
-          </Form>
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm md:text-base">Password</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="********" 
+                            type="password" 
+                            {...field} 
+                            className="h-10"
+                            onChange={(e) => {
+                              field.onChange(e);
+                              debouncedValidate('password');
+                            }}
+                          />
+                        </FormControl>
+                        <FormDescription className="text-xs md:text-sm">
+                          Choose a strong password with at least 8 characters, one number, and one special character.
+                        </FormDescription>
+                        <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="passwordConfirm"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm md:text-base">Confirm Password</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="********" 
+                            type="password" 
+                            className="h-10"
+                            {...field}
+                            onChange={(e) => {
+                              field.onChange(e);
+                              debouncedValidate('passwordConfirm');
+                            }}
+                          />
+                        </FormControl>
+                        <FormDescription className="text-xs md:text-sm">
+                          Re-enter your password to confirm.
+                        </FormDescription>
+                        <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="displayName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex justify-between items-center">
+                          <FormLabel className="text-sm md:text-base">Display Name</FormLabel>
+                          <span className={`text-xs ${displayNameLength > 8 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                            {displayNameLength} / 8
+                          </span>
+                        </div>
+                        <FormControl>
+                          <Input 
+                            placeholder="Display Name" 
+                            {...field} 
+                            className="h-10"
+                            onChange={(e) => {
+                              field.onChange(e);
+                              setDisplayNameLength(e.target.value.length);
+                              debouncedValidate('displayName');
+                            }}
+                          />
+                        </FormControl>
+                        <FormDescription className="text-xs md:text-sm">
+                          3-8 characters. This is how other users will see you.
+                        </FormDescription>
+                        <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-border"></div>
+
+                {/* Matchmaking Section */}
+                <div className="space-y-4">
+                  <h2 className="text-lg font-semibold text-primary">Matchmaking</h2>
+                  <FormField
+                    control={form.control}
+                    name="platform"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm md:text-base">Platform</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-10">
+                              <SelectValue placeholder="Select your platform" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {PLATFORMS.map((platform) => (
+                              <SelectItem key={platform} value={platform}>
+                                {platform}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormDescription className="text-xs md:text-sm">
+                          Select your gaming platform.
+                        </FormDescription>
+                        <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="region"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm md:text-base">Region</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-10">
+                              <SelectValue placeholder="Select your region" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {REGIONS.map((region) => (
+                              <SelectItem key={region} value={region}>
+                                {region}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormDescription className="text-xs md:text-sm">
+                          Select your geographic region for matchmaking purposes.
+                        </FormDescription>
+                        <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="autoRegion"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-sm md:text-base">Auto Region Detection</FormLabel>
+                          <FormDescription className="text-xs md:text-sm">
+                            Allow automatic detection of your region based on your location.
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-border"></div>
+
+                {/* Fun Section */}
+                <div className="space-y-4">
+                  <h2 className="text-lg font-semibold text-primary">Fun</h2>
+                  
+                  <FormField
+                    control={form.control}
+                    name="covenantName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm md:text-base">Covenant Name</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-10">
+                              <SelectValue placeholder="Select your covenant" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {COVENANT_NAMES.map((covenant) => (
+                              <SelectItem key={covenant} value={covenant}>
+                                {covenant}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormDescription className="text-xs md:text-sm">
+                          Choose your covenant allegiance.
+                        </FormDescription>
+                        <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <Button 
+                  type="submit" 
+                  disabled={isLoading}
+                  className="w-full md:w-auto h-10 mt-6"
+                >
+                  {isLoading ? "Creating..." : "Create Profile"}
+                </Button>
+              </form>
+            </Form>
+          )}
         </div>
       </div>
     </MainLayout>

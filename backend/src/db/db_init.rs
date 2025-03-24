@@ -1,3 +1,4 @@
+use bcrypt::{hash, DEFAULT_COST};
 use log::{error, info};
 use mongodb::{
     bson::{self, doc, oid::ObjectId, Bson, Document},
@@ -75,18 +76,22 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
         // Use object ID for admin user
         let admin_id = ObjectId::new();
 
+        // Hash the password
+        let password_hash = hash("changeme123#", DEFAULT_COST)
+            .map_err(|e| Error::custom(format!("Failed to hash password: {}", e)))?;
+
         users
             .insert_one(doc! {
                 "_id": admin_id,
                 "username": "admin",
                 "email": "akri@gmail.com",
-                "password": "admin",
+                "password_hash": password_hash,
                 "display_name": "Akri",
                 "region": "EU",
                 "auto_region": true,
                 "platform": "PlayStation",
                 "role": "admin",
-                "covenant_name": "Nightlords",
+                "covenant_name": "Warriors of Sunlight",
                 "created_at": now,
                 "updated_at": now
             })

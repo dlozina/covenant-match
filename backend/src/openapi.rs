@@ -1,3 +1,7 @@
+use crate::models::game_data::{
+    Covenant, CovenantResponse, GameDataResponse, Platform, PlatformResponse, Region,
+    RegionResponse,
+};
 use crate::models::session::{
     CreateSessionDto, GameResult, JoinSessionDto, PlayerInfo, RateSessionDto, ResultsResponseDto,
     SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto,
@@ -7,6 +11,7 @@ use crate::models::user::{
     UpdateUserProfileDto, User, UserResponse, UsersListData, UsersListResponse,
 };
 use crate::routes::{
+    game_data::*,
     health::*,
     // Import other routes as they become available
     sessions::*,
@@ -57,6 +62,11 @@ use utoipa::{
         update_session,
         submit_result,
         get_results,
+        // Game data routes
+        get_game_data,
+        get_platforms,
+        get_regions,
+        get_covenants,
         //tod: not needed for now
         //rate_session,
         // Add statistics routes as they become available
@@ -88,6 +98,14 @@ use utoipa::{
             SessionStatus,
             GameResult,
             SessionResult,
+            // Game data models
+            Platform,
+            Region,
+            Covenant,
+            GameDataResponse,
+            PlatformResponse,
+            RegionResponse,
+            CovenantResponse,
             // SSE models
             ServerMessage,
             SessionInfo,
@@ -100,6 +118,7 @@ use utoipa::{
         (name = "users", description = "User management endpoints"),
         (name = "admin", description = "Admin-only endpoints"),
         (name = "sessions", description = "Session management endpoints"),
+        (name = "game-data", description = "Game data endpoints"),
         (name = "statistics", description = "Statistics endpoints"),
         (name = "realtime", description = "Real-time communication endpoints")
     ),
