@@ -52,6 +52,7 @@ pub async fn create_user(
         display_name: user_data.display_name,
         avatar_url: None,
         region: user_data.region,
+        platform: user_data.platform,
         auto_region: user_data.auto_region,
         covenant_name: user_data.covenant_name,
         preferred_session_name: user_data.preferred_session_name,
@@ -73,6 +74,7 @@ pub async fn create_user(
         avatar_url: user.avatar_url,
         role: user.role,
         region: user.region,
+        platform: user.platform,
         auto_region: user.auto_region,
         covenant_name: user.covenant_name,
         preferred_session_name: user.preferred_session_name,
@@ -112,6 +114,7 @@ pub async fn login_user(
         avatar_url: user.avatar_url,
         region: user.region,
         auto_region: user.auto_region,
+        platform: user.platform,
         covenant_name: user.covenant_name,
         role: user.role,
         preferred_session_name: user.preferred_session_name,
@@ -136,6 +139,7 @@ pub async fn get_user_by_id(db: &Database, user_id: &str) -> Result<UserResponse
             avatar_url: user.avatar_url,
             region: user.region,
             auto_region: user.auto_region,
+            platform: user.platform,
             covenant_name: user.covenant_name,
             role: user.role,
             preferred_session_name: user.preferred_session_name,
@@ -173,6 +177,7 @@ pub async fn ensure_admin_exists(db: &Database) -> Result<(), AppError> {
             display_name: Some("Akri".to_string()),
             region: "EU".to_string(),
             auto_region: true,
+            platform: "PlayStation".to_string(),
             covenant_name: "Covenant".to_string(),
             preferred_session_name: None,
             preferred_session_password: None,
@@ -251,6 +256,9 @@ pub async fn update_user_profile(
     }
     if let Some(auto_region) = update_data.auto_region {
         update_doc.insert("auto_region", auto_region);
+    }
+    if let Some(platform) = update_data.platform.clone() {
+        update_doc.insert("platform", platform);
     }
     if let Some(covenant_name) = update_data.covenant_name.clone() {
         update_doc.insert("covenant_name", covenant_name);

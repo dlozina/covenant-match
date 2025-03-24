@@ -18,6 +18,7 @@ pub struct User {
     pub avatar_url: Option<String>,
     pub region: String,
     pub auto_region: bool,
+    pub platform: String,
     pub covenant_name: String,
     pub role: String, // "admin" or "user"
     pub created_at: DateTime<Utc>,
@@ -40,6 +41,7 @@ pub struct CreateUserDto {
     pub display_name: Option<String>,
     pub region: String,
     pub auto_region: bool,
+    pub platform: String,
     pub covenant_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub role: Option<String>, // Only used by admins when creating users
@@ -63,6 +65,7 @@ pub struct UserResponse {
     pub auto_region: bool,
     pub covenant_name: String,
     pub role: String,
+    pub platform: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub preferred_session_name: Option<String>,
@@ -96,6 +99,7 @@ pub struct UpdateUserProfileDto {
     pub display_name: Option<String>,
     pub region: Option<String>,
     pub auto_region: Option<bool>,
+    pub platform: Option<String>,
     pub covenant_name: Option<String>,
     pub avatar_url: Option<String>,
     pub preferred_session_name: Option<String>,
@@ -115,6 +119,7 @@ impl From<User> for UserResponse {
             auto_region: user.auto_region,
             covenant_name: user.covenant_name,
             role: user.role,
+            platform: user.platform,
             created_at: user.created_at,
             updated_at: user.updated_at,
             preferred_session_name: user.preferred_session_name,
