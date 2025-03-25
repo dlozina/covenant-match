@@ -2,8 +2,8 @@ use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
-use std::env;
 
+use crate::config::get_config;
 use crate::models::error::AppError;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -16,12 +16,16 @@ pub struct Claims {
 
 // Generate a JWT for a user
 pub fn generate_token(user_id: &ObjectId, role: &str) -> Result<String, AppError> {
-    let jwt_secret = env::var("JWT_SECRET")
-        .unwrap_or_else(|_| "default_secret_change_in_production".to_string());
+    let config = get_config();
+    let jwt_secret = config.jwt_secret();
 
-    // Set token expiration (24 hours from now)
+    // Parse expiration time from config
+    let expires_in = config.jwt_expires_in();
+    let hours = parse_duration(expires_in).unwrap_or(24); // Default to 24 hours
+
+    // Set token expiration
     let expiration = Utc::now()
-        .checked_add_signed(Duration::hours(24))
+        .checked_add_signed(Duration::hours(hours))
         .expect("valid timestamp")
         .timestamp() as usize;
 
@@ -45,8 +49,8 @@ pub fn generate_token(user_id: &ObjectId, role: &str) -> Result<String, AppError
 
 // Validate a JWT and extract the claims
 pub fn validate_token(token: &str) -> Result<Claims, AppError> {
-    let jwt_secret = env::var("JWT_SECRET")
-        .unwrap_or_else(|_| "default_secret_change_in_production".to_string());
+    let config = get_config();
+    let jwt_secret = config.jwt_secret();
 
     decode::<Claims>(
         token,
@@ -70,4 +74,26 @@ pub fn get_user_id_from_token(token: &str) -> Result<String, AppError> {
 pub fn get_role_from_token(token: &str) -> Result<String, AppError> {
     let claims = validate_token(token)?;
     Ok(claims.role)
+}
+
+// Parse duration string like "60m", "24h", "7d" to hours
+fn parse_duration(duration_str: &str) -> Option<i64> {
+    let len = duration_str.len();
+    if len < 2 {
+        return None;
+    }
+
+    let (value_str, unit) = duration_str.split_at(len - 1);
+
+    let value = match value_str.parse::<i64>() {
+        Ok(v) => v,
+        Err(_) => return None,
+    };
+
+    match unit {
+        "m" => Some(value / 60), // minutes to hours
+        "h" => Some(value),      // already hours
+        "d" => Some(value * 24), // days to hours
+        _ => None,
+    }
 }

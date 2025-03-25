@@ -1,0 +1,7 @@
+environment = "production"
+
+[server]
+workers = 4  # More workers for production
+
+# The database URL and JWT secret should be set via environment variables
+# in production using CONFIG_DATABASE__URL and CONFIG_JWT__SECRET 

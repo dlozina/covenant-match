@@ -1,0 +1,29 @@
+environment = "development"
+
+[database]
+url = "mongodb://localhost:27017/covenant-match"
+
+[jwt]
+secret = "malenia_is_the_best_girl_in_the_world"
+expires_in = "36000m"
+
+[server]
+port = 8080
+host = "0.0.0.0"
+workers = 1
+
+[auth]
+# Exclude patterns format: [path, method, is_regex]
+# method can be "GET", "POST", etc. or null for any method
+# is_regex is a boolean (true/false)
+exclude_patterns = [
+    { path = "/api/v1/auth/login", method = "POST", is_regex = false },
+    { path = "/api/v1/register", method = "POST", is_regex = false },
+    { path = "/api/docs/.*", method = "GET", is_regex = true },
+    { path = "/api-docs/.*", method = "GET", is_regex = true },
+    { path = "/api/v1/game-data", method = "GET", is_regex = false },
+    { path = "/api/v1/sse/status", method = "GET", is_regex = false },
+    # { path = "/ws/.*", method = "GET", is_regex = true },
+    # { path = "/api/public/.*", method = "GET", is_regex = true },
+    # { path = "/favicon.ico", method = "GET", is_regex = false },
+] 

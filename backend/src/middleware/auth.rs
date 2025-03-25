@@ -1,4 +1,5 @@
 // in auth.rs
+use crate::config::get_config;
 use crate::models::error::AppError;
 use crate::utils::jwt;
 use actix_web::{
@@ -11,19 +12,6 @@ use regex::Regex;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-
-// Define excluded paths similar to EXCLUDE_PATTERNS
-pub const EXCLUDE_PATTERNS: [(&str, Option<Method>, bool); 6] = [
-    ("/api/v1/auth/login", Some(Method::POST), false),
-    ("/api/v1/register", Some(Method::POST), false),
-    ("/api/docs/.*", Some(Method::GET), true),
-    ("/api-docs/.*", Some(Method::GET), true),
-    ("/api/v1/game-data", Some(Method::GET), false),
-    //("/ws/.*", Some(Method::GET), true),
-    ("/api/v1/sse/status", Some(Method::GET), false),
-    //("/api/public/.*", Some(Method::GET), true),
-    //("/favicon.ico", Some(Method::GET), false),
-];
 
 // Authentication middleware with optional role requirement
 pub struct Auth {
@@ -83,33 +71,34 @@ fn is_path_excluded(path: &str, method: &Method) -> bool {
         return true;
     }
 
-    // Check against defined exclusion patterns
-    EXCLUDE_PATTERNS
-        .iter()
-        .any(|(pattern, excluded_method, is_regex)| {
-            let method_matches = match excluded_method {
-                Some(excluded) => method == excluded,
-                None => true, // If no method specified, match any method
-            };
+    // Get exclude patterns from config
+    let config = get_config();
 
-            if !method_matches {
-                return false;
-            }
+    // Check against defined exclusion patterns from config
+    config.auth.exclude_patterns.iter().any(|pattern| {
+        let method_matches = match pattern.get_method() {
+            Some(excluded) => method == &excluded,
+            None => true, // If no method specified in config, match any method
+        };
 
-            if *is_regex {
-                // Use regex matching for patterns marked as regex
-                match Regex::new(pattern) {
-                    Ok(regex) => regex.is_match(path),
-                    Err(_) => {
-                        log::error!("Invalid regex pattern: {}", pattern);
-                        false
-                    }
+        if !method_matches {
+            return false;
+        }
+
+        if pattern.is_regex {
+            // Use regex matching for patterns marked as regex
+            match Regex::new(&pattern.path) {
+                Ok(regex) => regex.is_match(path),
+                Err(_) => {
+                    log::error!("Invalid regex pattern: {}", pattern.path);
+                    false
                 }
-            } else {
-                // Use simple path matching
-                path.starts_with(*pattern)
             }
-        })
+        } else {
+            // Use simple path matching
+            path.starts_with(&pattern.path)
+        }
+    })
 }
 
 impl<S, B> Service<ServiceRequest> for AuthMiddleware<S>

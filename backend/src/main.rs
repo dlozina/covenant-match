@@ -29,7 +29,6 @@ use std::time::Duration;
 use tokio::sync::Mutex;
 use tokio::task;
 use utoipa_swagger_ui::SwaggerUi;
-use ws::SessionManager as WsSessionManager;
 
 /// Starts a background task to periodically clean up old login attempts
 async fn start_login_attempts_cleanup(db: mongodb::Database) {
@@ -69,12 +68,26 @@ async fn main() -> std::io::Result<()> {
 
     // Load configuration
     let config = get_config();
-    let mongo_uri = std::env::var("MONGODB_URI").unwrap_or_else(|_| config.database_url.clone());
-    let server_port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+    info!("Running in {} environment", config.environment);
 
-    // Check for JWT_SECRET environment variable
-    if std::env::var("JWT_SECRET").is_err() {
-        warn!("JWT_SECRET environment variable not set! Using default secret. This is insecure for production!");
+    // Get the MongoDB connection string
+    let mongo_uri =
+        std::env::var("MONGODB_URI").unwrap_or_else(|_| config.database_url().to_string());
+
+    // Check for JWT_SECRET
+    if config.jwt_secret() == "your_jwt_secret_key"
+        || config.jwt_secret() == "default_jwt_secret_key_change_me_in_production"
+    {
+        if config.environment == "production" || config.environment == "docker" {
+            warn!(
+                "JWT_SECRET not properly set in {} environment! Set CONFIG_JWT__SECRET env var.",
+                config.environment
+            );
+        } else {
+            warn!(
+                "Using default JWT secret. This is OK for development but insecure for production!"
+            );
+        }
     }
 
     // Connect to MongoDB
@@ -130,7 +143,11 @@ async fn main() -> std::io::Result<()> {
     session_service::set_sse_session_manager(sse_session_manager.clone());
     info!("SSE session manager initialized");
 
-    info!("Starting HTTP server on port {}", server_port);
+    info!(
+        "Starting HTTP server on {}:{}",
+        config.server_host(),
+        config.server_port()
+    );
     HttpServer::new(move || {
         // Configure CORS
         let cors = Cors::default()
@@ -170,10 +187,8 @@ async fn main() -> std::io::Result<()> {
                     .url("/api-docs/openapi.json", openapi::get_openapi()),
             )
     })
-    // TODO: make this configurable
-    // Change in production
-    .workers(1)
-    .bind(format!("0.0.0.0:{}", server_port))?
+    .workers(config.workers())
+    .bind(format!("{}:{}", config.server_host(), config.server_port()))?
     .run()
     .await
 }

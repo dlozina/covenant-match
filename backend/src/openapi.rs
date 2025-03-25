@@ -19,7 +19,10 @@ use crate::routes::{
     users::*,
 };
 // Import SSE models
+use crate::config::get_config;
 use crate::sse::messages::{ServerMessage, SessionInfo, SessionStatus as SseSessionStatus};
+use actix_web::http::Method;
+use regex::Regex;
 
 use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
@@ -144,19 +147,54 @@ impl Modify for SecurityAddon {
             // Add the security scheme to components
             components.add_security_scheme("bearer_auth", SecurityScheme::Http(http));
 
-            // Apply security to all endpoints except login and user creation
+            // Get config exclude patterns
+            let app_config = get_config();
+            let exclude_patterns = &app_config.auth.exclude_patterns;
+
+            // Apply security to all endpoints except those in exclude patterns
             for (path, path_item) in openapi.paths.paths.iter_mut() {
                 for (method, operation) in &mut path_item.operations {
-                    // Check the path and method for exceptions
-                    let method_str = match method {
-                        utoipa::openapi::PathItemType::Post => "post",
-                        _ => "other",
+                    // Convert to HTTP method for comparison
+                    let http_method = match method {
+                        utoipa::openapi::PathItemType::Get => Method::GET,
+                        utoipa::openapi::PathItemType::Post => Method::POST,
+                        utoipa::openapi::PathItemType::Put => Method::PUT,
+                        utoipa::openapi::PathItemType::Delete => Method::DELETE,
+                        utoipa::openapi::PathItemType::Patch => Method::PATCH,
+                        utoipa::openapi::PathItemType::Options => Method::OPTIONS,
+                        utoipa::openapi::PathItemType::Head => Method::HEAD,
+                        _ => Method::GET,
                     };
 
-                    // Skip auth for login and user creation endpoints
-                    if !(path.contains("/auth/login")
-                        || (path.contains("/users") && method_str == "post"))
-                    {
+                    // Check if this path should be excluded from auth
+                    let should_exclude = exclude_patterns.iter().any(|pattern| {
+                        // Check method
+                        let method_matches = match pattern.get_method() {
+                            Some(pattern_method) => &http_method == &pattern_method,
+                            None => true, // If no method specified, match any method
+                        };
+
+                        if !method_matches {
+                            return false;
+                        }
+
+                        // Check path
+                        let api_path = path.as_str();
+
+                        if pattern.is_regex {
+                            // Use regex matching for patterns marked as regex
+                            match Regex::new(&pattern.path) {
+                                Ok(regex) => regex.is_match(api_path),
+                                Err(_) => false,
+                            }
+                        } else {
+                            // Use simple path matching
+                            api_path.starts_with(&pattern.path)
+                        }
+                    });
+
+                    // If not excluded, apply security requirement
+                    if !should_exclude {
                         // Create a security requirement with bearer_auth and empty scopes
                         let security_req = utoipa::openapi::SecurityRequirement::new(
                             "bearer_auth",
