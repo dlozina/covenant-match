@@ -58,22 +58,22 @@ pub struct GetRecentEvents {
 
 // Message to get the status of sessions and clients
 #[derive(Message)]
-#[rtype(result = "SessionStatus")]
+#[rtype(result = "SseSessionStatus")]
 pub struct GetSessionStatus {}
 
 // Status of all sessions and clients
 #[derive(Serialize, Deserialize, Clone, Debug, ToSchema)]
-pub struct SessionStatus {
+pub struct SseSessionStatus {
     pub active_sessions: Vec<SessionInfo>,
     pub total_clients: usize,
     pub total_sessions: usize,
 }
 
-// Implement MessageResponse for SessionStatus
-impl<A, M> actix::dev::MessageResponse<A, M> for SessionStatus
+// Implement MessageResponse for SseSessionStatus
+impl<A, M> actix::dev::MessageResponse<A, M> for SseSessionStatus
 where
     A: Actor,
-    M: Message<Result = SessionStatus>,
+    M: Message<Result = SseSessionStatus>,
 {
     fn handle(self, _: &mut A::Context, tx: Option<actix::dev::OneshotSender<M::Result>>) {
         if let Some(tx) = tx {

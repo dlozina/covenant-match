@@ -10,7 +10,7 @@ use crate::models::user::{
     AuthResponse, CreateUserDto, GetUsersQuery, LoginUserDto, PaginationInfo, UpdateUserDto,
     UpdateUserProfileDto, User, UserResponse, UsersListData, UsersListResponse,
 };
-use crate::sse::messages::{ServerMessage, SessionInfo, SessionStatus as SseSessionStatus};
+use crate::sse::messages::{ServerMessage, SessionInfo, SseSessionStatus};
 
 use crate::routes::{game_data::*, health::*, sessions::*, sse::*, users::*};
 

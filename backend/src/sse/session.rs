@@ -1,6 +1,6 @@
 use crate::sse::messages::{
     BroadcastMessage, ConnectSSE, DisconnectSSE, GetRecentEvents, GetSessionStatus, ServerMessage,
-    SessionInfo, SessionStatus,
+    SessionInfo, SseSessionStatus,
 };
 use crate::ws::messages::ServerMessage as WsServerMessage;
 use actix::prelude::*;
@@ -700,7 +700,7 @@ impl Handler<GetRecentEvents> for SessionManager {
 
 // Implementation of handler for GetSessionStatus message
 impl Handler<GetSessionStatus> for SessionManager {
-    type Result = SessionStatus;
+    type Result = SseSessionStatus;
 
     fn handle(&mut self, _msg: GetSessionStatus, _ctx: &mut Self::Context) -> Self::Result {
         let mut active_sessions = Vec::new();
@@ -723,7 +723,7 @@ impl Handler<GetSessionStatus> for SessionManager {
         }
 
         // Return the status information
-        SessionStatus {
+        SseSessionStatus {
             active_sessions,
             total_clients: self.clients.len(),
             total_sessions: self.sessions.len(),

@@ -8,7 +8,9 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use utoipa::{IntoParams, ToSchema};
 
-use crate::sse::messages::{ConnectSSE, GetSessionStatus, ServerMessage};
+use crate::sse::messages::{
+    ConnectSSE, GetSessionStatus, ServerMessage,
+};
 use crate::sse::session::SessionManager;
 use crate::utils::jwt;
 
@@ -22,7 +24,7 @@ pub struct SessionEventParams {
 /// SSE endpoint for real-time updates
 #[utoipa::path(
     get,
-    path = "/api/v1/sessions/{session_id}/events",
+    path = "/api/v1/sse/sessions/{session_id}/events",
     params(SessionEventParams),
     responses(
         (status = 200, description = "SSE stream established", content_type = "text/event-stream"),
@@ -35,7 +37,7 @@ pub struct SessionEventParams {
     ),
     tag = "realtime"
 )]
-#[get("/api/v1/sessions/{session_id}/events")]
+#[get("/api/v1/sse/sessions/{session_id}/events")]
 pub async fn events_route(
     req: HttpRequest,
     path: web::Path<SessionEventParams>,
@@ -113,8 +115,9 @@ pub async fn events_route(
     get,
     path = "/api/v1/sse/status",
     responses(
-        (status = 200, description = "Current SSE status", body = crate::sse::messages::SessionStatus),
+        (status = 200, description = "Current SSE status", body = SseSessionStatus),
         (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden"),
         (status = 500, description = "Internal server error")
     ),
     security(
@@ -123,18 +126,31 @@ pub async fn events_route(
     tag = "realtime"
 )]
 #[get("/api/v1/sse/status")]
-pub async fn events_status(sse_session_manager: web::Data<Addr<SessionManager>>) -> impl Responder {
-    info!("Request received for SSE status");
+pub async fn events_status(
+    sse_session_manager: web::Data<Addr<SessionManager>>,
+    req: HttpRequest,
+) -> impl Responder {
+
+    // Get the user role from the request extensions
+    let user_role = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.role.clone()
+    };
+
+    // Middleware already checked admin role, but we can double-check here
+    if user_role != "admin" {
+        return HttpResponse::Forbidden().json(serde_json::json!({
+            "status": "error",
+            "message": "Admin role required"
+        }));
+    }
 
     // Get the status from the session manager
     let status_result = sse_session_manager.send(GetSessionStatus {}).await;
 
     match status_result {
         Ok(status) => {
-            info!(
-                "SSE status successfully retrieved: {} sessions, {} clients",
-                status.total_sessions, status.total_clients
-            );
             HttpResponse::Ok().json(status)
         }
         Err(e) => {

@@ -79,7 +79,7 @@ class EventSourceService {
     
     try {
       // Create a new EventSource connection with the correct endpoint
-      const url = `${apiBaseUrl}/api/v1/sessions/${sessionId}/events`;
+      const url = `${apiBaseUrl}/api/v1/sse/sessions/${sessionId}/events`;
       
       // Check for debug mode via URL
       const isDebugMode = typeof window !== 'undefined' && 

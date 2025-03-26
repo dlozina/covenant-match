@@ -169,12 +169,15 @@ async fn login(
 #[get("/api/v1/users/me")]
 async fn get_current_user(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
     // Get claims from request extensions (set by middleware)
-    let extensions = req.extensions();
-    let claims = extensions.get::<jwt::Claims>().unwrap();
-    let user_id = &claims.sub;
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.sub.clone()
+    };
 
     // Get the user from the database
-    match user_service::get_user_by_id(&db, user_id).await {
+    match user_service::get_user_by_id(&db, &user_id).await {
         Ok(user) => HttpResponse::Ok().json(user),
         Err(e) => {
             log::error!("Error fetching user: {:?}", e);
@@ -208,12 +211,15 @@ async fn update_profile(
     update_data: web::Json<UpdateUserProfileDto>,
 ) -> impl Responder {
     // Get claims from request extensions (set by middleware)
-    let extensions = req.extensions();
-    let claims = extensions.get::<jwt::Claims>().unwrap();
-    let user_id = &claims.sub;
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.sub.clone()
+    };
 
     // Update the user profile
-    match user_service::update_user_profile(&db, user_id, update_data.into_inner()).await {
+    match user_service::update_user_profile(&db, &user_id, update_data.into_inner()).await {
         Ok(user) => HttpResponse::Ok().json(user),
         Err(e) => {
             log::error!("Error updating user profile: {:?}", e);
@@ -240,12 +246,15 @@ async fn update_profile(
 #[delete("/api/v1/users/me")]
 async fn delete_user(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
     // Get claims from request extensions (set by middleware)
-    let extensions = req.extensions();
-    let claims = extensions.get::<jwt::Claims>().unwrap();
-    let user_id = &claims.sub;
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.sub.clone()
+    };
 
     // Delete the user
-    match user_service::delete_user(&db, user_id).await {
+    match user_service::delete_user(&db, &user_id).await {
         Ok(_) => HttpResponse::NoContent().finish(),
         Err(e) => {
             log::error!("Error deleting user: {:?}", e);
@@ -279,8 +288,12 @@ async fn create_admin_user(
     req: HttpRequest,
 ) -> impl Responder {
     // Get claims from request extensions (set by middleware)
-    let extensions = req.extensions();
-    let claims = extensions.get::<jwt::Claims>().unwrap();
+    // Extract user_id before any await points
+    let claims = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.clone()
+    };
 
     // Middleware already checked admin role, but we can double-check here
     if claims.role != "admin" {
@@ -330,8 +343,11 @@ async fn get_all_users(
     query: web::Query<GetUsersQuery>,
 ) -> impl Responder {
     // Get claims from request extensions (set by middleware)
-    let extensions = req.extensions();
-    let claims = extensions.get::<jwt::Claims>().unwrap();
+    let claims = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.clone()
+    };
 
     // Middleware already checked admin role, but we can double-check here
     if claims.role != "admin" {
@@ -391,7 +407,6 @@ async fn get_all_users(
 async fn get_user_by_id_admin(
     db: web::Data<Database>,
     path: web::Path<String>,
-    req: HttpRequest,
 ) -> impl Responder {
     // Middleware already checks for admin role
     let user_id = path.into_inner();
@@ -432,7 +447,6 @@ async fn update_user_admin(
     db: web::Data<Database>,
     path: web::Path<String>,
     update_data: web::Json<UpdateUserProfileDto>,
-    req: HttpRequest,
 ) -> impl Responder {
     // Middleware already checks for admin role
     let user_id = path.into_inner();
@@ -469,7 +483,6 @@ async fn update_user_admin(
 async fn delete_user_admin(
     db: web::Data<Database>,
     path: web::Path<String>,
-    req: HttpRequest,
 ) -> impl Responder {
     // Middleware already checks for admin role
     let user_id = path.into_inner();
