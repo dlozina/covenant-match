@@ -10,17 +10,12 @@ use crate::models::user::{
     AuthResponse, CreateUserDto, GetUsersQuery, LoginUserDto, PaginationInfo, UpdateUserDto,
     UpdateUserProfileDto, User, UserResponse, UsersListData, UsersListResponse,
 };
-use crate::routes::{
-    game_data::*,
-    health::*,
-    // Import other routes as they become available
-    sessions::*,
-    // statistics::*,
-    users::*,
-};
+use crate::sse::messages::{ServerMessage, SessionInfo, SessionStatus as SseSessionStatus};
+
+use crate::routes::{game_data::*, health::*, sessions::*, sse::*, users::*};
+
 // Import SSE models
 use crate::config::get_config;
-use crate::sse::messages::{ServerMessage, SessionInfo, SessionStatus as SseSessionStatus};
 use actix_web::http::Method;
 use regex::Regex;
 
@@ -70,9 +65,9 @@ use utoipa::{
         get_platforms,
         get_regions,
         get_covenants,
-        //tod: not needed for now
-        //rate_session,
-        // Add statistics routes as they become available
+        // SSE routes
+        events_route,
+        events_status,
     ),
     components(
         schemas(

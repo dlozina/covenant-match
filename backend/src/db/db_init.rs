@@ -87,7 +87,7 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
                 "email": "akri@gmail.com",
                 "password_hash": password_hash,
                 "display_name": "Akri",
-                "region": "EU",
+                "region": "Europe",
                 "auto_region": true,
                 "platform": "PlayStation",
                 "role": "admin",

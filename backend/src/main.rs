@@ -164,21 +164,22 @@ async fn main() -> std::io::Result<()> {
             .app_data(Data::new(db.clone()))
             .app_data(Data::new(sse_session_manager.clone()))
             // SSE route - exempt from Auth middleware
-            .service(
-                actix_web::web::resource("/api/v1/sessions/{session_id}/events")
-                    .route(actix_web::web::get().to(sse::events_route)),
-            )
+            // .service(
+            //     actix_web::web::resource("/api/v1/sessions/{session_id}/events")
+            //         .route(actix_web::web::get().to(sse::events_route)),
+            // )
             // New SSE status route for debugging
-            .service(
-                actix_web::web::resource("/api/v1/sse/status")
-                    .route(actix_web::web::get().to(sse::events_status)),
-            )
+            // .service(
+            //     actix_web::web::resource("/api/v1/sse/status")
+            //         .route(actix_web::web::get().to(sse::events_status)),
+            // )
             // Register routes directly (not inside a scope) -> scope has issues
             .wrap(Auth::user())
             .configure(health::config)
             .configure(users::config)
             .configure(sessions::config)
             .configure(game_data::config)
+            .configure(routes::sse::config)
             //TODO: Add statistics routes
             //.configure(statistics::config)
             // Add Swagger UI with the OpenAPI schema from our new module

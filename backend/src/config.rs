@@ -128,11 +128,6 @@ impl Config {
                     method: Some("GET".to_string()),
                     is_regex: false,
                 },
-                ExcludePattern {
-                    path: "/api/v1/sse/status".to_string(),
-                    method: Some("GET".to_string()),
-                    is_regex: false,
-                },
             ],
         };
 

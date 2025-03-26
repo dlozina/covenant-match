@@ -1,5 +1,5 @@
 use actix::prelude::*;
-use actix_web::{web, HttpMessage, HttpRequest, HttpResponse, Responder};
+use actix_web::{get, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use bytes::Bytes;
 use futures::stream::StreamExt;
 use log::{debug, error, info};
@@ -42,6 +42,7 @@ pub struct SessionEventParams {
     ),
     tag = "realtime"
 )]
+#[get("/api/v1/sessions/{session_id}/events")]
 pub async fn events_route(
     req: HttpRequest,
     path: web::Path<String>,
@@ -107,15 +108,15 @@ pub async fn events_route(
         .append_header(("Content-Type", "text/event-stream"))
         .append_header(("Cache-Control", "no-cache"))
         .append_header(("Connection", "keep-alive"))
-        // Add these headers to prevent proxies from closing the connection
+        
         .append_header(("X-Accel-Buffering", "no"))
         .append_header(("Access-Control-Allow-Origin", "*"))
-        // Increase timeouts
+        
         .append_header(("Keep-Alive", "timeout=60"))
-        // Add additional headers to prevent connection closures
+        
         .append_header(("Access-Control-Allow-Credentials", "true"))
         .append_header(("Access-Control-Expose-Headers", "Content-Type"))
-        // Prevent browser/proxy timeouts with periodic response
+        
         .append_header(("Ping-Interval", "15"))
         .streaming(stream)
 }
@@ -140,6 +141,7 @@ pub async fn events_route(
     ),
     tag = "realtime"
 )]
+#[get("/api/v1/sse/status")]
 pub async fn events_status(sse_session_manager: web::Data<Addr<SessionManager>>) -> impl Responder {
     info!("Request received for SSE status");
 
@@ -161,4 +163,9 @@ pub async fn events_status(sse_session_manager: web::Data<Addr<SessionManager>>)
             }))
         }
     }
+}
+
+pub fn config(cfg: &mut web::ServiceConfig) {
+    cfg.service(events_route);
+    cfg.service(events_status);
 }

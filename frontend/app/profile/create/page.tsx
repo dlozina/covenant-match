@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { FALLBACK_REGIONS, FALLBACK_PLATFORMS, FALLBACK_COVENANT_NAMES } from "@/lib/constants"
 
 // Username and display name validation regex
 const usernameRegex = /^[a-zA-Z0-9_.-]+$/;
@@ -156,34 +157,6 @@ export default function CreateProfilePage() {
     
     fetchGameData();
   }, []);
-
-  // Fallback data in case API fails
-  const FALLBACK_REGIONS = [
-    "North America",
-    "Europe",
-    "Asia",
-    "Oceania",
-    "South America",
-    "Africa",
-    "Middle East",
-  ]
-
-  const FALLBACK_PLATFORMS = [
-    "PlayStation",
-    "Xbox",
-    "PC",
-  ]
-
-  const FALLBACK_COVENANT_NAMES = [
-    "Warriors of Sunlight",
-    "Way of White",
-    "Princess Guard",
-    "Way of the Blue",
-    "Heirs of the Sun",
-    "Spears of the Church",
-    "Blades of the Darkmoon",
-    "Watchdogs of Farron",
-  ]
 
   // Use API data or fallback data
   const REGIONS = gameData?.regions?.map(r => r.description) || FALLBACK_REGIONS;
