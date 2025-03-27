@@ -1,4 +1,3 @@
-use crate::middleware::auth::Auth;
 use crate::utils::jwt;
 use actix_web::{get, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 

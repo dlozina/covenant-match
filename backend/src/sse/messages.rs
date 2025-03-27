@@ -47,6 +47,14 @@ pub struct SendHeartbeat {
     pub message: ServerMessage,
 }
 
+// New message to send staggered heartbeats to a specific batch of sessions
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct SendStaggeredHeartbeat {
+    pub message: ServerMessage,
+    pub batch_id: u32, // Which batch of sessions should receive this heartbeat
+}
+
 // Message to request recent events for polling
 #[derive(Message)]
 #[rtype(result = "Result<Vec<ServerMessage>, std::io::Error>")]

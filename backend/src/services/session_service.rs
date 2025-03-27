@@ -7,6 +7,7 @@ use crate::models::session::{
 use crate::repository::{session_repository, statistics_repository, user_repository};
 use crate::sse::messages::{BroadcastMessage, ServerMessage as SseServerMessage};
 use crate::sse::session::SessionManager as SseSessionManager;
+use crate::sse::session_pruner::SessionPrunerActor;
 use crate::ws::messages::{Broadcast, ServerMessage as WsServerMessage};
 use crate::ws::SessionManager as WsSessionManager;
 use actix::prelude::*;
@@ -127,6 +128,14 @@ pub fn broadcast_event(
 
                 // Set the new SSE session manager
                 set_sse_session_manager(new_sse_manager.clone());
+
+                // Start the session pruner with a 1-hour interval and 24-hour max inactivity
+                let _session_pruner = SessionPrunerActor::new(
+                    new_sse_manager.clone(),
+                    3600,  // Run every hour
+                    86400, // Prune sessions inactive for 24 hours
+                )
+                .start();
 
                 // Try broadcasting again with the new manager
                 let message = SseServerMessage {

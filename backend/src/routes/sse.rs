@@ -6,7 +6,7 @@ use log::{debug, error, info};
 use serde_json::json;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
-use utoipa::{IntoParams, ToSchema};
+use utoipa::IntoParams;
 
 use crate::sse::messages::{
     ConnectSSE, GetSessionStatus, ServerMessage,

@@ -1,7 +1,6 @@
-use crate::middleware::auth::Auth;
 use crate::models::error::AppError;
 use crate::models::user::{
-    CreateUserDto, GetUsersQuery, LoginUserDto, UpdateUserProfileDto, UserResponse,
+    CreateUserDto, GetUsersQuery, LoginUserDto, UpdateUserProfileDto,
 };
 use crate::services::{auth_service, user_service};
 use crate::utils::{jwt, recaptcha};
@@ -9,7 +8,6 @@ use actix_web::{
     delete, get, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError,
 };
 use mongodb::Database;
-use utoipa::{IntoParams, ToSchema};
 
 /// Create a new user
 #[utoipa::path(

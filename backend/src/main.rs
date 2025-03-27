@@ -24,6 +24,7 @@ use routes::{game_data, sessions};
 use services::{auth_service, session_service, user_service};
 use sse::heartbeat::HeartbeatActor;
 use sse::session::SessionManager as SseSessionManager;
+use sse::session_pruner::SessionPrunerActor;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -134,6 +135,14 @@ async fn main() -> std::io::Result<()> {
 
     // Start SSE session manager actor (standalone without WebSocket)
     let sse_session_manager = SseSessionManager::new_standalone().start();
+
+    // Start the session pruner with a 1-hour interval and 24-hour max inactivity
+    let _session_pruner = SessionPrunerActor::new(
+        sse_session_manager.clone(),
+        3600,  // Run every hour
+        7200, // Prune sessions inactive for 2 hours
+    )
+    .start();
 
     // Start the HeartbeatActor to send periodic heartbeat events
     let _heartbeat_actor = HeartbeatActor::new(sse_session_manager.clone()).start();

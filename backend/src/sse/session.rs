@@ -2,6 +2,7 @@ use crate::sse::messages::{
     BroadcastMessage, ConnectSSE, DisconnectSSE, GetRecentEvents, GetSessionStatus, ServerMessage,
     SessionInfo, SseSessionStatus,
 };
+use crate::sse::session_pruner::PruneInactiveSessions;
 use crate::ws::messages::ServerMessage as WsServerMessage;
 use actix::prelude::*;
 use chrono;
@@ -20,6 +21,8 @@ pub struct SessionManager {
     ws_session_manager: Option<Addr<crate::ws::session::SessionManager>>,
     // Add a new field to store recent events for each session
     recent_events: HashMap<String, VecDeque<ServerMessage>>,
+    // New field to track last activity time for each session
+    session_last_activity: HashMap<String, i64>, // session_id -> timestamp
 }
 
 impl Default for SessionManager {
@@ -29,6 +32,7 @@ impl Default for SessionManager {
             clients: HashMap::new(),
             ws_session_manager: None,
             recent_events: HashMap::new(),
+            session_last_activity: HashMap::new(),
         }
     }
 }
@@ -41,6 +45,7 @@ impl SessionManager {
             clients: HashMap::new(),
             ws_session_manager: Some(ws_session_manager),
             recent_events: HashMap::new(),
+            session_last_activity: HashMap::new(),
         }
     }
 
@@ -52,11 +57,27 @@ impl SessionManager {
             clients: HashMap::new(),
             ws_session_manager: None,
             recent_events: HashMap::new(),
+            session_last_activity: HashMap::new(),
         }
+    }
+
+    // Helper method to update session activity timestamp
+    fn update_session_activity(&mut self, session_id: &str) {
+        let now = chrono::Utc::now().timestamp();
+        self.session_last_activity
+            .insert(session_id.to_string(), now);
+        log::debug!(
+            "Updated activity timestamp for session {}: {}",
+            session_id,
+            now
+        );
     }
 
     pub fn store_recent_event(&mut self, session_id: &str, event: ServerMessage) {
         log::debug!("Storing event for session {}: {:?}", session_id, event);
+
+        // Update session activity timestamp
+        self.update_session_activity(session_id);
 
         // Ensure the session exists in the recent_events map
         if !self.recent_events.contains_key(session_id) {
@@ -142,6 +163,54 @@ impl SessionManager {
             if !self.sessions.contains_key(session_id) {
                 log::debug!("Session {} has events but no connected clients", session_id);
             }
+        }
+    }
+
+    // Implement the pruning logic for inactive sessions
+    pub fn prune_inactive_sessions(&mut self, max_inactive_seconds: i64) {
+        let now = chrono::Utc::now().timestamp();
+        let cutoff_time = now - max_inactive_seconds;
+
+        // Collect sessions to prune
+        let inactive_sessions: Vec<String> = self
+            .session_last_activity
+            .iter()
+            .filter(|(session_id, last_activity)| {
+                // Session is inactive if:
+                // 1. It has no connected clients
+                // 2. Last activity was before the cutoff time
+                let has_clients = self
+                    .sessions
+                    .get(*session_id)
+                    .map_or(false, |clients| !clients.is_empty());
+                !has_clients && **last_activity < cutoff_time
+            })
+            .map(|(session_id, _)| session_id.clone())
+            .collect();
+
+        // Prune the collected sessions
+        if !inactive_sessions.is_empty() {
+            log::info!(
+                "Pruning {} inactive sessions older than {} seconds",
+                inactive_sessions.len(),
+                max_inactive_seconds
+            );
+
+            for session_id in &inactive_sessions {
+                // Remove events for this session
+                if let Some(events) = self.recent_events.remove(session_id) {
+                    log::info!(
+                        "Pruned {} events from inactive session {}",
+                        events.len(),
+                        session_id
+                    );
+                }
+
+                // Remove activity timestamp
+                self.session_last_activity.remove(session_id);
+            }
+        } else {
+            log::debug!("No inactive sessions to prune");
         }
     }
 
@@ -380,6 +449,9 @@ impl Handler<ConnectSSE> for SessionManager {
         let client_id = msg.client_id.clone();
         let sender = msg.sender.clone();
 
+        // Update session activity timestamp on connection
+        self.update_session_activity(&session_id);
+
         // Create the connection event
         let connection_event = ServerMessage {
             message_type: "connection".to_string(),
@@ -507,7 +579,7 @@ impl Handler<DisconnectSSE> for SessionManager {
         if let Some(clients) = self.sessions.get_mut(&msg.session_id) {
             clients.remove(&msg.client_id);
 
-            // If session is empty, remove it from the sessions map but keep the events
+            // If session is empty, update timestamp but don't remove the session
             if clients.is_empty() {
                 self.sessions.remove(&msg.session_id);
                 debug!(
@@ -515,9 +587,13 @@ impl Handler<DisconnectSSE> for SessionManager {
                     msg.session_id
                 );
 
-                // Log but don't clean up events for this session
+                // Keep track of when the session became inactive
+                // This is already handled by update_session_activity,
+                // but calling it explicitly to make the logic clear
+                self.update_session_activity(&msg.session_id);
+
                 log::info!(
-                    "Session {} has no connected clients but keeping events",
+                    "Session {} has no connected clients but keeping events (updated activity timestamp)",
                     msg.session_id
                 );
             } else {
@@ -544,6 +620,9 @@ impl Handler<BroadcastMessage> for SessionManager {
             msg.session_id,
             msg.message
         );
+
+        // Update session activity timestamp when broadcasting
+        self.update_session_activity(&msg.session_id);
 
         // Ensure the session exists in the recent_events map
         if !self.recent_events.contains_key(&msg.session_id) {
@@ -676,6 +755,9 @@ impl Handler<GetRecentEvents> for SessionManager {
             client_id, session_id, since_timestamp
         );
 
+        // Update session activity timestamp when events are requested
+        self.update_session_activity(&session_id);
+
         // Log the current state of recent_events
         debug!(
             "Current sessions with stored events: {:?}",
@@ -780,5 +862,80 @@ impl Handler<crate::sse::messages::SendHeartbeat> for SessionManager {
                 }
             }
         }
+    }
+}
+
+// Handler for SendStaggeredHeartbeat message
+impl Handler<crate::sse::messages::SendStaggeredHeartbeat> for SessionManager {
+    type Result = ();
+
+    fn handle(&mut self, msg: crate::sse::messages::SendStaggeredHeartbeat, _: &mut Context<Self>) {
+        let heartbeat = msg.message;
+        let batch_id = msg.batch_id;
+        let message_type = &heartbeat.message_type;
+
+        // Filter active sessions based on batch_id
+        // We'll use the last character of the session ID to determine which batch it belongs to
+        let session_ids: Vec<String> = self
+            .sessions
+            .keys()
+            .filter(|id| {
+                let last_char = id.chars().last().unwrap_or('0');
+                let digit = last_char.to_digit(16).unwrap_or(0); // Use base 16 to handle alphanumeric
+                digit % 4 == batch_id // Split into 4 batches (0,1,2,3)
+            })
+            .cloned()
+            .collect();
+
+        if session_ids.is_empty() {
+            info!("No active sessions for batch {} heartbeat", batch_id);
+            return;
+        }
+
+        info!(
+            "Broadcasting staggered heartbeat to {} active sessions in batch {}",
+            session_ids.len(),
+            batch_id
+        );
+
+        // For each session in this batch, send the heartbeat
+        for session_id in session_ids {
+            // Store the event in this session's history
+            self.store_recent_event(&session_id, heartbeat.clone());
+
+            // Get the clients for this session
+            if let Some(clients) = self.sessions.get(&session_id) {
+                debug!(
+                    "Sending batch {} heartbeat to {} clients in session {}",
+                    batch_id,
+                    clients.len(),
+                    session_id
+                );
+
+                for client_id in clients {
+                    if let Some(client_sender) = self.clients.get(client_id) {
+                        // Try to send the heartbeat
+                        if let Err(e) = client_sender.try_send(heartbeat.clone()) {
+                            error!("Failed to send heartbeat to client {}: {:?}", client_id, e);
+                        } else {
+                            debug!(
+                                "❤️ Batch {} heartbeat sent to client {} in session {}",
+                                batch_id, client_id, session_id
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Add handler for PruneInactiveSessions
+impl Handler<PruneInactiveSessions> for SessionManager {
+    type Result = ();
+
+    fn handle(&mut self, msg: PruneInactiveSessions, _: &mut Context<Self>) {
+        log::info!("Received request to prune inactive sessions");
+        self.prune_inactive_sessions(msg.max_inactive_seconds);
     }
 }
