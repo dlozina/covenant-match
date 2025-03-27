@@ -23,6 +23,7 @@ use mongodb::{options::ClientOptions, Client};
 use routes::{game_data, sessions};
 use services::{auth_service, session_service, user_service};
 use sse::heartbeat::HeartbeatActor;
+use sse::partition::{SessionRouter, DEFAULT_PARTITION_COUNT};
 use sse::session::SessionManager as SseSessionManager;
 use sse::session_pruner::SessionPrunerActor;
 use std::sync::Arc;
@@ -134,23 +135,21 @@ async fn main() -> std::io::Result<()> {
     }
 
     // Start SSE session manager actor (standalone without WebSocket)
-    let sse_session_manager = SseSessionManager::new_standalone().start();
+    let sse_router = SessionRouter::new(DEFAULT_PARTITION_COUNT, None).start();
 
     // Start the session pruner with a 1-hour interval and 24-hour max inactivity
     let _session_pruner = SessionPrunerActor::new(
-        sse_session_manager.clone(),
+        sse_router.clone(),
         3600,  // Run every hour
-        7200, // Prune sessions inactive for 2 hours
+        86400, // Prune sessions inactive for 24 hours
     )
     .start();
 
     // Start the HeartbeatActor to send periodic heartbeat events
-    let _heartbeat_actor = HeartbeatActor::new(sse_session_manager.clone()).start();
-    info!("Heartbeat actor started with interval defined in heartbeat.rs");
+    let _heartbeat_actor = HeartbeatActor::new(sse_router.clone()).start();
 
-    // Set the SSE session manager in the session service
-    session_service::set_sse_session_manager(sse_session_manager.clone());
-    info!("SSE session manager initialized");
+    // Register the router with the session service (which needs updating)
+    session_service::set_sse_router(sse_router.clone());
 
     info!(
         "Starting HTTP server on {}:{}",
@@ -171,7 +170,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(Logger::default())
             .wrap(cors)
             .app_data(Data::new(db.clone()))
-            .app_data(Data::new(sse_session_manager.clone()))
+            .app_data(Data::new(sse_router.clone()))
             // Register routes directly (not inside a scope) -> scope has issues
             .wrap(Auth::user())
             .configure(health::config)

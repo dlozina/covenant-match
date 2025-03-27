@@ -4,26 +4,26 @@ use serde_json::json;
 use std::time::Duration;
 
 use crate::sse::messages::{SendHeartbeat, SendStaggeredHeartbeat, ServerMessage};
-use crate::sse::session::SessionManager;
+use crate::sse::partition::SessionRouter;
 
 // Actor for sending periodic heartbeats to connected clients
 pub struct HeartbeatActor {
     interval: Duration,
-    sse_manager: Addr<SessionManager>,
+    sse_router: Addr<SessionRouter>,
     batch_count: u32,
     use_staggered_heartbeats: bool,
     sub_interval: Duration,
 }
 
 // Main heartbeat interval in seconds
-const HEARTBEAT_INTERVAL: u64 = 30;
+const HEARTBEAT_INTERVAL: u64 = 15;
 // Number of batches for staggered heartbeats
 const DEFAULT_BATCH_COUNT: u32 = 4;
 // If true, use staggered heartbeats instead of all-at-once
 const USE_STAGGERED_HEARTBEATS: bool = true;
 
 impl HeartbeatActor {
-    pub fn new(sse_manager: Addr<SessionManager>) -> Self {
+    pub fn new(sse_router: Addr<SessionRouter>) -> Self {
         let interval = Duration::from_secs(HEARTBEAT_INTERVAL);
 
         // For staggered heartbeats, we'll divide the main interval by the batch count
@@ -36,7 +36,7 @@ impl HeartbeatActor {
 
         Self {
             interval,
-            sse_manager,
+            sse_router,
             batch_count: DEFAULT_BATCH_COUNT,
             use_staggered_heartbeats: USE_STAGGERED_HEARTBEATS,
             sub_interval,
@@ -69,10 +69,13 @@ impl HeartbeatActor {
 
     // Send heartbeat to all sessions at once (original method)
     fn send_regular_heartbeat(&self, message: ServerMessage) {
-        info!("❤️ Sending regular heartbeat to all connected sessions");
+        info!(
+            "❤️ Sending regular heartbeat to all connected sessions (timestamp: {})",
+            message.timestamp
+        );
 
-        // Send a special SendHeartbeat message to the SessionManager
-        self.sse_manager.do_send(SendHeartbeat {
+        // Send a special SendHeartbeat message to the SessionRouter
+        self.sse_router.do_send(SendHeartbeat {
             message: message.clone(),
         });
 
@@ -83,8 +86,8 @@ impl HeartbeatActor {
     // Send heartbeats in a staggered way, batch by batch
     fn send_staggered_heartbeats(&self, ctx: &mut Context<Self>, message: ServerMessage) {
         info!(
-            "Starting staggered heartbeat cycle (will send to {} batches)",
-            self.batch_count
+            "Starting staggered heartbeat cycle (will send to {} batches, timestamp: {})",
+            self.batch_count, message.timestamp
         );
 
         // Schedule the first batch immediately
@@ -102,7 +105,7 @@ impl HeartbeatActor {
             batch_id + 1,
             self.batch_count
         );
-        self.sse_manager.do_send(SendStaggeredHeartbeat {
+        self.sse_router.do_send(SendStaggeredHeartbeat {
             message: message_clone,
             batch_id,
         });

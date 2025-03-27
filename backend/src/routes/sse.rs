@@ -8,10 +8,8 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use utoipa::IntoParams;
 
-use crate::sse::messages::{
-    ConnectSSE, GetSessionStatus, ServerMessage,
-};
-use crate::sse::session::SessionManager;
+use crate::sse::messages::{ConnectSSE, GetSessionStatus, ServerMessage};
+use crate::sse::partition::SessionRouter;
 use crate::utils::jwt;
 
 /// Path parameter for session events
@@ -41,9 +39,10 @@ pub struct SessionEventParams {
 pub async fn events_route(
     req: HttpRequest,
     path: web::Path<SessionEventParams>,
-    session_manager: web::Data<Addr<SessionManager>>,
+    session_router: web::Data<Addr<SessionRouter>>,
 ) -> impl Responder {
     let session_event_params = path.into_inner();
+    let session_id = session_event_params.session_id.clone();
 
     let user_id = {
         let extensions = req.extensions();
@@ -51,15 +50,22 @@ pub async fn events_route(
         claims.sub.clone()
     };
 
-    info!("SSE connection authorized for user: {}", user_id);
+    info!(
+        "New SSE connection established - User: {}, Session: {}",
+        user_id, session_id
+    );
 
     // Create channel for sending events to client
     let (tx, rx) = mpsc::channel::<ServerMessage>(100);
 
-    // Register client with session manager
-    session_manager.do_send(ConnectSSE {
+    // Clone these values for use after the closure
+    let user_id_log = user_id.clone();
+    let session_id_log = session_id.clone();
+
+    // Register client with session router, which will route to the correct partition
+    session_router.do_send(ConnectSSE {
         client_id: user_id.clone(),
-        session_id: session_event_params.session_id.clone(),
+        session_id: session_id.clone(),
         sender: tx,
     });
 
@@ -68,17 +74,18 @@ pub async fn events_route(
         // Format the message as an SSE event
         let event_type = &msg.message_type;
         let data = serde_json::to_string(&msg.data).unwrap_or_default();
+        let timestamp = msg.timestamp;
 
         // Log the event type and data
         if event_type == "heartbeat" {
             info!(
-                "❤️ Sending SSE heartbeat event to client {}: event: {}, data: {}",
-                user_id, event_type, data
+                "❤️ SSE heartbeat (timestamp: {}) for client {} in session {}",
+                timestamp, user_id, session_id
             );
         } else {
             debug!(
-                "Sending SSE event to client {}: event: {}, data: {}",
-                user_id, event_type, data
+                "SSE event (type: {}, timestamp: {}) for client {} in session {}",
+                event_type, timestamp, user_id, session_id
             );
         }
 
@@ -91,6 +98,11 @@ pub async fn events_route(
 
         Ok::<Bytes, std::convert::Infallible>(Bytes::from(sse_data))
     });
+
+    info!(
+        "SSE stream ready for client {} in session {}",
+        user_id_log, session_id_log
+    );
 
     // Return SSE response
     HttpResponse::Ok()
@@ -127,10 +139,9 @@ pub async fn events_route(
 )]
 #[get("/api/v1/sse/status")]
 pub async fn events_status(
-    sse_session_manager: web::Data<Addr<SessionManager>>,
+    session_router: web::Data<Addr<SessionRouter>>,
     req: HttpRequest,
 ) -> impl Responder {
-
     // Get the user role from the request extensions
     let user_role = {
         let extensions = req.extensions();
@@ -146,13 +157,11 @@ pub async fn events_status(
         }));
     }
 
-    // Get the status from the session manager
-    let status_result = sse_session_manager.send(GetSessionStatus {}).await;
+    // Get the status from the session router, which will aggregate from all partitions
+    let status_result = session_router.send(GetSessionStatus {}).await;
 
     match status_result {
-        Ok(status) => {
-            HttpResponse::Ok().json(status)
-        }
+        Ok(status) => HttpResponse::Ok().json(status),
         Err(e) => {
             error!("Failed to get SSE status: {:?}", e);
             HttpResponse::InternalServerError().json(json!({

@@ -32,7 +32,7 @@ pub struct DisconnectSSE {
 }
 
 // Message to broadcast to all clients in a session
-#[derive(Message)]
+#[derive(Message, Clone)]
 #[rtype(result = "()")]
 pub struct BroadcastMessage {
     pub session_id: String,
@@ -41,14 +41,14 @@ pub struct BroadcastMessage {
 }
 
 // New message to send heartbeats to all active sessions
-#[derive(Message)]
+#[derive(Message, Clone)]
 #[rtype(result = "()")]
 pub struct SendHeartbeat {
     pub message: ServerMessage,
 }
 
 // New message to send staggered heartbeats to a specific batch of sessions
-#[derive(Message)]
+#[derive(Message, Clone)]
 #[rtype(result = "()")]
 pub struct SendStaggeredHeartbeat {
     pub message: ServerMessage,

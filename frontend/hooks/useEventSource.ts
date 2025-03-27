@@ -46,15 +46,42 @@ class EventSourceService {
       return;
     }
     
+    console.log(`connect() called for session ${sessionId}. Current session: ${this.sessionId}, status: ${this.connectionStatus}`);
+    
     // If we're already connected to this same session, just update activity
     if (this.sessionId === sessionId && this.eventSource && 
-        (this.connectionStatus === 'connected' || this.connectionStatus === 'connecting')) {
+        this.connectionStatus === 'connected') {
+      console.log(`Already connected to session ${sessionId}, updating activity`);
       this.updateActivity();
       return;
     }
     
+    // If we're already connecting to this session, don't create another connection
+    if (this.sessionId === sessionId && this.eventSource && 
+        this.connectionStatus === 'connecting' && 
+        this.eventSource.readyState !== EventSource.CLOSED) {
+      console.log(`Already connecting to session ${sessionId}, waiting for connection to establish`);
+      this.updateActivity();
+      return;
+    }
+    
+    // If we're in error state but the connection is not CLOSED and for the same session,
+    // don't create a new connection - our error handler will take care of reconnection
+    if (this.sessionId === sessionId && this.eventSource && 
+        this.connectionStatus === 'error' && 
+        this.eventSource.readyState !== EventSource.CLOSED &&
+        this.isReconnectingFlag) {
+      console.log(`Connection is in error state but reconnecting - not creating new connection for ${sessionId}`);
+      this.updateActivity();
+      return;
+    }
+    
+    // If we're in error state or trying to connect to a different session, clean up first
+    console.log(`Creating new connection to session ${sessionId}`);
+    
     // Close existing connection if there is one
     if (this.eventSource) {
+      console.log(`Closing existing EventSource connection to ${this.sessionId}`);
       if (this.eventSource.readyState !== EventSource.CLOSED) {
         this.eventSource.close();
       }
@@ -85,19 +112,24 @@ class EventSourceService {
       const isDebugMode = typeof window !== 'undefined' && 
                           window.location.search.includes('debug=eventsource');
       
-                          const token = localStorage.getItem('token');
       // Create the EventSource instance -> this is the polyfilled EventSource
       const newEventSource = new EventSourcePolyfill(
         url, 
         {
           headers: {
             'Authorization': `Bearer ${token}`
-          }
+          },
+          // Increase the heartbeat timeout to 2 minutes (120,000ms)
+          // This value should be longer than the server's heartbeat interval
+          heartbeatTimeout: 120000
         }
       );
       
-      // Create the EventSource instance -> this is the original EventSource
-      // const newEventSource = new EventSource(url);
+      // For debugging the polyfill internals
+      console.log('EventSourcePolyfill created with options:', {
+        url,
+        heartbeatTimeout: 120000
+      });
       
       // Add a very low-level event listener to log all raw messages if in debug mode
       if (isDebugMode) {
@@ -125,6 +157,37 @@ class EventSourceService {
       // Handle reconnection
       newEventSource.onerror = (error) => {
         const readyState = (error.target as EventSource)?.readyState;
+        console.log('EventSource error:', error, 'readyState:', readyState);
+        
+        // Check for "No activity" error which is a special case from the polyfill
+        const errorMessage = error.toString();
+        const isNoActivityError = errorMessage.includes && errorMessage.includes('No activity within');
+        
+        if (isNoActivityError) {
+          console.log('No activity error detected from polyfill. This should be fixed by increasing heartbeatTimeout.');
+          
+          // Don't treat this as a fatal error, as our longer heartbeatTimeout should prevent it
+          this.connectionStatus = 'connecting';
+          
+          // Force a heartbeat from client side to reset the activity timer
+          if (this.eventSource) {
+            console.log('Dispatching fake heartbeat to keep connection alive');
+            const fakeEvent = new CustomEvent('sse-heartbeat', { 
+              detail: { 
+                timestamp: Date.now(),
+                formattedTime: new Date().toLocaleTimeString(),
+                message: "Client-side heartbeat",
+                sequence: "client",
+                sessionId: this.sessionId,
+                receivedAt: new Date().toLocaleTimeString(),
+                source: "client-heartbeat"
+              } 
+            });
+            window.dispatchEvent(fakeEvent);
+          }
+          
+          return;
+        }
         
         if (readyState === EventSource.CLOSED) {
           console.log('EventSource connection closed - handling reconnection');
@@ -133,7 +196,9 @@ class EventSourceService {
           // Manage reconnection with backoff
           if (this.reconnectAttempts < this.maxReconnectAttempts && !this.isReconnectingFlag) {
             this.isReconnectingFlag = true;
-            const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000); // Exponential backoff, max 30s
+            const delay = Math.min(1000 * Math.pow(1.5, this.reconnectAttempts), 10000); // Reduced backoff, max 10s
+            
+            console.log(`Will attempt to reconnect in ${delay}ms (attempt ${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})`);
             
             if (this.reconnectTimer) {
               clearTimeout(this.reconnectTimer);
@@ -148,6 +213,8 @@ class EventSourceService {
                 this.eventSource = null;
               }
               
+              console.log(`Attempting reconnection #${this.reconnectAttempts} for session ${this.sessionId}`);
+              
               // Reconnect with the same session ID
               if (this.sessionId) {
                 this.connect(this.sessionId);
@@ -158,6 +225,7 @@ class EventSourceService {
             toast.error('Could not establish a stable connection. Please refresh the page.');
           }
         } else {
+          console.log('EventSource error but connection not closed, status:', readyState);
           this.connectionStatus = 'connecting';
         }
       };
@@ -199,6 +267,9 @@ class EventSourceService {
           
           // Create a local timestamp for received time (browser time)
           const localTime = new Date().toLocaleTimeString();
+          
+          // Improved logging for heartbeats
+          console.log(`❤️ Heartbeat received at ${localTime} - server timestamp: ${data.timestamp || 'unknown'}, sequence: ${data.sequence || 'unknown'}`);
           
           // Dispatch a custom event for heartbeat visualization
           const heartbeatEvent = new CustomEvent('sse-heartbeat', { 
@@ -263,6 +334,9 @@ class EventSourceService {
       
       // Assign the EventSource
       this.eventSource = newEventSource;
+      
+      // Log successful connection
+      console.log(`SSE connection established to session ${sessionId}`);
     } catch (error) {
       console.error('Error creating EventSource:', error);
       this.connectionStatus = 'error';
@@ -284,31 +358,36 @@ class EventSourceService {
   }
 
   disconnect(force: boolean = false): void {
-    if (!force && this.activeConnections > 0) {
-      console.log(`Not disconnecting - still has ${this.activeConnections} active connections`);
-      return;
-    }
-
-    if (this.eventSource) {
-      console.log('Closing EventSource connection');
-      this.eventSource.close();
-      this.eventSource = null;
-    }
+    console.log(`Disconnect called. Force: ${force}, active connections: ${this.activeConnections}`);
     
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
+    // Only actually disconnect if forced or if no more active components need the connection
+    if (force || this.activeConnections <= 0) {
+      if (this.reconnectTimer) {
+        console.log('Clearing reconnect timer');
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+      }
+      
+      this.isReconnectingFlag = false;
+      this.reconnectAttempts = 0;
+      
+      // Close the EventSource connection
+      if (this.eventSource) {
+        console.log('Closing EventSource connection');
+        this.eventSource.close();
+        this.eventSource = null;
+        this.connectionStatus = 'disconnected';
+      } else {
+        console.log('No EventSource connection to close');
+      }
+      
+      // Reset state
+      this.sessionId = null;
+      
+      console.log('EventSource connection fully closed and cleaned up');
+    } else {
+      console.log(`Not disconnecting - ${this.activeConnections} components still using the connection`);
     }
-    
-    // Clear message handlers only if forced or no active connections
-    if (force) {
-      this.messageHandlers.clear();
-    }
-    
-    this.reconnectAttempts = 0;
-    this.connectionStatus = 'disconnected';
-    this.sessionId = null;
-    this.isReconnectingFlag = false;
   }
   
   on(eventType: string, handler: MessageHandler): UnsubscribeFunction {

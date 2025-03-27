@@ -4,12 +4,11 @@ import { Footer } from "@/components/layout/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/lib/auth-context";
 import { jwtDecode } from "jwt-decode";
-import { useRealTimeUpdates } from "@/hooks/useEventSource";
 import { Notification, NotificationType } from "@/components/ui/notification";
 
 // Define a type for session details
@@ -48,32 +47,10 @@ function JoinSessionContent() {
   const sessionId = searchParams.get('id');
   const { userData } = useAuth();
   
-  // Initialize real-time updates connection
-  const { subscribe, isConnected } = useRealTimeUpdates(sessionId);
-  
-  useEffect(() => {
-    // Fetch session details when component mounts
-    if (sessionId) {
-      fetchSessionDetails();
-    } else {
-      setNotification({
-        type: 'error',
-        message: 'No session ID provided'
-      });
-    }
+  // Use useCallback for fetchSessionDetails to avoid recreating it on each render
+  const fetchSessionDetails = useCallback(async () => {
+    if (!sessionId) return;
     
-    // Subscribe to session updates
-    const unsubscribe = subscribe('join', () => {
-      // Refresh session details to include the new player
-      fetchSessionDetails();
-    });
-    
-    return () => {
-      unsubscribe();
-    };
-  }, [sessionId, subscribe, isConnected]);
-  
-  const fetchSessionDetails = async () => {
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       const token = localStorage.getItem('token');
@@ -101,7 +78,19 @@ function JoinSessionContent() {
         message: 'Error fetching session details: ' + error
       });
     }
-  };
+  }, [sessionId, setNotification]);
+  
+  useEffect(() => {
+    // Fetch session details only once when component mounts
+    if (sessionId) {
+      fetchSessionDetails();
+    } else {
+      setNotification({
+        type: 'error',
+        message: 'No session ID provided'
+      });
+    }
+  }, [sessionId, fetchSessionDetails]);
   
   // Function to extract user ID from JWT token
   const getUserIdFromToken = (): string | null => {

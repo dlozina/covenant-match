@@ -820,18 +820,29 @@ impl Handler<crate::sse::messages::SendHeartbeat> for SessionManager {
     fn handle(&mut self, msg: crate::sse::messages::SendHeartbeat, _: &mut Context<Self>) {
         let heartbeat = msg.message;
         let message_type = &heartbeat.message_type;
+        let timestamp = heartbeat.timestamp;
 
         // Get all active session IDs
         let session_ids: Vec<String> = self.sessions.keys().cloned().collect();
 
         if session_ids.is_empty() {
-            info!("No active sessions for heartbeat, storing for future use");
+            info!(
+                "No active sessions for heartbeat, storing for future use (timestamp: {})",
+                timestamp
+            );
             return;
         }
 
         info!(
-            "Broadcasting heartbeat to {} active sessions",
+            "Broadcasting heartbeat (timestamp: {}) to {} active sessions",
+            timestamp,
             session_ids.len()
+        );
+
+        let client_count: usize = self.sessions.values().map(|clients| clients.len()).sum();
+        info!(
+            "Total clients that will receive heartbeat: {}",
+            client_count
         );
 
         // For each active session, send the heartbeat directly
@@ -842,7 +853,8 @@ impl Handler<crate::sse::messages::SendHeartbeat> for SessionManager {
             // Get the clients for this session
             if let Some(clients) = self.sessions.get(&session_id) {
                 info!(
-                    "Sending heartbeat to {} clients in session {}",
+                    "Sending heartbeat (timestamp: {}) to {} clients in session {}",
+                    timestamp,
                     clients.len(),
                     session_id
                 );
@@ -854,8 +866,8 @@ impl Handler<crate::sse::messages::SendHeartbeat> for SessionManager {
                             error!("Failed to send heartbeat to client {}: {:?}", client_id, e);
                         } else {
                             debug!(
-                                "❤️ Heartbeat sent to client {} in session {}",
-                                client_id, session_id
+                                "❤️ Heartbeat (timestamp: {}) sent to client {} in session {}",
+                                timestamp, client_id, session_id
                             );
                         }
                     }
@@ -873,6 +885,7 @@ impl Handler<crate::sse::messages::SendStaggeredHeartbeat> for SessionManager {
         let heartbeat = msg.message;
         let batch_id = msg.batch_id;
         let message_type = &heartbeat.message_type;
+        let timestamp = heartbeat.timestamp;
 
         // Filter active sessions based on batch_id
         // We'll use the last character of the session ID to determine which batch it belongs to
@@ -888,14 +901,23 @@ impl Handler<crate::sse::messages::SendStaggeredHeartbeat> for SessionManager {
             .collect();
 
         if session_ids.is_empty() {
-            info!("No active sessions for batch {} heartbeat", batch_id);
+            info!(
+                "No active sessions for batch {} heartbeat (timestamp: {})",
+                batch_id, timestamp
+            );
             return;
         }
 
+        // Count total clients in these sessions
+        let client_count: usize = session_ids
+            .iter()
+            .filter_map(|sid| self.sessions.get(sid))
+            .map(|clients| clients.len())
+            .sum();
+
         info!(
-            "Broadcasting staggered heartbeat to {} active sessions in batch {}",
-            session_ids.len(),
-            batch_id
+            "Broadcasting staggered heartbeat (timestamp: {}) to {} active sessions with {} clients in batch {}",
+            timestamp, session_ids.len(), client_count, batch_id
         );
 
         // For each session in this batch, send the heartbeat
@@ -906,8 +928,9 @@ impl Handler<crate::sse::messages::SendStaggeredHeartbeat> for SessionManager {
             // Get the clients for this session
             if let Some(clients) = self.sessions.get(&session_id) {
                 debug!(
-                    "Sending batch {} heartbeat to {} clients in session {}",
+                    "Sending batch {} heartbeat (timestamp: {}) to {} clients in session {}",
                     batch_id,
+                    timestamp,
                     clients.len(),
                     session_id
                 );
@@ -919,8 +942,8 @@ impl Handler<crate::sse::messages::SendStaggeredHeartbeat> for SessionManager {
                             error!("Failed to send heartbeat to client {}: {:?}", client_id, e);
                         } else {
                             debug!(
-                                "❤️ Batch {} heartbeat sent to client {} in session {}",
-                                batch_id, client_id, session_id
+                                "❤️ Batch {} heartbeat (timestamp: {}) sent to client {} in session {}",
+                                batch_id, timestamp, client_id, session_id
                             );
                         }
                     }

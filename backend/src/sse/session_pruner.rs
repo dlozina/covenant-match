@@ -1,4 +1,4 @@
-use crate::sse::session::SessionManager;
+use crate::sse::partition::SessionRouter;
 use actix::prelude::*;
 use log::info;
 use std::time::Duration;
@@ -7,12 +7,12 @@ use std::time::Duration;
 pub struct SessionPrunerActor {
     interval: Duration,
     max_inactive_seconds: i64,
-    sse_manager: Addr<SessionManager>,
+    sse_router: Addr<SessionRouter>,
 }
 
 impl SessionPrunerActor {
     pub fn new(
-        sse_manager: Addr<SessionManager>,
+        sse_router: Addr<SessionRouter>,
         prune_interval_seconds: u64,
         max_inactive_seconds: i64,
     ) -> Self {
@@ -21,13 +21,13 @@ impl SessionPrunerActor {
         Self {
             interval,
             max_inactive_seconds,
-            sse_manager,
+            sse_router,
         }
     }
 
     fn prune_inactive_sessions(&self, ctx: &mut Context<Self>) {
         // Create a message for the session manager to prune sessions
-        self.sse_manager.do_send(PruneInactiveSessions {
+        self.sse_router.do_send(PruneInactiveSessions {
             max_inactive_seconds: self.max_inactive_seconds,
         });
 
@@ -57,7 +57,7 @@ impl Actor for SessionPrunerActor {
 }
 
 // Define a message for session pruning
-#[derive(Message)]
+#[derive(Message, Clone)]
 #[rtype(result = "()")]
 pub struct PruneInactiveSessions {
     pub max_inactive_seconds: i64,
