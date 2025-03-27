@@ -28,4 +28,16 @@ export const FALLBACK_COVENANT_NAMES = [
   "Spears of the Church",
   "Blades of the Darkmoon",
   "Watchdogs of Farron",
+]
+
+// Fallback nightfarer options
+export const FALLBACK_NIGHTFARERS = [
+  "Wylder",
+  "Guardian",
+  "Recluse",
+  "Duchess",
+  "Patches",
+  "Jolan",
+  "Igon",
+  "Alexander",
 ] 

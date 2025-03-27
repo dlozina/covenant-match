@@ -2,7 +2,7 @@ use crate::services::game_data_service;
 use actix_web::{get, web, HttpResponse, Responder};
 use mongodb::Database;
 
-/// Get all game data (platforms, regions, and covenants)
+/// Get all game data (platforms, regions, covenants, and nightfarers)
 #[utoipa::path(
     get,
     path = "/api/v1/game-data",
@@ -98,9 +98,34 @@ async fn get_covenants(db: web::Data<Database>) -> impl Responder {
     }
 }
 
+/// Get all nightfarers
+#[utoipa::path(
+    get,
+    path = "/api/v1/nightfarers",
+    responses(
+        (status = 200, description = "Nightfarers retrieved successfully", body = Vec<NightfarerResponse>),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "game-data"
+)]
+#[get("/api/v1/nightfarers")]
+async fn get_nightfarers(db: web::Data<Database>) -> impl Responder {
+    match game_data_service::get_all_nightfarers(&db).await {
+        Ok(nightfarers) => HttpResponse::Ok().json(nightfarers),
+        Err(e) => {
+            log::error!("Error fetching nightfarers: {:?}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": "error",
+                "message": e.to_string()
+            }))
+        }
+    }
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(get_game_data)
         .service(get_platforms)
         .service(get_regions)
-        .service(get_covenants);
+        .service(get_covenants)
+        .service(get_nightfarers);
 }

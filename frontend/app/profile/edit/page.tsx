@@ -31,7 +31,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import React from "react"
-import { FALLBACK_REGIONS, FALLBACK_PLATFORMS, FALLBACK_COVENANT_NAMES } from "@/lib/constants"
+import { FALLBACK_REGIONS, FALLBACK_PLATFORMS, FALLBACK_COVENANT_NAMES, FALLBACK_NIGHTFARERS } from "@/lib/constants"
 
 // Username and display name validation regex
 const usernameRegex = /^[a-zA-Z0-9_.-]+$/;
@@ -55,10 +55,17 @@ interface CovenantData {
   description: string;
 }
 
+interface NightfarerData {
+  id: string;
+  name: string;
+  description: string;
+}
+
 interface GameData {
   platforms: PlatformData[];
   regions: RegionData[];
   covenants: CovenantData[];
+  nightfarers: NightfarerData[];
 }
 
 const profileFormSchema = z.object({
@@ -173,6 +180,7 @@ function EditProfileContent() {
   const REGIONS = gameData?.regions?.map(r => r.description) || FALLBACK_REGIONS;
   const PLATFORMS = gameData?.platforms?.map(p => p.name) || FALLBACK_PLATFORMS;
   const COVENANT_NAMES = gameData?.covenants?.map(c => c.name) || FALLBACK_COVENANT_NAMES;
+  const NIGHTFARERS = gameData?.nightfarers?.map(n => n.name) || FALLBACK_NIGHTFARERS;
   
   // Memoize the select options to prevent unnecessary re-renders
   const regionOptions = React.useMemo(() => 
@@ -202,6 +210,15 @@ function EditProfileContent() {
     [COVENANT_NAMES]
   );
   
+  const nightfarerOptions = React.useMemo(() => 
+    NIGHTFARERS.map(nightfarer => (
+      <SelectItem key={nightfarer} value={nightfarer}>
+        {nightfarer}
+      </SelectItem>
+    )), 
+    [NIGHTFARERS]
+  );
+  
   // Debounce timer reference
   const [validationTimeout, setValidationTimeout] = useState<NodeJS.Timeout | null>(null)
 
@@ -217,7 +234,7 @@ function EditProfileContent() {
       covenantName: userData?.covenantName || COVENANT_NAMES[0],
       preferredSessionName: "",
       preferredSessionPassword: "",
-      preferredNightfarer: "",
+      preferredNightfarer: userData?.preferredNightfarer || "",
     },
     mode: "onBlur", // Only validate on blur and submit for better UX
   })
@@ -726,15 +743,25 @@ function EditProfileContent() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-sm md:text-base">Preferred Nightfarer</FormLabel>
-                            <FormControl>
-                              <Input 
-                                placeholder="Character name" 
-                                {...field}
-                                className="h-10" 
-                              />
-                            </FormControl>
+                            <Select
+                              onValueChange={(value) => {
+                                // Convert "__NONE__" back to an empty string
+                                field.onChange(value === "__NONE__" ? "" : value);
+                              }}
+                              value={field.value ? field.value : "__NONE__"}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="h-10">
+                                  <SelectValue placeholder="Select your nightfarer (optional)" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="__NONE__">None</SelectItem>
+                                {nightfarerOptions}
+                              </SelectContent>
+                            </Select>
                             <FormDescription className="text-xs md:text-sm">
-                              Your main character&apos;s name in the game.
+                              Your main character&apos;s name in the game (optional).
                             </FormDescription>
                             <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
                           </FormItem>

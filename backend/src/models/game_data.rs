@@ -35,11 +35,23 @@ pub struct Covenant {
     pub schema_version: i32,
 }
 
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
+pub struct Nightfarer {
+    #[serde(rename = "_id")]
+    pub id: ObjectId,
+    pub name: String,
+    pub description: String,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
+    pub schema_version: i32,
+}
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct GameDataResponse {
     pub platforms: Vec<PlatformResponse>,
     pub regions: Vec<RegionResponse>,
     pub covenants: Vec<CovenantResponse>,
+    pub nightfarers: Vec<NightfarerResponse>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -58,6 +70,13 @@ pub struct RegionResponse {
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CovenantResponse {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct NightfarerResponse {
     pub id: String,
     pub name: String,
     pub description: String,
@@ -90,6 +109,16 @@ impl From<Covenant> for CovenantResponse {
             id: covenant.id.to_hex(),
             name: covenant.name,
             description: covenant.description,
+        }
+    }
+}
+
+impl From<Nightfarer> for NightfarerResponse {
+    fn from(nightfarer: Nightfarer) -> Self {
+        Self {
+            id: nightfarer.id.to_hex(),
+            name: nightfarer.name,
+            description: nightfarer.description,
         }
     }
 }
