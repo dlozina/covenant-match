@@ -1,15 +1,16 @@
 use crate::models::game_data::{
-    Covenant, CovenantResponse, GameDataResponse, Platform, PlatformResponse, Region,
-    RegionResponse,
+    Covenant, CovenantResponse, GameDataResponse, Nightfarer, NightfarerResponse, Platform,
+    PlatformResponse, Region, RegionResponse,
 };
 use crate::models::session::{
     CreateSessionDto, GameResult, JoinSessionDto, PlayerInfo, RateSessionDto, ResultsResponseDto,
     SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto,
 };
 use crate::models::user::{
-    AuthResponse, CreateUserDto, GetUsersQuery, LoginUserDto, PaginationInfo, UpdateUserDto,
-    UpdateUserProfileDto, User, UserResponse, UsersListData, UsersListResponse,
+    AuthResponse, CreateUserDto, GetUsersQuery, LoginUserDto, PaginationInfo, RefreshTokenResponse,
+    UpdateUserDto, UpdateUserProfileDto, User, UserResponse, UsersListData, UsersListResponse,
 };
+use crate::routes::users::{JwtInfoDto, TokenInfoResponse};
 use crate::sse::messages::{ServerMessage, SessionInfo, SseSessionStatus};
 
 use crate::routes::{game_data::*, health::*, sessions::*, sse::*, users::*};
@@ -39,6 +40,8 @@ use utoipa::{
         // User routes
         create_user,
         login,
+        refresh_token,
+        decode_token,
         get_current_user,
         create_admin_user,
         update_profile,
@@ -65,6 +68,7 @@ use utoipa::{
         get_platforms,
         get_regions,
         get_covenants,
+        get_nightfarers,
         // SSE routes
         events_route,
         events_status,
@@ -78,11 +82,14 @@ use utoipa::{
             LoginUserDto,
             UpdateUserDto,
             AuthResponse,
+            RefreshTokenResponse,
             UpdateUserProfileDto,
             GetUsersQuery,
             UsersListResponse,
             UsersListData,
             PaginationInfo,
+            JwtInfoDto,
+            TokenInfoResponse,
             // Session models
             CreateSessionDto,
             JoinSessionDto,
@@ -100,10 +107,12 @@ use utoipa::{
             Platform,
             Region,
             Covenant,
+            Nightfarer,
             GameDataResponse,
             PlatformResponse,
             RegionResponse,
             CovenantResponse,
+            NightfarerResponse,
             // SSE models
             ServerMessage,
             SessionInfo,

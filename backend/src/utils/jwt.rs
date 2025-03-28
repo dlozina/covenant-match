@@ -6,6 +6,9 @@ use serde::{Deserialize, Serialize};
 use crate::config::get_config;
 use crate::models::error::AppError;
 
+/// Claims structure for JWT tokens
+///
+/// This defines the payload of our JSON Web Tokens
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
     pub sub: String,  // Subject (user ID)
@@ -14,20 +17,45 @@ pub struct Claims {
     pub iat: usize,   // Issued at (as UTC timestamp)
 }
 
-// Generate a JWT for a user
+/// Generate a JWT for a user
+///
+/// # Arguments
+/// * `user_id` - The MongoDB ObjectId of the user
+/// * `role` - The role of the user ("admin" or "user")
+///
+/// # Returns
+/// A Result containing either the encoded JWT or an AppError
+///
+/// # Duration format
+/// The token expiration is controlled by the `jwt.expires_in` setting in config,
+/// which accepts the following formats:
+/// - "30s" - 30 seconds
+/// - "10m" - 10 minutes
+/// - "12h" - 12 hours (default)
+/// - "7d" - 7 days
 pub fn generate_token(user_id: &ObjectId, role: &str) -> Result<String, AppError> {
     let config = get_config();
     let jwt_secret = config.jwt_secret();
 
     // Parse expiration time from config
     let expires_in = config.jwt_expires_in();
-    let hours = parse_duration(expires_in).unwrap_or(24); // Default to 24 hours
 
-    // Set token expiration
-    let expiration = Utc::now()
-        .checked_add_signed(Duration::hours(hours))
-        .expect("valid timestamp")
-        .timestamp() as usize;
+    // Calculate expiration time based on the configured duration
+    let expiration = match parse_duration_to_seconds(expires_in) {
+        Some(seconds) => {
+            let now = Utc::now().timestamp() as i64;
+            (now + seconds) as usize
+        }
+        None => {
+            // Default to 12 hours if parsing fails
+            log::warn!(
+                "Invalid duration format in config: '{}'. Using default of 12h",
+                expires_in
+            );
+            let now = Utc::now().timestamp() as i64;
+            (now + 12 * 3600) as usize
+        }
+    };
 
     let issued_at = Utc::now().timestamp() as usize;
 
@@ -76,8 +104,39 @@ pub fn get_role_from_token(token: &str) -> Result<String, AppError> {
     Ok(claims.role)
 }
 
-// Parse duration string like "60m", "24h", "7d" to hours
-fn parse_duration(duration_str: &str) -> Option<i64> {
+// Decode a token without validating expiration
+pub fn decode_token(token: &str) -> Result<Claims, AppError> {
+    let config = get_config();
+    let jwt_secret = config.jwt_secret();
+
+    // Create validation that ignores exp field
+    let mut validation = Validation::default();
+    validation.validate_exp = false;
+
+    decode::<Claims>(
+        token,
+        &DecodingKey::from_secret(jwt_secret.as_bytes()),
+        &validation,
+    )
+    .map(|token_data| token_data.claims)
+    .map_err(|e| match e.kind() {
+        jsonwebtoken::errors::ErrorKind::InvalidToken => AppError::InvalidToken,
+        jsonwebtoken::errors::ErrorKind::InvalidSignature => AppError::InvalidToken,
+        _ => AppError::InternalError(format!("Token decoding error: {}", e)),
+    })
+}
+
+/// Parse duration string to seconds
+///
+/// Accepts the following formats:
+/// - "30s" - 30 seconds
+/// - "10m" - 10 minutes
+/// - "12h" - 12 hours
+/// - "7d" - 7 days
+///
+/// # Returns
+/// Some(seconds) if parsing was successful, None otherwise
+fn parse_duration_to_seconds(duration_str: &str) -> Option<i64> {
     let len = duration_str.len();
     if len < 2 {
         return None;
@@ -91,9 +150,10 @@ fn parse_duration(duration_str: &str) -> Option<i64> {
     };
 
     match unit {
-        "m" => Some(value / 60), // minutes to hours
-        "h" => Some(value),      // already hours
-        "d" => Some(value * 24), // days to hours
+        "s" => Some(value),         // seconds
+        "m" => Some(value * 60),    // minutes to seconds
+        "h" => Some(value * 3600),  // hours to seconds
+        "d" => Some(value * 86400), // days to seconds
         _ => None,
     }
 }

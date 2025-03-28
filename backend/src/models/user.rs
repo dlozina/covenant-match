@@ -197,3 +197,12 @@ pub struct PaginationInfo {
     /// Total number of pages
     pub total_pages: u64,
 }
+
+/// Response data for token refresh
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct RefreshTokenResponse {
+    /// Status of the operation
+    pub status: String,
+    /// The new JWT token
+    pub token: String,
+}

@@ -75,11 +75,11 @@ function SessionRunContent(): JSX.Element {
   // State for notifications
   const [notification, setNotification] = useState<NotificationType | null>(null);
   
-  // Get user data from auth context
-  const { userData } = useAuth();
+  // Get user data and fetchWithAuth from auth context
+  const { userData, fetchWithAuth } = useAuth();
   
   // Initialize real-time updates connection
-  const { subscribe, isConnected, disconnect } = useRealTimeUpdates(sessionId);
+  const { subscribe, isConnected, disconnect, reconnectWithFreshToken } = useRealTimeUpdates(sessionId);
   
   // State for connection status
   const [rtConnected, setRtConnected] = useState<boolean>(false);
@@ -192,15 +192,9 @@ function SessionRunContent(): JSX.Element {
     
     // Send API request to start session on server
     if (sessionData) {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const token = localStorage.getItem('token');
-      
-      fetch(`${apiBaseUrl}/api/v1/sessions/${sessionId}/start`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+      // Use fetchWithAuth to ensure token is valid
+      fetchWithAuth(`/api/v1/sessions/${sessionId}/start`, {
+        method: 'POST'
       }).catch(err => {
         showNotification('Error starting session: ' + err, 'error');
       });
@@ -216,7 +210,7 @@ function SessionRunContent(): JSX.Element {
         };
       });
     }
-  }, [sessionState.isSessionStarted, sessionId, isValidSessionId, sessionData, showNotification]);
+  }, [sessionState.isSessionStarted, sessionId, isValidSessionId, sessionData, fetchWithAuth, showNotification]);
   
   // Handle finish session (memoized)
   const handleFinishSession = useCallback(() => {
@@ -229,15 +223,9 @@ function SessionRunContent(): JSX.Element {
     
     // Send API request to end session on server
     if (sessionData) {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const token = localStorage.getItem('token');
-      
-      fetch(`${apiBaseUrl}/api/v1/sessions/${sessionId}/complete`, {
+      // Use fetchWithAuth to ensure token is valid
+      fetchWithAuth(`/api/v1/sessions/${sessionId}/complete`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify({
           duration: sessionState.elapsedSeconds
         })
@@ -249,7 +237,7 @@ function SessionRunContent(): JSX.Element {
       // about other players submitting their results
       // NOTE: We deliberately don't disconnect here anymore to continue receiving result updates
     }
-  }, [sessionState.elapsedSeconds, sessionId, sessionData, showNotification]);
+  }, [sessionState.elapsedSeconds, sessionId, sessionData, fetchWithAuth, showNotification]);
   
   // Reset session (memoized)
   const resetSession = useCallback(() => {
@@ -297,23 +285,8 @@ function SessionRunContent(): JSX.Element {
         setIsLoading(true);
         setError(null);
 
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-        const token = localStorage.getItem('token');
-        
-        // Fetch session data from API
-        const response = await fetch(`${apiBaseUrl}/api/v1/sessions/${sessionId}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch session data: ${response.status}`);
-        }
-        
-        const data = await response.json();
+        // Use fetchWithAuth to ensure token is valid
+        const data = await fetchWithAuth<SessionData>(`/api/v1/sessions/${sessionId}`);
         
         // Ensure proper initialization of hasReported flag for all players
         if (data && data.joinedPlayers) {
@@ -340,7 +313,7 @@ function SessionRunContent(): JSX.Element {
     // Initial fetch
     fetchSessionData();
     
-  }, [isValidSessionId, sessionId, showNotification]);
+  }, [isValidSessionId, sessionId, fetchWithAuth, showNotification]);
   
   // Set up SSE subscriptions
   useEffect(() => {
@@ -540,7 +513,7 @@ function SessionRunContent(): JSX.Element {
       unsubscribeResult();
       unsubscribeMessage(); // DEBUG: Clean up the generic message subscription
     };
-  }, [isValidSessionId, sessionId, subscribe, sessionState.isSessionStarted, sessionState.isSessionFinished, sessionState.elapsedSeconds, disconnect, sessionData, userData]);
+  }, [isValidSessionId, sessionId, subscribe, sessionState.isSessionStarted, sessionState.isSessionFinished, sessionState.elapsedSeconds, disconnect, sessionData, userData, fetchWithAuth]);
   
   // Effect to handle page refresh detection and disconnect EventSource when truly unloading
   useEffect(() => {
@@ -764,8 +737,6 @@ function SessionRunContent(): JSX.Element {
     
     try {
       setSubmissionError(null);
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const token = localStorage.getItem('token');
       
       // Map the UI result value to the backend format
       let resultValue = '';
@@ -791,20 +762,11 @@ function SessionRunContent(): JSX.Element {
         feedback: resultState.feedback || ''
       };
       
-      // Send API request to submit result
-      const response = await fetch(`${apiBaseUrl}/api/v1/sessions/${sessionId}/results`, {
+      // Use fetchWithAuth to ensure token is valid
+      await fetchWithAuth(`/api/v1/sessions/${sessionId}/results`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify(submissionData)
       });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to submit result');
-      }
       
       // Mark as submitted
       setResultSubmitted(true);
@@ -826,7 +788,6 @@ function SessionRunContent(): JSX.Element {
           joinedPlayers: updatedPlayers
         };
       });
-      
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
@@ -867,7 +828,7 @@ function SessionRunContent(): JSX.Element {
         throw err;
       }
     }
-  }, [sessionId, userData, resultState, sessionData, resultSubmitted, setSessionData, showNotification]);
+  }, [sessionId, userData, resultState, sessionData, resultSubmitted, fetchWithAuth, setSessionData, showNotification]);
 
   // Add a handler for "newSession" SSE events
   useEffect(() => {
@@ -924,6 +885,24 @@ function SessionRunContent(): JSX.Element {
       // No action needed here - the UI will update based on newSessionId state
     }
   }, [newSessionId, isHost]);
+
+  // Add effect to handle connection management for EventSource
+  useEffect(() => {
+    if (!isValidSessionId) return;
+    
+    // Set up a timer to check connection status and reconnect if needed
+    const connectionCheckInterval = setInterval(() => {
+      // If we're not connected and we have a sessionId, try to reconnect
+      if (!rtConnected && isValidSessionId) {
+        console.log('EventSource disconnected, attempting to reconnect with fresh token');
+        reconnectWithFreshToken();
+      }
+    }, 30000); // Check connection every 30 seconds
+    
+    return () => {
+      clearInterval(connectionCheckInterval);
+    };
+  }, [isValidSessionId, rtConnected, reconnectWithFreshToken]);
 
   return (
     <MainLayout footer={<Footer />}>

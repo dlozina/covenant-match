@@ -5,7 +5,12 @@ url = "mongodb://localhost:27017/covenant-match"
 
 [jwt]
 secret = "malenia_is_the_best_girl_in_the_world"
-expires_in = "36000m"
+# Duration formats:
+# - "30s" = 30 seconds
+# - "10m" = 10 minutes
+# - "12h" = 12 hours (recommended for production)
+# - "7d" = 7 days (for longer sessions)
+expires_in = "12h" 
 
 [server]
 port = 8080

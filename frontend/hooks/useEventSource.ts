@@ -95,12 +95,37 @@ class EventSourceService {
     // Get the API base URL from environment variable
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
     
-    // Get the token from localStorage
-    const token = localStorage.getItem('token');
+    // Get the token from localStorage with validation
+    const getValidToken = (): string | null => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('No authentication token found');
+        return null;
+      }
+      
+      // Just do basic validation without attempting to check expiration
+      try {
+        // Parse the token to verify it's valid JWT format
+        const base64Url = token.split('.')[1];
+        if (!base64Url) {
+          console.error('Invalid token format');
+          return null;
+        }
+        
+        // Log that we're using the token - don't worry about expiration as auth-context handles that
+        console.log('Retrieved token from localStorage for EventSource connection');
+        return token;
+      } catch (error) {
+        console.error('Error parsing token:', error);
+        return null;
+      }
+    };
+    
+    const token = getValidToken();
     if (!token) {
-      console.error('No authentication token found');
+      console.error('No valid authentication token found');
       this.connectionStatus = 'error';
-      toast.error('Authentication token not found');
+      toast.error('Authentication error - please refresh the page or log in again');
       return;
     }
     
@@ -427,92 +452,94 @@ class EventSourceService {
   isConnected(): boolean {
     return this.connectionStatus === 'connected';
   }
+
+  // Function to reconnect with a fresh token
+  reconnectWithFreshToken(sessionId: string): void {
+    console.log('Attempting to reconnect with a fresh token');
+    
+    // Close existing connection if there is one
+    if (this.eventSource) {
+      console.log('Closing existing EventSource connection before refreshing token');
+      if (this.eventSource.readyState !== EventSource.CLOSED) {
+        this.eventSource.close();
+      }
+      this.eventSource = null;
+    }
+    
+    // Set status to connecting
+    this.connectionStatus = 'connecting';
+    
+    // Connect again with the same session ID (which will get a fresh token)
+    this.connect(sessionId);
+  }
 }
 
-// Create a singleton instance
-const eventSourceService = new EventSourceService();
+// Create a singleton instance (unused but kept for reference)
+// const eventSourceService = new EventSourceService();
 
 // Custom hook for using EventSource - simplified for single page use case
-export function useRealTimeUpdates(sessionId: string | null, options = {
-  inactivityTimeout: 60 * 60 * 1000, // 30 minutes by default
-}) {
-  // Store the current session ID
-  const currentSessionIdRef = useRef<string | null>(sessionId);
+export function useRealTimeUpdates(sessionId: string | null) {
+  const service = useRef(new EventSourceService()).current;
   
-  // Update the ref when sessionId changes
+  // Connect on mount or when session ID changes
   useEffect(() => {
-    currentSessionIdRef.current = sessionId;
-  }, [sessionId]);
-  
-  // Set up inactivity checker - only disconnect after long periods of inactivity
-  useEffect(() => {
-    if (!sessionId || !options.inactivityTimeout) return;
+    if (!sessionId) {
+      return;
+    }
     
-    const inactivityCheck = setInterval(() => {
-      const inactiveTime = eventSourceService.getInactiveTime();
-      
-      if (inactiveTime * 1000 > options.inactivityTimeout && 
-          eventSourceService.isConnected()) {
-        console.log(`Disconnecting EventSource due to inactivity (${Math.round(inactiveTime)} seconds)`);
-        eventSourceService.disconnect(true);
-      }
-    }, 60000); // Check every minute
+    // Increment connection counter
+    service.incrementConnection();
     
+    // Connect to the server
+    service.connect(sessionId);
+    
+    // Cleanup on unmount
     return () => {
-      clearInterval(inactivityCheck);
+      console.log('useRealTimeUpdates unmounting, decrementing connection count');
+      const shouldDisconnect = service.decrementConnection();
+      if (shouldDisconnect) {
+        service.disconnect(false);
+      }
     };
-  }, [sessionId, options.inactivityTimeout]);
+  }, [sessionId, service]);
   
-
-  // Connect to EventSource on mount and disconnect on unmount
+  // Setup a token change listener to reconnect with fresh token
   useEffect(() => {
     if (!sessionId) return;
     
-    // Increment connection counter first
-    eventSourceService.incrementConnection();
-    
-    // Set a small delay to ensure subscriptions are registered before connecting
-    const connectTimer = setTimeout(() => {
-      // Connect to the EventSource
-      console.log('Connecting to EventSource after subscriptions are set up');
-      eventSourceService.connect(sessionId);
-    }, 50);
-    
-    // Return cleanup function
-    return () => {
-      clearTimeout(connectTimer);
-      console.log('Component unmounted, checking if we should disconnect EventSource');
-      const shouldDisconnect = eventSourceService.decrementConnection();
-      if (shouldDisconnect) {
-        console.log('No more active connections, disconnecting EventSource');
-        eventSourceService.disconnect();
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'token' && e.newValue && e.newValue !== e.oldValue) {
+        console.log('Token changed in storage, reconnecting EventSource');
+        service.reconnectWithFreshToken(sessionId);
       }
     };
-  }, [sessionId]);
-  
-  // Subscribe to events
-  const subscribe = useCallback((eventType: string, handler: MessageHandler): UnsubscribeFunction => {
-    if (!eventType || !handler) {
-      return () => {}; // Return empty function if invalid params
-    }
     
-    return eventSourceService.on(eventType, handler);
-  }, []);
+    // Listen for storage events (which occur when token is updated in another tab)
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [sessionId, service]);
   
-  // Check connection status
-  const isConnected = useCallback((): boolean => {
-    return eventSourceService.isConnected();
-  }, []);
-  
-  // Add an explicit disconnect method the consumer can call when truly done
-  const disconnect = useCallback(() => {
-    eventSourceService.disconnect(true);
-  }, []);
-  
-  // Return the API
+  // Return the public API
   return {
-    subscribe,
-    isConnected,
-    disconnect
+    subscribe: useCallback((eventType: string, handler: MessageHandler): UnsubscribeFunction => {
+      return service.on(eventType, handler);
+    }, [service]),
+    
+    isConnected: useCallback((): boolean => {
+      return service.isConnected();
+    }, [service]),
+    
+    disconnect: useCallback((force: boolean = false): void => {
+      service.disconnect(force);
+    }, [service]),
+    
+    reconnectWithFreshToken: useCallback((sid: string = sessionId || ''): void => {
+      if (sid) {
+        service.reconnectWithFreshToken(sid);
+      }
+    }, [service, sessionId])
   };
 } 

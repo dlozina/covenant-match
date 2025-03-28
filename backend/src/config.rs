@@ -64,14 +64,52 @@ impl Config {
         let env = std::env::var("RUST_ENV").unwrap_or_else(|_| "development".to_string());
         info!("Loading configuration for environment: {}", env);
 
+        // Figure out the config directory path
+        let config_dir = if Path::new("config").exists() {
+            // Running from backend directory
+            "config".to_string()
+        } else if Path::new("backend/config").exists() {
+            // Running from project root
+            "backend/config".to_string()
+        } else {
+            // Docker or other environment - use absolute path
+            std::env::var("CONFIG_DIR").unwrap_or_else(|_| "/app/config".to_string())
+        };
+
+        info!("Using config directory: {}", config_dir);
+
+        // Check which config files actually exist and log them
+        let default_config_path = format!("{}/default.toml", config_dir);
+        let env_config_path = format!("{}/{}.toml", config_dir, env);
+        let local_config_path = format!("{}/local.toml", config_dir);
+
+        if Path::new(&default_config_path).exists() {
+            info!("Found default config file: {}", default_config_path);
+        } else {
+            warn!("Default config file not found: {}", default_config_path);
+        }
+
+        if Path::new(&env_config_path).exists() {
+            info!("Found environment config file: {}", env_config_path);
+        } else {
+            info!(
+                "Environment config file not found (this is normal): {}",
+                env_config_path
+            );
+        }
+
+        if Path::new(&local_config_path).exists() {
+            info!("Found local config file: {}", local_config_path);
+        }
+
         // Base config file + environment-specific config file
         let config_builder = ConfigLoader::builder()
             // Start with default settings
-            .add_source(File::with_name("backend/config/default").required(false))
+            .add_source(File::with_name(&format!("{}/default", config_dir)).required(false))
             // Add environment-specific settings
-            .add_source(File::with_name(&format!("backend/config/{}", env)).required(false))
+            .add_source(File::with_name(&format!("{}/{}", config_dir, env)).required(false))
             // Add local config overrides
-            .add_source(File::with_name("backend/config/local").required(false))
+            .add_source(File::with_name(&format!("{}/local", config_dir)).required(false))
             // Override with environment variables
             // Environment variables take the form of CONFIG_SECTION__KEY=value
             // e.g., CONFIG_DATABASE__URL=mongodb://localhost:27017
@@ -131,6 +169,14 @@ impl Config {
             ],
         };
 
+        // Use hardcoded defaults that match default.toml
+        let jwt_secret = std::env::var("JWT_SECRET")
+            .unwrap_or_else(|_| "malenia_is_the_best_girl_in_the_world".to_string());
+        let jwt_expires_in = std::env::var("JWT_EXPIRES_IN").unwrap_or_else(|_| "12h".to_string());
+
+        // When falling back to defaults, warn the user
+        warn!("Using fallback configuration. This may not be what you want in production.");
+
         Self {
             environment: "development".to_string(),
             database: DatabaseConfig {
@@ -138,9 +184,8 @@ impl Config {
                     .unwrap_or_else(|_| "mongodb://localhost:27017/covenant-match".to_string()),
             },
             jwt: JwtConfig {
-                secret: std::env::var("JWT_SECRET")
-                    .unwrap_or_else(|_| "your_jwt_secret_key".to_string()),
-                expires_in: std::env::var("JWT_EXPIRES_IN").unwrap_or_else(|_| "60m".to_string()),
+                secret: jwt_secret,
+                expires_in: jwt_expires_in,
             },
             server: ServerConfig {
                 port: std::env::var("PORT")

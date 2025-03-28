@@ -1,13 +1,13 @@
 use crate::models::error::AppError;
-use crate::models::user::{
-    CreateUserDto, GetUsersQuery, LoginUserDto, UpdateUserProfileDto,
-};
+use crate::models::user::{CreateUserDto, GetUsersQuery, LoginUserDto, UpdateUserProfileDto};
 use crate::services::{auth_service, user_service};
 use crate::utils::{jwt, recaptcha};
 use actix_web::{
     delete, get, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError,
 };
 use mongodb::Database;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// Create a new user
 #[utoipa::path(
@@ -402,10 +402,7 @@ async fn get_all_users(
     tag = "admin"
 )]
 #[get("/api/v1/admin/users/{user_id}")]
-async fn get_user_by_id_admin(
-    db: web::Data<Database>,
-    path: web::Path<String>,
-) -> impl Responder {
+async fn get_user_by_id_admin(db: web::Data<Database>, path: web::Path<String>) -> impl Responder {
     // Middleware already checks for admin role
     let user_id = path.into_inner();
 
@@ -478,10 +475,7 @@ async fn update_user_admin(
     tag = "admin"
 )]
 #[delete("/api/v1/admin/users/{user_id}")]
-async fn delete_user_admin(
-    db: web::Data<Database>,
-    path: web::Path<String>,
-) -> impl Responder {
+async fn delete_user_admin(db: web::Data<Database>, path: web::Path<String>) -> impl Responder {
     // Middleware already checks for admin role
     let user_id = path.into_inner();
 
@@ -490,6 +484,201 @@ async fn delete_user_admin(
         Err(e) => {
             log::error!("Error deleting user: {:?}", e);
             e.error_response()
+        }
+    }
+}
+
+/// Refresh JWT token
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/refresh",
+    responses(
+        (status = 200, description = "Token refreshed successfully", body = RefreshTokenResponse),
+        (status = 401, description = "Invalid or expired token"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "users"
+)]
+#[post("/api/v1/auth/refresh")]
+async fn refresh_token(req: HttpRequest) -> impl Responder {
+    // The auth middleware has already validated the token
+    // Extract claims from the request extensions
+    let claims = {
+        let extensions = req.extensions();
+        match extensions.get::<jwt::Claims>() {
+            Some(claims) => claims.clone(),
+            None => {
+                // This should never happen as middleware validates the token
+                // But we handle it anyway for robustness
+                return HttpResponse::Unauthorized().json(serde_json::json!({
+                    "status": "error",
+                    "message": "Invalid token"
+                }));
+            }
+        }
+    };
+
+    // Check if the token is already expired
+    let now = chrono::Utc::now().timestamp();
+    if claims.exp < now as usize {
+        return HttpResponse::Unauthorized().json(serde_json::json!({
+            "status": "error",
+            "message": "Token has expired"
+        }));
+    }
+
+    // Parse the user ID from the token
+    let user_id = match mongodb::bson::oid::ObjectId::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": "error",
+                "message": "Invalid user ID format in token"
+            }));
+        }
+    };
+
+    // Generate a new token with the same user ID and role
+    match jwt::generate_token(&user_id, &claims.role) {
+        Ok(new_token) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "token": new_token
+        })),
+        Err(e) => {
+            log::error!("Error refreshing token: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
+/// JWT decode info DTO
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct JwtInfoDto {
+    pub token: String,
+}
+
+/// Response with token info
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct TokenInfoResponse {
+    pub sub: String,
+    pub role: String,
+    pub iat: usize,
+    pub exp: usize,
+    pub expires_at: String,
+    pub is_valid: bool,
+    pub time_to_expiry: String,
+}
+
+/// Decode and validate a JWT token
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/decode-token",
+    request_body = JwtInfoDto,
+    responses(
+        (status = 200, description = "Token decoded successfully", body = TokenInfoResponse),
+        (status = 400, description = "Invalid token format"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "users"
+)]
+#[post("/api/v1/auth/decode-token")]
+async fn decode_token(token_data: web::Json<JwtInfoDto>, req: HttpRequest) -> impl Responder {
+    // Verify that the user is authenticated
+    let authenticated_user_id = {
+        let extensions = req.extensions();
+        match extensions.get::<jwt::Claims>() {
+            Some(claims) => claims.sub.clone(),
+            None => {
+                return HttpResponse::Unauthorized().json(serde_json::json!({
+                    "status": "error",
+                    "message": "Authentication required to decode tokens"
+                }));
+            }
+        }
+    };
+
+    // Optionally check if user has admin role for additional security
+    // This is commented out to allow any authenticated user to decode tokens
+    // Consider uncommenting this if you want to restrict token decoding to admins only
+
+    let is_admin = {
+        let extensions = req.extensions();
+        match extensions.get::<jwt::Claims>() {
+            Some(claims) => claims.role == "admin",
+            None => false,
+        }
+    };
+
+    if !is_admin {
+        return HttpResponse::Forbidden().json(serde_json::json!({
+            "status": "error",
+            "message": "Admin access required to decode tokens"
+        }));
+    }
+
+    let token = &token_data.token;
+
+    // Parse and validate the token
+    match jwt::decode_token(token) {
+        Ok(claims) => {
+            // Get current time for validity check
+            let now = chrono::Utc::now().timestamp() as usize;
+            let is_valid = claims.exp > now;
+
+            // Calculate time to expiry
+            let seconds_to_expiry = if is_valid { claims.exp - now } else { 0 };
+
+            // Format expiry time
+            let expires_at = chrono::DateTime::<chrono::Utc>::from_timestamp(claims.exp as i64, 0)
+                .map(|dt| dt.to_rfc3339())
+                .unwrap_or_else(|| "Invalid timestamp".to_string());
+
+            // Format time to expiry in a human-readable format
+            let time_to_expiry = if is_valid {
+                let days = seconds_to_expiry / 86400;
+                let hours = (seconds_to_expiry % 86400) / 3600;
+                let minutes = (seconds_to_expiry % 3600) / 60;
+                let seconds = seconds_to_expiry % 60;
+
+                if days > 0 {
+                    format!("{}d {}h {}m {}s", days, hours, minutes, seconds)
+                } else if hours > 0 {
+                    format!("{}h {}m {}s", hours, minutes, seconds)
+                } else if minutes > 0 {
+                    format!("{}m {}s", minutes, seconds)
+                } else {
+                    format!("{}s", seconds)
+                }
+            } else {
+                "Expired".to_string()
+            };
+
+            // Create response
+            let token_info = TokenInfoResponse {
+                sub: claims.sub,
+                role: claims.role,
+                iat: claims.iat,
+                exp: claims.exp,
+                expires_at,
+                is_valid,
+                time_to_expiry,
+            };
+
+            HttpResponse::Ok().json(token_info)
+        }
+        Err(e) => {
+            log::error!("Error decoding token: {:?}", e);
+            HttpResponse::BadRequest().json(serde_json::json!({
+                "status": "error",
+                "message": format!("Invalid token: {}", e)
+            }))
         }
     }
 }
@@ -506,4 +695,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(get_user_by_id_admin);
     cfg.service(update_user_admin);
     cfg.service(delete_user_admin);
+    cfg.service(refresh_token);
+    cfg.service(decode_token);
 }
