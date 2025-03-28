@@ -24,6 +24,13 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface JoinedPlayer {
   userId: string;
@@ -199,31 +206,74 @@ export default function SessionsPage() {
           <h3 className="text-base font-medium mb-3">Filter Sessions</h3>
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="w-full">
-              <label htmlFor="status-filter" className="block text-sm font-medium mb-1">Status</label>
-              <select 
-                id="status-filter"
-                className="w-full p-2 rounded-md border bg-background"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-              >
-                <option value="All">All Statuses</option>
-                <option value="Open">Open</option>
-                <option value="InProgress">In Progress</option>
-                <option value="Completed">Completed</option>
-              </select>
+              {/* Desktop View - Keep original select */}
+              <div className="hidden md:block">
+                <label htmlFor="status-filter" className="block text-sm font-medium mb-1">Status</label>
+                <select 
+                  id="status-filter"
+                  className="w-full p-2 rounded-md border bg-background"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Open">Open</option>
+                  <option value="InProgress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                </select>
+              </div>
+              
+              {/* Mobile View - Use styled Select component */}
+              <div className="block md:hidden">
+                <label htmlFor="mobile-status-filter" className="block text-sm font-medium mb-1">Status</label>
+                <Select
+                  value={statusFilter}
+                  onValueChange={(value) => setStatusFilter(value as StatusFilter)}
+                >
+                  <SelectTrigger id="mobile-status-filter" className="h-10 w-full">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All Statuses</SelectItem>
+                    <SelectItem value="Open">Open</SelectItem>
+                    <SelectItem value="InProgress">In Progress</SelectItem>
+                    <SelectItem value="Completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="w-full">
-              <label htmlFor="friend-filter" className="block text-sm font-medium mb-1">Players</label>
-              <select 
-                id="friend-filter"
-                className="w-full p-2 rounded-md border bg-background"
-                value={friendFilter}
-                onChange={(e) => setFriendFilter(e.target.value as FriendFilter)}
-              >
-                <option value="All">All Players</option>
-                <option value="Friends">Friends Only</option>
-              </select>
-              <p className="text-xs text-muted-foreground mt-1">Friend filtering coming soon!</p>
+              {/* Desktop View - Keep original select */}
+              <div className="hidden md:block">
+                <label htmlFor="friend-filter" className="block text-sm font-medium mb-1">Players</label>
+                <select 
+                  id="friend-filter"
+                  className="w-full p-2 rounded-md border bg-background"
+                  value={friendFilter}
+                  onChange={(e) => setFriendFilter(e.target.value as FriendFilter)}
+                >
+                  <option value="All">All Players</option>
+                  <option value="Friends">Friends Only</option>
+                </select>
+                <p className="text-xs text-muted-foreground mt-1">Friend filtering coming soon!</p>
+              </div>
+              
+              {/* Mobile View - Use styled Select component */}
+              <div className="block md:hidden">
+                <label htmlFor="mobile-friend-filter" className="block text-sm font-medium mb-1">Players</label>
+                <Select
+                  value={friendFilter}
+                  onValueChange={(value) => setFriendFilter(value as FriendFilter)}
+                >
+                  <SelectTrigger id="mobile-friend-filter" className="h-10 w-full">
+                    <SelectValue placeholder="Select players" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All Players</SelectItem>
+                    <SelectItem value="Friends">Friends Only</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">Friend filtering coming soon!</p>
+              </div>
             </div>
           </div>
         </div>
