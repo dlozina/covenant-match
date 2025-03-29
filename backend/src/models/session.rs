@@ -6,19 +6,23 @@ use utoipa::ToSchema;
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerInfo {
+    #[serde(alias = "user_id")]
     pub user_id: String,
     pub username: String,
     pub nightfarer: String,
+    #[serde(alias = "joined_at")]
     pub joined_at: DateTime,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionResult {
+    #[serde(alias = "user_id")]
     pub user_id: String,
     pub result: GameResult,
     pub rating: Option<u8>,
     pub feedback: Option<String>,
+    #[serde(alias = "submitted_at")]
     pub submitted_at: DateTime,
 }
 

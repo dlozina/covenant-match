@@ -5,7 +5,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Cell, Label, Legend, Pie, PieChart, ResponsiveContainer, Sector, Tooltip, TooltipProps } from "recharts";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -14,6 +14,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PieSectorDataItem } from "recharts/types/polar/Pie";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { 
+  SessionHistoryEntry,
+  PaginationInfo,
+  PaginatedSessionHistory,
+  PaginatedResponse
+} from "@/utils/api";
+import { formatDistanceToNow } from 'date-fns';
+import { Button } from "@/components/ui/button";
 
 interface CharacterStats {
   played: number;
@@ -54,6 +63,15 @@ function DashboardContent() {
   const [animateCharts, setAnimateCharts] = useState(false);
   const [activeNightfarer, setActiveNightfarer] = useState<string | null>(null);
   const [activeNightLord, setActiveNightLord] = useState<string | null>(null);
+  const [sessionHistory, setSessionHistory] = useState<SessionHistoryEntry[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    page: 0,
+    limit: 10,
+    total: 0,
+    total_pages: 0
+  });
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -86,8 +104,58 @@ function DashboardContent() {
       }
     };
 
+    const fetchSessionHistory = async () => {
+      try {
+        setIsLoadingHistory(true);
+        const response = await fetchWithAuth<PaginatedResponse<PaginatedSessionHistory>>(
+          `/api/v1/statistics/users/me/sessions?page=1&limit=10`
+        );
+        
+        // Convert from 1-indexed to 0-indexed
+        if (response.data && response.data.pagination) {
+          response.data.pagination.page -= 1;
+        }
+        
+        setSessionHistory(response.data.sessions);
+        setPagination(response.data.pagination);
+      } catch (err) {
+        console.error('Error fetching session history:', err);
+        setHistoryError(err instanceof Error ? err.message : 'Unknown error');
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+
     fetchStats();
+    fetchSessionHistory();
   }, [fetchWithAuth]);
+
+  // Function to handle page change
+  const handlePageChange = async (newPage: number) => {
+    if (newPage < 0 || newPage >= pagination.total_pages) {
+      return;
+    }
+    
+    try {
+      setIsLoadingHistory(true);
+      const response = await fetchWithAuth<PaginatedResponse<PaginatedSessionHistory>>(
+        `/api/v1/statistics/users/me/sessions?page=${newPage + 1}&limit=${pagination.limit}`
+      );
+      
+      // Convert from 1-indexed to 0-indexed
+      if (response.data && response.data.pagination) {
+        response.data.pagination.page -= 1;
+      }
+      
+      setSessionHistory(response.data.sessions);
+      setPagination(response.data.pagination);
+    } catch (err) {
+      console.error('Error fetching session history page:', err);
+      setHistoryError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
 
   // Sort character data by number of games played (descending)
   const nightfarerData = useMemo(() => {
@@ -231,6 +299,128 @@ function DashboardContent() {
     ? nightLordData[activeNightLordIndex]
     : null;
 
+  // Function to format dates
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return formatDistanceToNow(date, { addSuffix: true });
+    } catch {
+      return 'Invalid date';
+    }
+  };
+
+  // Function to get the result color
+  const getResultColor = (result: string) => {
+    switch(result.toLowerCase()) {
+      case 'win':
+        return 'text-green-400';
+      case 'loss':
+        return 'text-red-400';
+      case 'disconnect':
+        return 'text-yellow-400';
+      default:
+        return 'text-muted-foreground';
+    }
+  };
+
+  // Session History Section
+  const renderSessionHistory = () => {
+    if (isLoadingHistory) {
+      return (
+        <div className="text-center py-8 flex flex-col items-center justify-center gap-4">
+          <Loader2 className="h-6 w-6 animate-spin text-purple-500" />
+          <p>Loading session history...</p>
+        </div>
+      );
+    }
+
+    if (historyError) {
+      return (
+        <div className="text-center py-4 text-destructive">
+          <p>Error loading session history: {historyError}</p>
+        </div>
+      );
+    }
+
+    if (sessionHistory.length === 0) {
+      return (
+        <div className="text-center py-6 bg-background/50 border border-purple-900/20 rounded-lg">
+          <p className="text-muted-foreground">No session history available yet.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-background/50 border border-purple-900/20 rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Session</TableHead>
+                <TableHead>Night Lord</TableHead>
+                <TableHead>Nightfarer</TableHead>
+                <TableHead>Result</TableHead>
+                <TableHead>Time</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sessionHistory.map((session) => (
+                <TableRow key={session.session_id} className="hover:bg-purple-900/5">
+                  <TableCell className="font-medium">{session.session_name}</TableCell>
+                  <TableCell>{session.night_lord}</TableCell>
+                  <TableCell>{session.player_nightfarer}</TableCell>
+                  <TableCell>
+                    <span className={getResultColor(session.player_result)}>
+                      {session.player_result}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">
+                    {formatDate(session.created_at)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        
+        {/* Pagination Controls */}
+        {pagination.total_pages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-purple-900/20">
+            <div className="text-sm text-muted-foreground">
+              Showing <span className="font-medium">{pagination.page * pagination.limit + 1}</span>
+              {' '} to {' '}
+              <span className="font-medium">
+                {Math.min((pagination.page + 1) * pagination.limit, pagination.total)}
+              </span>
+              {' '} of {' '}
+              <span className="font-medium">{pagination.total}</span> sessions
+            </div>
+            <div className="flex space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(pagination.page - 1)}
+                disabled={pagination.page === 0}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span className="sr-only">Previous</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(pagination.page + 1)}
+                disabled={pagination.page >= pagination.total_pages - 1}
+              >
+                <ChevronRight className="h-4 w-4" />
+                <span className="sr-only">Next</span>
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="container mx-auto py-6 md:py-8 px-4 md:px-6">
       <h1 className="text-2xl md:text-3xl font-bold mb-4 md:mb-6">Dashboard</h1>
@@ -292,7 +482,7 @@ function DashboardContent() {
             </div>
             
             {/* Character Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6">
               {/* Nightfarer Stats */}
               <Card className="flex flex-col transition-shadow hover:shadow-md">
                 <CardHeader className="flex-row items-start space-y-0 pb-0">
@@ -546,6 +736,14 @@ function DashboardContent() {
                   )}
                 </CardContent>
               </Card>
+            </div>
+            
+            {/* Session History */}
+            <div className="mb-6">
+              <h3 className="font-medium text-base md:text-lg mb-3 md:mb-4 border-b border-purple-900/20 pb-2">
+                Recent Session History
+              </h3>
+              {renderSessionHistory()}
             </div>
             
             {/* Empty State - for when there's no data */}

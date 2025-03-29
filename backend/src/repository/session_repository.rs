@@ -119,3 +119,73 @@ pub async fn update_player_character(
 
     Ok(())
 }
+
+pub async fn find_sessions_with_user(
+    db: &Database,
+    user_id: &str,
+) -> Result<Vec<GameSession>, AppError> {
+    // Find sessions where this user is a participant
+    // The MongoDB document uses both userId and user_id in different places
+    let filter = doc! {
+        "$or": [
+            { "joined_players.user_id": user_id },
+            { "joined_players.userId": user_id },
+            { "host_id": user_id }
+        ]
+    };
+
+    // MongoDB 3.2.3 doesn't support options directly in find, so apply options manually
+    let collection = get_collection(db);
+    let cursor = collection.find(filter).await?;
+
+    // Sort results after fetching
+    let mut sessions: Vec<GameSession> = cursor.try_collect().await?;
+    sessions.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+    Ok(sessions)
+}
+
+pub async fn find_sessions_with_user_paginated(
+    db: &Database,
+    user_id: &str,
+    page: u64,
+    limit: u64,
+) -> Result<(Vec<GameSession>, u64), AppError> {
+    // Find sessions where this user is a participant
+    // The MongoDB document uses both userId and user_id in different places
+    let filter = doc! {
+        "$or": [
+            { "joined_players.user_id": user_id },
+            { "joined_players.userId": user_id },
+            { "host_id": user_id }
+        ]
+    };
+
+    // Get total count
+    let total = get_collection(db).count_documents(filter.clone()).await?;
+
+    // MongoDB 3.2.3 doesn't support options directly in find, so apply options manually
+    let collection = get_collection(db);
+    let cursor = collection.find(filter).await?;
+    let mut sessions: Vec<GameSession> = cursor.try_collect().await?;
+
+    // Sort, then apply pagination manually
+    sessions.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+    let start = page * limit;
+    let end = start + limit;
+
+    // Apply pagination manually
+    if start < (sessions.len() as u64) {
+        let end_idx = if end < (sessions.len() as u64) {
+            end as usize
+        } else {
+            sessions.len()
+        };
+        sessions = sessions[start as usize..end_idx].to_vec();
+    } else {
+        sessions.clear();
+    }
+
+    Ok((sessions, total))
+}

@@ -2,7 +2,7 @@ use crate::services::statistics_service;
 use crate::utils::jwt;
 use actix_web::{get, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use mongodb::Database;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 #[derive(Serialize, ToSchema)]
@@ -13,6 +13,46 @@ pub struct NightLordStatsResponse {
     losses: i32,
     disconnects: i32,
     win_rate: f64,
+}
+
+// Add a new response type for session history
+#[derive(Serialize, ToSchema)]
+pub struct SessionHistoryResponse {
+    session_id: String,
+    session_name: String,
+    night_lord: String,
+    player_nightfarer: String,
+    player_result: String,
+    created_at: chrono::DateTime<chrono::Utc>,
+    completed_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+// Response structure for paginated session history
+#[derive(Serialize, ToSchema)]
+pub struct PaginatedSessionResponse {
+    status: String,
+    data: PaginatedSessionData,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct PaginatedSessionData {
+    pagination: PaginationInfo,
+    sessions: Vec<SessionHistoryResponse>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct PaginationInfo {
+    page: u64,
+    limit: u64,
+    total: u64,
+    total_pages: u64,
+}
+
+// Query parameters for pagination
+#[derive(Deserialize)]
+pub struct PaginationQuery {
+    page: Option<u64>,
+    limit: Option<u64>,
 }
 
 /// Get current user's statistics
@@ -48,6 +88,84 @@ async fn get_current_user_statistics(db: web::Data<Database>, req: HttpRequest) 
         })),
         Err(e) => {
             log::error!("Error fetching user statistics: {:?}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": "error",
+                "message": e.to_string()
+            }))
+        }
+    }
+}
+
+/// Get current user's session history with pagination
+#[utoipa::path(
+    get,
+    path = "/api/v1/statistics/users/me/sessions",
+    params(
+        ("page" = Option<u64>, Query, description = "Page number (1-indexed, default: 1)"),
+        ("limit" = Option<u64>, Query, description = "Items per page (default: 10)")
+    ),
+    responses(
+        (status = 200, description = "User session history retrieved successfully", body = PaginatedSessionResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "statistics"
+)]
+#[get("/api/v1/statistics/users/me/sessions")]
+async fn get_current_user_session_history(
+    db: web::Data<Database>,
+    req: HttpRequest,
+    query: web::Query<PaginationQuery>,
+) -> impl Responder {
+    // Get claims from request extensions (set by middleware)
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.sub.clone()
+    };
+
+    // Get pagination parameters with defaults
+    // Convert from 1-indexed (UI) to 0-indexed (internal)
+    let page = query.page.unwrap_or(1).saturating_sub(1);
+    let limit = query.limit.unwrap_or(10);
+
+    match statistics_service::get_user_session_history_paginated(&db, &user_id, page, limit).await {
+        Ok(paginated_history) => {
+            // Transform to API response format
+            let response = PaginatedSessionResponse {
+                status: "success".to_string(),
+                data: PaginatedSessionData {
+                    pagination: PaginationInfo {
+                        // Convert back to 1-indexed for response
+                        page: paginated_history.pagination.page + 1,
+                        limit: paginated_history.pagination.limit,
+                        total: paginated_history.pagination.total,
+                        total_pages: paginated_history.pagination.total_pages,
+                    },
+                    sessions: paginated_history
+                        .sessions
+                        .into_iter()
+                        .map(|entry| SessionHistoryResponse {
+                            session_id: entry.session_id,
+                            session_name: entry.session_name,
+                            night_lord: entry.night_lord,
+                            player_nightfarer: entry.player_nightfarer,
+                            player_result: entry.player_result,
+                            created_at: entry.created_at,
+                            completed_at: entry.completed_at,
+                        })
+                        .collect(),
+                },
+            };
+
+            HttpResponse::Ok().json(response)
+        }
+        Err(e) => {
+            log::error!("Error fetching paginated user session history: {:?}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "status": "error",
                 "message": e.to_string()
@@ -306,5 +424,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         .service(get_user_statistics)
         .service(get_leaderboard)
         .service(get_night_lord_statistics)
-        .service(get_all_night_lord_statistics);
+        .service(get_all_night_lord_statistics)
+        .service(get_current_user_session_history);
 }
