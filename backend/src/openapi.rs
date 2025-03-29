@@ -6,14 +6,16 @@ use crate::models::session::{
     CreateSessionDto, GameResult, JoinSessionDto, PlayerInfo, RateSessionDto, ResultsResponseDto,
     SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto,
 };
+use crate::models::statistics::{LeaderboardEntry, Stats, UserStatistics};
 use crate::models::user::{
     AuthResponse, CreateUserDto, GetUsersQuery, LoginUserDto, PaginationInfo, RefreshTokenResponse,
     UpdateUserDto, UpdateUserProfileDto, User, UserResponse, UsersListData, UsersListResponse,
 };
+use crate::routes::statistics::NightLordStatsResponse;
 use crate::routes::users::{JwtInfoDto, TokenInfoResponse};
 use crate::sse::messages::{ServerMessage, SessionInfo, SseSessionStatus};
 
-use crate::routes::{game_data::*, health::*, sessions::*, sse::*, users::*};
+use crate::routes::{game_data::*, health::*, sessions::*, sse::*, statistics::*, users::*};
 
 // Import SSE models
 use crate::config::get_config;
@@ -72,6 +74,12 @@ use utoipa::{
         // SSE routes
         events_route,
         events_status,
+        // Statistics routes
+        get_current_user_statistics,
+        get_user_statistics,
+        get_leaderboard,
+        get_night_lord_statistics,
+        get_all_night_lord_statistics,
     ),
     components(
         schemas(
@@ -98,7 +106,6 @@ use utoipa::{
             UpdateSessionDto,
             SessionResponseDto,
             ResultsResponseDto,
-            // Add the missing schema components
             PlayerInfo,
             SessionStatus,
             GameResult,
@@ -117,7 +124,11 @@ use utoipa::{
             ServerMessage,
             SessionInfo,
             SseSessionStatus,
-            // Add other models as needed
+            // Statistics models
+            Stats,
+            UserStatistics,
+            LeaderboardEntry,
+            NightLordStatsResponse,
         ),
     ),
     tags(

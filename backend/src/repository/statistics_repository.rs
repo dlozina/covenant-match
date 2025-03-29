@@ -1,6 +1,6 @@
 use crate::models::error::AppError;
 use crate::models::session::GameResult;
-use crate::models::statistics::{CharacterStats, LeaderboardEntry, UserStatistics};
+use crate::models::statistics::{LeaderboardEntry, Stats, UserStatistics};
 use futures::TryStreamExt;
 use mongodb::{
     bson::{doc, Document},
@@ -23,11 +23,18 @@ pub async fn find_by_user_id(
     Ok(stats)
 }
 
+pub async fn find_all(db: &Database) -> Result<Vec<UserStatistics>, AppError> {
+    let cursor = get_collection(db).find(doc! {}).await?;
+    let stats = cursor.try_collect().await?;
+    Ok(stats)
+}
+
 pub async fn update_player_stats(
     db: &Database,
     user_id: &str,
     username: &str,
-    character: &str,
+    nightfarer: &str,
+    night_lord: &str,
     result: &GameResult,
 ) -> Result<(), AppError> {
     // Get existing stats or create new ones
@@ -44,7 +51,8 @@ pub async fn update_player_stats(
                 losses: 0,
                 disconnects: 0,
                 win_rate: 0.0,
-                character_stats: HashMap::new(),
+                nightfarer_stats: HashMap::new(),
+                night_lord_stats: HashMap::new(),
                 achievements: vec![],
                 reputation_score: 0.0,
             }
@@ -65,11 +73,11 @@ pub async fn update_player_stats(
         stats.win_rate = (stats.wins as f64 / stats.total_games as f64) * 100.0;
     }
 
-    // Update character stats
+    // Update nightfarer stats
     let character_stats = stats
-        .character_stats
-        .entry(character.to_string())
-        .or_insert_with(|| CharacterStats {
+        .nightfarer_stats
+        .entry(nightfarer.to_string())
+        .or_insert_with(|| Stats {
             played: 0,
             wins: 0,
             losses: 0,
@@ -91,9 +99,36 @@ pub async fn update_player_stats(
             (character_stats.wins as f64 / character_stats.played as f64) * 100.0;
     }
 
+    // Update night lord stats
+    let night_lord_stats = stats
+        .night_lord_stats
+        .entry(night_lord.to_string())
+        .or_insert_with(|| Stats {
+            played: 0,
+            wins: 0,
+            losses: 0,
+            disconnects: 0,
+            win_rate: 0.0,
+        });
+
+    night_lord_stats.played += 1;
+
+    match result {
+        GameResult::Win => night_lord_stats.wins += 1,
+        GameResult::Loss => night_lord_stats.losses += 1,
+        GameResult::Disconnect => night_lord_stats.disconnects += 1,
+    }
+
+    // Calculate night lord win rate
+    if night_lord_stats.played > 0 {
+        night_lord_stats.win_rate =
+            (night_lord_stats.wins as f64 / night_lord_stats.played as f64) * 100.0;
+    }
+
     // Update or insert the stats document
     get_collection(db)
         .replace_one(doc! { "user_id": user_id }, &stats)
+        .upsert(true)
         .await?;
 
     Ok(())

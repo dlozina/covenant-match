@@ -497,7 +497,7 @@ pub async fn submit_result(
             session.completed_at = Some(now);
 
             //todo important: update player statistics
-            // Update player statistics
+            // Update player statistics, this will update
             for player in &session.joined_players {
                 // Get player's submitted result or use majority result
                 let player_result = session
@@ -521,6 +521,7 @@ pub async fn submit_result(
                     &player.user_id,
                     &player.username,
                     &player.nightfarer,
+                    &session.night_lord,
                     &player_result,
                 )
                 .await?;

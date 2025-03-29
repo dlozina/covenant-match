@@ -171,6 +171,12 @@ db.users.aggregate([
 ])
 ```
 
+# Useful commands
+
+```bash
+db.sessions.find({ _id: ObjectId('67e80906364825d8d6ec4004')})
+```
+
 
 
 
