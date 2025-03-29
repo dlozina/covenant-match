@@ -140,18 +140,28 @@ function DashboardContent() {
     losses: number;
     disconnects: number;
     win_rate: number;
+    fillOpacity?: number;
   }
 
   type CustomTooltipProps = TooltipProps<number, string> & {
-    payload?: Array<{ payload: CharacterData }>;
+    payload?: Array<{ payload: CharacterData; color?: string }>;
   };
 
   const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
+      const color = payload[0].color || basePurple;
+      const opacity = data.fillOpacity || 1;
+      
       return (
         <div className="bg-card border border-purple-900/20 rounded-lg p-2 shadow-md text-sm">
-          <p className="font-semibold">{data.name}</p>
+          <div className="flex items-center gap-2 mb-1">
+            <div 
+              className="w-3 h-3 rounded-full" 
+              style={{ backgroundColor: color, opacity }}
+            />
+            <p className="font-semibold">{data.name}</p>
+          </div>
           <p>Games: {data.played}</p>
           <p>Wins: {data.wins} ({data.win_rate}%)</p>
           <p>Losses: {data.losses}</p>
@@ -229,7 +239,10 @@ function DashboardContent() {
                     <PieChart>
                       <Tooltip content={<CustomTooltip />} />
                       <Pie
-                        data={nightfarerData}
+                        data={nightfarerData.map(entry => ({
+                          ...entry,
+                          fillOpacity: getOpacity(entry.played, maxNightfarerPlayed)
+                        }))}
                         dataKey="played"
                         nameKey="character"
                         innerRadius={60}
@@ -294,7 +307,10 @@ function DashboardContent() {
                     <PieChart>
                       <Tooltip content={<CustomTooltip />} />
                       <Pie
-                        data={nightLordData}
+                        data={nightLordData.map(entry => ({
+                          ...entry,
+                          fillOpacity: getOpacity(entry.played, maxNightLordPlayed)
+                        }))}
                         dataKey="played"
                         nameKey="character"
                         innerRadius={60}
