@@ -4,11 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Cell, Label, Pie, PieChart, Tooltip, TooltipProps } from "recharts";
+import { Cell, Label, Legend, Pie, PieChart, ResponsiveContainer, Sector, Tooltip, TooltipProps } from "recharts";
+import { Loader2 } from "lucide-react";
 import {
-  ChartConfig,
-  ChartContainer,
-} from "@/components/ui/chart";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { PieSectorDataItem } from "recharts/types/polar/Pie";
 
 interface CharacterStats {
   played: number;
@@ -46,6 +51,9 @@ function DashboardContent() {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [animateCharts, setAnimateCharts] = useState(false);
+  const [activeNightfarer, setActiveNightfarer] = useState<string | null>(null);
+  const [activeNightLord, setActiveNightLord] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -53,11 +61,28 @@ function DashboardContent() {
         setIsLoading(true);
         const data = await fetchWithAuth<UserStats>('/api/v1/statistics/users/me');
         setStats(data);
+        
+        // Set initial active characters
+        if (data) {
+          // Set first nightfarer character as active
+          const firstNightfarer = Object.keys(data.nightfarer_stats || {})[0];
+          if (firstNightfarer) {
+            setActiveNightfarer(firstNightfarer);
+          }
+          
+          // Set first night lord character as active
+          const firstNightLord = Object.keys(data.night_lord_stats || {})[0];
+          if (firstNightLord) {
+            setActiveNightLord(firstNightLord);
+          }
+        }
       } catch (err) {
         console.error('Error fetching user statistics:', err);
         setError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
         setIsLoading(false);
+        // Add a slight delay before starting animation
+        setTimeout(() => setAnimateCharts(true), 300);
       }
     };
 
@@ -95,6 +120,17 @@ function DashboardContent() {
       .sort((a, b) => b.played - a.played); // Sort by played count
   }, [stats]);
 
+  // Calculate active indexes
+  const activeNightfarerIndex = useMemo(() => 
+    nightfarerData.findIndex(item => item.character === activeNightfarer) || 0, 
+    [nightfarerData, activeNightfarer]
+  );
+
+  const activeNightLordIndex = useMemo(() => 
+    nightLordData.findIndex(item => item.character === activeNightLord) || 0, 
+    [nightLordData, activeNightLord]
+  );
+
   // Get max values for opacity scaling
   const maxNightfarerPlayed = useMemo(() => {
     return nightfarerData.length > 0 
@@ -108,28 +144,31 @@ function DashboardContent() {
       : 1;
   }, [nightLordData]);
 
-  // Generate opacity based on games played (more games = more opaque)
+  // Generate opacity based on games played
+  // Reversed: More games = deeper purple (lower opacity), less games = lighter purple (higher opacity)
   const getOpacity = (played: number, maxPlayed: number) => {
-    // Calculate opacity between 0.2 (minimum) and 1.0 (maximum)
-    // This ensures even low-count entries are still somewhat visible
-    return 0.2 + (played / maxPlayed) * 0.8;
+    // Reverse the opacity calculation so that more played = deeper color
+    // Now between 0.3 and 0.9 to avoid extremely dark/light colors
+    return 0.9 - (played / maxPlayed) * 0.6;
   };
 
   // Base purple color
   const basePurple = "hsl(267 75% 50%)";
 
-  const chartConfig: ChartConfig = {
-    played: { label: "Games Played" },
-    character: { label: "Character" },
-  };
-
-  const totalNightfarerGames = useMemo(() => {
-    return nightfarerData.reduce((acc, curr) => acc + curr.played, 0);
-  }, [nightfarerData]);
-
-  const totalNightLordGames = useMemo(() => {
-    return nightLordData.reduce((acc, curr) => acc + curr.played, 0);
-  }, [nightLordData]);
+  // Active shape renderer for highlighted pie segment
+  const activeShapeRenderer = ({
+    outerRadius = 0,
+    ...props
+  }: PieSectorDataItem) => (
+    <g>
+      <Sector {...props} outerRadius={outerRadius + 10} />
+      <Sector
+        {...props}
+        outerRadius={outerRadius + 25}
+        innerRadius={outerRadius + 12}
+      />
+    </g>
+  );
 
   // Custom tooltip content
   interface CharacterData {
@@ -171,23 +210,51 @@ function DashboardContent() {
     return null;
   };
   
+  // Generate a custom entry for the legend renderer
+  const renderLegend = (nightfarerData.length > 0 || nightLordData.length > 0) ? {
+    formatter: (value: string) => {
+      // Return white text for the legend
+      return <span style={{ color: "white" }}>{value}</span>;
+    },
+    payload: [
+      { value: 'Most played', color: basePurple, fillOpacity: 0.3 },
+      { value: 'Least played', color: basePurple, fillOpacity: 0.9 },
+    ],
+  } : undefined;
+
+  // Selected character data
+  const selectedNightfarer = activeNightfarerIndex >= 0 && nightfarerData.length > 0 
+    ? nightfarerData[activeNightfarerIndex] 
+    : null;
+
+  const selectedNightLord = activeNightLordIndex >= 0 && nightLordData.length > 0
+    ? nightLordData[activeNightLordIndex]
+    : null;
+
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
+    <div className="container mx-auto py-6 md:py-8 px-4 md:px-6">
+      <h1 className="text-2xl md:text-3xl font-bold mb-4 md:mb-6">Dashboard</h1>
       
-      <div className="bg-card/50 border border-purple-900/20 rounded-lg p-6 backdrop-blur-sm">
-        <h2 className="text-xl font-semibold mb-4">Welcome, {userData?.displayName || userData?.username || 'Ashen One'}</h2>
-        <p className="text-muted-foreground mb-6">
+      <div className="bg-card/50 border border-purple-900/20 rounded-lg p-4 md:p-6 backdrop-blur-sm">
+        <h2 className="text-lg md:text-xl font-semibold mb-2 md:mb-4">Welcome, {userData?.displayName || userData?.username || 'Ashen One'}</h2>
+        <p className="text-muted-foreground mb-4 md:mb-6 text-sm md:text-base">
           This is your personal dashboard where you can track your game statistics.
         </p>
         
         {isLoading ? (
-          <div className="text-center py-8">
+          <div className="text-center py-12 flex flex-col items-center justify-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
             <p>Loading your statistics...</p>
           </div>
         ) : error ? (
           <div className="text-center py-8 text-destructive">
             <p>Error loading statistics: {error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="mt-4 px-4 py-2 bg-purple-700 hover:bg-purple-600 transition-colors rounded-md text-white"
+            >
+              Try Again
+            </button>
           </div>
         ) : !stats ? (
           <div className="text-center py-8">
@@ -197,171 +264,299 @@ function DashboardContent() {
           <>
             {/* Overall Stats */}
             <div className="mb-6">
-              <h3 className="font-medium text-lg mb-4">Overall Statistics</h3>
-              <div className="bg-background/50 border border-purple-900/20 rounded-lg p-4">
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Total Games</p>
-                    <p className="text-2xl font-bold text-purple-400">{stats.total_games}</p>
+              <h3 className="font-medium text-base md:text-lg mb-3 md:mb-4 border-b border-purple-900/20 pb-2">Overall Statistics</h3>
+              <div className="bg-background/50 border border-purple-900/20 rounded-lg p-3 md:p-4">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4">
+                  <div className="p-2 md:p-3 rounded-md bg-purple-900/10">
+                    <p className="text-xs md:text-sm text-muted-foreground">Total Games</p>
+                    <p className="text-xl md:text-2xl font-bold text-purple-400">{stats.total_games}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Wins</p>
-                    <p className="text-2xl font-bold text-green-400">{stats.wins}</p>
+                  <div className="p-2 md:p-3 rounded-md bg-green-900/10">
+                    <p className="text-xs md:text-sm text-muted-foreground">Wins</p>
+                    <p className="text-xl md:text-2xl font-bold text-green-400">{stats.wins}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Losses</p>
-                    <p className="text-2xl font-bold text-red-400">{stats.losses}</p>
+                  <div className="p-2 md:p-3 rounded-md bg-red-900/10">
+                    <p className="text-xs md:text-sm text-muted-foreground">Losses</p>
+                    <p className="text-xl md:text-2xl font-bold text-red-400">{stats.losses}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Disconnects</p>
-                    <p className="text-2xl font-bold text-yellow-400">{stats.disconnects}</p>
+                  <div className="p-2 md:p-3 rounded-md bg-yellow-900/10">
+                    <p className="text-xs md:text-sm text-muted-foreground">Disconnects</p>
+                    <p className="text-xl md:text-2xl font-bold text-yellow-400">{stats.disconnects}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Win Rate</p>
-                    <p className="text-2xl font-bold text-indigo-400">{stats.win_rate}%</p>
+                  <div className="p-2 md:p-3 rounded-md bg-indigo-900/10">
+                    <p className="text-xs md:text-sm text-muted-foreground">Win Rate</p>
+                    <p className="text-xl md:text-2xl font-bold text-indigo-400">{stats.win_rate}%</p>
                   </div>
                 </div>
               </div>
             </div>
             
             {/* Character Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               {/* Nightfarer Stats */}
-              <Card className="flex flex-col">
-                <CardHeader className="items-center pb-0">
-                  <CardTitle>Nightfarer Stats</CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1 pb-0">
-                  <ChartContainer
-                    config={chartConfig}
-                    className="mx-auto aspect-square max-h-[250px]"
-                  >
-                    <PieChart>
-                      <Tooltip content={<CustomTooltip />} />
-                      <Pie
-                        data={nightfarerData.map(entry => ({
-                          ...entry,
-                          fillOpacity: getOpacity(entry.played, maxNightfarerPlayed)
-                        }))}
-                        dataKey="played"
-                        nameKey="character"
-                        innerRadius={60}
-                        strokeWidth={0}
-                        paddingAngle={0}
-                      >
-                        {nightfarerData.map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={basePurple}
-                            fillOpacity={getOpacity(entry.played, maxNightfarerPlayed)}
-                          />
+              <Card className="flex flex-col transition-shadow hover:shadow-md">
+                <CardHeader className="flex-row items-start space-y-0 pb-0">
+                  <div>
+                    <CardTitle className="text-base md:text-lg">Nightfarer Stats</CardTitle>
+                  </div>
+                  {nightfarerData.length > 0 && (
+                    <Select 
+                      value={activeNightfarer || ''}
+                      onValueChange={setActiveNightfarer}
+                    >
+                      <SelectTrigger className="ml-auto h-7 w-[160px] rounded-lg pl-2.5">
+                        <SelectValue placeholder="Select character" />
+                      </SelectTrigger>
+                      <SelectContent align="end" className="rounded-xl">
+                        {nightfarerData.map((item) => (
+                          <SelectItem 
+                            key={item.character} 
+                            value={item.character}
+                            className="rounded-lg [&_span]:flex"
+                          >
+                            <div className="flex items-center gap-2 text-xs">
+                              <span
+                                className="flex h-3 w-3 shrink-0 rounded-sm"
+                                style={{
+                                  backgroundColor: basePurple,
+                                  opacity: getOpacity(item.played, maxNightfarerPlayed)
+                                }}
+                              />
+                              {item.character}
+                            </div>
+                          </SelectItem>
                         ))}
-                        <Label
-                          content={({ viewBox }) => {
-                            if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                              return (
-                                <text
-                                  x={viewBox.cx}
-                                  y={viewBox.cy}
-                                  textAnchor="middle"
-                                  dominantBaseline="middle"
-                                >
-                                  <tspan
-                                    x={viewBox.cx}
-                                    y={viewBox.cy}
-                                    className="fill-foreground text-3xl font-bold"
-                                    fill="hsl(var(--foreground))"
-                                  >
-                                    {totalNightfarerGames}
-                                  </tspan>
-                                  <tspan
-                                    x={viewBox.cx}
-                                    y={(viewBox.cy || 0) + 24}
-                                    className="fill-muted-foreground"
-                                    fill="hsl(var(--muted-foreground))"
-                                  >
-                                    Games
-                                  </tspan>
-                                </text>
-                              )
-                            }
-                            return null;
-                          }}
-                        />
-                      </Pie>
-                    </PieChart>
-                  </ChartContainer>
+                      </SelectContent>
+                    </Select>
+                  )}
+                </CardHeader>
+                <CardContent className="flex-1 pb-0 pt-2">
+                  {nightfarerData.length === 0 ? (
+                    <div className="h-[250px] flex items-center justify-center text-sm text-muted-foreground">
+                      No Nightfarer data available
+                    </div>
+                  ) : (
+                    <div className="w-full h-[250px] md:h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Tooltip content={<CustomTooltip />} />
+                          <Legend 
+                            formatter={renderLegend?.formatter}
+                            payload={renderLegend?.payload}
+                            layout="horizontal"
+                            verticalAlign="bottom"
+                            align="center"
+                            iconSize={10}
+                            iconType="circle"
+                            wrapperStyle={{ fontSize: '12px', marginTop: '10px' }}
+                          />
+                          <Pie
+                            data={nightfarerData.map(entry => ({
+                              ...entry,
+                              fillOpacity: getOpacity(entry.played, maxNightfarerPlayed)
+                            }))}
+                            dataKey="played"
+                            nameKey="character"
+                            innerRadius={60}
+                            strokeWidth={0}
+                            paddingAngle={0}
+                            animationDuration={animateCharts ? 1000 : 0}
+                            animationBegin={0}
+                            activeIndex={activeNightfarerIndex}
+                            activeShape={activeShapeRenderer}
+                          >
+                            {nightfarerData.map((entry, index) => (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={basePurple}
+                                fillOpacity={getOpacity(entry.played, maxNightfarerPlayed)}
+                              />
+                            ))}
+                            <Label
+                              content={({ viewBox }) => {
+                                if (viewBox && "cx" in viewBox && "cy" in viewBox && selectedNightfarer) {
+                                  return (
+                                    <text
+                                      x={viewBox.cx}
+                                      y={viewBox.cy}
+                                      textAnchor="middle"
+                                      dominantBaseline="middle"
+                                    >
+                                      <tspan
+                                        x={viewBox.cx}
+                                        y={(viewBox.cy || 0) - 10}
+                                        className="fill-foreground text-2xl md:text-3xl font-bold"
+                                        fill="hsl(var(--foreground))"
+                                      >
+                                        {selectedNightfarer.played}
+                                      </tspan>
+                                      <tspan
+                                        x={viewBox.cx}
+                                        y={(viewBox.cy || 0) + 14}
+                                        className="fill-muted-foreground text-sm"
+                                        fill="hsl(var(--muted-foreground))"
+                                      >
+                                        Games
+                                      </tspan>
+                                      <tspan
+                                        x={viewBox.cx}
+                                        y={(viewBox.cy || 0) + 32}
+                                        className="fill-muted-foreground text-xs"
+                                        fill="hsl(var(--muted-foreground))"
+                                      >
+                                        Win rate: {selectedNightfarer.win_rate}%
+                                      </tspan>
+                                    </text>
+                                  )
+                                }
+                                return null;
+                              }}
+                            />
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
               {/* Night Lord Stats */}
-              <Card className="flex flex-col">
-                <CardHeader className="items-center pb-0">
-                  <CardTitle>Night Lord Stats</CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1 pb-0">
-                  <ChartContainer
-                    config={chartConfig}
-                    className="mx-auto aspect-square max-h-[250px]"
-                  >
-                    <PieChart>
-                      <Tooltip content={<CustomTooltip />} />
-                      <Pie
-                        data={nightLordData.map(entry => ({
-                          ...entry,
-                          fillOpacity: getOpacity(entry.played, maxNightLordPlayed)
-                        }))}
-                        dataKey="played"
-                        nameKey="character"
-                        innerRadius={60}
-                        strokeWidth={0}
-                        paddingAngle={0}
-                      >
-                        {nightLordData.map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={basePurple}
-                            fillOpacity={getOpacity(entry.played, maxNightLordPlayed)}
-                          />
+              <Card className="flex flex-col transition-shadow hover:shadow-md">
+                <CardHeader className="flex-row items-start space-y-0 pb-0">
+                  <div>
+                    <CardTitle className="text-base md:text-lg">Night Lord Stats</CardTitle>
+                  </div>
+                  {nightLordData.length > 0 && (
+                    <Select 
+                      value={activeNightLord || ''}
+                      onValueChange={setActiveNightLord}
+                    >
+                      <SelectTrigger className="ml-auto h-7 w-[160px] rounded-lg pl-2.5">
+                        <SelectValue placeholder="Select character" />
+                      </SelectTrigger>
+                      <SelectContent align="end" className="rounded-xl">
+                        {nightLordData.map((item) => (
+                          <SelectItem 
+                            key={item.character} 
+                            value={item.character}
+                            className="rounded-lg [&_span]:flex"
+                          >
+                            <div className="flex items-center gap-2 text-xs">
+                              <span
+                                className="flex h-3 w-3 shrink-0 rounded-sm"
+                                style={{
+                                  backgroundColor: basePurple,
+                                  opacity: getOpacity(item.played, maxNightLordPlayed)
+                                }}
+                              />
+                              {item.character}
+                            </div>
+                          </SelectItem>
                         ))}
-                        <Label
-                          content={({ viewBox }) => {
-                            if (viewBox && "cx" in viewBox && "cy" in viewBox) {
-                              return (
-                                <text
-                                  x={viewBox.cx}
-                                  y={viewBox.cy}
-                                  textAnchor="middle"
-                                  dominantBaseline="middle"
-                                >
-                                  <tspan
-                                    x={viewBox.cx}
-                                    y={viewBox.cy}
-                                    className="fill-foreground text-3xl font-bold"
-                                    fill="hsl(var(--foreground))"
-                                  >
-                                    {totalNightLordGames}
-                                  </tspan>
-                                  <tspan
-                                    x={viewBox.cx}
-                                    y={(viewBox.cy || 0) + 24}
-                                    className="fill-muted-foreground"
-                                    fill="hsl(var(--muted-foreground))"
-                                  >
-                                    Games
-                                  </tspan>
-                                </text>
-                              )
-                            }
-                            return null;
-                          }}
-                        />
-                      </Pie>
-                    </PieChart>
-                  </ChartContainer>
+                      </SelectContent>
+                    </Select>
+                  )}
+                </CardHeader>
+                <CardContent className="flex-1 pb-0 pt-2">
+                  {nightLordData.length === 0 ? (
+                    <div className="h-[250px] flex items-center justify-center text-sm text-muted-foreground">
+                      No Night Lord data available
+                    </div>
+                  ) : (
+                    <div className="w-full h-[250px] md:h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Tooltip content={<CustomTooltip />} />
+                          <Legend 
+                            formatter={renderLegend?.formatter}
+                            payload={renderLegend?.payload}
+                            layout="horizontal"
+                            verticalAlign="bottom"
+                            align="center"
+                            iconSize={10}
+                            iconType="circle"
+                            wrapperStyle={{ fontSize: '12px', marginTop: '10px' }}
+                          />
+                          <Pie
+                            data={nightLordData.map(entry => ({
+                              ...entry,
+                              fillOpacity: getOpacity(entry.played, maxNightLordPlayed)
+                            }))}
+                            dataKey="played"
+                            nameKey="character"
+                            innerRadius={60}
+                            strokeWidth={0}
+                            paddingAngle={0}
+                            animationDuration={animateCharts ? 1000 : 0}
+                            animationBegin={0}
+                            activeIndex={activeNightLordIndex}
+                            activeShape={activeShapeRenderer}
+                          >
+                            {nightLordData.map((entry, index) => (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={basePurple}
+                                fillOpacity={getOpacity(entry.played, maxNightLordPlayed)}
+                              />
+                            ))}
+                            <Label
+                              content={({ viewBox }) => {
+                                if (viewBox && "cx" in viewBox && "cy" in viewBox && selectedNightLord) {
+                                  return (
+                                    <text
+                                      x={viewBox.cx}
+                                      y={viewBox.cy}
+                                      textAnchor="middle"
+                                      dominantBaseline="middle"
+                                    >
+                                      <tspan
+                                        x={viewBox.cx}
+                                        y={(viewBox.cy || 0) - 10}
+                                        className="fill-foreground text-2xl md:text-3xl font-bold"
+                                        fill="hsl(var(--foreground))"
+                                      >
+                                        {selectedNightLord.played}
+                                      </tspan>
+                                      <tspan
+                                        x={viewBox.cx}
+                                        y={(viewBox.cy || 0) + 14}
+                                        className="fill-muted-foreground text-sm"
+                                        fill="hsl(var(--muted-foreground))"
+                                      >
+                                        Games
+                                      </tspan>
+                                      <tspan
+                                        x={viewBox.cx}
+                                        y={(viewBox.cy || 0) + 32}
+                                        className="fill-muted-foreground text-xs"
+                                        fill="hsl(var(--muted-foreground))"
+                                      >
+                                        Win rate: {selectedNightLord.win_rate}%
+                                      </tspan>
+                                    </text>
+                                  )
+                                }
+                                return null;
+                              }}
+                            />
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
+            
+            {/* Empty State - for when there's no data */}
+            {stats.total_games === 0 && (
+              <div className="mt-6 p-6 border border-purple-900/20 rounded-lg bg-background/50 text-center">
+                <h3 className="font-medium text-lg mb-2">No Games Played Yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  Join a game to start seeing your statistics here.
+                </p>
+              </div>
+            )}
           </>
         )}
       </div>
