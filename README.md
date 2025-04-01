@@ -136,6 +136,7 @@ covenant-match/
     ├── architecture/           # Architecture diagrams
     └── development/            # Development guidelines
 ```
+
 ## License
 
 Copyright (c) 2025 Dino Lozina
