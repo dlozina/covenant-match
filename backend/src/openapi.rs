@@ -81,6 +81,7 @@ use utoipa::{
         get_night_lord_statistics,
         get_all_night_lord_statistics,
         get_current_user_session_history,
+        get_session_details,
     ),
     components(
         schemas(
@@ -133,6 +134,9 @@ use utoipa::{
             SessionHistoryResponse,
             PaginatedSessionResponse,
             PaginatedSessionData,
+            SessionDetailResponse,
+            SessionDetail,
+            PlayerDetail,
         ),
     ),
     tags(

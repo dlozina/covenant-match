@@ -1,6 +1,7 @@
 use chrono::{Duration, Utc};
 use mongodb::bson::{oid::ObjectId, DateTime};
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use utoipa::ToSchema;
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
@@ -33,6 +34,17 @@ pub enum GameResult {
     Disconnect,
 }
 
+// Implement Display for GameResult
+impl fmt::Display for GameResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GameResult::Win => write!(f, "Win"),
+            GameResult::Loss => write!(f, "Loss"),
+            GameResult::Disconnect => write!(f, "Disconnect"),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, ToSchema)]
 pub enum SessionStatus {
     Open,
@@ -40,6 +52,19 @@ pub enum SessionStatus {
     InProgress,
     Completed,
     Cancelled,
+}
+
+// Implement Display for SessionStatus
+impl fmt::Display for SessionStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SessionStatus::Open => write!(f, "Open"),
+            SessionStatus::Full => write!(f, "Full"),
+            SessionStatus::InProgress => write!(f, "In Progress"),
+            SessionStatus::Completed => write!(f, "Completed"),
+            SessionStatus::Cancelled => write!(f, "Cancelled"),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

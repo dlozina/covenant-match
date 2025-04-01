@@ -77,6 +77,9 @@ pub enum AppError {
 
     #[error("CAPTCHA required: {0}")]
     CaptchaRequired(String),
+
+    #[error("Invalid object id: {0}")]
+    InvalidObjectId(String),
 }
 
 impl ResponseError for AppError {
@@ -121,6 +124,8 @@ impl ResponseError for AppError {
             AppError::CaptchaRequired(_) => StatusCode::BAD_REQUEST,
 
             AppError::InvalidId => StatusCode::BAD_REQUEST,
+
+            AppError::InvalidObjectId(_) => StatusCode::BAD_REQUEST,
         }
     }
 }

@@ -5,7 +5,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Cell, Label, Legend, Pie, PieChart, ResponsiveContainer, Sector, Tooltip, TooltipProps } from "recharts";
-import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Info } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -16,13 +16,24 @@ import {
 import { PieSectorDataItem } from "recharts/types/polar/Pie";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
-  SessionHistoryEntry,
-  PaginationInfo,
   PaginatedSessionHistory,
-  PaginatedResponse
+  PaginatedResponse,
+  PaginationInfo,
+  SessionHistoryEntry,
+  SessionDetail,
+  SessionDetailResponse
 } from "@/utils/api";
 import { formatDistanceToNow } from 'date-fns';
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface CharacterStats {
   played: number;
@@ -72,6 +83,13 @@ function DashboardContent() {
     total: 0,
     total_pages: 0
   });
+  
+  // Session details dialog state
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [sessionDetails, setSessionDetails] = useState<SessionDetail | null>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -361,6 +379,7 @@ function DashboardContent() {
                 <TableHead>Nightfarer</TableHead>
                 <TableHead>Result</TableHead>
                 <TableHead>Time</TableHead>
+                <TableHead className="w-[80px]">Details</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -376,6 +395,17 @@ function DashboardContent() {
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
                     {formatDate(session.created_at)}
+                  </TableCell>
+                  <TableCell>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 w-8 p-0"
+                      onClick={() => openSessionDetails(session.session_id)}
+                    >
+                      <Info className="h-4 w-4" />
+                      <span className="sr-only">View details</span>
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -421,6 +451,34 @@ function DashboardContent() {
     );
   };
 
+  // Function to fetch session details
+  const fetchDetails = async (sessionId: string) => {
+    if (!sessionId) return;
+    
+    try {
+      setIsLoadingDetails(true);
+      setDetailsError(null);
+      // Use fetchWithAuth instead of fetchSessionDetails to ensure the token is properly included
+      const response = await fetchWithAuth<SessionDetailResponse>(
+        `/api/v1/statistics/sessions/${sessionId}`
+      );
+      setSessionDetails(response.data);
+    } catch (err) {
+      console.error('Error fetching session details:', err);
+      setDetailsError(err instanceof Error ? err.message : 'Unknown error');
+      setSessionDetails(null);
+    } finally {
+      setIsLoadingDetails(false);
+    }
+  };
+  
+  // Function to open session details dialog
+  const openSessionDetails = (sessionId: string) => {
+    setSelectedSessionId(sessionId);
+    setIsDetailsDialogOpen(true);
+    fetchDetails(sessionId);
+  };
+  
   return (
     <div className="container mx-auto py-6 md:py-8 px-4 md:px-6">
       <h1 className="text-2xl md:text-3xl font-bold mb-4 md:mb-6">Dashboard</h1>
@@ -613,7 +671,7 @@ function DashboardContent() {
               {/* Night Lord Stats */}
               <Card className="flex flex-col transition-shadow hover:shadow-md">
                 <CardHeader className="flex-row items-start space-y-0 pb-0">
-                  <div>
+              <div>
                     <CardTitle className="text-base md:text-lg">Night Lord Stats</CardTitle>
                   </div>
                   {nightLordData.length > 0 && (
@@ -757,6 +815,99 @@ function DashboardContent() {
             )}
           </>
         )}
+
+        {/* Session details dialog */}
+        <AlertDialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
+          <AlertDialogContent className="max-w-[90vw] w-[500px]">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-lg">
+                {isLoadingDetails ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> 
+                    Loading session details...
+                  </div>
+                ) : detailsError ? (
+                  <span className="text-destructive">Error loading details</span>
+                ) : (
+                  <>Session: {sessionDetails?.session_name || 'Unknown'} <span className="text-xs text-muted-foreground">({selectedSessionId})</span></>
+                )}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {isLoadingDetails ? (
+                  <div className="py-8 flex justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-purple-500" />
+                  </div>
+                ) : detailsError ? (
+                  <div className="text-destructive text-center py-4">
+                    {detailsError}
+                  </div>
+                ) : sessionDetails ? (
+                  <div className="space-y-4 py-2">
+                    <div className="grid grid-cols-2 gap-4 mb-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Night Lord</p>
+                        <p className="font-medium">{sessionDetails.night_lord}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Status</p>
+                        <p className="font-medium">{sessionDetails.status}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Created</p>
+                        <p className="text-sm">{formatDate(sessionDetails.created_at)}</p>
+                      </div>
+                      {sessionDetails.completed_at && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Completed</p>
+                          <p className="text-sm">{formatDate(sessionDetails.completed_at)}</p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">Players</h4>
+                      <div className="border border-purple-900/20 rounded-md overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Player</TableHead>
+                              <TableHead>Nightfarer</TableHead>
+                              <TableHead>Result</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {sessionDetails.players.map((player) => (
+                              <TableRow key={player.user_id} className="hover:bg-purple-900/5">
+                                <TableCell className="py-2">{player.username}</TableCell>
+                                <TableCell className="py-2">{player.nightfarer}</TableCell>
+                                <TableCell className="py-2">
+                                  {player.result ? (
+                                    <span className={getResultColor(player.result)}>
+                                      {player.result}
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground text-xs">No result</span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+            </div>
+          </div>
+        </div>
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground">
+                    No session details available
+                  </div>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Close</AlertDialogCancel>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

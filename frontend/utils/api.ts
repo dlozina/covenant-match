@@ -27,6 +27,30 @@ export interface SessionHistoryEntry {
   completed_at: string | null;
 }
 
+// Types for session details
+export interface PlayerDetail {
+  user_id: string;
+  username: string;
+  nightfarer: string;
+  result: string | null;
+  joined_at: string;
+}
+
+export interface SessionDetail {
+  session_id: string;
+  session_name: string;
+  night_lord: string;
+  created_at: string;
+  completed_at: string | null;
+  status: string;
+  players: PlayerDetail[];
+}
+
+export interface SessionDetailResponse {
+  status: string;
+  data: SessionDetail;
+}
+
 // Pagination types
 export interface PaginationInfo {
   page: number;
@@ -99,6 +123,31 @@ export const fetchUserSessionHistoryPaginated = async (
     return data;
   } catch (error) {
     console.error('Failed to fetch paginated user session history:', error);
+    throw error;
+  }
+};
+
+// Function to fetch session details
+export const fetchSessionDetails = async (sessionId: string): Promise<SessionDetailResponse> => {
+  try {
+    const response = await fetch(
+      `${API_URL}/api/v1/statistics/sessions/${sessionId}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getToken()}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Error fetching session details: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch session details:', error);
     throw error;
   }
 }; 

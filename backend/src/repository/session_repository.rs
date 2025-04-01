@@ -189,3 +189,13 @@ pub async fn find_sessions_with_user_paginated(
 
     Ok((sessions, total))
 }
+
+// Find session by ID
+pub async fn find_session_by_id(
+    db: &Database,
+    id: ObjectId,
+) -> Result<Option<GameSession>, AppError> {
+    let collection = get_collection(db);
+    let session = collection.find_one(doc! { "_id": id }).await?;
+    Ok(session)
+}

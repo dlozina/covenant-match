@@ -2,7 +2,8 @@ use crate::models::error::AppError;
 use crate::models::statistics::{LeaderboardEntry, UserStatistics};
 use crate::repository::session_repository;
 use crate::repository::statistics_repository;
-use mongodb::Database;
+use crate::routes::statistics::{PlayerDetail, SessionDetail};
+use mongodb::{bson::oid::ObjectId, Database};
 use serde::{Deserialize, Serialize};
 
 // Define a simplified session history structure
@@ -120,4 +121,115 @@ pub async fn get_user_session_history_paginated(
         pagination,
         sessions: history,
     })
+}
+
+// Get detailed information for a specific session
+pub async fn get_session_details(
+    db: &Database,
+    session_id: &str,
+    requesting_user_id: &str,
+) -> Result<Option<SessionDetail>, AppError> {
+    // Convert session_id string to ObjectId
+    let obj_id = match ObjectId::parse_str(session_id) {
+        Ok(id) => id,
+        Err(_) => return Err(AppError::InvalidObjectId(session_id.to_string())),
+    };
+
+    // Get the session from the repository
+    let session = match session_repository::find_session_by_id(db, obj_id).await? {
+        Some(s) => s,
+        None => return Ok(None),
+    };
+
+    // Verify the user is a participant in this session
+    let is_participant = session
+        .joined_players
+        .iter()
+        .any(|p| p.user_id == requesting_user_id)
+        || session.host_id == requesting_user_id;
+
+    if !is_participant {
+        return Ok(None); // Don't expose session details to non-participants
+    }
+
+    // Map results to a hashmap for easier lookup
+    let result_map = session
+        .results
+        .iter()
+        .map(|r| (r.user_id.clone(), r.result.to_string()))
+        .collect::<std::collections::HashMap<_, _>>();
+
+    // Create PlayerDetail objects for each player
+    let mut players = Vec::new();
+
+    // First add the host (even if they're also in joined_players)
+    if let Some(host) = session
+        .joined_players
+        .iter()
+        .find(|p| p.user_id == session.host_id)
+    {
+        let result = result_map.get(&host.user_id).map(|r| r.to_string());
+
+        // Convert MongoDB DateTime to chrono DateTime
+        let joined_at_chrono =
+            chrono::DateTime::from_timestamp(host.joined_at.timestamp_millis() / 1000, 0)
+                .unwrap_or_else(|| chrono::Utc::now());
+
+        players.push(PlayerDetail {
+            user_id: host.user_id.clone(),
+            username: host.username.clone(),
+            nightfarer: host.nightfarer.clone(),
+            result,
+            joined_at: joined_at_chrono,
+        });
+    }
+
+    // Add remaining participants
+    for player in session
+        .joined_players
+        .iter()
+        .filter(|p| p.user_id != session.host_id)
+    {
+        let result = result_map.get(&player.user_id).map(|r| r.to_string());
+
+        // Convert MongoDB DateTime to chrono DateTime
+        let joined_at_chrono =
+            chrono::DateTime::from_timestamp(player.joined_at.timestamp_millis() / 1000, 0)
+                .unwrap_or_else(|| chrono::Utc::now());
+
+        players.push(PlayerDetail {
+            user_id: player.user_id.clone(),
+            username: player.username.clone(),
+            nightfarer: player.nightfarer.clone(),
+            result,
+            joined_at: joined_at_chrono,
+        });
+    }
+
+    // Sort players by join time
+    players.sort_by(|a, b| a.joined_at.cmp(&b.joined_at));
+
+    // Convert MongoDB DateTime to chrono DateTime for created_at
+    let created_at_chrono =
+        chrono::DateTime::from_timestamp(session.created_at.timestamp_millis() / 1000, 0)
+            .unwrap_or_else(|| chrono::Utc::now());
+
+    // Convert MongoDB DateTime to chrono DateTime for completed_at if it exists
+    let completed_at_chrono = session.completed_at.map(|dt| {
+        chrono::DateTime::from_timestamp(dt.timestamp_millis() / 1000, 0)
+            .unwrap_or_else(|| chrono::Utc::now())
+    });
+
+    // Create the session detail
+    let session_detail = SessionDetail {
+        session_id: session.id.to_hex(),
+        session_name: session.name,
+        night_lord: session.night_lord,
+        created_at: created_at_chrono,
+        completed_at: completed_at_chrono,
+        status: session.status.to_string(),
+        players,
+    };
+
+    Ok(Some(session_detail))
 }

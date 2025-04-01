@@ -418,6 +418,89 @@ async fn get_all_night_lord_statistics(db: web::Data<Database>) -> impl Responde
     }
 }
 
+/// Get detailed information for a specific session
+#[utoipa::path(
+    get,
+    path = "/api/v1/statistics/sessions/{session_id}",
+    params(
+        ("session_id" = String, Path, description = "ID of the session to retrieve details for")
+    ),
+    responses(
+        (status = 200, description = "Session details retrieved successfully", body = SessionDetailResponse),
+        (status = 404, description = "Session not found"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "statistics"
+)]
+#[get("/api/v1/statistics/sessions/{session_id}")]
+async fn get_session_details(
+    db: web::Data<Database>,
+    path: web::Path<String>,
+    req: HttpRequest,
+) -> impl Responder {
+    // Get claims from request extensions (set by middleware)
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.sub.clone()
+    };
+
+    let session_id = path.into_inner();
+
+    match statistics_service::get_session_details(&db, &session_id, &user_id).await {
+        Ok(Some(details)) => {
+            // Transform to API response format
+            let response = SessionDetailResponse {
+                status: "success".to_string(),
+                data: details,
+            };
+            HttpResponse::Ok().json(response)
+        }
+        Ok(None) => HttpResponse::NotFound().json(serde_json::json!({
+            "status": "error",
+            "message": "Session not found or you don't have access to it"
+        })),
+        Err(e) => {
+            log::error!("Error fetching session details: {:?}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": "error",
+                "message": e.to_string()
+            }))
+        }
+    }
+}
+
+// Add response type for session details
+#[derive(Serialize, ToSchema)]
+pub struct SessionDetailResponse {
+    status: String,
+    data: SessionDetail,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct SessionDetail {
+    pub session_id: String,
+    pub session_name: String,
+    pub night_lord: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub completed_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub status: String,
+    pub players: Vec<PlayerDetail>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct PlayerDetail {
+    pub user_id: String,
+    pub username: String,
+    pub nightfarer: String,
+    pub result: Option<String>,
+    pub joined_at: chrono::DateTime<chrono::Utc>,
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     log::info!("Configuring statistics routes");
     cfg.service(get_current_user_statistics)
@@ -425,5 +508,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         .service(get_leaderboard)
         .service(get_night_lord_statistics)
         .service(get_all_night_lord_statistics)
-        .service(get_current_user_session_history);
+        .service(get_current_user_session_history)
+        .service(get_session_details);
 }
