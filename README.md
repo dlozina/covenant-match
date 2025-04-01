@@ -137,6 +137,7 @@ covenant-match/
     └── development/            # Development guidelines
 ```
 
+
 ## Deployment Components
                   +------------------+
                   |   Load Balancer  |
@@ -154,6 +155,7 @@ covenant-match/
                              |    MongoDB Atlas  |
                              |    (Database)     |
                              +-------------------+ 
+
 ## License
 
 Copyright (c) 2025 Dino Lozina
