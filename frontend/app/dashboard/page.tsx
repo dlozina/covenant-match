@@ -84,6 +84,12 @@ function DashboardContent() {
     total_pages: 0
   });
   
+  // Session history filters
+  const [filteredHistory, setFilteredHistory] = useState<SessionHistoryEntry[]>([]);
+  const [nightLordFilter, setNightLordFilter] = useState<string>('');
+  const [nightfarerFilter, setNightfarerFilter] = useState<string>('');
+  const [resultFilter, setResultFilter] = useState<string>('');
+  
   // Session details dialog state
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -135,6 +141,7 @@ function DashboardContent() {
         }
         
         setSessionHistory(response.data.sessions);
+        setFilteredHistory(response.data.sessions);
         setPagination(response.data.pagination);
       } catch (err) {
         console.error('Error fetching session history:', err);
@@ -147,12 +154,45 @@ function DashboardContent() {
     fetchStats();
     fetchSessionHistory();
   }, [fetchWithAuth]);
+  
+  // Apply filters to session history
+  useEffect(() => {
+    if (sessionHistory.length === 0) {
+      setFilteredHistory([]);
+      return;
+    }
+    
+    let filtered = [...sessionHistory];
+    
+    if (nightLordFilter) {
+      filtered = filtered.filter(session => 
+        session.night_lord.toLowerCase().includes(nightLordFilter.toLowerCase())
+      );
+    }
+    
+    if (nightfarerFilter) {
+      filtered = filtered.filter(session => 
+        session.player_nightfarer.toLowerCase().includes(nightfarerFilter.toLowerCase())
+      );
+    }
+    
+    if (resultFilter) {
+      filtered = filtered.filter(session => 
+        session.player_result.toLowerCase() === resultFilter.toLowerCase()
+      );
+    }
+    
+    setFilteredHistory(filtered);
+  }, [sessionHistory, nightLordFilter, nightfarerFilter, resultFilter]);
 
   // Function to handle page change
   const handlePageChange = async (newPage: number) => {
     if (newPage < 0 || newPage >= pagination.total_pages) {
       return;
     }
+    
+    // Reset filters when changing pages since pagination happens at the backend
+    resetFilters();
     
     try {
       setIsLoadingHistory(true);
@@ -166,6 +206,7 @@ function DashboardContent() {
       }
       
       setSessionHistory(response.data.sessions);
+      setFilteredHistory(response.data.sessions);
       setPagination(response.data.pagination);
     } catch (err) {
       console.error('Error fetching session history page:', err);
@@ -173,6 +214,13 @@ function DashboardContent() {
     } finally {
       setIsLoadingHistory(false);
     }
+  };
+
+  // Reset all filters
+  const resetFilters = () => {
+    setNightLordFilter('');
+    setNightfarerFilter('');
+    setResultFilter('');
   };
 
   // Sort character data by number of games played (descending)
@@ -367,86 +415,242 @@ function DashboardContent() {
         </div>
       );
     }
-
-    return (
-      <div className="bg-background/50 border border-purple-900/20 rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Session</TableHead>
-                <TableHead>Night Lord</TableHead>
-                <TableHead>Nightfarer</TableHead>
-                <TableHead>Result</TableHead>
-                <TableHead>Time</TableHead>
-                <TableHead className="w-[80px]">Details</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sessionHistory.map((session) => (
-                <TableRow key={session.session_id} className="hover:bg-purple-900/5">
-                  <TableCell className="font-medium">{session.session_name}</TableCell>
-                  <TableCell>{session.night_lord}</TableCell>
-                  <TableCell>{session.player_nightfarer}</TableCell>
-                  <TableCell>
-                    <span className={getResultColor(session.player_result)}>
-                      {session.player_result}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {formatDate(session.created_at)}
-                  </TableCell>
-                  <TableCell>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-8 w-8 p-0"
-                      onClick={() => openSessionDetails(session.session_id)}
-                    >
-                      <Info className="h-4 w-4" />
-                      <span className="sr-only">View details</span>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-        
-        {/* Pagination Controls */}
-        {pagination.total_pages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-purple-900/20">
-            <div className="text-sm text-muted-foreground">
-              Showing <span className="font-medium">{pagination.page * pagination.limit + 1}</span>
-              {' '} to {' '}
-              <span className="font-medium">
-                {Math.min((pagination.page + 1) * pagination.limit, pagination.total)}
-              </span>
-              {' '} of {' '}
-              <span className="font-medium">{pagination.total}</span> sessions
+    
+    // If we have sessions but all are filtered out
+    if (filteredHistory.length === 0 && sessionHistory.length > 0) {
+      return (
+        <div>
+          {/* Filters */}
+          <div className="mb-4 p-4 border border-purple-900/20 rounded-lg bg-background/50">
+            <div className="flex flex-col md:flex-row gap-3 mb-3">
+              <div className="flex-1">
+                <label htmlFor="night-lord-filter" className="block text-sm font-medium mb-1">Night Lord</label>
+                <input
+                  id="night-lord-filter"
+                  type="text"
+                  className="w-full p-2 rounded-md border bg-background"
+                  placeholder="Filter by Night Lord"
+                  value={nightLordFilter}
+                  onChange={(e) => setNightLordFilter(e.target.value)}
+                />
+              </div>
+              <div className="flex-1">
+                <label htmlFor="nightfarer-filter" className="block text-sm font-medium mb-1">Nightfarer</label>
+                <input
+                  id="nightfarer-filter"
+                  type="text"
+                  className="w-full p-2 rounded-md border bg-background"
+                  placeholder="Filter by Nightfarer"
+                  value={nightfarerFilter}
+                  onChange={(e) => setNightfarerFilter(e.target.value)}
+                />
+              </div>
+              <div className="flex-1">
+                <label htmlFor="result-filter" className="block text-sm font-medium mb-1">Result</label>
+                <select
+                  id="result-filter"
+                  className="w-full p-2 rounded-md border bg-background"
+                  value={resultFilter}
+                  onChange={(e) => setResultFilter(e.target.value)}
+                >
+                  <option value="">All Results</option>
+                  <option value="win">Win</option>
+                  <option value="loss">Loss</option>
+                  <option value="disconnect">Disconnect</option>
+                </select>
+              </div>
             </div>
-            <div className="flex space-x-2">
+            <div className="flex justify-end">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handlePageChange(pagination.page - 1)}
-                disabled={pagination.page === 0}
+                onClick={resetFilters}
               >
-                <ChevronLeft className="h-4 w-4" />
-                <span className="sr-only">Previous</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(pagination.page + 1)}
-                disabled={pagination.page >= pagination.total_pages - 1}
-              >
-                <ChevronRight className="h-4 w-4" />
-                <span className="sr-only">Next</span>
+                Reset Filters
               </Button>
             </div>
           </div>
-        )}
+          
+          <div className="text-center py-6 bg-background/50 border border-purple-900/20 rounded-lg">
+            <p className="text-muted-foreground">No sessions match your filter criteria.</p>
+            <Button
+              variant="link"
+              size="sm"
+              onClick={resetFilters}
+              className="mt-2"
+            >
+              Reset Filters
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        {/* Filters */}
+        <div className="mb-4 p-4 border border-purple-900/20 rounded-lg bg-background/50">
+          <div className="flex flex-col md:flex-row gap-3 mb-3">
+            <div className="flex-1">
+              <label htmlFor="night-lord-filter" className="block text-sm font-medium mb-1">Night Lord</label>
+              <input
+                id="night-lord-filter"
+                type="text"
+                className="w-full p-2 rounded-md border bg-background"
+                placeholder="Filter by Night Lord"
+                value={nightLordFilter}
+                onChange={(e) => setNightLordFilter(e.target.value)}
+              />
+            </div>
+            <div className="flex-1">
+              <label htmlFor="nightfarer-filter" className="block text-sm font-medium mb-1">Nightfarer</label>
+              <input
+                id="nightfarer-filter"
+                type="text"
+                className="w-full p-2 rounded-md border bg-background"
+                placeholder="Filter by Nightfarer"
+                value={nightfarerFilter}
+                onChange={(e) => setNightfarerFilter(e.target.value)}
+              />
+            </div>
+            <div className="flex-1">
+              <label htmlFor="result-filter" className="block text-sm font-medium mb-1">Result</label>
+              <select
+                id="result-filter"
+                className="w-full p-2 rounded-md border bg-background"
+                value={resultFilter}
+                onChange={(e) => setResultFilter(e.target.value)}
+              >
+                <option value="">All Results</option>
+                <option value="win">Win</option>
+                <option value="loss">Loss</option>
+                <option value="disconnect">Disconnect</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={resetFilters}
+            >
+              Reset Filters
+            </Button>
+          </div>
+        </div>
+        
+        <div className="bg-background/50 border border-purple-900/20 rounded-lg overflow-hidden">
+          {/* Desktop view - Table */}
+          <div className="hidden md:block overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Session</TableHead>
+                  <TableHead>Night Lord</TableHead>
+                  <TableHead>Nightfarer</TableHead>
+                  <TableHead>Result</TableHead>
+                  <TableHead>Time</TableHead>
+                  <TableHead className="w-[80px]">Details</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredHistory.map((session) => (
+                  <TableRow key={session.session_id} className="hover:bg-purple-900/5">
+                    <TableCell className="font-medium">{session.session_name}</TableCell>
+                    <TableCell>{session.night_lord}</TableCell>
+                    <TableCell>{session.player_nightfarer}</TableCell>
+                    <TableCell>
+                      <span className={getResultColor(session.player_result)}>
+                        {session.player_result}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {formatDate(session.created_at)}
+                    </TableCell>
+                    <TableCell>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 w-8 p-0"
+                        onClick={() => openSessionDetails(session.session_id)}
+                      >
+                        <Info className="h-4 w-4" />
+                        <span className="sr-only">View details</span>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          
+          {/* Mobile view - Cards */}
+          <div className="grid grid-cols-1 gap-3 p-3 md:hidden">
+            {filteredHistory.map((session) => (
+              <div key={session.session_id} className="p-3 border border-purple-900/20 rounded-lg bg-card/50 shadow-sm">
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-medium text-base">{session.session_name}</h3>
+                  <span className={getResultColor(session.player_result)}>
+                    {session.player_result}
+                  </span>
+                </div>
+                <div className="text-sm space-y-1 mb-3">
+                  <p><span className="text-muted-foreground">Night Lord:</span> {session.night_lord}</p>
+                  <p><span className="text-muted-foreground">Nightfarer:</span> {session.player_nightfarer}</p>
+                  <p className="text-xs text-muted-foreground">{formatDate(session.created_at)}</p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="w-full mt-2"
+                  onClick={() => openSessionDetails(session.session_id)}
+                >
+                  <Info className="h-4 w-4 mr-1" />
+                  View Details
+                </Button>
+              </div>
+            ))}
+          </div>
+          
+          {/* Pagination Controls */}
+          {pagination.total_pages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-purple-900/20">
+              <div className="text-sm text-muted-foreground hidden sm:block">
+                Showing <span className="font-medium">{pagination.page * pagination.limit + 1}</span>
+                {' '} to {' '}
+                <span className="font-medium">
+                  {Math.min((pagination.page + 1) * pagination.limit, pagination.total)}
+                </span>
+                {' '} of {' '}
+                <span className="font-medium">{pagination.total}</span> sessions
+              </div>
+              {/* Mobile pagination info */}
+              <div className="text-sm text-muted-foreground sm:hidden">
+                Page {pagination.page + 1} of {pagination.total_pages}
+              </div>
+              <div className="flex space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  disabled={pagination.page === 0}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  <span className="sr-only">Previous</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  disabled={pagination.page >= pagination.total_pages - 1}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                  <span className="sr-only">Next</span>
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
