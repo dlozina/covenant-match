@@ -91,11 +91,11 @@ const ResultReportingSectionComponent = ({
 
             {/* Submit Button */}
             <Button 
-              className="w-full h-12 mt-auto" 
+              className="w-full h-12 mt-auto bg-emerald-600 hover:bg-emerald-700 animate-pulse" 
               onClick={handleSubmitResults}
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Submitting...' : 'Submit Results'}
+              {isSubmitting ? 'Submitting...' : '➤ Submit Results'}
             </Button>
           </>
         )}

@@ -78,6 +78,7 @@ interface SessionControlButtonsProps {
   sessionData?: SessionData;
   isHost?: boolean;
   currentSessionId?: string;
+  resultSubmitted?: boolean;
 }
 
 interface SessionInfoSectionProps {
@@ -428,15 +429,24 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
   disabled,
   sessionData,
   isHost = false, // Default to false if not provided
-  currentSessionId
+  currentSessionId,
+  resultSubmitted = false
 }) => {
-  // Check if we have enough players to start (3 players required)
+  // Simplified logic for button state
   const hasEnoughPlayers = sessionData && sessionData.joinedPlayers.length >= 3;
   
-  // Disable buttons based on session state and host status
+  // Start button is disabled if the session has started, is disabled, not enough players, or not host
   const startButtonDisabled = sessionState.isSessionStarted || disabled || !hasEnoughPlayers || !isHost;
+  
+  // Finish button is disabled if session not started, is finished, disabled, or not host
   const finishButtonDisabled = !sessionState.isSessionStarted || sessionState.isSessionFinished || disabled || !isHost;
-  const recreateButtonDisabled = disabled || (!isHost && !onRecreateSession) || isNewSessionLoading;
+  
+  // SIMPLIFIED LOGIC: New session button is only disabled if explicitly disabled or loading
+  // The key is that it should be enabled as long as onRecreateSession exists
+  const newSessionButtonDisabled = disabled || isNewSessionLoading || !onRecreateSession;
+  
+  // Determine if the button should be highlighted
+  const shouldHighlightButton = !isHost && Boolean(onRecreateSession) && currentSessionId === sessionData?.id;
   
   // Create tooltips for the buttons
   const startButtonTooltip = !isHost ? "Only the host can start the session" : 
@@ -447,17 +457,13 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
                              !sessionState.isSessionStarted ? "Session must be started first" : 
                              sessionState.isSessionFinished ? "Session already finished" : "";
   
-  const recreateButtonTooltip = !isHost && !onRecreateSession 
+  const recreateButtonTooltip = !onRecreateSession 
                               ? "Wait for the host to create a new session" 
-                              : !isHost && onRecreateSession 
-                              ? "Click to select your character and join the new session" 
+                              : !isHost 
+                              ? resultSubmitted 
+                                ? "You can still join the new session after submitting results" 
+                                : "Click to select your character and join the new session" 
                               : "Create a new session with the same team and different characters";
-  
-  // Check if a new session is available for non-host players
-  const newSessionAvailable = !isHost && onRecreateSession;
-  
-  // Only highlight the button if this is an original session (not a recreated one we've joined)
-  const shouldHighlightButton = newSessionAvailable && sessionData && currentSessionId === sessionData.id;
   
   return (
   <Card className="mt-6">
@@ -469,8 +475,8 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
             <Button 
               size="lg" 
               className={`flex-1 h-14 text-lg ${shouldHighlightButton ? 'bg-emerald-600 hover:bg-emerald-700 animate-pulse' : ''}`}
-              onClick={isHost ? onRecreateSession : (onRecreateSession || resetSession)}
-              disabled={recreateButtonDisabled}
+              onClick={onRecreateSession || resetSession}
+              disabled={newSessionButtonDisabled}
               title={recreateButtonTooltip}
             >
               {isNewSessionLoading ? (
@@ -775,11 +781,11 @@ export const ResultReportingSection: React.FC<ResultReportingSectionProps> = ({
 
             {/* Submit Button */}
             <Button 
-              className="w-full h-12 mt-auto" 
+              className="w-full h-12 mt-auto bg-emerald-600 hover:bg-emerald-700 animate-pulse" 
               onClick={handleSubmitResults}
               disabled={isButtonDisabled}
             >
-              {localIsSubmitting ? 'Submitting...' : 'Submit Results'}
+              {localIsSubmitting ? 'Submitting...' : '➤ Submit Results'}
             </Button>
           </>
         )}

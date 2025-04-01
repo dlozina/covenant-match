@@ -10,6 +10,7 @@ interface UseSessionControlsProps {
   isNewSessionLoading?: boolean;
   disabled?: boolean;
   onRecreateSession?: () => void;
+  resultSubmitted?: boolean;
 }
 
 interface SessionControlsState {
@@ -24,6 +25,10 @@ interface SessionControlsState {
   shouldHighlightButton: boolean;
 }
 
+/**
+ * @deprecated This hook is deprecated. The logic has been simplified and moved directly 
+ * into the SessionControlButtons component for better maintainability.
+ */
 export function useSessionControls({
   sessionState,
   sessionData,
@@ -31,9 +36,19 @@ export function useSessionControls({
   currentSessionId,
   isNewSessionLoading = false,
   disabled = false,
-  onRecreateSession
+  onRecreateSession,
+  resultSubmitted = false
 }: UseSessionControlsProps): SessionControlsState {
   return useMemo(() => {
+    // DEBUG: Log the inputs that affect button state
+    console.log('useSessionControls inputs:', {
+      isHost,
+      hasOnRecreateSession: Boolean(onRecreateSession),
+      isNewSessionLoading,
+      disabled,
+      resultSubmitted
+    });
+    
     // Check if we have enough players to start (3 players required)
     const hasEnoughPlayers = Boolean(sessionData && sessionData.joinedPlayers.length >= 3);
     
@@ -42,8 +57,25 @@ export function useSessionControls({
     const finishButtonDisabled = !sessionState.isSessionStarted || sessionState.isSessionFinished || disabled || !isHost;
     
     // A "new session" is available for non-host players (they should join) if there's a recreate action available
+    // CRITICAL FIX: Make sure we still consider a session available even if the player submitted results
     const newSessionAvailable = !isHost && Boolean(onRecreateSession);
-    const recreateButtonDisabled = disabled || (!isHost && !newSessionAvailable) || isNewSessionLoading;
+    
+    // CRITICAL FIX: Don't disable the recreate button just because a player submitted results
+    // The button should ONLY be disabled if:
+    // 1. The whole form is disabled, OR
+    // 2. The player is not a host AND there's no new session available, OR
+    // 3. A new session is currently loading
+    // We explicitly ignore the resultSubmitted state here
+    const recreateButtonDisabled = Boolean(
+      disabled || (!isHost && !onRecreateSession) || isNewSessionLoading
+    );
+    
+    // DEBUG: Log the calculated button state
+    console.log('Calculated button state:', {
+      newSessionAvailable,
+      recreateButtonDisabled,
+      onRecreateSession: Boolean(onRecreateSession)
+    });
     
     // Create tooltips for the buttons
     const startButtonTooltip = !isHost ? "Only the host can start the session" : 
@@ -54,13 +86,17 @@ export function useSessionControls({
                                !sessionState.isSessionStarted ? "Session must be started first" : 
                                sessionState.isSessionFinished ? "Session already finished" : "";
     
-    const recreateButtonTooltip = !isHost && !newSessionAvailable 
+    // Update tooltip depending on result submission status
+    const recreateButtonTooltip = !isHost && !onRecreateSession 
                                 ? "Wait for the host to create a new session" 
-                                : !isHost && newSessionAvailable 
-                                ? "Click to join the new session" 
+                                : !isHost && onRecreateSession 
+                                ? resultSubmitted 
+                                  ? "You can still join the new session after submitting results" 
+                                  : "Click to join the new session" 
                                 : "Create a new session with the same team";
     
     // Only highlight the button if this is an original session (not a recreated one we've joined)
+    // CRITICAL FIX: Make sure the button is still highlighted even if the player submitted their result
     const shouldHighlightButton = Boolean(newSessionAvailable && sessionData && currentSessionId === sessionData.id);
     
     return {
@@ -81,6 +117,7 @@ export function useSessionControls({
     currentSessionId, 
     isNewSessionLoading, 
     disabled,
-    onRecreateSession
+    onRecreateSession,
+    resultSubmitted
   ]);
 } 

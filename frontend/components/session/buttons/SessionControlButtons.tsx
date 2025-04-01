@@ -18,6 +18,7 @@ interface SessionControlButtonsProps {
   sessionData?: SessionData;
   isHost?: boolean;
   currentSessionId?: string;
+  resultSubmitted?: boolean;
 }
 
 export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({ 
@@ -30,29 +31,42 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
   disabled = false,
   sessionData,
   isHost = false,
-  currentSessionId
+  currentSessionId,
+  resultSubmitted = false
 }) => {
-  // Use our custom hook to get all button states and logic
-  const {
-    hasEnoughPlayers,
-    startButtonDisabled,
-    finishButtonDisabled,
-    recreateButtonDisabled,
-    startButtonTooltip,
-    finishButtonTooltip,
-    recreateButtonTooltip,
-    newSessionAvailable,
-    shouldHighlightButton,
-  } = useSessionControls({
-    sessionState,
-    sessionData,
-    isHost,
-    currentSessionId,
-    isNewSessionLoading,
-    disabled,
-    onRecreateSession
-  });
+  // Simplified logic for button state
+  const hasEnoughPlayers = Boolean(sessionData && sessionData.joinedPlayers.length >= 3);
   
+  // Start button is disabled if the session has started, is disabled, not enough players, or not host
+  const startButtonDisabled = sessionState.isSessionStarted || disabled || !hasEnoughPlayers || !isHost;
+  
+  // Finish button is disabled if session not started, is finished, disabled, or not host
+  const finishButtonDisabled = !sessionState.isSessionStarted || sessionState.isSessionFinished || disabled || !isHost;
+  
+  // SIMPLIFIED LOGIC: New session button is only disabled if explicitly disabled or loading
+  // The key is that it should be enabled as long as onRecreateSession exists
+  const newSessionButtonDisabled = disabled || isNewSessionLoading || !onRecreateSession;
+  
+  // Determine if the button should be highlighted
+  const shouldHighlightButton = !isHost && Boolean(onRecreateSession) && currentSessionId === sessionData?.id;
+  
+  // Create tooltips for the buttons
+  const startButtonTooltip = !isHost ? "Only the host can start the session" : 
+                           !hasEnoughPlayers ? "Need at least 3 players to start" : 
+                           sessionState.isSessionStarted ? "Session already started" : "";
+                            
+  const finishButtonTooltip = !isHost ? "Only the host can finish the session" : 
+                             !sessionState.isSessionStarted ? "Session must be started first" : 
+                             sessionState.isSessionFinished ? "Session already finished" : "";
+  
+  const recreateButtonTooltip = !onRecreateSession 
+                              ? "Wait for the host to create a new session" 
+                              : !isHost 
+                              ? resultSubmitted 
+                                ? "You can still join the new session after submitting results" 
+                                : "Click to join the new session" 
+                              : "Create a new session with the same team";
+
   return (
     <Card className="mt-6">
       <CardContent className="py-6">
@@ -63,8 +77,8 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
               <Button 
                 size="lg" 
                 className={`flex-1 h-14 text-lg ${shouldHighlightButton ? 'bg-emerald-600 hover:bg-emerald-700 animate-pulse' : ''}`}
-                onClick={isHost ? onRecreateSession : (onRecreateSession || resetSession)}
-                disabled={recreateButtonDisabled}
+                onClick={onRecreateSession || resetSession}
+                disabled={newSessionButtonDisabled}
                 title={recreateButtonTooltip}
               >
                 {isNewSessionLoading ? (
@@ -79,7 +93,9 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
                       <span className="text-xs text-muted-foreground">with same team</span>
                     </span>
                     <span className="hidden sm:inline">
-                      {shouldHighlightButton ? "➤ Join New Session With Same Team" : "Start New Session With Same Team"}
+                      {shouldHighlightButton 
+                        ? "➤ Join New Session With Same Team"
+                        : "Start New Session With Same Team"}
                     </span>
                   </>
                 )}

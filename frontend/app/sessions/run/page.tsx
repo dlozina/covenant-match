@@ -256,7 +256,7 @@ function SessionRunContent(): JSX.Element {
     dispatchFriend({ type: 'ADD_FRIEND', payload: playerId });
   }, []);
   
-  // Recreate session with same team (memoized)
+  // Recreate session with same team (memoized) - for host
   const recreateSession = useCallback(async () => {
     if (!isValidSessionId || !isHost() || !userData || !sessionData) return;
     
@@ -270,6 +270,19 @@ function SessionRunContent(): JSX.Element {
       setIsCreatingNewSession(false);
     }
   }, [sessionId, isValidSessionId, isHost, userData, sessionData, router, setIsCreatingNewSession, showNotification]);
+  
+  // CRITICAL FIX: Create a separate memoized function for non-host navigation
+  // This ensures the callback remains stable even if resultSubmitted changes
+  const joinNewSession = useCallback(() => {
+    console.log('joinNewSession called with newSessionId:', newSessionId);
+    if (newSessionId) {
+      // Store the session ID in sessionStorage so the recreate page can access it
+      sessionStorage.setItem('autoJoinSessionId', newSessionId);
+      
+      // Navigate to the recreate page
+      router.push(`/sessions/recreate?id=${sessionId}`);
+    }
+  }, [newSessionId, sessionId, router]);
   
   // Fetch session data on mount
   useEffect(() => {
@@ -557,9 +570,9 @@ function SessionRunContent(): JSX.Element {
     setResultSubmitted(false);
     setSubmissionError(null);
     
-    // Reset newSessionId when changing sessions
-    // This prevents showing the "join new session" button if we're already in a new session
-    setNewSessionId(null);
+    // CRITICAL FIX: Only reset newSessionId when the actual session changes,
+    // not when the result is submitted. This was causing the button to become
+    // disabled after result submission.
     
     // Store the player character information for potential future recreate/join flows
     if (sessionData && userData) {
@@ -771,6 +784,11 @@ function SessionRunContent(): JSX.Element {
       // Mark as submitted
       setResultSubmitted(true);
       
+      // CRITICAL FIX: Log current newSessionId to ensure it's preserved
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`Result submitted - Current newSessionId: ${newSessionId}`);
+      }
+      
       // Update session data to mark current user as reported
       setSessionData(prevData => {
         if (!prevData) return null;
@@ -828,7 +846,7 @@ function SessionRunContent(): JSX.Element {
         throw err;
       }
     }
-  }, [sessionId, userData, resultState, sessionData, resultSubmitted, fetchWithAuth, setSessionData, showNotification]);
+  }, [sessionId, userData, resultState, sessionData, resultSubmitted, fetchWithAuth, setSessionData, showNotification, newSessionId]);
 
   // Add a handler for "newSession" SSE events
   useEffect(() => {
@@ -903,6 +921,16 @@ function SessionRunContent(): JSX.Element {
       clearInterval(connectionCheckInterval);
     };
   }, [isValidSessionId, rtConnected, reconnectWithFreshToken]);
+
+  // DEBUG: Track the critical values that affect the Join New Session button
+  useEffect(() => {
+    console.log('DEBUG VALUES CHANGED:', { 
+      newSessionId, 
+      resultSubmitted, 
+      isHost: isHost(),
+      hasOnRecreateSession: Boolean(newSessionId) || isHost()
+    });
+  }, [newSessionId, resultSubmitted, isHost]);
 
   return (
     <MainLayout footer={<Footer />}>
@@ -1001,26 +1029,20 @@ function SessionRunContent(): JSX.Element {
               </div>
 
               {/* Session Control Buttons */}
+              {/* CRITICAL FIX: We must provide the onRecreateSession prop regardless of the resultSubmitted state */}
+              {/* This ensures the button remains clickable after submitting results */}
               <SessionControlButtons 
                 sessionState={sessionState}
                 startSession={startSession}
                 resetSession={resetSession}
                 showConfirmDialog={() => dispatchDialog({ type: 'SHOW_CONFIRM' })}
-                onRecreateSession={isHost() ? recreateSession : newSessionId ? async () => {
-                  // For non-host players: navigate to the character selection page
-                  if (newSessionId) {
-                    // Store the session ID in sessionStorage so the recreate page can access it
-                    sessionStorage.setItem('autoJoinSessionId', newSessionId);
-                    
-                    // Navigate to the recreate page
-                    router.push(`/sessions/recreate?id=${sessionId}`);
-                  }
-                } : undefined}
+                onRecreateSession={isHost() ? recreateSession : newSessionId ? joinNewSession : undefined}
                 isNewSessionLoading={isCreatingNewSession}
                 disabled={!isValidSessionId}
                 sessionData={sessionData}
                 isHost={isHost()}
                 currentSessionId={sessionId}
+                resultSubmitted={resultSubmitted}
               />
             </div>
 
