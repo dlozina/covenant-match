@@ -3,8 +3,9 @@ use crate::models::game_data::{
     NightfarerResponse, Platform, PlatformResponse, Region, RegionResponse,
 };
 use crate::models::session::{
-    CreateSessionDto, GameResult, JoinSessionDto, PlayerInfo, RateSessionDto, ResultsResponseDto,
-    SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto,
+    CreateSessionDto, GameResult, JoinSessionDto, MinimalSessionDto, PlayerInfo, RateSessionDto,
+    ResultsResponseDto, SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto,
+    UpdateSessionDto,
 };
 use crate::models::statistics::{LeaderboardEntry, Stats, UserStatistics};
 use crate::models::user::{
@@ -65,6 +66,7 @@ use utoipa::{
         update_session,
         submit_result,
         get_results,
+        get_public_sessions,
         // Game data routes
         get_game_data,
         get_platforms,
@@ -110,6 +112,7 @@ use utoipa::{
             UpdateSessionDto,
             SessionResponseDto,
             ResultsResponseDto,
+            MinimalSessionDto,
             PlayerInfo,
             SessionStatus,
             GameResult,

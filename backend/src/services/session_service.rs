@@ -1,8 +1,9 @@
 use super::user_service;
 use crate::models::error::AppError;
 use crate::models::session::{
-    CreateSessionDto, GameResult, GameSession, JoinSessionDto, PlayerInfo, RateSessionDto,
-    SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto,
+    CreateSessionDto, GameResult, GameSession, JoinSessionDto, MinimalSessionDto, PlayerInfo,
+    RateSessionDto, SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto,
+    UpdateSessionDto,
 };
 use crate::repository::{session_repository, statistics_repository, user_repository};
 use crate::sse::messages::{BroadcastMessage, ServerMessage as SseServerMessage};
@@ -241,6 +242,53 @@ pub async fn get_sessions(
         .map(|s| {
             let mut response = SessionResponseDto::from(s);
             response
+        })
+        .collect())
+}
+
+/// Get minimal public session information for non-authenticated users
+pub async fn get_minimal_sessions(
+    db: &Database,
+    status: Option<String>,
+    limit: Option<u64>,
+    offset: Option<u64>,
+) -> Result<Vec<MinimalSessionDto>, AppError> {
+    let status_filter = match status {
+        Some(s) => match s.to_lowercase().as_str() {
+            "open" => Some(SessionStatus::Open),
+            "full" => Some(SessionStatus::Full),
+            "in_progress" => Some(SessionStatus::InProgress),
+            "completed" => Some(SessionStatus::Completed),
+            "cancelled" => Some(SessionStatus::Cancelled),
+            _ => None,
+        },
+        None => None,
+    };
+
+    // Always filter out private sessions for this public endpoint
+    let is_private = Some(false);
+
+    let sessions =
+        session_repository::find_sessions(db, status_filter, limit, offset, is_private).await?;
+
+    // Convert to minimal DTOs with just the necessary info
+    Ok(sessions
+        .into_iter()
+        .map(|s| {
+            // Find the host in the joined players
+            let host_name = s
+                .joined_players
+                .iter()
+                .find(|p| p.user_id == s.host_id)
+                .map_or_else(|| "Unknown".to_string(), |p| p.username.clone());
+
+            MinimalSessionDto {
+                id: s.id.to_hex(),
+                name: s.name,
+                host_name,
+                status: s.status,
+                created_at: s.created_at,
+            }
         })
         .collect())
 }

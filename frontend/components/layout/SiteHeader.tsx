@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu, UserPlus, Sword, Users, LayoutDashboard, User, LogOut, LogIn } from "lucide-react";
-import { useState } from "react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
@@ -44,18 +43,14 @@ export function SiteHeader() {
       icon: <Users className="h-4 w-4 mr-2" />,
       active: pathname === "/sessions",
     },
-    {
-      href: "/dashboard",
-      label: "Dashboard",
-      icon: <LayoutDashboard className="h-4 w-4 mr-2" />,
-      active: pathname === "/dashboard",
-    },
-    {
-      href: "/profile",
-      label: "Profile",
-      icon: <User className="h-4 w-4 mr-2" />,
-      active: pathname === "/profile",
-    },
+    ...(isLoggedIn ? [
+      {
+        href: "/dashboard",
+        label: "Dashboard",
+        icon: <LayoutDashboard className="h-4 w-4 mr-2" />,
+        active: pathname === "/dashboard",
+      }
+    ] : []),
   ];
 
   return (

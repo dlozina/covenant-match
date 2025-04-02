@@ -181,3 +181,14 @@ pub struct ResultsResponseDto {
     pub session_id: String,
     pub results: Vec<SessionResult>,
 }
+
+/// Minimal session data for public listing
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MinimalSessionDto {
+    pub id: String,
+    pub name: String,
+    pub host_name: String,
+    pub status: SessionStatus,
+    pub created_at: DateTime,
+}

@@ -180,7 +180,7 @@ export default function Home() {
             </div>
             <div className="flex-1">
               <h2 className="text-xl md:text-2xl font-semibold mb-2">Find Sessions</h2>
-              <p className="mb-4 text-sm md:text-base text-muted-foreground">Join other Ashen Ones looking for allies and begin your hunt immediately.</p>
+              <p className="mb-4 text-sm md:text-base text-muted-foreground">Join other nightfarer&apos;s looking for allies and begin your hunt immediately.</p>
               <div className="relative z-20">
                 <Button asChild variant="outline" className="border-purple-700/50 bg-purple-950/20 hover:bg-purple-950/30 text-purple-300 w-full sm:w-auto">
                   <Link href="/sessions" className="flex items-center justify-center">
@@ -204,7 +204,7 @@ export default function Home() {
             </div>
             <div className="flex-1">
               <h2 className="text-xl md:text-2xl font-semibold mb-2">Create Session</h2>
-              <p className="mb-4 text-sm md:text-base text-muted-foreground">Host a new covenant and summon fellow hunters to join your quest.</p>
+              <p className="mb-4 text-sm md:text-base text-muted-foreground">Host a new session and invite fellow nightfarer&apos;s to join your quest.</p>
               <div className="relative z-20">
                 {isLoading ? (
                   <Button variant="outline" className="border-indigo-700/50 bg-indigo-950/20 text-indigo-300 w-full sm:w-auto" disabled>
