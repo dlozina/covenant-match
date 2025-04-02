@@ -440,12 +440,6 @@ function EditProfileContent() {
             </p>
           </div>
 
-          {/* Notification display area */}
-          <Notification 
-            notification={notification} 
-            onDismiss={clearNotification}
-          />
-
           {/* Show loading spinner while game data is being fetched */}
           {isLoadingGameData ? (
             <div className="flex flex-col items-center justify-center py-10">
@@ -770,7 +764,11 @@ function EditProfileContent() {
                     </div>
                   </TabsContent>
                 </Tabs>
-
+                {/* Notification display area */}
+                <Notification 
+                  notification={notification} 
+                  onDismiss={clearNotification}
+                />
                 <div className="flex flex-col sm:flex-row justify-between gap-3 pt-2">
                   <Button 
                     type="button" 

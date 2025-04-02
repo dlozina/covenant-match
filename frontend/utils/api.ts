@@ -12,6 +12,12 @@ const getToken = (): string => {
     if (authCookie) {
       return authCookie.split('=')[1];
     }
+    
+    // Try to get token from localStorage if not in cookie
+    const token = localStorage.getItem('token');
+    if (token) {
+      return token;
+    }
   }
   return '';
 };
@@ -67,6 +73,19 @@ export interface PaginatedSessionHistory {
 export interface PaginatedResponse<T> {
   status: string;
   data: T;
+}
+
+// Types for nightlords and nightfarers
+export interface NightLord {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface Nightfarer {
+  id: string;
+  name: string;
+  description: string;
 }
 
 // Function to fetch user session history
@@ -148,6 +167,56 @@ export const fetchSessionDetails = async (sessionId: string): Promise<SessionDet
     return await response.json();
   } catch (error) {
     console.error('Failed to fetch session details:', error);
+    throw error;
+  }
+};
+
+// Function to fetch all nightlords
+export const fetchNightLords = async (): Promise<NightLord[]> => {
+  try {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+    const token = getToken();
+    
+    const response = await fetch(`${apiBaseUrl}/api/v1/night-lords`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error fetching nightlords: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch nightlords:', error);
+    throw error;
+  }
+};
+
+// Function to fetch all nightfarers
+export const fetchNightfarers = async (): Promise<Nightfarer[]> => {
+  try {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+    const token = getToken();
+    
+    const response = await fetch(`${apiBaseUrl}/api/v1/nightfarers`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error fetching nightfarers: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch nightfarers:', error);
     throw error;
   }
 }; 

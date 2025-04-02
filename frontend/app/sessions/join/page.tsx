@@ -10,6 +10,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/lib/auth-context";
 import { jwtDecode } from "jwt-decode";
 import { Notification, NotificationType } from "@/components/ui/notification";
+import { fetchNightfarers, Nightfarer } from "@/utils/api";
 
 // Define a type for session details
 interface SessionDetails {
@@ -42,10 +43,32 @@ function JoinSessionContent() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [sessionDetails, setSessionDetails] = useState<SessionDetails | null>(null);
   const [notification, setNotification] = useState<NotificationType | null>(null);
+  const [nightfarers, setNightfarers] = useState<Nightfarer[]>([]);
+  const [isLoadingCharacters, setIsLoadingCharacters] = useState<boolean>(true);
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('id');
   const { userData } = useAuth();
+  
+  // Fetch nightfarers on component mount
+  useEffect(() => {
+    const loadNightfarers = async () => {
+      try {
+        setIsLoadingCharacters(true);
+        const farers = await fetchNightfarers();
+        setNightfarers(farers);
+      } catch (error) {
+        setNotification({
+          type: 'error',
+          message: "Failed to load Nightfarers. Please refresh the page."
+        });
+      } finally {
+        setIsLoadingCharacters(false);
+      }
+    };
+
+    loadNightfarers();
+  }, []);
   
   // Use useCallback for fetchSessionDetails to avoid recreating it on each render
   const fetchSessionDetails = useCallback(async () => {
@@ -243,28 +266,23 @@ function JoinSessionContent() {
                 Select Nightfarer
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                {[
-                  "Wylder", 
-                  "Guardian", 
-                  "Recluse", 
-                  "Duchess", 
-                  "Patces", 
-                  "Jolan", 
-                  "Igon", 
-                  "Alexander"
-                ].map(farer => (
-                  <Button 
-                    key={farer} 
-                    variant="outline" 
-                    className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
-                      selectedFarer === farer ? "border-purple-500 bg-purple-950/20" : ""
-                    }`}
-                    style={{ whiteSpace: 'normal' }}
-                    onClick={() => setSelectedFarer(farer)}
-                  >
-                    <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{farer}</span>
-                  </Button>
-                ))}
+                {isLoadingCharacters ? (
+                  <div className="col-span-full text-center py-4">Loading Nightfarers...</div>
+                ) : (
+                  nightfarers.map(farer => (
+                    <Button 
+                      key={farer.id} 
+                      variant="outline" 
+                      className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
+                        selectedFarer === farer.name ? "border-purple-500 bg-purple-950/20" : ""
+                      }`}
+                      style={{ whiteSpace: 'normal' }}
+                      onClick={() => setSelectedFarer(farer.name)}
+                    >
+                      <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{farer.name}</span>
+                    </Button>
+                  ))
+                )}
               </div>
             </div>
 

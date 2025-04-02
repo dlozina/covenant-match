@@ -70,7 +70,7 @@ pub async fn update_player_stats(
 
     // Calculate win rate
     if stats.total_games > 0 {
-        stats.win_rate = (stats.wins as f64 / stats.total_games as f64) * 100.0;
+        stats.win_rate = ((stats.wins as f64 / stats.total_games as f64) * 100.0 * 100.0).round() / 100.0;
     }
 
     // Update nightfarer stats
@@ -96,7 +96,7 @@ pub async fn update_player_stats(
     // Calculate character win rate
     if character_stats.played > 0 {
         character_stats.win_rate =
-            (character_stats.wins as f64 / character_stats.played as f64) * 100.0;
+            ((character_stats.wins as f64 / character_stats.played as f64) * 100.0 * 100.0).round() / 100.0;
     }
 
     // Update night lord stats
@@ -122,7 +122,7 @@ pub async fn update_player_stats(
     // Calculate night lord win rate
     if night_lord_stats.played > 0 {
         night_lord_stats.win_rate =
-            (night_lord_stats.wins as f64 / night_lord_stats.played as f64) * 100.0;
+            ((night_lord_stats.wins as f64 / night_lord_stats.played as f64) * 100.0 * 100.0).round() / 100.0;
     }
 
     // Update or insert the stats document

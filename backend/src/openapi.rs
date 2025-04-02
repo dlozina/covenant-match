@@ -1,5 +1,5 @@
 use crate::models::game_data::{
-    Covenant, CovenantResponse, GameDataResponse, Nightfarer, NightfarerResponse, Platform,
+    Covenant, CovenantResponse, GameDataResponse, Nightfarer, NightfarerResponse, NightLord, NightLordResponse, Platform,
     PlatformResponse, Region, RegionResponse,
 };
 use crate::models::session::{
@@ -71,6 +71,7 @@ use utoipa::{
         get_regions,
         get_covenants,
         get_nightfarers,
+        get_night_lords,
         // SSE routes
         events_route,
         events_status,
@@ -117,11 +118,13 @@ use utoipa::{
             Region,
             Covenant,
             Nightfarer,
+            NightLord,
             GameDataResponse,
             PlatformResponse,
             RegionResponse,
             CovenantResponse,
             NightfarerResponse,
+            NightLordResponse,
             // SSE models
             ServerMessage,
             SessionInfo,

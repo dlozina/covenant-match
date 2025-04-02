@@ -66,12 +66,6 @@ export default function LoginPage() {
   const [showCaptcha, setShowCaptcha] = useState(false)
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [notification, setNotification] = useState<NotificationType | null>(null)
-  
-  // Character counter state
-  const [usernameLength, setUsernameLength] = useState(0)
-  
-  // Debounce timer reference
-  const [validationTimeout, setValidationTimeout] = useState<NodeJS.Timeout | null>(null)
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
@@ -79,34 +73,8 @@ export default function LoginPage() {
       username: "",
       password: "",
     },
-    mode: "onBlur", // Only validate on blur and submit for better UX
+    mode: "onSubmit", // Only validate on submit
   })
-
-  // Update character counter whenever field value changes
-  useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      if (name === 'username' && value.username) {
-        setUsernameLength(value.username.length);
-      }
-    });
-    
-    return () => subscription.unsubscribe();
-  }, [form.watch]);
-
-  // Handle debounced validation
-  const debouncedValidate = (fieldName: keyof LoginFormValues) => {
-    // Clear any existing timeout
-    if (validationTimeout) {
-      clearTimeout(validationTimeout);
-    }
-    
-    // Set a new timeout
-    const timeout = setTimeout(() => {
-      form.trigger(fieldName);
-    }, 500); // 500ms debounce
-    
-    setValidationTimeout(timeout);
-  };
 
   // Show CAPTCHA after 3 failed attempts
   useEffect(() => {
@@ -245,22 +213,12 @@ export default function LoginPage() {
                   name="username"
                   render={({ field }) => (
                     <FormItem>
-                      <div className="flex justify-between items-center">
-                        <FormLabel className="text-sm">Username</FormLabel>
-                        <span className={`text-xs ${usernameLength > 8 ? 'text-red-500' : 'text-muted-foreground'}`}>
-                          {usernameLength} / 8
-                        </span>
-                      </div>
+                      <FormLabel className="text-sm">Username</FormLabel>
                       <FormControl>
                         <Input 
                           placeholder="username" 
                           {...field} 
                           className="h-10 text-base"
-                          onChange={(e) => {
-                            field.onChange(e);
-                            setUsernameLength(e.target.value.length);
-                            debouncedValidate('username');
-                          }}
                         />
                       </FormControl>
                       <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
@@ -280,10 +238,6 @@ export default function LoginPage() {
                           type="password" 
                           {...field} 
                           className="h-10 text-base"
-                          onChange={(e) => {
-                            field.onChange(e);
-                            debouncedValidate('password');
-                          }}
                         />
                       </FormControl>
                       <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />

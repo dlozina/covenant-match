@@ -10,6 +10,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/lib/auth-context";
 import { jwtDecode } from "jwt-decode";
 import { Notification, NotificationType } from "@/components/ui/notification";
+import { fetchNightLords, fetchNightfarers, NightLord, Nightfarer } from "@/utils/api";
 
 // Define a type for session details
 interface SessionDetails {
@@ -50,6 +51,11 @@ function RecreateSessionContent() {
   // State for notifications
   const [notification, setNotification] = useState<NotificationType | null>(null);
   
+  // State for character data
+  const [nightLords, setNightLords] = useState<NightLord[]>([]);
+  const [nightfarers, setNightfarers] = useState<Nightfarer[]>([]);
+  const [isLoadingCharacters, setIsLoadingCharacters] = useState<boolean>(true);
+  
   // Navigation
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -73,7 +79,29 @@ function RecreateSessionContent() {
       });
       router.push('/sessions');
     }
+    
+    // Fetch character data
+    fetchCharacterData();
   }, [originalSessionId]);
+  
+  const fetchCharacterData = async () => {
+    try {
+      setIsLoadingCharacters(true);
+      const [lords, farers] = await Promise.all([
+        fetchNightLords(),
+        fetchNightfarers()
+      ]);
+      setNightLords(lords);
+      setNightfarers(farers);
+    } catch {
+      setNotification({
+        type: 'error',
+        message: "Failed to load characters. Please refresh the page."
+      });
+    } finally {
+      setIsLoadingCharacters(false);
+    }
+  };
   
   const fetchSessionDetails = async () => {
     console.log(`Recreate page: Fetching session details for session ID: ${originalSessionId}`);
@@ -344,28 +372,23 @@ function RecreateSessionContent() {
                         Select New Night Lord
                       </label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                        {[
-                          "Tricephalos", 
-                          "PCR", 
-                          "Malenia, Blade of Miquella", 
-                          "Maliketh", 
-                          "Mohg", 
-                          "Midra", 
-                          "Bayle", 
-                          "Messmer"
-                        ].map(lord => (
-                          <Button 
-                            key={lord} 
-                            variant="outline" 
-                            className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
-                              selectedLord === lord ? "border-purple-500 bg-purple-950/20" : ""
-                            }`}
-                            style={{ whiteSpace: 'normal' }}
-                            onClick={() => setSelectedLord(lord)}
-                          >
-                            <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{lord}</span>
-                          </Button>
-                        ))}
+                        {isLoadingCharacters ? (
+                          <div className="col-span-full text-center py-4">Loading Night Lords...</div>
+                        ) : (
+                          nightLords.map(lord => (
+                            <Button 
+                              key={lord.id} 
+                              variant="outline" 
+                              className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
+                                selectedLord === lord.name ? "border-purple-500 bg-purple-950/20" : ""
+                              }`}
+                              style={{ whiteSpace: 'normal' }}
+                              onClick={() => setSelectedLord(lord.name)}
+                            >
+                              <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{lord.name}</span>
+                            </Button>
+                          ))
+                        )}
                       </div>
                     </div>
                   </div>
@@ -385,28 +408,23 @@ function RecreateSessionContent() {
                 Select {isHost ? "Your New" : ""} Nightfarer
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                {[
-                  "Wylder", 
-                  "Guardian", 
-                  "Recluse", 
-                  "Duchess", 
-                  "Patces", 
-                  "Jolan", 
-                  "Igon", 
-                  "Alexander"
-                ].map(farer => (
-                  <Button 
-                    key={farer} 
-                    variant="outline" 
-                    className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
-                      selectedFarer === farer ? "border-purple-500 bg-purple-950/20" : ""
-                    }`}
-                    style={{ whiteSpace: 'normal' }}
-                    onClick={() => setSelectedFarer(farer)}
-                  >
-                    <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{farer}</span>
-                  </Button>
-                ))}
+                {isLoadingCharacters ? (
+                  <div className="col-span-full text-center py-4">Loading Nightfarers...</div>
+                ) : (
+                  nightfarers.map(farer => (
+                    <Button 
+                      key={farer.id} 
+                      variant="outline" 
+                      className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
+                        selectedFarer === farer.name ? "border-purple-500 bg-purple-950/20" : ""
+                      }`}
+                      style={{ whiteSpace: 'normal' }}
+                      onClick={() => setSelectedFarer(farer.name)}
+                    >
+                      <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{farer.name}</span>
+                    </Button>
+                  ))
+                )}
               </div>
             </div>
 
