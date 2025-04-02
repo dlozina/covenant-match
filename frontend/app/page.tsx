@@ -9,9 +9,47 @@ import { Sword, Shield, Timer, Users, Trophy, Skull, ScrollText, Compass } from 
 // import { BasicTest } from "@/components/ui/basic-test";
 import { Footer } from "@/components/layout/Footer";
 import { useAuth } from "@/lib/auth-context";
+import { useEffect, useState } from "react";
+import { LeaderboardEntry, fetchLeaderboard, fetchSessionsCount } from "@/utils/api";
 
 export default function Home() {
   const { isLoggedIn, isLoading } = useAuth();
+  const [topPlayers, setTopPlayers] = useState<LeaderboardEntry[]>([]);
+  const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(true);
+  const [activeSessions, setActiveSessions] = useState<number>(0);
+  const [isLoadingActiveSessions, setIsLoadingActiveSessions] = useState(true);
+
+  useEffect(() => {
+    const getLeaderboard = async () => {
+      try {
+        setIsLoadingLeaderboard(true);
+        const data = await fetchLeaderboard();
+        setTopPlayers(data.slice(0, 3)); // Get top 3 players
+      } catch (error) {
+        console.error("Failed to fetch leaderboard:", error);
+      } finally {
+        setIsLoadingLeaderboard(false);
+      }
+    };
+
+    const getActiveSessions = async () => {
+      try {
+        setIsLoadingActiveSessions(true);
+        console.log('Before fetching active sessions count');
+        // Fetch only Open sessions for the "Active Sessions" widget
+        const count = await fetchSessionsCount("Open");
+        console.log('After fetching active sessions count:', count);
+        setActiveSessions(count);
+      } catch (error) {
+        console.error("Failed to fetch active sessions count:", error);
+      } finally {
+        setIsLoadingActiveSessions(false);
+      }
+    };
+
+    getLeaderboard();
+    getActiveSessions();
+  }, []);
 
   // Add custom sidebars with improved styling
   const leftSidebar = (
@@ -22,27 +60,37 @@ export default function Home() {
           <span>Top Players</span>
         </h3>
         <div className="space-y-3">
-          {["Ashen One", "Tarnished", "Hunter"].map((name, i) => (
-            <div key={i} className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="rounded-full bg-gradient-to-br from-purple-700 to-indigo-900 h-6 w-6 flex items-center justify-center text-xs">
-                  {i+1}
+          {isLoadingLeaderboard ? (
+            <div className="py-2 text-sm text-muted-foreground">Loading leaderboard...</div>
+          ) : topPlayers.length > 0 ? (
+            topPlayers.map((player, i) => (
+              <div key={i} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="rounded-full bg-gradient-to-br from-purple-700 to-indigo-900 h-6 w-6 flex items-center justify-center text-xs">
+                    {i+1}
+                  </div>
+                  <span>{player.username}</span>
                 </div>
-                <span>{name}</span>
+                <span className="text-indigo-400">{player.wins} W</span>
               </div>
-              <span className="text-indigo-400">{120 - (i * 15)} W</span>
-            </div>
-          ))}
+            ))
+          ) : (
+            <div className="py-2 text-sm text-muted-foreground">No players found</div>
+          )}
         </div>
       </div>
       
       <div className="bg-card/50 border border-purple-900/20 rounded-lg p-4 backdrop-blur-sm">
         <h3 className="font-bold text-lg flex items-center gap-2 mb-3">
           <Timer className="h-5 w-5 text-emerald-400" />
-          <span>Active Sessions</span>
+          <span>Open Sessions</span>
         </h3>
         <div className="text-4xl font-bold text-center py-2 text-emerald-400">
-          24
+          {isLoadingActiveSessions ? (
+            <span className="text-lg text-muted-foreground">Loading...</span>
+          ) : (
+            activeSessions
+          )}
         </div>
         <div className="text-xs text-center text-muted-foreground">
           Players looking for groups now
@@ -121,40 +169,66 @@ export default function Home() {
       
       {/* Feature Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 my-8 md:my-12">
-        <div className="group bg-gradient-to-br from-background to-purple-950/10 rounded-lg p-4 md:p-6 border border-purple-900/20 shadow-md hover:shadow-purple-900/5 transition-all relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-600/5 to-indigo-600/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-          <div className="flex items-start gap-3 md:gap-4">
+        <div className="group bg-gradient-to-br from-background to-purple-950/10 rounded-lg p-4 md:p-6 border border-purple-900/20 shadow-md transition-all relative overflow-hidden">
+          {/* Background effect - always visible, not just on hover */}
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-600/10 to-indigo-600/10 pointer-events-none"></div>
+          
+          {/* Content */}
+          <div className="flex items-start gap-3 md:gap-4 relative z-10">
             <div className="bg-purple-900/30 p-2 md:p-3 rounded-lg">
               <Sword className="h-5 w-5 md:h-6 md:w-6 text-purple-400" />
             </div>
             <div className="flex-1">
               <h2 className="text-xl md:text-2xl font-semibold mb-2">Find Sessions</h2>
               <p className="mb-4 text-sm md:text-base text-muted-foreground">Join other Ashen Ones looking for allies and begin your hunt immediately.</p>
-              <Button asChild variant="outline" className="border-purple-700/50 hover:bg-purple-950/50 hover:text-purple-300">
-                <Link href="/sessions" className="flex items-center">
-                  Browse Sessions
-                  <Shield className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
+              <div className="relative z-20">
+                <Button asChild variant="outline" className="border-purple-700/50 bg-purple-950/20 hover:bg-purple-950/30 text-purple-300 w-full sm:w-auto">
+                  <Link href="/sessions" className="flex items-center justify-center">
+                    Browse Sessions
+                    <Shield className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
             </div>
           </div>
         </div>
         
-        <div className="group bg-gradient-to-br from-background to-indigo-950/10 rounded-lg p-4 md:p-6 border border-indigo-900/20 shadow-md hover:shadow-indigo-900/5 transition-all relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/5 to-blue-600/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-          <div className="flex items-start gap-3 md:gap-4">
+        <div className="group bg-gradient-to-br from-background to-indigo-950/10 rounded-lg p-4 md:p-6 border border-indigo-900/20 shadow-md transition-all relative overflow-hidden">
+          {/* Background effect - always visible, not just on hover */}
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/10 to-blue-600/10 pointer-events-none"></div>
+          
+          {/* Content */}
+          <div className="flex items-start gap-3 md:gap-4 relative z-10">
             <div className="bg-indigo-900/30 p-2 md:p-3 rounded-lg">
               <Users className="h-5 w-5 md:h-6 md:w-6 text-indigo-400" />
             </div>
             <div className="flex-1">
               <h2 className="text-xl md:text-2xl font-semibold mb-2">Create Session</h2>
               <p className="mb-4 text-sm md:text-base text-muted-foreground">Host a new covenant and summon fellow hunters to join your quest.</p>
-              <Button asChild variant="outline" className="border-indigo-700/50 hover:bg-indigo-950/50 hover:text-indigo-300">
-                <Link href="/sessions/create" className="flex items-center">
-                  Create Session
-                  <Skull className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
+              <div className="relative z-20">
+                {isLoading ? (
+                  <Button variant="outline" className="border-indigo-700/50 bg-indigo-950/20 text-indigo-300 w-full sm:w-auto" disabled>
+                    <span className="flex items-center justify-center">
+                      Loading...
+                      <Skull className="ml-2 h-4 w-4 animate-pulse" />
+                    </span>
+                  </Button>
+                ) : isLoggedIn ? (
+                  <Button asChild variant="outline" className="border-indigo-700/50 bg-indigo-950/20 hover:bg-indigo-950/30 text-indigo-300 w-full sm:w-auto">
+                    <Link href="/sessions/create" className="flex items-center justify-center">
+                      Create Session
+                      <Skull className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button asChild variant="outline" className="border-indigo-700/50 bg-indigo-950/20 hover:bg-indigo-950/30 text-indigo-300 w-full sm:w-auto">
+                    <Link href="/profile/create" className="flex items-center justify-center">
+                      Join to Create
+                      <Users className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </div>

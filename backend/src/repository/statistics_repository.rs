@@ -59,6 +59,11 @@ pub async fn update_player_stats(
         }
     };
 
+    // Update changed username -> Display Name
+    if stats.username != username {
+        stats.username = username.to_string();
+    }
+
     // Update overall stats
     stats.total_games += 1;
 

@@ -27,6 +27,8 @@ exclude_patterns = [
     { path = "/api/docs/.*", method = "GET", is_regex = true },
     { path = "/api-docs/.*", method = "GET", is_regex = true },
     { path = "/api/v1/game-data", method = "GET", is_regex = false },
+    { path = "/api/v1/statistics/sessions-stats", method = "GET", is_regex = false },
+    { path = "/api/v1/statistics/leaderboard", method = "GET", is_regex = false },
     # { path = "/ws/.*", method = "GET", is_regex = true },
     # { path = "/api/public/.*", method = "GET", is_regex = true },
     # { path = "/favicon.ico", method = "GET", is_regex = false },

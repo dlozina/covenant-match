@@ -1,6 +1,6 @@
 use crate::models::game_data::{
-    Covenant, CovenantResponse, GameDataResponse, Nightfarer, NightfarerResponse, NightLord, NightLordResponse, Platform,
-    PlatformResponse, Region, RegionResponse,
+    Covenant, CovenantResponse, GameDataResponse, NightLord, NightLordResponse, Nightfarer,
+    NightfarerResponse, Platform, PlatformResponse, Region, RegionResponse,
 };
 use crate::models::session::{
     CreateSessionDto, GameResult, JoinSessionDto, PlayerInfo, RateSessionDto, ResultsResponseDto,
@@ -83,6 +83,7 @@ use utoipa::{
         get_all_night_lord_statistics,
         get_current_user_session_history,
         get_session_details,
+        get_sessions_stats,
     ),
     components(
         schemas(
@@ -140,6 +141,8 @@ use utoipa::{
             SessionDetailResponse,
             SessionDetail,
             PlayerDetail,
+            SessionsStatsResponse,
+            SessionsStatsData,
         ),
     ),
     tags(

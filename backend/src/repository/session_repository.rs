@@ -199,3 +199,17 @@ pub async fn find_session_by_id(
     let session = collection.find_one(doc! { "_id": id }).await?;
     Ok(session)
 }
+
+// Count sessions by status (or all sessions if status is None)
+pub async fn count_sessions_by_status(
+    db: &Database,
+    status: Option<String>,
+) -> Result<u64, AppError> {
+    let filter = match status {
+        Some(status_str) => doc! { "status": status_str },
+        None => doc! {},
+    };
+
+    let count = get_collection(db).count_documents(filter).await?;
+    Ok(count)
+}

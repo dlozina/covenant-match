@@ -22,6 +22,16 @@ const getToken = (): string => {
   return '';
 };
 
+// Types for leaderboard
+export interface LeaderboardEntry {
+  user_id: string;
+  username: string;
+  total_games: number;
+  wins: number;
+  win_rate: number;
+  reputation_score: number;
+}
+
 // Types for session history
 export interface SessionHistoryEntry {
   session_id: string;
@@ -87,6 +97,43 @@ export interface Nightfarer {
   name: string;
   description: string;
 }
+
+// Types for active sessions
+export interface ActiveSessionsResponse {
+  status: string;
+  data: {
+    count: number;
+  };
+}
+
+// Types for sessions stats
+export interface SessionsStatsResponse {
+  status: string;
+  data: {
+    count: number;
+  };
+}
+
+// Function to fetch leaderboard data
+export const fetchLeaderboard = async (): Promise<LeaderboardEntry[]> => {
+  try {
+    const response = await fetch(`${API_URL}/api/v1/statistics/leaderboard`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error fetching leaderboard data: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch leaderboard data:', error);
+    return []; // Return empty array on error to prevent UI from breaking
+  }
+};
 
 // Function to fetch user session history
 export const fetchUserSessionHistory = async (): Promise<SessionHistoryEntry[]> => {
@@ -218,5 +265,68 @@ export const fetchNightfarers = async (): Promise<Nightfarer[]> => {
   } catch (error) {
     console.error('Failed to fetch nightfarers:', error);
     throw error;
+  }
+};
+
+// Function to fetch active sessions count
+export const fetchActiveSessionsCount = async (): Promise<number> => {
+  try {
+    const token = getToken();
+    console.log('Fetching active sessions count...');
+    
+    const response = await fetch(`${API_URL}/api/v1/statistics/active-sessions`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    console.log('Active sessions response status:', response.status);
+    
+    if (!response.ok) {
+      throw new Error(`Error fetching active sessions count: ${response.statusText}`);
+    }
+
+    const data: ActiveSessionsResponse = await response.json();
+    console.log('Active sessions data:', data);
+    return data.data.count;
+  } catch (error) {
+    console.error('Failed to fetch active sessions count:', error);
+    return 0; // Return 0 on error to prevent UI from breaking
+  }
+};
+
+// Function to fetch sessions count by status
+export const fetchSessionsCount = async (status?: string): Promise<number> => {
+  try {
+    const token = getToken();
+    console.log('Fetching sessions count...');
+    
+    // Build URL with optional status parameter
+    const url = status 
+      ? `${API_URL}/api/v1/statistics/sessions-stats?status=${encodeURIComponent(status)}`
+      : `${API_URL}/api/v1/statistics/sessions-stats`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    console.log('Sessions count response status:', response.status);
+    
+    if (!response.ok) {
+      throw new Error(`Error fetching sessions count: ${response.statusText}`);
+    }
+
+    const data: SessionsStatsResponse = await response.json();
+    console.log('Sessions count data:', data);
+    return data.data.count;
+  } catch (error) {
+    console.error('Failed to fetch sessions count:', error);
+    return 0; // Return 0 on error to prevent UI from breaking
   }
 }; 

@@ -1,8 +1,10 @@
+use crate::repository::session_repository;
 use crate::services::statistics_service;
 use crate::utils::jwt;
 use actix_web::{get, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use mongodb::Database;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use utoipa::ToSchema;
 
 #[derive(Serialize, ToSchema)]
@@ -501,6 +503,54 @@ pub struct PlayerDetail {
     pub joined_at: chrono::DateTime<chrono::Utc>,
 }
 
+/// Get count of sessions with optional status filter
+#[utoipa::path(
+    get,
+    path = "/api/v1/statistics/sessions-stats",
+    params(
+        ("status" = Option<String>, Query, description = "Filter sessions by status (e.g., 'Open', 'InProgress', 'Completed')")
+    ),
+    responses(
+        (status = 200, description = "Sessions count retrieved successfully", body = SessionsStatsResponse),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "statistics"
+)]
+#[get("/api/v1/statistics/sessions-stats")]
+async fn get_sessions_stats(
+    db: web::Data<Database>,
+    query: web::Query<std::collections::HashMap<String, String>>,
+) -> impl Responder {
+    let status = query.get("status").cloned();
+
+    match session_repository::count_sessions_by_status(&db, status).await {
+        Ok(count) => HttpResponse::Ok().json(json!({
+            "status": "success",
+            "data": {
+                "count": count
+            }
+        })),
+        Err(e) => {
+            log::error!("Error fetching sessions count: {:?}", e);
+            HttpResponse::InternalServerError().json(json!({
+                "status": "error",
+                "message": e.to_string()
+            }))
+        }
+    }
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct SessionsStatsResponse {
+    pub status: String,
+    pub data: SessionsStatsData,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct SessionsStatsData {
+    pub count: u64,
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     log::info!("Configuring statistics routes");
     cfg.service(get_current_user_statistics)
@@ -509,5 +559,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         .service(get_night_lord_statistics)
         .service(get_all_night_lord_statistics)
         .service(get_current_user_session_history)
-        .service(get_session_details);
+        .service(get_session_details)
+        .service(get_sessions_stats);
 }
