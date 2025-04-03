@@ -90,7 +90,7 @@ function CreateSessionContent() {
         ]);
         setNightLords(lords);
         setNightfarers(farers);
-      } catch (error) {
+      } catch {
         setNotification({
           message: "Failed to load characters. Please refresh the page.",
           type: 'error'
