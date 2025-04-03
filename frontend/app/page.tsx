@@ -96,13 +96,13 @@ export default function Home() {
           ) : topPlayers.length > 0 ? (
             topPlayers.map((player, i) => (
               <div key={i} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="rounded-full bg-gradient-to-br from-purple-700 to-indigo-900 h-6 w-6 flex items-center justify-center text-xs">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="rounded-full bg-gradient-to-br from-purple-700 to-indigo-900 h-6 w-6 flex-shrink-0 flex items-center justify-center text-xs">
                     {i+1}
                   </div>
-                  <span>{player.username}</span>
+                  <span className="truncate">{player.username}</span>
                 </div>
-                <span className="text-indigo-400">{player.wins} W</span>
+                <span className="text-indigo-400 flex-shrink-0">{player.wins} W</span>
               </div>
             ))
           ) : (
@@ -122,13 +122,13 @@ export default function Home() {
           ) : topCovenants.length > 0 ? (
             topCovenants.map((covenant, i) => (
               <div key={i} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="rounded-full bg-gradient-to-br from-red-700 to-amber-600 h-6 w-6 flex items-center justify-center text-xs">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <div className="rounded-full bg-gradient-to-br from-red-700 to-amber-600 h-6 w-6 flex-shrink-0 flex items-center justify-center text-xs">
                     {i+1}
                   </div>
-                  <span>{covenant.covenantName}</span>
+                  <span className="truncate">{covenant.covenantName}</span>
                 </div>
-                <span className="text-red-400">{covenant.wins} W</span>
+                <span className="text-red-400 flex-shrink-0">{covenant.wins} W</span>
               </div>
             ))
           ) : (
