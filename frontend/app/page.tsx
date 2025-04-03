@@ -32,7 +32,11 @@ export default function Home() {
       try {
         setIsLoadingLeaderboard(true);
         const data = await fetchLeaderboard();
-        setTopPlayers(data.slice(0, 3)); // Get top 3 players
+        // Sort first by wins (descending), then by username (ascending) when wins are equal
+        const sortedPlayers = [...data].sort((a, b) => 
+          b.wins === a.wins ? a.username.localeCompare(b.username) : b.wins - a.wins
+        );
+        setTopPlayers(sortedPlayers.slice(0, 3)); // Get top 3 players
       } catch (error) {
         console.error("Failed to fetch leaderboard:", error);
       } finally {
@@ -61,8 +65,10 @@ export default function Home() {
         const data = await fetchCovenantStats();
         // Check if covenantStats exists and has items
         if (data && data.covenantStats && data.covenantStats.length > 0) {
-          // Sort by wins and get top 3
-          const sortedCovenants = [...data.covenantStats].sort((a, b) => b.wins - a.wins);
+          // Sort by wins (descending) and then by covenantName (ascending) when wins are equal
+          const sortedCovenants = [...data.covenantStats].sort((a, b) => 
+            b.wins === a.wins ? a.covenantName.localeCompare(b.covenantName) : b.wins - a.wins
+          );
           setTopCovenants(sortedCovenants.slice(0, 3));
         } else {
           // If no covenant stats exist, set empty array

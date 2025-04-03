@@ -343,104 +343,107 @@ function RecreateSessionContent() {
   
   return (
     <MainLayout footer={<Footer />}>
-      <div className="container py-6 px-4 mx-auto">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold">{pageTitle}</h1>
-          <Button variant="outline" asChild>
-            <Link href="/sessions">Back to main sessions page (Quit session)</Link>
-          </Button>
-        </div>
+      <div className="container max-w-2xl py-6 md:py-10 px-4 mx-auto">
+        <div className="space-y-4 md:space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <h1 className="text-xl md:text-2xl font-bold">{pageTitle}</h1>
+            <Button variant="outline" asChild className="h-10">
+              <Link href="/sessions">Back to Sessions</Link>
+            </Button>
+          </div>
 
-        <Card className="max-w-2xl mx-auto">
-          <CardHeader>
-            <CardTitle>
-              {sessionDetails ? sessionDetails.name : "Loading session..."}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <Notification 
-              notification={notification} 
-              onDismiss={clearNotification}
-            />
-          
-            {sessionDetails && (
-              <div className="space-y-2">
-                {isHost ? (
-                  <div className="flex flex-col space-y-4">
-                    <p className="text-muted-foreground text-sm">The session name and in-game password will remain the same as the original session.</p>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">
-                        Select New Night Lord
-                      </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                        {isLoadingCharacters ? (
-                          <div className="col-span-full text-center py-4">Loading Night Lords...</div>
-                        ) : (
-                          nightLords.map(lord => (
-                            <Button 
-                              key={lord.id} 
-                              variant="outline" 
-                              className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
-                                selectedLord === lord.name ? "border-purple-500 bg-purple-950/20" : ""
-                              }`}
-                              style={{ whiteSpace: 'normal' }}
-                              onClick={() => setSelectedLord(lord.name)}
-                            >
-                              <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{lord.name}</span>
-                            </Button>
-                          ))
-                        )}
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                {sessionDetails ? sessionDetails.name : "Loading session..."}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <Notification 
+                notification={notification} 
+                onDismiss={clearNotification}
+              />
+            
+              {sessionDetails && (
+                <div className="space-y-4">
+                  {isHost ? (
+                    <div className="space-y-4">
+                      <p className="text-muted-foreground text-sm">The session name and in-game password will remain the same as the original session.</p>
+                      <div className="space-y-2">
+                        <label className="text-sm md:text-base font-medium">
+                          Select New Night Lord
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                          {isLoadingCharacters ? (
+                            <div className="col-span-full text-center py-4">Loading Night Lords...</div>
+                          ) : (
+                            nightLords.map(lord => (
+                              <Button 
+                                key={lord.id} 
+                                variant="outline" 
+                                className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
+                                  selectedLord === lord.name ? "border-purple-500 bg-purple-950/20" : ""
+                                }`}
+                                style={{ whiteSpace: 'normal' }}
+                                onClick={() => setSelectedLord(lord.name)}
+                                type="button"
+                              >
+                                <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{lord.name}</span>
+                              </Button>
+                            ))
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col space-y-2">
-                    <p className="text-sm font-medium">Night Lord: {sessionDetails.nightLord}</p>
-                    <p className="text-sm text-muted-foreground">
-                      The host has created a new session with the same team. Choose your character to join.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-sm md:text-base font-medium">Night Lord: {sessionDetails.nightLord}</p>
+                      <p className="text-sm text-muted-foreground">
+                        The host has created a new session with the same team. Choose your character to join.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Select {isHost ? "Your New" : ""} Nightfarer
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                {isLoadingCharacters ? (
-                  <div className="col-span-full text-center py-4">Loading Nightfarers...</div>
-                ) : (
-                  nightfarers.map(farer => (
-                    <Button 
-                      key={farer.id} 
-                      variant="outline" 
-                      className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
-                        selectedFarer === farer.name ? "border-purple-500 bg-purple-950/20" : ""
-                      }`}
-                      style={{ whiteSpace: 'normal' }}
-                      onClick={() => setSelectedFarer(farer.name)}
-                    >
-                      <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{farer.name}</span>
-                    </Button>
-                  ))
-                )}
+              <div className="space-y-2">
+                <label className="text-sm md:text-base font-medium">
+                  Select {isHost ? "Your New" : ""} Nightfarer
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                  {isLoadingCharacters ? (
+                    <div className="col-span-full text-center py-4">Loading Nightfarers...</div>
+                  ) : (
+                    nightfarers.map(farer => (
+                      <Button 
+                        key={farer.id} 
+                        variant="outline" 
+                        className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
+                          selectedFarer === farer.name ? "border-purple-500 bg-purple-950/20" : ""
+                        }`}
+                        style={{ whiteSpace: 'normal' }}
+                        onClick={() => setSelectedFarer(farer.name)}
+                        type="button"
+                      >
+                        <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{farer.name}</span>
+                      </Button>
+                    ))
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="pt-4">
-              <Button 
-                className="w-full" 
-                size="lg" 
-                onClick={handleAction}
-                disabled={isLoading}
-              >
-                {isLoading ? "Processing..." : buttonText}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="pt-4">
+                <Button 
+                  className="w-full h-10" 
+                  onClick={handleAction}
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Processing..." : buttonText}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </MainLayout>
   );
