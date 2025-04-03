@@ -1,4 +1,4 @@
-use crate::repository::session_repository;
+use crate::{repository::session_repository, services::session_service};
 use crate::services::statistics_service;
 use crate::utils::jwt;
 use actix_web::{get, web, HttpMessage, HttpRequest, HttpResponse, Responder};
@@ -540,6 +540,43 @@ async fn get_sessions_stats(
     }
 }
 
+/// Get covenant statistics
+#[utoipa::path(
+    get,
+    path = "/api/v1/statistics/covenants",
+    responses(
+        (status = 200, description = "Covenant statistics retrieved successfully", body = CovenantStatsResponse),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "statistics"
+)]
+#[get("/api/v1/statistics/covenants")]
+async fn get_covenant_stats(db: web::Data<Database>) -> impl Responder {
+    log::info!("Received request for covenant statistics");
+
+    match session_service::get_covenant_stats(&db).await {
+        Ok(stats) => {
+            log::info!(
+                "Successfully retrieved covenant statistics for {} covenants",
+                stats.covenant_stats.len()
+            );
+            HttpResponse::Ok().json(stats)
+        }
+        Err(e) => {
+            log::error!("Error fetching covenant statistics: {:?}", e);
+
+            // Return a more informative error message
+            let error_message = format!("Failed to retrieve covenant statistics: {}", e);
+
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": "error",
+                "message": error_message,
+                "error_type": "covenant_stats_error"
+            }))
+        }
+    }
+}
+
 #[derive(Serialize, ToSchema)]
 pub struct SessionsStatsResponse {
     pub status: String,
@@ -560,5 +597,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         .service(get_all_night_lord_statistics)
         .service(get_current_user_session_history)
         .service(get_session_details)
-        .service(get_sessions_stats);
+        .service(get_sessions_stats)
+        .service(get_covenant_stats);
 }

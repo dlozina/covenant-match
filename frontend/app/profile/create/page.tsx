@@ -220,7 +220,7 @@ export default function CreateProfilePage() {
     // Set a new timeout
     const timeout = setTimeout(() => {
       form.trigger(fieldName);
-    }, 500); // 500ms debounce
+    }, 1000); // 1000ms debounce
     
     setValidationTimeout(timeout);
   };
@@ -300,12 +300,6 @@ export default function CreateProfilePage() {
               Fill in your details to create your profile
             </p>
           </div>
-
-          {/* Notification display area */}
-          <Notification 
-            notification={notification} 
-            onDismiss={clearNotification}
-          />
 
           {isLoadingGameData ? (
             <div className="flex flex-col items-center justify-center py-10">
@@ -589,6 +583,12 @@ export default function CreateProfilePage() {
                     )}
                   />
                 </div>
+
+                {/* Notification display area */}
+                <Notification 
+                  notification={notification} 
+                  onDismiss={clearNotification}
+                />
 
                 <Button 
                   type="submit" 

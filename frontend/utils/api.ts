@@ -114,6 +114,18 @@ export interface SessionsStatsResponse {
   };
 }
 
+// Types for covenant stats
+export interface CovenantStats {
+  covenantName: string;
+  wins: number;
+  losses: number;
+  disconnects: number;
+}
+
+export interface CovenantStatsResponse {
+  covenantStats: CovenantStats[];
+}
+
 // Function to fetch leaderboard data
 export const fetchLeaderboard = async (): Promise<LeaderboardEntry[]> => {
   try {
@@ -328,5 +340,26 @@ export const fetchSessionsCount = async (status?: string): Promise<number> => {
   } catch (error) {
     console.error('Failed to fetch sessions count:', error);
     return 0; // Return 0 on error to prevent UI from breaking
+  }
+};
+
+// Function to fetch covenant stats
+export const fetchCovenantStats = async (): Promise<CovenantStatsResponse> => {
+  try {
+    const response = await fetch(`${API_URL}/api/v1/statistics/covenants`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error fetching covenant stats: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch covenant stats:', error);
+    return { covenantStats: [] }; // Return empty array on error to prevent UI from breaking
   }
 }; 

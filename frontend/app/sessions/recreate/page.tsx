@@ -301,7 +301,8 @@ function RecreateSessionContent() {
         body: JSON.stringify({
           nightfarer: selectedFarer,
           userId: userId,
-          username: userData.username
+          username: userData.username,
+          covenantName: userData.covenantName
         }),
       });
       

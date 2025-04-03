@@ -3,9 +3,9 @@ use crate::models::game_data::{
     NightfarerResponse, Platform, PlatformResponse, Region, RegionResponse,
 };
 use crate::models::session::{
-    CreateSessionDto, GameResult, JoinSessionDto, MinimalSessionDto, PlayerInfo, RateSessionDto,
-    ResultsResponseDto, SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto,
-    UpdateSessionDto,
+    CovenantStats, CovenantStatsResponse, CreateSessionDto, GameResult, JoinSessionDto,
+    MinimalSessionDto, PlayerInfo, RateSessionDto, ResultsResponseDto, SessionResponseDto,
+    SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto,
 };
 use crate::models::statistics::{LeaderboardEntry, Stats, UserStatistics};
 use crate::models::user::{
@@ -86,6 +86,7 @@ use utoipa::{
         get_current_user_session_history,
         get_session_details,
         get_sessions_stats,
+        get_covenant_stats,
     ),
     components(
         schemas(
@@ -117,6 +118,9 @@ use utoipa::{
             SessionStatus,
             GameResult,
             SessionResult,
+            // Covenant statistics models
+            CovenantStats,
+            CovenantStatsResponse,
             // Game data models
             Platform,
             Region,

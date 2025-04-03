@@ -3,14 +3,20 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { MainLayout } from "@/components/layout";
-import { Sword, Shield, Timer, Users, Trophy, Skull, ScrollText, Compass } from "lucide-react";
+import { Sword, Shield, Timer, Users, Trophy, Skull, ScrollText, Compass, Award } from "lucide-react";
 // Use for test if css config is not working
 // import { TestStyled } from "@/components/ui/test-styled";
 // import { BasicTest } from "@/components/ui/basic-test";
 import { Footer } from "@/components/layout/Footer";
 import { useAuth } from "@/lib/auth-context";
 import { useEffect, useState } from "react";
-import { LeaderboardEntry, fetchLeaderboard, fetchSessionsCount } from "@/utils/api";
+import { 
+  LeaderboardEntry, 
+  CovenantStats,
+  fetchLeaderboard, 
+  fetchSessionsCount,
+  fetchCovenantStats 
+} from "@/utils/api";
 
 export default function Home() {
   const { isLoggedIn, isLoading } = useAuth();
@@ -18,6 +24,8 @@ export default function Home() {
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(true);
   const [activeSessions, setActiveSessions] = useState<number>(0);
   const [isLoadingActiveSessions, setIsLoadingActiveSessions] = useState(true);
+  const [topCovenants, setTopCovenants] = useState<CovenantStats[]>([]);
+  const [isLoadingCovenants, setIsLoadingCovenants] = useState(true);
 
   useEffect(() => {
     const getLeaderboard = async () => {
@@ -47,8 +55,31 @@ export default function Home() {
       }
     };
 
+    const getTopCovenants = async () => {
+      try {
+        setIsLoadingCovenants(true);
+        const data = await fetchCovenantStats();
+        // Check if covenantStats exists and has items
+        if (data && data.covenantStats && data.covenantStats.length > 0) {
+          // Sort by wins and get top 3
+          const sortedCovenants = [...data.covenantStats].sort((a, b) => b.wins - a.wins);
+          setTopCovenants(sortedCovenants.slice(0, 3));
+        } else {
+          // If no covenant stats exist, set empty array
+          setTopCovenants([]);
+          console.log("No covenant statistics available");
+        }
+      } catch (error) {
+        console.error("Failed to fetch covenant stats:", error);
+        setTopCovenants([]); // Set empty array on error too
+      } finally {
+        setIsLoadingCovenants(false);
+      }
+    };
+
     getLeaderboard();
     getActiveSessions();
+    getTopCovenants();
   }, []);
 
   // Add custom sidebars with improved styling
@@ -76,6 +107,32 @@ export default function Home() {
             ))
           ) : (
             <div className="py-2 text-sm text-muted-foreground">No players found</div>
+          )}
+        </div>
+      </div>
+      
+      <div className="bg-card/50 border border-purple-900/20 rounded-lg p-4 backdrop-blur-sm">
+        <h3 className="font-bold text-lg flex items-center gap-2 mb-3">
+          <Award className="h-5 w-5 text-red-400" />
+          <span>Top Covenants</span>
+        </h3>
+        <div className="space-y-3">
+          {isLoadingCovenants ? (
+            <div className="py-2 text-sm text-muted-foreground">Loading covenants...</div>
+          ) : topCovenants.length > 0 ? (
+            topCovenants.map((covenant, i) => (
+              <div key={i} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="rounded-full bg-gradient-to-br from-red-700 to-amber-600 h-6 w-6 flex items-center justify-center text-xs">
+                    {i+1}
+                  </div>
+                  <span>{covenant.covenantName}</span>
+                </div>
+                <span className="text-red-400">{covenant.wins} W</span>
+              </div>
+            ))
+          ) : (
+            <div className="py-2 text-sm text-muted-foreground">No covenant data found</div>
           )}
         </div>
       </div>
@@ -236,7 +293,7 @@ export default function Home() {
       
       {/* Features Section */}
       <div className="bg-card/30 border border-accent/20 p-4 md:p-6 rounded-lg mt-6 md:mt-8 backdrop-blur-sm">
-        <h2 className="text-xl md:text-2xl font-semibold mb-4 md:mb-6 pb-2 border-b border-purple-900/20">The Dark Covenant Awaits</h2>
+        <h2 className="text-xl md:text-2xl font-semibold mb-4 md:mb-6 pb-2 border-b border-purple-900/20">The Covenant Awaits</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
           <div className="flex items-start gap-3">
             <div className="bg-purple-900/30 p-2 rounded-lg">

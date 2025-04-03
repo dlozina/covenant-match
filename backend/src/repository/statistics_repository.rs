@@ -35,6 +35,7 @@ pub async fn update_player_stats(
     username: &str,
     nightfarer: &str,
     night_lord: &str,
+    covenant_name: &str,
     result: &GameResult,
 ) -> Result<(), AppError> {
     // Get existing stats or create new ones
@@ -53,6 +54,7 @@ pub async fn update_player_stats(
                 win_rate: 0.0,
                 nightfarer_stats: HashMap::new(),
                 night_lord_stats: HashMap::new(),
+                covenant_stats: HashMap::new(),
                 achievements: vec![],
                 reputation_score: 0.0,
             }
@@ -75,7 +77,8 @@ pub async fn update_player_stats(
 
     // Calculate win rate
     if stats.total_games > 0 {
-        stats.win_rate = ((stats.wins as f64 / stats.total_games as f64) * 100.0 * 100.0).round() / 100.0;
+        stats.win_rate =
+            ((stats.wins as f64 / stats.total_games as f64) * 100.0 * 100.0).round() / 100.0;
     }
 
     // Update nightfarer stats
@@ -101,7 +104,8 @@ pub async fn update_player_stats(
     // Calculate character win rate
     if character_stats.played > 0 {
         character_stats.win_rate =
-            ((character_stats.wins as f64 / character_stats.played as f64) * 100.0 * 100.0).round() / 100.0;
+            ((character_stats.wins as f64 / character_stats.played as f64) * 100.0 * 100.0).round()
+                / 100.0;
     }
 
     // Update night lord stats
@@ -127,7 +131,36 @@ pub async fn update_player_stats(
     // Calculate night lord win rate
     if night_lord_stats.played > 0 {
         night_lord_stats.win_rate =
-            ((night_lord_stats.wins as f64 / night_lord_stats.played as f64) * 100.0 * 100.0).round() / 100.0;
+            ((night_lord_stats.wins as f64 / night_lord_stats.played as f64) * 100.0 * 100.0)
+                .round()
+                / 100.0;
+    }
+
+    // Update covenant stats
+    let covenant_stats = stats
+        .covenant_stats
+        .entry(covenant_name.to_string())
+        .or_insert_with(|| Stats {
+            played: 0,
+            wins: 0,
+            losses: 0,
+            disconnects: 0,
+            win_rate: 0.0,
+        });
+
+    covenant_stats.played += 1;
+
+    match result {
+        GameResult::Win => covenant_stats.wins += 1,
+        GameResult::Loss => covenant_stats.losses += 1,
+        GameResult::Disconnect => covenant_stats.disconnects += 1,
+    }
+
+    // Calculate covenant win rate
+    if covenant_stats.played > 0 {
+        covenant_stats.win_rate =
+            ((covenant_stats.wins as f64 / covenant_stats.played as f64) * 100.0 * 100.0).round()
+                / 100.0;
     }
 
     // Update or insert the stats document

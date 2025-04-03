@@ -32,12 +32,6 @@ export function SiteHeader() {
 
   const routes = [
     {
-      href: "/",
-      label: "Home",
-      icon: <Sword className="h-4 w-4 mr-2" />,
-      active: pathname === "/",
-    },
-    {
       href: "/sessions",
       label: "Find Sessions",
       icon: <Users className="h-4 w-4 mr-2" />,

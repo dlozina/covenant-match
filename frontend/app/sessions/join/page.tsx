@@ -57,7 +57,7 @@ function JoinSessionContent() {
         setIsLoadingCharacters(true);
         const farers = await fetchNightfarers();
         setNightfarers(farers);
-      } catch (error) {
+      } catch {
         setNotification({
           type: 'error',
           message: "Failed to load Nightfarers. Please refresh the page."
@@ -183,7 +183,8 @@ function JoinSessionContent() {
         body: JSON.stringify({
           nightfarer: selectedFarer,
           userId: userId,
-          username: userData.username
+          username: userData.username,
+          covenantName: userData.covenantName || 'Unknown'
         }),
       });
       
@@ -249,10 +250,6 @@ function JoinSessionContent() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <Notification 
-              notification={notification} 
-              onDismiss={clearNotification}
-            />
             
             {sessionDetails && (
               <div className="space-y-2">
@@ -285,6 +282,11 @@ function JoinSessionContent() {
                 )}
               </div>
             </div>
+            
+            <Notification 
+              notification={notification} 
+              onDismiss={clearNotification}
+            />
 
             <div className="pt-4">
               <Button 

@@ -1,6 +1,6 @@
 use crate::models::session::{
-    CreateSessionDto, GameResult, JoinSessionDto, MinimalSessionDto, RateSessionDto,
-    SessionReviewDto, SubmitResultDto, UpdateSessionDto,
+    CovenantStatsResponse, CreateSessionDto, GameResult, JoinSessionDto, MinimalSessionDto,
+    RateSessionDto, SessionReviewDto, SubmitResultDto, UpdateSessionDto,
 };
 use crate::services::session_service;
 use crate::utils::jwt;
@@ -361,7 +361,7 @@ async fn recreate_session(
         claims.sub.clone()
     };
 
-    match session_service::recreate_session(&db, &id, &user_id).await {
+    match session_service::recreate_session(&db, &id, &user_id, true).await {
         Ok(session) => HttpResponse::Created().json(session),
         Err(e) => {
             log::error!("Error recreating session: {:?}", e);

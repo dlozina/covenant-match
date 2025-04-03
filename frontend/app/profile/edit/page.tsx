@@ -300,7 +300,7 @@ function EditProfileContent() {
     // Set a new timeout
     const timeout = setTimeout(() => {
       form.trigger(fieldName);
-    }, 500); // 500ms debounce
+    }, 1000); // 1000ms debounce
     
     setValidationTimeout(timeout);
   };

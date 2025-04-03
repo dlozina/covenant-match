@@ -23,6 +23,7 @@ pub struct UserStatistics {
     pub win_rate: f64,
     pub nightfarer_stats: HashMap<String, Stats>,
     pub night_lord_stats: HashMap<String, Stats>,
+    pub covenant_stats: HashMap<String, Stats>,
     pub achievements: Vec<String>,
     pub reputation_score: f64,
 }

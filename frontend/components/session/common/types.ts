@@ -3,6 +3,7 @@ export interface JoinedPlayer {
   userId: string;
   username: string;
   nightfarer: string;
+  covenantName: string;
   joinedAt: string;
   hasReported?: boolean;
 }

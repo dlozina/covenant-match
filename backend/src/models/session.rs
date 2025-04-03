@@ -11,6 +11,7 @@ pub struct PlayerInfo {
     pub user_id: String,
     pub username: String,
     pub nightfarer: String,
+    pub covenant_name: String,
     #[serde(alias = "joined_at")]
     pub joined_at: DateTime,
 }
@@ -109,6 +110,7 @@ pub struct JoinSessionDto {
     pub user_id: String,
     pub username: String,
     pub nightfarer: String,
+    pub covenant_name: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
@@ -191,4 +193,21 @@ pub struct MinimalSessionDto {
     pub host_name: String,
     pub status: SessionStatus,
     pub created_at: DateTime,
+}
+
+/// Statistics by covenant
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CovenantStats {
+    pub covenant_name: String,
+    pub wins: i32,
+    pub losses: i32,
+    pub disconnects: i32,
+}
+
+/// Response for covenant statistics
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CovenantStatsResponse {
+    pub covenant_stats: Vec<CovenantStats>,
 }
