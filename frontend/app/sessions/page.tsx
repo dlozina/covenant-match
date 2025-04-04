@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { MainLayout } from "@/components/layout";
 import { Footer } from "@/components/layout/Footer";
-import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -96,7 +95,6 @@ export default function SessionsPage() {
     if (friendFilter === "Friends") {
       // This will be implemented later
       // For now, we'll just show a toast message
-      toast.info("Friend filtering will be implemented soon!");
     }
     
     setFilteredSessions(result);
@@ -165,7 +163,6 @@ export default function SessionsPage() {
       }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "Failed to load sessions");
-      toast.error(error instanceof Error ? error.message : "Failed to load sessions");
     } finally {
       setIsLoading(false);
     }
@@ -174,7 +171,6 @@ export default function SessionsPage() {
   async function handleJoinSession(sessionId: string) {
     // Require authentication to join a session
     if (!isLoggedIn) {
-      toast.error("Authentication required to join a session");
       router.push('/login');
       return;
     }
@@ -183,14 +179,13 @@ export default function SessionsPage() {
       // Check if the session is open before attempting to join
       const session = sessions.find(s => s.id === sessionId);
       if (!session || session.status !== 'Open') {
-        toast.error("You can only join open sessions");
         return;
       }
 
       // Navigate to the join page with the session ID
       router.push(`/sessions/join?id=${sessionId}`);
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Failed to process join request");
+      console.error(error);
     }
   }
 
@@ -214,7 +209,8 @@ export default function SessionsPage() {
 
   // Determine which dataset to display based on login status
   const hasFullData = isLoggedIn && sessions.length > 0;
-  const dataToDisplay = hasFullData ? filteredSessions : minimalSessions;
+  //todo
+  //const dataToDisplay = hasFullData ? filteredSessions : minimalSessions;
   const isEmptyResult = (hasFullData && filteredSessions.length === 0) || (!hasFullData && minimalSessions.length === 0);
 
   return (

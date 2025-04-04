@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   frontend:
+    image: covenant-match-frontend-dev:latest
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -11,12 +12,18 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+      - NEXT_PUBLIC_RECAPTCHA_SITE_KEY=6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI
     ports:
       - "3000:3000"
     command: npm run dev
+    depends_on:
+      - backend
+    networks:
+      - covenant-network-dev
 
   backend:
+    image: covenant-match-backend-dev:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -26,20 +33,54 @@ services:
       - /app/target
     environment:
       - RUST_LOG=debug
-      - MONGODB_URI=mongodb://mongodb:27017/covenant-match
+      - PORT=8080
+      - CAPTCHA_ATTEMPTS_THRESHOLD=3
+      - CAPTCHA_WINDOW_MINUTES=30
+      - LOGIN_ATTEMPTS_RETENTION_DAYS=30
+      - LOGIN_ATTEMPTS_CLEANUP_INTERVAL_HOURS=24
     ports:
       - "8080:8080"
     command: cargo watch -x run
+    depends_on:
+      - mongodb
+    secrets:
+      - mongodb_uri_dev
+      - jwt_secret_dev
+      - recaptcha_secret_key_dev
+    networks:
+      - covenant-network-dev
 
   mongodb:
+    image: mongo:latest
     ports:
       - "27017:27017"
     volumes:
       - ./mongodb/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
-      - mongodb_data:/data/db
+      - mongodb_data_dev:/data/db
+    networks:
+      - covenant-network-dev
 
-  # In development, we can optionally disable nginx
-  # and access frontend/backend directly
   nginx:
+    image: covenant-match-nginx-dev:latest
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
     ports:
       - "80:80"
+    networks:
+      - covenant-network-dev
+
+networks:
+  covenant-network-dev:
+    driver: overlay
+
+volumes:
+  mongodb_data_dev:
+
+secrets:
+  mongodb_uri_dev:
+    file: ./dev-secrets/mongodb_uri.txt
+  jwt_secret_dev:
+    file: ./dev-secrets/jwt_secret.txt
+  recaptcha_secret_key_dev:
+    file: ./dev-secrets/recaptcha_secret_key.txt
