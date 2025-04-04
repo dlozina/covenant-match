@@ -2,7 +2,7 @@ environment = "docker"
 
 [database]
 # In Docker, we typically connect to other containers by service name
-url = "mongodb://mongodb:27017/covenant-match"
+url = "mongodb://mongodb:27017"
 
 [server]
 port = 8080

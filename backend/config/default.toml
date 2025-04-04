@@ -1,7 +1,7 @@
 environment = "development"
 
 [database]
-url = "mongodb://localhost:27017/covenant-match"
+url = "mongodb://localhost:27017"
 
 [jwt]
 secret = "malenia_is_the_best_girl_in_the_world"

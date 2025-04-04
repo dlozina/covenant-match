@@ -59,6 +59,7 @@ services:
       - mongodb_data:/data/db
     networks:
       - covenant-network
+    # Note: not exposing MongoDB port in production for security
 
   nginx:
     image: covenant-match-nginx:latest

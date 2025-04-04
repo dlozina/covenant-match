@@ -28,9 +28,9 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: development
-    volumes:
-      - ./backend:/app
-      - /app/target
+    # volumes:
+    #   - ./backend:/app
+    #   - ./dev-secrets:/dev-secrets
     environment:
       - RUST_LOG=debug
       - PORT=8080
@@ -40,7 +40,7 @@ services:
       - LOGIN_ATTEMPTS_CLEANUP_INTERVAL_HOURS=24
     ports:
       - "8080:8080"
-    command: cargo watch -x run
+    # command: cargo watch -x run
     depends_on:
       - mongodb
     secrets:
@@ -53,7 +53,7 @@ services:
   mongodb:
     image: mongo:latest
     ports:
-      - "27017:27017"
+      - "27018:27017"
     volumes:
       - ./mongodb/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
       - mongodb_data_dev:/data/db
@@ -72,7 +72,6 @@ services:
 
 networks:
   covenant-network-dev:
-    driver: overlay
 
 volumes:
   mongodb_data_dev:
