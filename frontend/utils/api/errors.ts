@@ -1,8 +1,8 @@
 export class ApiError extends Error {
   status: number;
-  data?: any;
+  data?: Record<string, unknown>;
   
-  constructor(message: string, status: number, data?: any) {
+  constructor(message: string, status: number, data?: Record<string, unknown>) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
@@ -41,7 +41,7 @@ export class ApiError extends Error {
 
 // Specific error types for better error handling
 export class AuthenticationError extends ApiError {
-  constructor(message: string = 'Authentication required', data?: any) {
+  constructor(message: string = 'Authentication required', data?: Record<string, unknown>) {
     super(message, 401, data);
     this.name = 'AuthenticationError';
   }
