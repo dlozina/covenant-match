@@ -22,6 +22,37 @@ const getToken = (): string => {
   return '';
 };
 
+// Types for sessions
+export interface JoinedPlayer {
+  userId: string;
+  username: string;
+  nightfarer: string;
+  joinedAt: string;
+}
+
+export interface Session {
+  id: string;
+  name: string;
+  hostId: string;
+  status: "Open" | "InProgress" | "Completed";
+  nightLord: string;
+  joinedPlayers: JoinedPlayer[];
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  password: string;
+}
+
+// Interface for the minimal session data from public endpoint
+export interface MinimalSession {
+  id: string;
+  name: string;
+  hostName: string;
+  status: "Open" | "InProgress" | "Completed";
+  createdAt: string;
+}
+
 // Types for leaderboard
 export interface LeaderboardEntry {
   user_id: string;
@@ -353,5 +384,400 @@ export const fetchCovenantStats = async (): Promise<CovenantStatsResponse> => {
   } catch (error) {
     console.error('Failed to fetch covenant stats:', error);
     return { covenantStats: [] }; // Return empty array on error to prevent UI from breaking
+  }
+};
+
+// Function to fetch sessions (for sessions page)
+export const fetchSessions = async (
+  isLoggedIn: boolean,
+  currentPage: number,
+  limit: number,
+  statusFilter: string
+): Promise<{ sessions?: Session[], minimalSessions?: MinimalSession[] }> => {
+  try {
+    const offset = (currentPage - 1) * limit;
+    // Add status parameter to only fetch sessions with the current status filter
+    const statusParam = statusFilter !== 'All' ? `&status=${statusFilter}` : '';
+    const token = getToken();
+    
+    // Different endpoints based on authentication status
+    if (isLoggedIn && token) {
+      // Use authenticated endpoint with full data for logged-in users
+      // Always set isPrivate=false to ensure we never show private sessions
+      const isPrivateParam = '&isPrivate=false';
+      
+      const response = await fetch(`${API_URL}/api/v1/sessions?limit=${limit}&offset=${offset}${statusParam}${isPrivateParam}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch sessions');
+      }
+
+      const data = await response.json();
+      return { sessions: data };
+    } else {
+      // Use public endpoint with minimal data for non-authenticated users
+      const response = await fetch(`${API_URL}/api/v1/public/sessions?limit=${limit}&offset=${offset}${statusParam}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch public sessions');
+      }
+
+      const data = await response.json();
+      return { minimalSessions: data };
+    }
+  } catch (error) {
+    console.error('Failed to fetch sessions:', error);
+    throw error;
+  }
+};
+
+// Types for session fetching/recreation
+export interface SessionDetails {
+  id: string;
+  name: string;
+  nightLord: string;
+  password: string | null;
+  hostId: string;
+  nightfarer?: string;
+  joinedPlayers?: { userId: string; username: string; nightfarer: string }[];
+}
+
+// Function to fetch detailed information about a specific session
+export const fetchSessionDetail = async (sessionId: string | null | undefined): Promise<SessionDetails> => {
+  if (!sessionId) {
+    throw new Error('Session ID is required');
+  }
+  
+  try {
+    const token = getToken();
+    
+    const response = await fetch(`${API_URL}/api/v1/sessions/${sessionId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch session details');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch session details:', error);
+    throw error;
+  }
+};
+
+// Function to recreate a session
+export const recreateSession = async (originalSessionId: string | null | undefined): Promise<{ id: string }> => {
+  if (!originalSessionId) {
+    throw new Error('Original session ID is required');
+  }
+  
+  try {
+    const token = getToken();
+    
+    const response = await fetch(`${API_URL}/api/v1/sessions/${originalSessionId}/recreate`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.message || 'Failed to recreate session');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to recreate session:', error);
+    throw error;
+  }
+};
+
+// Function to update session characters
+export const updateSessionCharacters = async (
+  sessionId: string, 
+  nightLord: string, 
+  hostNightfarer: string
+): Promise<void> => {
+  try {
+    const token = getToken();
+    
+    const response = await fetch(`${API_URL}/api/v1/sessions/${sessionId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        nightLord,
+        hostNightfarer
+      }),
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.message || 'Failed to update session characters');
+    }
+  } catch (error) {
+    console.error('Failed to update session characters:', error);
+    throw error;
+  }
+};
+
+// Function to join a session
+export const joinSession = async (
+  sessionId: string,
+  nightfarer: string,
+  userId: string,
+  username: string,
+  covenantName: string
+): Promise<void> => {
+  try {
+    const token = getToken();
+    
+    const response = await fetch(`${API_URL}/api/v1/sessions/${sessionId}/join`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        nightfarer,
+        userId,
+        username,
+        covenantName
+      }),
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.message || 'Failed to join session');
+    }
+  } catch (error) {
+    console.error('Failed to join session:', error);
+    throw error;
+  }
+};
+
+// Interface for session creation
+export interface CreateSessionParams {
+  gamePassword: string;
+  name: string;
+  nightLord: string;
+  nightfarer: string;
+  isPrivate: boolean;
+}
+
+// Function to create a session
+export const createSession = async (
+  sessionData: CreateSessionParams
+): Promise<{ id: string }> => {
+  try {
+    const token = getToken();
+    
+    const response = await fetch(`${API_URL}/api/v1/sessions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(sessionData),
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.message || 'Failed to create session');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to create session:', error);
+    throw error;
+  }
+};
+
+// User-related types
+export interface GameData {
+  platforms: {
+    id: string;
+    name: string;
+    description: string;
+  }[];
+  regions: {
+    id: string;
+    name: string;
+    description: string;
+  }[];
+  covenants: {
+    id: string;
+    name: string;
+    description: string;
+  }[];
+  nightfarers: {
+    id: string;
+    name: string;
+    description: string;
+  }[];
+}
+
+export interface LoginParams {
+  username: string;
+  password: string;
+  captchaToken?: string;
+}
+
+export interface RegisterParams {
+  username: string;
+  email: string;
+  password: string;
+  displayName: string;
+  region: string;
+  platform: string;
+  autoRegion: boolean;
+  covenantName: string;
+}
+
+export interface UpdateProfileParams {
+  username?: string;
+  email?: string;
+  displayName?: string;
+  region?: string;
+  platform?: string;
+  autoRegion?: boolean;
+  covenantName?: string;
+  preferredSessionName?: string;
+  preferredSessionPassword?: string;
+  preferredNightfarer?: string;
+}
+
+// Login function
+export const login = async (loginData: LoginParams): Promise<{ token: string }> => {
+  try {
+    const response = await fetch(`${API_URL}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(loginData),
+      credentials: 'include', // Include cookies for CSRF protection
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      if (errorData.requiresCaptcha) {
+        const error = new Error(errorData.message || 'CAPTCHA verification required');
+        // @ts-expect-error - Adding custom property to Error object
+        error.requiresCaptcha = true;
+        throw error;
+      }
+      throw new Error(errorData.message || 'Invalid username or password');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Login failed:', error);
+    throw error;
+  }
+};
+
+// Register (create profile) function
+export const register = async (registerData: RegisterParams): Promise<{ token: string }> => {
+  try {
+    const response = await fetch(`${API_URL}/api/v1/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(registerData),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to create profile');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Registration failed:', error);
+    throw error;
+  }
+};
+
+// Update profile function
+export const updateProfile = async (profileData: UpdateProfileParams): Promise<Record<string, unknown>> => {
+  try {
+    const token = getToken();
+    
+    const response = await fetch(`${API_URL}/api/v1/users/me`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(profileData),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to update profile');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Profile update failed:', error);
+    throw error;
+  }
+};
+
+// Delete profile function
+export const deleteProfile = async (): Promise<void> => {
+  try {
+    const token = getToken();
+    
+    const response = await fetch(`${API_URL}/api/v1/users/me`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to delete profile');
+    }
+  } catch (error) {
+    console.error('Profile deletion failed:', error);
+    throw error;
+  }
+};
+
+// Fetch game data function
+export const fetchGameData = async (): Promise<GameData> => {
+  try {
+    const response = await fetch(`${API_URL}/api/v1/game-data`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch game data');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch game data:', error);
+    throw error;
   }
 }; 

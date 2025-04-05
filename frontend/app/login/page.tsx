@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import ReCaptchaComponent from "@/components/auth/ReCaptcha"
 import { AlertCircle } from "lucide-react"
+import { login as apiLogin, LoginParams } from "@/utils/api"
 
 // Username validation regex - must match the one used in profile creation
 const usernameRegex = /^[a-zA-Z0-9_.-]+$/;
@@ -126,44 +127,18 @@ export default function LoginPage() {
     }
 
     try {
-      // Sanitize inputs before submission
-      const sanitizedData: {
-        username: string;
-        password: string;
-        captchaToken?: string;
-      } = {
+      // Prepare login data
+      const loginData: LoginParams = {
         username: data.username.trim().toLowerCase(),
-        password: data.password // passwords should not be modified
+        password: data.password, // passwords should not be modified
       };
       
       // Add captcha token if available
       if (captchaToken) {
-        sanitizedData.captchaToken = captchaToken
+        loginData.captchaToken = captchaToken;
       }
       
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const response = await fetch(`${apiBaseUrl}/api/v1/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(sanitizedData),
-        credentials: 'include', // Include cookies for CSRF protection
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        
-        // Check if server requires CAPTCHA
-        if (errorData.requiresCaptcha) {
-          setShowCaptcha(true)
-          throw new Error(errorData.message || 'CAPTCHA verification required')
-        }
-        
-        throw new Error(errorData.message || 'Invalid username or password')
-      }
-
-      const responseData = await response.json()
+      const responseData = await apiLogin(loginData);
       
       // Use the login function from auth context
       if (responseData.token) {
@@ -181,6 +156,12 @@ export default function LoginPage() {
         throw new Error('Authentication failed')
       }
     } catch (error: unknown) {
+      // Check if error has requiresCaptcha property
+      // @ts-expect-error - Custom property on error
+      if (error instanceof Error && error.requiresCaptcha) {
+        setShowCaptcha(true);
+      }
+      
       setNotification({
         message: error instanceof Error ? error.message : "Login failed. Please try again.",
         type: 'error'

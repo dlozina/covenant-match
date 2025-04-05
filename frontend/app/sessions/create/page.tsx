@@ -20,7 +20,14 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { fetchNightLords, fetchNightfarers, NightLord, Nightfarer } from "@/utils/api";
+import { 
+  fetchNightLords, 
+  fetchNightfarers, 
+  NightLord, 
+  Nightfarer, 
+  createSession, 
+  CreateSessionParams 
+} from "@/utils/api";
 
 // Type for our notification state
 type NotificationType = {
@@ -156,11 +163,8 @@ function CreateSessionContent() {
     setIsLoading(true);
     
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const token = localStorage.getItem('token');
-      
       // Sanitize inputs before submission
-      const sanitizedData = {
+      const sessionData: CreateSessionParams = {
         gamePassword: data.password.trim(),
         name: data.sessionName.trim(),
         nightLord: selectedLord,
@@ -168,28 +172,16 @@ function CreateSessionContent() {
         isPrivate: false
       };
       
-      const response = await fetch(`${apiBaseUrl}/api/v1/sessions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(sanitizedData),
+      const responseData = await createSession(sessionData);
+      
+      setNotification({
+        message: "Session created successfully!",
+        type: 'success'
       });
       
-      const responseData = await response.json();
-      
-      if (response.ok) {
-        setNotification({
-          message: "Session created successfully!",
-          type: 'success'
-        });
-        setTimeout(() => {
-          router.push(`/sessions/run?id=${responseData.id}`);
-        }, 1000); // Short delay to show success message
-      } else {
-        throw new Error(responseData.message || "Failed to create session");
-      }
+      setTimeout(() => {
+        router.push(`/sessions/run?id=${responseData.id}`);
+      }, 1000); // Short delay to show success message
     } catch (error) {
       setNotification({
         message: error instanceof Error ? error.message : "An unexpected error occurred",

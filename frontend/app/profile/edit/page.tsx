@@ -32,6 +32,7 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import React from "react"
 import { FALLBACK_REGIONS, FALLBACK_PLATFORMS, FALLBACK_COVENANT_NAMES, FALLBACK_NIGHTFARERS } from "@/lib/constants"
+import { fetchGameData, updateProfile, deleteProfile } from "@/utils/api"
 
 // Username and display name validation regex
 const usernameRegex = /^[a-zA-Z0-9_.-]+$/;
@@ -149,20 +150,13 @@ function EditProfileContent() {
   
   // Fetch game data from API
   useEffect(() => {
-    const fetchGameData = async () => {
+    const fetchGameDataDetails = async () => {
       // Only fetch if we haven't already
       if (!gameData && isLoadingGameData) {
         setGameDataError(null);
         
         try {
-          const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-          const response = await fetch(`${apiBaseUrl}/api/v1/game-data`);
-          
-          if (!response.ok) {
-            throw new Error('Failed to fetch game data');
-          }
-          
-          const data = await response.json();
+          const data = await fetchGameData();
           setGameData(data);
         } catch (error) {
           console.error('Error fetching game data:', error);
@@ -173,7 +167,7 @@ function EditProfileContent() {
       }
     };
     
-    fetchGameData();
+    fetchGameDataDetails();
   }, [gameData, isLoadingGameData]);
   
   // Use API data or fallback data
@@ -332,27 +326,7 @@ function EditProfileContent() {
       // Debug: Log what we're sending to the API
       console.log("Submitting profile data:", sanitizedData);
     
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const token = localStorage.getItem('token');
-      
-      const response = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(sanitizedData),
-      });
-
-      const responseData = await response.json();
-      
-      // Debug: Log the response from the API
-      console.log("Profile update response:", responseData);
-
-      if (!response.ok) {
-        // Parse the error response to get the specific message
-        throw new Error(responseData.message || 'Failed to update profile');
-      }
+      await updateProfile(sanitizedData);
 
       // Refresh user data in the auth context
       await refreshUserData();
@@ -380,21 +354,7 @@ function EditProfileContent() {
   async function handleDeleteProfile() {
     if (window.confirm("Are you sure you want to delete your profile? This action cannot be undone.")) {
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-        const token = localStorage.getItem('token');
-        
-        const response = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          },
-        });
-
-        if (!response.ok) {
-          // Parse the error response to get the specific message
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to delete profile');
-        }
+        await deleteProfile();
 
         // Clear token and other stored data
         localStorage.removeItem('token');

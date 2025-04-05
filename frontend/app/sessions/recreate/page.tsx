@@ -10,18 +10,17 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/lib/auth-context";
 import { jwtDecode } from "jwt-decode";
 import { Notification, NotificationType } from "@/components/ui/notification";
-import { fetchNightLords, fetchNightfarers, NightLord, Nightfarer } from "@/utils/api";
-
-// Define a type for session details
-interface SessionDetails {
-  id: string;
-  name: string;
-  nightLord: string;
-  password: string | null;
-  hostId: string;
-  nightfarer?: string;
-  joinedPlayers?: { userId: string; username: string; nightfarer: string }[];
-}
+import { 
+  fetchNightLords, 
+  fetchNightfarers, 
+  NightLord, 
+  Nightfarer, 
+  SessionDetails, 
+  fetchSessionDetail, 
+  recreateSession, 
+  updateSessionCharacters, 
+  joinSession 
+} from "@/utils/api";
 
 // Define JWT Claims interface
 interface JwtClaims {
@@ -71,7 +70,7 @@ function RecreateSessionContent() {
     // Fetch original session details when component mounts
     if (originalSessionId) {
       console.log(`Recreate page: Initializing with original session ID: ${originalSessionId}`);
-      fetchSessionDetails();
+      fetchSessionDetailsData();
     } else {
       setNotification({
         type: 'error',
@@ -103,44 +102,28 @@ function RecreateSessionContent() {
     }
   };
   
-  const fetchSessionDetails = async () => {
+  const fetchSessionDetailsData = async () => {
+    if (!originalSessionId) return;
+    
     console.log(`Recreate page: Fetching session details for session ID: ${originalSessionId}`);
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const token = localStorage.getItem('token');
+      const data = await fetchSessionDetail(originalSessionId);
+      setSessionDetails(data);
       
-      const response = await fetch(`${apiBaseUrl}/api/v1/sessions/${originalSessionId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        setSessionDetails(data);
-        
-        // Check if the current user is the host
-        const userId = getUserIdFromToken();
-        if (userId && data.hostId === userId) {
-          setIsHost(true);
-        } else {
-          setIsHost(false);
-          // If not host, we'll need to handle this differently
-          // For non-hosts, this is a "join new session" page
-        }
+      // Check if the current user is the host
+      const userId = getUserIdFromToken();
+      if (userId && data.hostId === userId) {
+        setIsHost(true);
       } else {
-        setNotification({
-          type: 'error',
-          message: data.message || 'Failed to fetch session details'
-        });
-        router.push('/sessions');
+        setIsHost(false);
+        // If not host, we'll need to handle this differently
+        // For non-hosts, this is a "join new session" page
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Error fetching session details";
       setNotification({
         type: 'error',
-        message: 'Error fetching session details: ' + error
+        message: errorMessage
       });
       router.push('/sessions');
     }
@@ -205,42 +188,13 @@ function RecreateSessionContent() {
     setIsLoading(true);
     
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const token = localStorage.getItem('token');
-      
-      // First, recreate the session using the existing API endpoint
-      const recreateResponse = await fetch(`${apiBaseUrl}/api/v1/sessions/${originalSessionId}/recreate`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-      });
-      
-      const recreateData = await recreateResponse.json();
-      
-      if (!recreateResponse.ok) {
-        throw new Error(recreateData.message || "Failed to recreate session");
-      }
-      
+      // First, recreate the session using the API function
+      const recreateData = await recreateSession(originalSessionId);
       const newSessionId = recreateData.id;
       
       // Now, update the new session with the selected characters
-      const updateResponse = await fetch(`${apiBaseUrl}/api/v1/sessions/${newSessionId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          nightLord: selectedLord,
-          hostNightfarer: selectedFarer
-        }),
-      });
+      await updateSessionCharacters(newSessionId, selectedLord, selectedFarer);
       
-      if (!updateResponse.ok) {
-        const updateData = await updateResponse.json();
-        throw new Error(updateData.message || "Failed to update session characters");
-      }
       // Set a flag in sessionStorage so the run page knows we came from here
       sessionStorage.setItem('fromRecreatePage', 'true');
       
@@ -284,48 +238,33 @@ function RecreateSessionContent() {
         throw new Error("New session ID not found");
       }
       
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const token = localStorage.getItem('token');
       const userId = getUserIdFromToken();
       
       if (!userId || !userData) {
         throw new Error("User information not available");
       }
        
-      const response = await fetch(`${apiBaseUrl}/api/v1/sessions/${autoJoinSessionId}/join`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          nightfarer: selectedFarer,
-          userId: userId,
-          username: userData.username,
-          covenantName: userData.covenantName
-        }),
+      await joinSession(
+        autoJoinSessionId,
+        selectedFarer,
+        userId,
+        userData.username,
+        userData.covenantName || ''
+      );
+      
+      setNotification({
+        type: 'success',
+        message: "Successfully joined new session"
       });
       
-      const data = await response.json();
-      if (response.ok) {
-        setNotification({
-          type: 'success',
-          message: "Successfully joined new session"
-        });
-        // Clear the auto-join data from sessionStorage
-        sessionStorage.removeItem('autoJoinSessionId');
-        sessionStorage.removeItem('autoJoinCharacter');
-        
-        // Set a flag in sessionStorage so the run page knows we came from here
-        sessionStorage.setItem('fromRecreatePage', 'true');
-        
-        router.push(`/sessions/run?id=${autoJoinSessionId}`);
-      } else {
-        setNotification({
-          type: 'error',
-          message: data.message || "Failed to join session"
-        });
-      }
+      // Clear the auto-join data from sessionStorage
+      sessionStorage.removeItem('autoJoinSessionId');
+      sessionStorage.removeItem('autoJoinCharacter');
+      
+      // Set a flag in sessionStorage so the run page knows we came from here
+      sessionStorage.setItem('fromRecreatePage', 'true');
+      
+      router.push(`/sessions/run?id=${autoJoinSessionId}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
       setNotification({

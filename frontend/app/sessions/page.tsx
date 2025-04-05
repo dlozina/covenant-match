@@ -30,36 +30,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-interface JoinedPlayer {
-  userId: string;
-  username: string;
-  nightfarer: string;
-  joinedAt: string;
-}
-
-interface Session {
-  id: string;
-  name: string;
-  hostId: string;
-  status: "Open" | "InProgress" | "Completed";
-  nightLord: string;
-  joinedPlayers: JoinedPlayer[];
-  createdAt: string;
-  updatedAt: string;
-  startedAt: string | null;
-  completedAt: string | null;
-  password: string;
-}
-
-// Interface for the minimal session data from public endpoint
-interface MinimalSession {
-  id: string;
-  name: string;
-  hostName: string;
-  status: "Open" | "InProgress" | "Completed";
-  createdAt: string;
-}
+import {
+  Session, 
+  MinimalSession, 
+  fetchSessions
+} from "@/utils/api";
 
 type StatusFilter = "All" | "Open" | "InProgress" | "Completed";
 type FriendFilter = "All" | "Friends";
@@ -79,7 +54,7 @@ export default function SessionsPage() {
   const limit = 10;
 
   useEffect(() => {
-    fetchSessions();
+    fetchSessionsData();
   }, [currentPage, statusFilter]);
 
   useEffect(() => {
@@ -106,60 +81,22 @@ export default function SessionsPage() {
     }
   }
 
-  async function fetchSessions() {
+  async function fetchSessionsData() {
     setIsLoading(true);
     setError(null);
 
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const token = localStorage.getItem('token');
+      const result = await fetchSessions(isLoggedIn, currentPage, limit, statusFilter);
       
-      const offset = (currentPage - 1) * limit;
-      // Add status parameter to only fetch sessions with the current status filter
-      const statusParam = statusFilter !== 'All' ? `&status=${statusFilter}` : '';
-      
-      // Different endpoints based on authentication status
-      if (isLoggedIn && token) {
-        // Use authenticated endpoint with full data for logged-in users
-        // Always set isPrivate=false to ensure we never show private sessions
-        const isPrivateParam = '&isPrivate=false';
-        
-        const response = await fetch(`${apiBaseUrl}/api/v1/sessions?limit=${limit}&offset=${offset}${statusParam}${isPrivateParam}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch sessions');
-        }
-
-        const data = await response.json();
-        setSessions(data);
-        setFilteredSessions(data);
-        
+      if (result.sessions) {
+        setSessions(result.sessions);
+        setFilteredSessions(result.sessions);
         // For now, we'll just assume there are more pages if we get a full page of results
-        setTotalPages(data.length === limit ? currentPage + 1 : currentPage);
-      } else {
-        // Use public endpoint with minimal data for non-authenticated users
-        const response = await fetch(`${apiBaseUrl}/api/v1/public/sessions?limit=${limit}&offset=${offset}${statusParam}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch public sessions');
-        }
-
-        const data = await response.json();
-        setMinimalSessions(data);
-        
+        setTotalPages(result.sessions.length === limit ? currentPage + 1 : currentPage);
+      } else if (result.minimalSessions) {
+        setMinimalSessions(result.minimalSessions);
         // For now, we'll just assume there are more pages if we get a full page of results
-        setTotalPages(data.length === limit ? currentPage + 1 : currentPage);
+        setTotalPages(result.minimalSessions.length === limit ? currentPage + 1 : currentPage);
       }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "Failed to load sessions");
