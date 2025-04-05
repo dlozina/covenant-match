@@ -183,6 +183,17 @@ Stop and restart the development environment:
 docker compose -f docker-compose.dev.yml down && docker compose -f docker-compose.dev.yml up
 ```
 
+Access to the db:
+```
+docker exec -it covenant-match-mongodb-1 bash
+```
+
+Activate the mongo shell:
+```
+mongosh
+```
+
+
 
 ## License
 

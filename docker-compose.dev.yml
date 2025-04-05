@@ -28,9 +28,9 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: development
-    # volumes:
-    #   - ./backend:/app
-    #   - ./dev-secrets:/dev-secrets
+    volumes:
+      - ./backend:/app
+      - ./dev-secrets:/dev-secrets
     environment:
       - RUST_LOG=debug
       - PORT=8080
@@ -40,7 +40,7 @@ services:
       - LOGIN_ATTEMPTS_CLEANUP_INTERVAL_HOURS=24
     ports:
       - "8080:8080"
-    # command: cargo watch -x run
+    command: cargo watch -x run
     depends_on:
       - mongodb
     secrets:

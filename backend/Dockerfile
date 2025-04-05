@@ -9,11 +9,11 @@ RUN apt-get update && \
     cargo install cargo-watch && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy the entire application
-COPY . .
+# Copy the entire application -> We are using local mounts for the backend
+#COPY . .
 
-# Build the application to cache dependencies
-RUN cargo build --bin covenant-match-backend
+# Build the application to cache dependencies -> We are using local mounts for the backend, build is done in the docker-compose.dev.yml file
+#RUN cargo build --bin covenant-match-backend
 
 # Set environment variables
 ENV RUST_LOG=debug

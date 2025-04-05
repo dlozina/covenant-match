@@ -316,8 +316,8 @@ export default function Home() {
               <Sword className="h-4 w-4 text-indigo-400" />
             </div>
             <div>
-              <h3 className="font-medium">Secure Sessions</h3>
-              <p className="text-sm text-muted-foreground">Password protection ensures only the worthy may join.</p>
+              <h3 className="font-medium">Automatic IP Detection</h3>
+              <p className="text-sm text-muted-foreground">Automatically detect your IP address and match you with the closest players. Important for peer-to-peer sessions.</p>
             </div>
           </div>
           
