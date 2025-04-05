@@ -1,5 +1,5 @@
 // Define API URL
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 // Helper to get JWT token
 const getToken = (): string => {
@@ -233,10 +233,9 @@ export const fetchSessionDetails = async (sessionId: string): Promise<SessionDet
 // Function to fetch all nightlords
 export const fetchNightLords = async (): Promise<NightLord[]> => {
   try {
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
     const token = getToken();
     
-    const response = await fetch(`${apiBaseUrl}/api/v1/night-lords`, {
+    const response = await fetch(`${API_URL}/api/v1/night-lords`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -258,10 +257,8 @@ export const fetchNightLords = async (): Promise<NightLord[]> => {
 // Function to fetch all nightfarers
 export const fetchNightfarers = async (): Promise<Nightfarer[]> => {
   try {
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
     const token = getToken();
-    
-    const response = await fetch(`${apiBaseUrl}/api/v1/nightfarers`, {
+    const response = await fetch(`${API_URL}/api/v1/nightfarers`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -313,7 +310,6 @@ export const fetchActiveSessionsCount = async (): Promise<number> => {
 export const fetchSessionsCount = async (status?: string): Promise<number> => {
   try {
     const token = getToken();
-    console.log('Fetching sessions count...');
     
     // Build URL with optional status parameter
     const url = status 
@@ -327,18 +323,14 @@ export const fetchSessionsCount = async (status?: string): Promise<number> => {
         'Authorization': `Bearer ${token}`,
       },
     });
-
-    console.log('Sessions count response status:', response.status);
     
     if (!response.ok) {
       throw new Error(`Error fetching sessions count: ${response.statusText}`);
     }
 
     const data: SessionsStatsResponse = await response.json();
-    console.log('Sessions count data:', data);
     return data.data.count;
-  } catch (error) {
-    console.error('Failed to fetch sessions count:', error);
+  } catch {
     return 0; // Return 0 on error to prevent UI from breaking
   }
 };

@@ -193,6 +193,14 @@ Activate the mongo shell:
 mongosh
 ```
 
+Change environment variables:
+```
+docker compose -f docker-compose.dev.yml stop frontend
+```
+
+```
+docker compose -f docker-compose.dev.yml up -d --no-deps frontend
+```
 
 
 ## License
