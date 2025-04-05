@@ -4,8 +4,7 @@ use chrono::{Duration, Utc};
 use futures::TryStreamExt;
 use log::error;
 use mongodb::{
-    bson::{self, doc, DateTime},
-    options::FindOptions,
+    bson::{doc, DateTime},
     Collection, Database,
 };
 

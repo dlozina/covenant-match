@@ -1,14 +1,8 @@
-use crate::models::session::{
-    CovenantStatsResponse, CreateSessionDto, GameResult, JoinSessionDto, MinimalSessionDto,
-    RateSessionDto, SessionReviewDto, SubmitResultDto, UpdateSessionDto,
-};
+use crate::models::session::{CreateSessionDto, JoinSessionDto, SubmitResultDto, UpdateSessionDto};
 use crate::services::session_service;
 use crate::utils::jwt;
-use actix_web::{
-    delete, get, patch, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder,
-};
+use actix_web::{get, patch, post, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use mongodb::Database;
-use serde::{Deserialize, Serialize};
 
 /// Get all sessions with optional status filter
 #[utoipa::path(

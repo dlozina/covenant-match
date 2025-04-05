@@ -24,7 +24,6 @@ use routes::{game_data, sessions};
 use services::{auth_service, session_service, user_service};
 use sse::heartbeat::HeartbeatActor;
 use sse::partition::{SessionRouter, DEFAULT_PARTITION_COUNT};
-use sse::session::SessionManager as SseSessionManager;
 use sse::session_pruner::SessionPrunerActor;
 use std::sync::Arc;
 use std::time::Duration;

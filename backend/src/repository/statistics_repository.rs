@@ -2,11 +2,7 @@ use crate::models::error::AppError;
 use crate::models::session::GameResult;
 use crate::models::statistics::{LeaderboardEntry, Stats, UserStatistics};
 use futures::TryStreamExt;
-use mongodb::{
-    bson::{doc, Document},
-    options::{FindOptions, ReplaceOptions},
-    Collection, Database,
-};
+use mongodb::{bson::doc, Collection, Database};
 use std::collections::HashMap;
 
 fn get_collection(db: &Database) -> Collection<UserStatistics> {

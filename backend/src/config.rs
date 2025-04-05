@@ -4,7 +4,6 @@ use log::{info, warn};
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use std::path::Path;
-use std::sync::Arc;
 
 #[derive(Debug, Deserialize)]
 pub struct AuthConfig {
@@ -225,7 +224,7 @@ impl Config {
     }
 }
 
-static CONFIG: Lazy<Config> = Lazy::new(|| Config::new());
+static CONFIG: Lazy<Config> = Lazy::new(Config::new);
 
 pub fn get_config() -> &'static Config {
     &CONFIG

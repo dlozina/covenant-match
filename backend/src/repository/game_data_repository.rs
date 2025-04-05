@@ -1,5 +1,5 @@
 use crate::models::error::AppError;
-use crate::models::game_data::{Covenant, Nightfarer, NightLord, Platform, Region};
+use crate::models::game_data::{Covenant, NightLord, Nightfarer, Platform, Region};
 use futures::StreamExt;
 use log::error;
 use mongodb::{bson::doc, Collection, Database};

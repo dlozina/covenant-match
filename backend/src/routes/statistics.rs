@@ -1,6 +1,6 @@
-use crate::{repository::session_repository, services::session_service};
 use crate::services::statistics_service;
 use crate::utils::jwt;
+use crate::{repository::session_repository, services::session_service};
 use actix_web::{get, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use mongodb::Database;
 use serde::{Deserialize, Serialize};

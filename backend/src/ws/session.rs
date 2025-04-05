@@ -101,7 +101,7 @@ impl Handler<Broadcast> for SessionManager {
     fn handle(&mut self, msg: Broadcast, _: &mut Context<Self>) {
         // First collect the clients to process to avoid borrow conflicts
         let mut to_process = Vec::new();
-        
+
         // Get a list of clients to send to (avoiding the borrow checker issues)
         if let Some(clients) = self.sessions.get(&msg.session_id) {
             for client_id in clients {
@@ -111,14 +111,14 @@ impl Handler<Broadcast> for SessionManager {
                         continue;
                     }
                 }
-                
+
                 to_process.push(client_id.clone());
             }
         }
-        
+
         // Process all clients that need messages
         let mut clients_to_remove = Vec::new();
-        
+
         for client_id in to_process {
             if let Some(client_addr) = self.clients.get(&client_id) {
                 // Use try_send() which returns a Result with SendError
@@ -126,18 +126,18 @@ impl Handler<Broadcast> for SessionManager {
                     Ok(_) => {
                         // Message queued successfully
                         debug!("Message sent to client {}", client_id);
-                    },
+                    }
                     Err(err) => {
                         // Log the error
                         error!("Failed to send message to client {}: {:?}", client_id, err);
-                        
+
                         // Mark this client for removal
                         clients_to_remove.push(client_id);
                     }
                 }
             }
         }
-        
+
         // Clean up any disconnected clients
         for client_id in clients_to_remove {
             self.clients.remove(&client_id);

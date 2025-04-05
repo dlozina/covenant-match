@@ -1,6 +1,7 @@
 use crate::models::error::AppError;
 use crate::models::game_data::{
-    CovenantResponse, GameDataResponse, NightLordResponse, NightfarerResponse, PlatformResponse, RegionResponse,
+    CovenantResponse, GameDataResponse, NightLordResponse, NightfarerResponse, PlatformResponse,
+    RegionResponse,
 };
 use crate::repository::game_data_repository;
 use mongodb::Database;
@@ -37,7 +38,7 @@ pub async fn get_all_game_data(db: &Database) -> Result<GameDataResponse, AppErr
         .into_iter()
         .map(NightfarerResponse::from)
         .collect();
-        
+
     let nightlord_responses: Vec<NightLordResponse> = nightlords
         .into_iter()
         .map(NightLordResponse::from)

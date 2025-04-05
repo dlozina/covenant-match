@@ -231,11 +231,6 @@ pub async fn update_user_profile(
     // Get the current timestamp as MongoDB DateTime
     let now = mongodb::bson::DateTime::now();
 
-    // Get the user first
-    let user = user_repository::find_user_by_id(db, user_id)
-        .await?
-        .ok_or(AppError::UserNotFound)?;
-
     // Create update document
     let mut update_doc = doc! {};
 
@@ -301,23 +296,6 @@ pub async fn delete_user(db: &Database, user_id: &str) -> Result<(), AppError> {
     user_repository::delete_user(db, user_id).await?;
 
     Ok(())
-}
-
-/// Get all users, optionally filtered by role
-pub async fn get_all_users(
-    db: &Database,
-    role: Option<&str>,
-) -> Result<Vec<UserResponse>, AppError> {
-    // Call the repository function to get users
-    let users = user_repository::find_users_by_role(db, role).await?;
-
-    // Convert to UserResponse objects
-    let user_responses = users
-        .into_iter()
-        .map(|user| UserResponse::from(user))
-        .collect();
-
-    Ok(user_responses)
 }
 
 /// Get paginated list of users, optionally filtered by role

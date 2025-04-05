@@ -696,7 +696,7 @@ impl Handler<BroadcastMessage> for SessionManager {
 impl Handler<WsServerMessage> for SessionManager {
     type Result = ();
 
-    fn handle(&mut self, msg: WsServerMessage, ctx: &mut Context<Self>) {
+    fn handle(&mut self, msg: WsServerMessage, _ctx: &mut Context<Self>) {
         // Get current timestamp
         let now = chrono::Utc::now().timestamp();
 
@@ -819,7 +819,6 @@ impl Handler<crate::sse::messages::SendHeartbeat> for SessionManager {
 
     fn handle(&mut self, msg: crate::sse::messages::SendHeartbeat, _: &mut Context<Self>) {
         let heartbeat = msg.message;
-        let message_type = &heartbeat.message_type;
         let timestamp = heartbeat.timestamp;
 
         // Get all active session IDs
@@ -884,7 +883,6 @@ impl Handler<crate::sse::messages::SendStaggeredHeartbeat> for SessionManager {
     fn handle(&mut self, msg: crate::sse::messages::SendStaggeredHeartbeat, _: &mut Context<Self>) {
         let heartbeat = msg.message;
         let batch_id = msg.batch_id;
-        let message_type = &heartbeat.message_type;
         let timestamp = heartbeat.timestamp;
 
         // Filter active sessions based on batch_id

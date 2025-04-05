@@ -2,8 +2,7 @@ use crate::models::error::AppError;
 use crate::models::session::{GameSession, SessionStatus};
 use futures::TryStreamExt;
 use mongodb::{
-    bson::{doc, oid::ObjectId, to_bson, Document},
-    options::{FindOptions, ReplaceOptions, UpdateOptions},
+    bson::{doc, oid::ObjectId, to_bson},
     Collection, Database,
 };
 
@@ -93,56 +92,6 @@ pub async fn update_session(db: &Database, session: &GameSession) -> Result<(), 
         .await?;
 
     Ok(())
-}
-
-pub async fn update_player_character(
-    db: &Database,
-    session_id: &str,
-    user_id: &str,
-    new_character: &str,
-) -> Result<(), AppError> {
-    // Convert string ID to ObjectId
-    let object_id = ObjectId::parse_str(session_id).map_err(|e| {
-        log::error!("Invalid ObjectId format: {:?}", e);
-        AppError::InvalidId
-    })?;
-
-    let filter = doc! {
-        "_id": object_id,
-        "joined_players.user_id": user_id
-    };
-    let update = doc! {
-        "$set": { "joined_players.$.nightfarer": new_character }
-    };
-
-    get_collection(db).update_one(filter, update).await?;
-
-    Ok(())
-}
-
-pub async fn find_sessions_with_user(
-    db: &Database,
-    user_id: &str,
-) -> Result<Vec<GameSession>, AppError> {
-    // Find sessions where this user is a participant
-    // The MongoDB document uses both userId and user_id in different places
-    let filter = doc! {
-        "$or": [
-            { "joined_players.user_id": user_id },
-            { "joined_players.userId": user_id },
-            { "host_id": user_id }
-        ]
-    };
-
-    // MongoDB 3.2.3 doesn't support options directly in find, so apply options manually
-    let collection = get_collection(db);
-    let cursor = collection.find(filter).await?;
-
-    // Sort results after fetching
-    let mut sessions: Vec<GameSession> = cursor.try_collect().await?;
-    sessions.sort_by(|a, b| b.created_at.cmp(&a.created_at));
-
-    Ok(sessions)
 }
 
 pub async fn find_sessions_with_user_paginated(

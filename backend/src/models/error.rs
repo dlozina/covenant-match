@@ -2,7 +2,6 @@ use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError};
 use mongodb::bson;
 use serde_json::json;
-use std::fmt;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

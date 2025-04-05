@@ -1,4 +1,3 @@
-use super::user_service;
 use crate::models::error::AppError;
 use crate::models::session::{
     CovenantStats, CovenantStatsResponse, CreateSessionDto, GameResult, GameSession,
@@ -8,16 +7,13 @@ use crate::models::session::{
 use crate::repository::{session_repository, statistics_repository, user_repository};
 use crate::sse::messages::{BroadcastMessage, ServerMessage as SseServerMessage};
 use crate::sse::partition::SessionRouter;
-use crate::sse::session::SessionManager as SseSessionManager;
 use crate::sse::session_pruner::SessionPrunerActor;
 use crate::ws::messages::{Broadcast, ServerMessage as WsServerMessage};
 use crate::ws::SessionManager as WsSessionManager;
 use actix::prelude::*;
 use chrono::Utc;
-use mongodb::bson::{doc, oid::ObjectId, DateTime, Document};
+use mongodb::bson::oid::ObjectId;
 use mongodb::Database;
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
 use serde_json::json;
 use std::sync::LazyLock;
 use std::sync::Mutex;
@@ -178,7 +174,7 @@ pub async fn create_session(
     session_data: CreateSessionDto,
 ) -> Result<SessionResponseDto, AppError> {
     // Verify host user exists
-    let user = user_repository::find_user_by_id(db, &user_id)
+    let user = user_repository::find_user_by_id(db, user_id)
         .await?
         .ok_or(AppError::UserNotFound)?;
 
@@ -240,10 +236,7 @@ pub async fn get_sessions(
     // Convert to response DTOs (exclude passwords for listing)
     Ok(sessions
         .into_iter()
-        .map(|s| {
-            let mut response = SessionResponseDto::from(s);
-            response
-        })
+        .map(|s| SessionResponseDto::from(s))
         .collect())
 }
 
@@ -322,10 +315,6 @@ pub async fn join_session(
     // Verify user exists
     let user_id = join_data.user_id.clone();
 
-    let user = user_repository::find_user_by_id(db, &user_id)
-        .await?
-        .ok_or(AppError::UserNotFound)?;
-
     // Get the session
     let mut session = session_repository::find_by_id(db, session_id)
         .await?
@@ -350,10 +339,6 @@ pub async fn join_session(
         return Err(AppError::BadRequest("Session is full".to_string()));
     }
 
-    // Get the username and nightfarer for broadcasting
-    let username = user.display_name.clone().unwrap_or(user.username.clone());
-    let nightfarer = join_data.nightfarer.clone();
-
     // Add player to session
     let now = mongodb::bson::DateTime::now();
     session.joined_players.push(PlayerInfo {
@@ -364,19 +349,8 @@ pub async fn join_session(
         joined_at: now,
     });
 
-    log::info!(
-        "Player joined session {}: player count now {}",
-        session_id,
-        session.joined_players.len()
-    );
-
     // Update session status if full (3 players instead of 4)
     if session.joined_players.len() >= 3 {
-        log::info!(
-            "Session {} now has {} players, updating status to Full",
-            session_id,
-            session.joined_players.len()
-        );
         session.status = SessionStatus::Full;
     }
 
@@ -828,7 +802,7 @@ pub async fn recreate_session(
         name: format!("{} (Replay)", original_session.name),
         host_id: user_id.to_string(),
         password: original_session.password.clone(),
-        is_private: true, // Always make recreated sessions private it will show in the sessions list
+        is_private: make_private, // Always make recreated sessions private so they don't show in the sessions list
         status: SessionStatus::Open,
         joined_players: vec![PlayerInfo {
             user_id: user_id.to_string(),

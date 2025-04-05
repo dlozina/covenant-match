@@ -24,7 +24,7 @@ use actix_web::http::Method;
 use regex::Regex;
 
 use utoipa::{
-    openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
+    openapi::security::SecurityScheme,
     openapi::{OpenApiBuilder, Server},
     Modify, OpenApi,
 };
@@ -206,7 +206,7 @@ impl Modify for SecurityAddon {
                     let should_exclude = exclude_patterns.iter().any(|pattern| {
                         // Check method
                         let method_matches = match pattern.get_method() {
-                            Some(pattern_method) => &http_method == &pattern_method,
+                            Some(pattern_method) => http_method == pattern_method,
                             None => true, // If no method specified, match any method
                         };
 

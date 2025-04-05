@@ -1,10 +1,9 @@
 use crate::models::error::AppError;
 use crate::models::user::User;
-use futures::{StreamExt, TryStreamExt};
+use futures::StreamExt;
 use log::error;
 use mongodb::{
-    bson::{self, doc, oid::ObjectId, Document},
-    options::{FindOneOptions, FindOptions, UpdateOptions},
+    bson::{doc, oid::ObjectId, Document},
     Collection, Database,
 };
 
@@ -86,25 +85,6 @@ pub async fn find_by_email(db: &Database, email: &str) -> Result<Option<User>, A
     Ok(user)
 }
 
-pub async fn update_user(db: &Database, user: &User) -> Result<(), AppError> {
-    let update = doc! {
-        "$set": {
-            "username": &user.username,
-            "email": &user.email,
-            "password_hash": &user.password_hash,
-            "display_name": &user.display_name,
-            "avatar_url": &user.avatar_url,
-            "updated_at": bson::DateTime::from(std::time::SystemTime::from(user.updated_at)),
-        }
-    };
-
-    get_collection(db)
-        .update_one(doc! { "_id": &user.id }, update)
-        .await?;
-
-    Ok(())
-}
-
 pub async fn delete_user(db: &Database, user_id: &str) -> Result<(), AppError> {
     let collection = db.collection::<User>(COLLECTION_NAME);
 
@@ -169,31 +149,6 @@ pub async fn find_by_display_name(
         .find_one(filter)
         .await
         .map_err(AppError::DatabaseError)
-}
-
-/// Find users by role (or all users if role is None)
-pub async fn find_users_by_role(db: &Database, role: Option<&str>) -> Result<Vec<User>, AppError> {
-    let collection = db.collection::<User>("users");
-
-    let filter = match role {
-        Some(role_value) => doc! { "role": role_value },
-        None => doc! {},
-    };
-
-    let mut cursor = collection
-        .find(filter)
-        .await
-        .map_err(AppError::DatabaseError)?;
-
-    let mut users = Vec::new();
-    while let Some(result) = cursor.next().await {
-        match result {
-            Ok(user) => users.push(user),
-            Err(e) => return Err(AppError::DatabaseError(e)),
-        }
-    }
-
-    Ok(users)
 }
 
 /// Find users by role with pagination
