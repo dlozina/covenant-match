@@ -579,8 +579,10 @@ function SessionRunContent(): JSX.Element {
         };
       });
       
-      // Show notification
-      showNotification(`${data.username || 'A player'} left the session`, 'warning');
+      // Only show notification if it's not about the current user
+      if (userId !== userData?.id) {
+        showNotification(`${data.username || 'A player'} left the session`, 'warning');
+      }
     });
     
     // Add additional event subscriptions here as needed
