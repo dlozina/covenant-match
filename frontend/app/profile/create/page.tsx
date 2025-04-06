@@ -188,7 +188,7 @@ export default function CreateProfilePage() {
         type: 'warning'
       });
     }
-  }, [isLoadingGameData, gameData, form, gameDataError]);
+  }, [isLoadingGameData, gameData, form, gameDataError, REGIONS, PLATFORMS, COVENANT_NAMES]);
 
   // Update character counters whenever field values change
   useEffect(() => {
@@ -202,7 +202,7 @@ export default function CreateProfilePage() {
     });
     
     return () => subscription.unsubscribe();
-  }, [form.watch]);
+  }, [form, form.watch]);
 
   // Handle debounced validation
   const debouncedValidate = (fieldName: keyof ProfileFormValues) => {

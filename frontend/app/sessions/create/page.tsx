@@ -122,7 +122,7 @@ function CreateSessionContent() {
     });
     
     return () => subscription.unsubscribe();
-  }, [form.watch]);
+  }, [form, form.watch]);
   
   // Handle debounced validation
   const debouncedValidate = (fieldName: keyof SessionFormValues) => {

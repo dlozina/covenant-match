@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { MainLayout } from "@/components/layout";
@@ -53,35 +53,8 @@ export default function SessionsPage() {
   const [friendFilter, setFriendFilter] = useState<FriendFilter>("All");
   const limit = 10;
 
-  useEffect(() => {
-    fetchSessionsData();
-  }, [currentPage, statusFilter]);
-
-  useEffect(() => {
-    applyFilters();
-  }, [sessions, friendFilter]);
-
-  function applyFilters() {
-    const result = [...sessions];
-    
-    // Status filtering is now handled at the API level
-    
-    // Apply friend filter (placeholder for future implementation)
-    if (friendFilter === "Friends") {
-      // This will be implemented later
-      // For now, we'll just show a toast message
-    }
-    
-    setFilteredSessions(result);
-    
-    // Update pagination based on filtered results
-    setTotalPages(Math.max(1, Math.ceil(result.length / limit)));
-    if (currentPage > Math.ceil(result.length / limit) && result.length > 0) {
-      setCurrentPage(1);
-    }
-  }
-
-  async function fetchSessionsData() {
+  // Define fetchSessionsData before using it in useEffect
+  const fetchSessionsData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
@@ -103,7 +76,36 @@ export default function SessionsPage() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [isLoggedIn, currentPage, limit, statusFilter]);
+  
+  // Define applyFilters before using it in useEffect
+  const applyFilters = useCallback(() => {
+    const result = [...sessions];
+    
+    // Status filtering is now handled at the API level
+    
+    // Apply friend filter (placeholder for future implementation)
+    if (friendFilter === "Friends") {
+      // This will be implemented later
+      // For now, we'll just show a toast message
+    }
+    
+    setFilteredSessions(result);
+    
+    // Update pagination based on filtered results
+    setTotalPages(Math.max(1, Math.ceil(result.length / limit)));
+    if (currentPage > Math.ceil(result.length / limit) && result.length > 0) {
+      setCurrentPage(1);
+    }
+  }, [sessions, friendFilter, currentPage, limit]);
+
+  useEffect(() => {
+    fetchSessionsData();
+  }, [currentPage, statusFilter, fetchSessionsData]);
+
+  useEffect(() => {
+    applyFilters();
+  }, [sessions, friendFilter, applyFilters]);
 
   async function handleJoinSession(sessionId: string) {
     // Require authentication to join a session

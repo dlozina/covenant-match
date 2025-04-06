@@ -255,7 +255,7 @@ function EditProfileContent() {
       setSessionNameLength(userData.preferredSessionName?.length || 0);
       setSessionPasswordLength(userData.preferredSessionPassword?.length || 0);
     }
-  }, [userData, isLoadingGameData, form]);
+  }, [userData, isLoadingGameData, form, REGIONS, PLATFORMS, COVENANT_NAMES]);
   
   // Show notification if there's an error loading game data
   useEffect(() => {
@@ -282,7 +282,7 @@ function EditProfileContent() {
     });
     
     return () => subscription.unsubscribe();
-  }, [form.watch]);
+  }, [form, form.watch]);
 
   // Handle debounced validation
   const debouncedValidate = (fieldName: keyof ProfileFormValues) => {
