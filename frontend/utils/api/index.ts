@@ -34,6 +34,7 @@ export const joinSession = (sessionId, nightfarer, userId, username, covenantNam
 export const recreateSession = (sessionId) => sessionService.recreateSession(sessionId);
 export const updateSessionCharacters = (sessionId, nightLord, hostNightfarer) => 
   sessionService.updateSessionCharacters(sessionId, nightLord, hostNightfarer);
+export const getActiveSession = () => sessionService.getActiveSession();
 
 // Add Legacy session functions from sessions.ts
 export const fetchAvailableSessions = () => sessionService.fetchAvailableSessions();

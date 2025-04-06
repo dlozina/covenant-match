@@ -544,9 +544,50 @@ async fn get_public_sessions(
     }
 }
 
+/// Get active session for the current user
+#[utoipa::path(
+    get,
+    path = "/api/v1/sessions/active",
+    responses(
+        (status = 200, description = "User's active session information or null if none", body = Option<SessionResponseDto>),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "sessions"
+)]
+#[get("/api/v1/sessions/active")]
+async fn get_user_active_session(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.sub.clone()
+    };
+
+    match session_service::check_user_active_session(&db, &user_id).await {
+        Ok(session) => HttpResponse::Ok().json(session),
+        Err(e) => {
+            log::error!("Error checking active session: {:?}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": "error",
+                "message": e.to_string()
+            }))
+        }
+    }
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
-    cfg.service(get_sessions)
+    // Register paths from most specific to most general
+    // Global endpoints first
+    cfg.service(get_public_sessions)
+        // Then specific action endpoints
+        .service(get_user_active_session) // /api/v1/sessions/active must be before {id} routes
+        .service(get_sessions)
         .service(create_session)
+        // Then ID-based endpoints
         .service(get_session)
         .service(join_session)
         .service(start_session)
@@ -555,6 +596,5 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         .service(recreate_session)
         .service(update_session)
         .service(submit_result)
-        .service(get_results)
-        .service(get_public_sessions);
+        .service(get_results);
 }

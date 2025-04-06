@@ -5,8 +5,10 @@ import {
   SessionDetails, 
   CreateSessionParams,
   JoinSessionParams,
-  UserSessionResult
+  UserSessionResult,
+  SessionDto
 } from './types';
+import { ApiError } from './errors';
 
 // Legacy functions from sessions.ts to be moved into service methods
 export async function fetchAvailableSessions(): Promise<Session[]> {
@@ -218,6 +220,25 @@ export class SessionService {
 
   async startSession(sessionId: string): Promise<Session> {
     return this.client.post<Session>(`/sessions/${sessionId}/start`, {});
+  }
+
+  /**
+   * Get the current user's active session if any
+   * @returns The active session or null if none
+   */
+  async getActiveSession(): Promise<SessionDto | null> {
+    try {
+      return await this.client.get<SessionDto | null>(
+        '/api/v1/sessions/active',
+        true
+      );
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        // Not logged in, so no active session
+        return null;
+      }
+      throw error;
+    }
   }
 }
 

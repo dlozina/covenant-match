@@ -178,6 +178,17 @@ pub async fn create_session(
         .await?
         .ok_or(AppError::UserNotFound)?;
 
+    // Check if user already has an active session
+    let active_sessions = session_repository::find_active_sessions_for_user(db, user_id).await?;
+    if !active_sessions.is_empty() {
+        let active_session = &active_sessions[0];
+        return Err(AppError::AlreadyInSession(
+            active_session.id.to_hex(),
+            active_session.name.clone(),
+            active_session.status.to_string(),
+        ));
+    }
+
     let now = mongodb::bson::DateTime::now();
     let session = GameSession {
         id: ObjectId::new(),
@@ -209,6 +220,39 @@ pub async fn create_session(
     let response = SessionResponseDto::from(session);
 
     Ok(response)
+}
+
+/// Check if a user is already in an active session
+pub async fn check_user_active_session(
+    db: &Database,
+    user_id: &str,
+) -> Result<Option<SessionResponseDto>, AppError> {
+    // No need to validate the user ID format - the ID comes directly from JWT claims
+    // and should be used as is
+    log::info!("Checking active sessions for user ID: {}", user_id);
+
+    // Find active sessions for the user
+    let active_sessions = match session_repository::find_active_sessions_for_user(db, user_id).await
+    {
+        Ok(sessions) => sessions,
+        Err(e) => {
+            log::error!(
+                "Error finding active sessions for user {}: {:?}",
+                user_id,
+                e
+            );
+            // Return no sessions instead of propagating the error
+            return Ok(None);
+        }
+    };
+
+    if active_sessions.is_empty() {
+        return Ok(None);
+    }
+
+    // Return the first active session (users should only have one active session)
+    let session = active_sessions.into_iter().next().unwrap();
+    Ok(Some(SessionResponseDto::from(session)))
 }
 
 pub async fn get_sessions(
@@ -314,6 +358,24 @@ pub async fn join_session(
 ) -> Result<SessionResponseDto, AppError> {
     // Verify user exists
     let user_id = join_data.user_id.clone();
+
+    // Check if user already has an active session
+    let active_sessions = session_repository::find_active_sessions_for_user(db, &user_id).await?;
+    if !active_sessions.is_empty() {
+        // If the active session is the one they're trying to join, that's fine
+        if active_sessions.iter().any(|s| s.id.to_hex() == session_id) {
+            // They're already in this session, return the session
+            return Ok(SessionResponseDto::from(active_sessions[0].clone()));
+        }
+
+        // Otherwise, they're trying to join a different session while already in one
+        let active_session = &active_sessions[0];
+        return Err(AppError::AlreadyInSession(
+            active_session.id.to_hex(),
+            active_session.name.clone(),
+            active_session.status.to_string(),
+        ));
+    }
 
     // Get the session
     let mut session = session_repository::find_by_id(db, session_id)

@@ -67,6 +67,7 @@ use utoipa::{
         submit_result,
         get_results,
         get_public_sessions,
+        get_user_active_session,
         // Game data routes
         get_game_data,
         get_platforms,

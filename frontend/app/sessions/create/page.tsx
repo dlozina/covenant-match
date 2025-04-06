@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle } from "lucide-react";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -26,12 +26,13 @@ import {
   NightLord, 
   Nightfarer, 
   createSession, 
-  CreateSessionParams 
+  CreateSessionParams
 } from "@/utils/api";
+import { sessionService } from "@/utils/api/session-service";
 
 // Type for our notification state
 type NotificationType = {
-  message: string;
+  message: string | React.ReactNode;
   type: 'error' | 'success' | 'warning';
 }
 
@@ -88,9 +89,33 @@ function CreateSessionContent() {
 
   // Fetch nightlords and nightfarers on component mount
   useEffect(() => {
-    const fetchCharacters = async () => {
+    const fetchData = async () => {
       try {
         setIsLoadingCharacters(true);
+        
+        // Check if user has an active session
+        try {
+          const activeSession = await sessionService.getActiveSession();
+          
+          if (activeSession) {
+            setNotification({
+              message: (
+                <div>
+                  You are already in an active session: &apos;{activeSession.name}&apos; (ID: {activeSession.id}) with status {activeSession.status}. 
+                  <Link href={`/sessions/run?id=${activeSession.id}`} className="underline font-bold ml-1">
+                    Click here
+                  </Link> to go to your active session.
+                </div>
+              ),
+              type: 'warning'
+            });
+          }
+        } catch (error) {
+          // Ignore errors checking for active sessions
+          console.error("Error checking for active sessions:", error);
+        }
+        
+        // Fetch characters
         const [lords, farers] = await Promise.all([
           fetchNightLords(),
           fetchNightfarers()
@@ -107,7 +132,7 @@ function CreateSessionContent() {
       }
     };
 
-    fetchCharacters();
+    fetchData();
   }, []);
   
   // Update character counters whenever field values change
@@ -183,10 +208,35 @@ function CreateSessionContent() {
         router.push(`/sessions/run?id=${responseData.id}`);
       }, 1000); // Short delay to show success message
     } catch (error) {
-      setNotification({
-        message: error instanceof Error ? error.message : "An unexpected error occurred",
-        type: 'error'
-      });
+      // Check if error message contains information about already being in a session
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
+      
+      if (errorMessage.includes("You are already in an active session")) {
+        // Extract session ID from the error message using regex
+        const sessionIdMatch = errorMessage.match(/\(ID: ([a-f0-9]+)\)/i);
+        const sessionId = sessionIdMatch ? sessionIdMatch[1] : null;
+        
+        if (sessionId) {
+          setNotification({
+            message: (
+              <div>
+                {errorMessage}. <Link href={`/sessions/run?id=${sessionId}`} className="underline font-bold">Click here</Link> to go to your active session.
+              </div>
+            ),
+            type: 'warning'
+          });
+        } else {
+          setNotification({
+            message: errorMessage,
+            type: 'warning'
+          });
+        }
+      } else {
+        setNotification({
+          message: errorMessage,
+          type: 'error'
+        });
+      }
     } finally {
       setIsLoading(false);
     }

@@ -149,6 +149,46 @@ pub async fn find_session_by_id(
     Ok(session)
 }
 
+/// Find active sessions (Open or InProgress) for a specific user
+pub async fn find_active_sessions_for_user(
+    db: &Database,
+    user_id: &str,
+) -> Result<Vec<GameSession>, AppError> {
+    // Log the user ID being used for query
+    log::info!("Finding active sessions for user ID: {}", user_id);
+
+    // Use the user_id directly as a string for comparison
+    let filter = doc! {
+        "$and": [
+            {
+                "$or": [
+                    { "joined_players.user_id": user_id },
+                    { "host_id": user_id }
+                ]
+            },
+            {
+                "status": {
+                    "$in": [
+                        to_bson(&SessionStatus::Open)?,
+                        to_bson(&SessionStatus::InProgress)?
+                    ]
+                }
+            }
+        ]
+    };
+
+    let cursor = get_collection(db).find(filter).await?;
+    let sessions: Vec<GameSession> = cursor.try_collect().await?;
+
+    log::info!(
+        "Found {} active sessions for user ID: {}",
+        sessions.len(),
+        user_id
+    );
+
+    Ok(sessions)
+}
+
 // Count sessions by status (or all sessions if status is None)
 pub async fn count_sessions_by_status(
     db: &Database,

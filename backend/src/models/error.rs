@@ -36,6 +36,9 @@ pub enum AppError {
     #[error("User is already in the session")]
     UserAlreadyInSession,
 
+    #[error("You are already in an active session: '{1}' (ID: {0}) with status {2}")]
+    AlreadyInSession(String, String, String),
+
     #[error("Authentication error: {0}")]
     AuthError(String),
 
@@ -107,6 +110,7 @@ impl ResponseError for AppError {
             AppError::UserAlreadyExists => StatusCode::CONFLICT,
             AppError::UserAlreadyInSession => StatusCode::CONFLICT,
             AppError::SessionFull => StatusCode::CONFLICT,
+            AppError::AlreadyInSession(_, _, _) => StatusCode::CONFLICT,
 
             AppError::ValidationError(_) => StatusCode::BAD_REQUEST,
             AppError::InvalidSessionState => StatusCode::BAD_REQUEST,
