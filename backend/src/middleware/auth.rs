@@ -5,13 +5,12 @@ use crate::utils::jwt;
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
     http::Method,
-    web, Error, HttpMessage,
+    Error, HttpMessage,
 };
 use futures::future::{ready, Ready};
 use regex::Regex;
 use std::future::Future;
 use std::pin::Pin;
-use std::task::{Context, Poll};
 
 // Authentication middleware with optional role requirement
 pub struct Auth {
@@ -22,20 +21,6 @@ impl Auth {
     // Just verify the user is authenticated without role check
     pub fn user() -> Self {
         Auth { require_role: None }
-    }
-
-    // Verify user has admin role
-    pub fn admin() -> Self {
-        Auth {
-            require_role: Some("admin".to_string()),
-        }
-    }
-
-    // Verify user has a specific role
-    pub fn role(role: &str) -> Self {
-        Auth {
-            require_role: Some(role.to_string()),
-        }
     }
 }
 

@@ -1,9 +1,9 @@
 use bcrypt::{hash, DEFAULT_COST};
-use log::{error, info};
+use log::info;
 use mongodb::{
-    bson::{self, doc, oid::ObjectId, Bson, Document},
+    bson::{self, doc, oid::ObjectId, Document},
     error::Error,
-    options::{IndexOptions, UpdateOptions},
+    options::IndexOptions,
     Collection, Database, IndexModel,
 };
 
@@ -78,7 +78,7 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
 
         // Hash the password
         let password_hash = hash("changeme123#", DEFAULT_COST)
-            .map_err(|e| Error::custom(format!("Failed to hash password: {}", e)))?;
+            .map_err(|e| Error::custom(format!("Failed to hash password: {e}")))?;
 
         users
             .insert_one(doc! {
@@ -202,22 +202,23 @@ async fn seed_collection(
     Ok(())
 }
 
-async fn update_schemas(db: &Database) -> Result<(), Error> {
-    let settings: Collection<Document> = db.collection("settings");
+// Example of how to update schemas
+// async fn update_schemas(db: &Database) -> Result<(), Error> {
+//     let settings: Collection<Document> = db.collection("settings");
 
-    // Update from v1 to v2 (adding new fields)
-    settings
-        .update_many(
-            doc! { "schema_version": 1 },
-            doc! {
-                "$set": {
-                    "new_feature_flag": false,
-                    "analytics_enabled": true,
-                    "schema_version": 2  // Bump version
-                }
-            },
-        )
-        .await?;
+//     // Update from v1 to v2 (adding new fields)
+//     settings
+//         .update_many(
+//             doc! { "schema_version": 1 },
+//             doc! {
+//                 "$set": {
+//                     "new_feature_flag": false,
+//                     "analytics_enabled": true,
+//                     "schema_version": 2  // Bump version
+//                 }
+//             },
+//         )
+//         .await?;
 
-    Ok(())
-}
+//     Ok(())
+// }

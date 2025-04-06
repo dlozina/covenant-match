@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { FALLBACK_REGIONS, FALLBACK_PLATFORMS, FALLBACK_COVENANT_NAMES } from "@/lib/constants"
+import { fetchGameData, register, RegisterParams } from "@/utils/api"
 
 // Username and display name validation regex
 const usernameRegex = /^[a-zA-Z0-9_.-]+$/;
@@ -133,19 +134,12 @@ export default function CreateProfilePage() {
 
   // Fetch game data from API
   useEffect(() => {
-    const fetchGameData = async () => {
+    const fetchGameDataDetails = async () => {
       setIsLoadingGameData(true)
       setGameDataError(null)
       
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-        const response = await fetch(`${apiBaseUrl}/api/v1/game-data`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch game data');
-        }
-        
-        const data = await response.json();
+        const data = await fetchGameData();
         setGameData(data);
       } catch (error) {
         console.error('Error fetching game data:', error);
@@ -155,7 +149,7 @@ export default function CreateProfilePage() {
       }
     };
     
-    fetchGameData();
+    fetchGameDataDetails();
   }, []);
 
   // Use API data or fallback data
@@ -220,7 +214,7 @@ export default function CreateProfilePage() {
     // Set a new timeout
     const timeout = setTimeout(() => {
       form.trigger(fieldName);
-    }, 500); // 500ms debounce
+    }, 1000); // 1000ms debounce
     
     setValidationTimeout(timeout);
   };
@@ -235,8 +229,8 @@ export default function CreateProfilePage() {
     setNotification(null)
 
     try {
-      // Extract the fields we need for the API
-      const sanitizedData = {
+      // Prepare registration data
+      const registerData: RegisterParams = {
         username: data.username.trim().toLowerCase(),
         email: data.email.trim().toLowerCase(),
         password: data.password, // passwords should not be modified
@@ -247,22 +241,8 @@ export default function CreateProfilePage() {
         covenantName: data.covenantName,
       };
     
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const response = await fetch(`${apiBaseUrl}/api/v1/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(sanitizedData),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || 'Failed to create profile')
-      }
-
-      // Parse the response to get the token
-      const responseData = await response.json()
+      // Register the user
+      const responseData = await register(registerData);
       
       // Use the login function from auth context
       if (responseData.token) {
@@ -300,12 +280,6 @@ export default function CreateProfilePage() {
               Fill in your details to create your profile
             </p>
           </div>
-
-          {/* Notification display area */}
-          <Notification 
-            notification={notification} 
-            onDismiss={clearNotification}
-          />
 
           {isLoadingGameData ? (
             <div className="flex flex-col items-center justify-center py-10">
@@ -589,6 +563,12 @@ export default function CreateProfilePage() {
                     )}
                   />
                 </div>
+
+                {/* Notification display area */}
+                <Notification 
+                  notification={notification} 
+                  onDismiss={clearNotification}
+                />
 
                 <Button 
                   type="submit" 

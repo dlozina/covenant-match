@@ -1,4 +1,4 @@
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
@@ -43,7 +43,7 @@ pub fn generate_token(user_id: &ObjectId, role: &str) -> Result<String, AppError
     // Calculate expiration time based on the configured duration
     let expiration = match parse_duration_to_seconds(expires_in) {
         Some(seconds) => {
-            let now = Utc::now().timestamp() as i64;
+            let now = Utc::now().timestamp();
             (now + seconds) as usize
         }
         None => {
@@ -52,7 +52,7 @@ pub fn generate_token(user_id: &ObjectId, role: &str) -> Result<String, AppError
                 "Invalid duration format in config: '{}'. Using default of 12h",
                 expires_in
             );
-            let now = Utc::now().timestamp() as i64;
+            let now = Utc::now().timestamp();
             (now + 12 * 3600) as usize
         }
     };
@@ -90,12 +90,6 @@ pub fn validate_token(token: &str) -> Result<Claims, AppError> {
         jsonwebtoken::errors::ErrorKind::ExpiredSignature => AppError::TokenExpired,
         _ => AppError::InvalidToken,
     })
-}
-
-// Extract user ID from token
-pub fn get_user_id_from_token(token: &str) -> Result<String, AppError> {
-    let claims = validate_token(token)?;
-    Ok(claims.sub)
 }
 
 // Extract role from token

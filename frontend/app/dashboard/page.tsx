@@ -71,6 +71,7 @@ function DashboardContent() {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [noStatsYet, setNoStatsYet] = useState(false);
   const [animateCharts, setAnimateCharts] = useState(false);
   const [activeNightfarer, setActiveNightfarer] = useState<string | null>(null);
   const [activeNightLord, setActiveNightLord] = useState<string | null>(null);
@@ -101,6 +102,7 @@ function DashboardContent() {
     const fetchStats = async () => {
       try {
         setIsLoading(true);
+        setNoStatsYet(false);
         const data = await fetchWithAuth<UserStats>('/api/v1/statistics/users/me');
         setStats(data);
         
@@ -120,7 +122,12 @@ function DashboardContent() {
         }
       } catch (err) {
         console.error('Error fetching user statistics:', err);
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        // Check if error is 404 (not found) which indicates no stats yet
+        if (err instanceof Error && err.message.includes('404')) {
+          setNoStatsYet(true);
+        } else {
+          setError(err instanceof Error ? err.message : 'Unknown error');
+        }
       } finally {
         setIsLoading(false);
         // Add a slight delay before starting animation
@@ -697,6 +704,13 @@ function DashboardContent() {
           <div className="text-center py-12 flex flex-col items-center justify-center gap-4">
             <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
             <p>Loading your statistics...</p>
+          </div>
+        ) : noStatsYet ? (
+          <div className="text-center py-8 bg-background/50 border border-purple-900/20 rounded-lg">
+            <h3 className="font-medium text-lg mb-2">No Statistics Yet</h3>
+            <p className="text-muted-foreground">
+              You haven&apos;t played any games yet. Your statistics will appear here after your first match.
+            </p>
           </div>
         ) : error ? (
           <div className="text-center py-8 text-destructive">

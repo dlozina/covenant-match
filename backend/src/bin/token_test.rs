@@ -56,9 +56,8 @@ fn parse_duration_to_seconds(duration_str: &str) -> Option<i64> {
 
     let (value_str, unit) = duration_str.split_at(len - 1);
 
-    let value = match value_str.parse::<i64>() {
-        Ok(v) => v,
-        Err(_) => return None,
+    let Ok(value) = value_str.parse::<i64>() else {
+        return None;
     };
 
     match unit {
@@ -76,19 +75,16 @@ fn generate_token(user_id: &ObjectId, role: &str) -> Result<String, String> {
     let expires_in = get_jwt_expires_in();
 
     // Calculate expiration time based on the configured duration
-    let expiration = match parse_duration_to_seconds(&expires_in) {
-        Some(seconds) => {
-            let now = Utc::now().timestamp() as i64;
-            (now + seconds) as usize
-        }
-        None => {
-            eprintln!(
-                "Warning: Invalid duration format in config: '{}'. Using default of 12h",
-                expires_in
-            );
-            let now = Utc::now().timestamp() as i64;
-            (now + 12 * 3600) as usize
-        }
+    let expiration = if let Some(seconds) = parse_duration_to_seconds(&expires_in) {
+        let now = Utc::now().timestamp();
+        (now + seconds) as usize
+    } else {
+        eprintln!(
+            "Warning: Invalid duration format in config: '{}'. Using default of 12h",
+            expires_in
+        );
+        let now = Utc::now().timestamp();
+        (now + 12 * 3600) as usize
     };
 
     let issued_at = Utc::now().timestamp() as usize;

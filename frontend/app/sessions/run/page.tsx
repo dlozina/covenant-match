@@ -35,6 +35,7 @@ interface JoinedPlayer {
   nightfarer: string;
   joinedAt: string;
   hasReported?: boolean;
+  covenantName?: string; // Make it optional for backward compatibility
 }
 
 interface SessionData {
@@ -352,7 +353,9 @@ function SessionRunContent(): JSX.Element {
         nightfarer: typeof data === 'object' && data !== null && 'nightfarer' in data 
                    ? String(data.nightfarer) : 'Unknown Class',
         userId: typeof data === 'object' && data !== null && 'userId' in data 
-               ? String(data.userId) : `user-${Date.now()}`
+               ? String(data.userId) : `user-${Date.now()}`,
+        covenantName: typeof data === 'object' && data !== null && 'covenantName' in data 
+                   ? String(data.covenantName) : 'Unknown Covenant'
       };
       // No toast notification - UI will update through session data changes
       
@@ -375,6 +378,7 @@ function SessionRunContent(): JSX.Element {
               userId: playerData.userId,
               username: playerData.username,
               nightfarer: playerData.nightfarer,
+              covenantName: playerData.covenantName,
               joinedAt: new Date().toISOString(),
               hasReported: false  // Explicitly set to false for new players
             }
@@ -772,7 +776,8 @@ function SessionRunContent(): JSX.Element {
         userId: userData.id, // Use authenticated user's ID
         result: resultValue, // Properly mapped result value
         rating: resultState.rating,
-        feedback: resultState.feedback || ''
+        feedback: resultState.feedback || '',
+        covenantName: userData.covenantName // Include covenant name in submission
       };
       
       // Use fetchWithAuth to ensure token is valid

@@ -1,7 +1,7 @@
 use crate::models::error::AppError;
 use crate::models::user::{CreateUserDto, GetUsersQuery, LoginUserDto, UpdateUserProfileDto};
 use crate::services::{auth_service, user_service};
-use crate::utils::{jwt, recaptcha};
+use crate::utils::jwt;
 use actix_web::{
     delete, get, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError,
 };
@@ -591,7 +591,8 @@ pub struct TokenInfoResponse {
 #[post("/api/v1/auth/decode-token")]
 async fn decode_token(token_data: web::Json<JwtInfoDto>, req: HttpRequest) -> impl Responder {
     // Verify that the user is authenticated
-    let authenticated_user_id = {
+    // todo: remove this once we have a proper auth middleware
+    let _authenticated_user_id = {
         let extensions = req.extensions();
         match extensions.get::<jwt::Claims>() {
             Some(claims) => claims.sub.clone(),

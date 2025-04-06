@@ -90,11 +90,11 @@ pub async fn get_user_session_history_paginated(
             // Convert MongoDB DateTime to Chrono DateTime
             let created_at =
                 chrono::DateTime::from_timestamp(session.created_at.timestamp_millis() / 1000, 0)
-                    .unwrap_or_else(|| chrono::Utc::now());
+                    .unwrap_or_else(chrono::Utc::now);
 
             let completed_at = session.completed_at.map(|dt| {
                 chrono::DateTime::from_timestamp(dt.timestamp_millis() / 1000, 0)
-                    .unwrap_or_else(|| chrono::Utc::now())
+                    .unwrap_or_else(chrono::Utc::now)
             });
 
             Some(SessionHistoryEntry {
@@ -173,7 +173,7 @@ pub async fn get_session_details(
         // Convert MongoDB DateTime to chrono DateTime
         let joined_at_chrono =
             chrono::DateTime::from_timestamp(host.joined_at.timestamp_millis() / 1000, 0)
-                .unwrap_or_else(|| chrono::Utc::now());
+                .unwrap_or_else(chrono::Utc::now);
 
         players.push(PlayerDetail {
             user_id: host.user_id.clone(),
@@ -195,7 +195,7 @@ pub async fn get_session_details(
         // Convert MongoDB DateTime to chrono DateTime
         let joined_at_chrono =
             chrono::DateTime::from_timestamp(player.joined_at.timestamp_millis() / 1000, 0)
-                .unwrap_or_else(|| chrono::Utc::now());
+                .unwrap_or_else(chrono::Utc::now);
 
         players.push(PlayerDetail {
             user_id: player.user_id.clone(),
@@ -212,12 +212,12 @@ pub async fn get_session_details(
     // Convert MongoDB DateTime to chrono DateTime for created_at
     let created_at_chrono =
         chrono::DateTime::from_timestamp(session.created_at.timestamp_millis() / 1000, 0)
-            .unwrap_or_else(|| chrono::Utc::now());
+            .unwrap_or_else(chrono::Utc::now);
 
     // Convert MongoDB DateTime to chrono DateTime for completed_at if it exists
     let completed_at_chrono = session.completed_at.map(|dt| {
         chrono::DateTime::from_timestamp(dt.timestamp_millis() / 1000, 0)
-            .unwrap_or_else(|| chrono::Utc::now())
+            .unwrap_or_else(chrono::Utc::now)
     });
 
     // Create the session detail

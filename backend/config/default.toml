@@ -1,7 +1,7 @@
 environment = "development"
 
 [database]
-url = "mongodb://localhost:27017/covenant-match"
+url = "mongodb://localhost:27017"
 
 [jwt]
 secret = "malenia_is_the_best_girl_in_the_world"
@@ -27,6 +27,10 @@ exclude_patterns = [
     { path = "/api/docs/.*", method = "GET", is_regex = true },
     { path = "/api-docs/.*", method = "GET", is_regex = true },
     { path = "/api/v1/game-data", method = "GET", is_regex = false },
+    { path = "/api/v1/statistics/sessions-stats", method = "GET", is_regex = false },
+    { path = "/api/v1/statistics/leaderboard", method = "GET", is_regex = false },
+    { path = "/api/v1/statistics/covenants", method = "GET", is_regex = false },
+    { path = "/api/v1/public/sessions", method = "GET", is_regex = false },
     # { path = "/ws/.*", method = "GET", is_regex = true },
     # { path = "/api/public/.*", method = "GET", is_regex = true },
     # { path = "/favicon.ico", method = "GET", is_regex = false },

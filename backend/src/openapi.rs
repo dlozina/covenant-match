@@ -1,10 +1,11 @@
 use crate::models::game_data::{
-    Covenant, CovenantResponse, GameDataResponse, Nightfarer, NightfarerResponse, Platform,
-    PlatformResponse, Region, RegionResponse,
+    Covenant, CovenantResponse, GameDataResponse, NightLord, NightLordResponse, Nightfarer,
+    NightfarerResponse, Platform, PlatformResponse, Region, RegionResponse,
 };
 use crate::models::session::{
-    CreateSessionDto, GameResult, JoinSessionDto, PlayerInfo, RateSessionDto, ResultsResponseDto,
-    SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto,
+    CovenantStats, CovenantStatsResponse, CreateSessionDto, GameResult, JoinSessionDto,
+    MinimalSessionDto, PlayerInfo, RateSessionDto, ResultsResponseDto, SessionResponseDto,
+    SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto,
 };
 use crate::models::statistics::{LeaderboardEntry, Stats, UserStatistics};
 use crate::models::user::{
@@ -23,7 +24,7 @@ use actix_web::http::Method;
 use regex::Regex;
 
 use utoipa::{
-    openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
+    openapi::security::SecurityScheme,
     openapi::{OpenApiBuilder, Server},
     Modify, OpenApi,
 };
@@ -65,12 +66,14 @@ use utoipa::{
         update_session,
         submit_result,
         get_results,
+        get_public_sessions,
         // Game data routes
         get_game_data,
         get_platforms,
         get_regions,
         get_covenants,
         get_nightfarers,
+        get_night_lords,
         // SSE routes
         events_route,
         events_status,
@@ -82,6 +85,8 @@ use utoipa::{
         get_all_night_lord_statistics,
         get_current_user_session_history,
         get_session_details,
+        get_sessions_stats,
+        get_covenant_stats,
     ),
     components(
         schemas(
@@ -108,20 +113,26 @@ use utoipa::{
             UpdateSessionDto,
             SessionResponseDto,
             ResultsResponseDto,
+            MinimalSessionDto,
             PlayerInfo,
             SessionStatus,
             GameResult,
             SessionResult,
+            // Covenant statistics models
+            CovenantStats,
+            CovenantStatsResponse,
             // Game data models
             Platform,
             Region,
             Covenant,
             Nightfarer,
+            NightLord,
             GameDataResponse,
             PlatformResponse,
             RegionResponse,
             CovenantResponse,
             NightfarerResponse,
+            NightLordResponse,
             // SSE models
             ServerMessage,
             SessionInfo,
@@ -137,6 +148,8 @@ use utoipa::{
             SessionDetailResponse,
             SessionDetail,
             PlayerDetail,
+            SessionsStatsResponse,
+            SessionsStatsData,
         ),
     ),
     tags(
@@ -193,7 +206,7 @@ impl Modify for SecurityAddon {
                     let should_exclude = exclude_patterns.iter().any(|pattern| {
                         // Check method
                         let method_matches = match pattern.get_method() {
-                            Some(pattern_method) => &http_method == &pattern_method,
+                            Some(pattern_method) => http_method == pattern_method,
                             None => true, // If no method specified, match any method
                         };
 

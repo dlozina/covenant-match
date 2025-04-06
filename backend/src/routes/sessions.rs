@@ -1,14 +1,8 @@
-use crate::models::session::{
-    CreateSessionDto, GameResult, JoinSessionDto, RateSessionDto, SessionReviewDto,
-    SubmitResultDto, UpdateSessionDto,
-};
+use crate::models::session::{CreateSessionDto, JoinSessionDto, SubmitResultDto, UpdateSessionDto};
 use crate::services::session_service;
 use crate::utils::jwt;
-use actix_web::{
-    delete, get, patch, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder,
-};
+use actix_web::{get, patch, post, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use mongodb::Database;
-use serde::{Deserialize, Serialize};
 
 /// Get all sessions with optional status filter
 #[utoipa::path(
@@ -361,7 +355,7 @@ async fn recreate_session(
         claims.sub.clone()
     };
 
-    match session_service::recreate_session(&db, &id, &user_id).await {
+    match session_service::recreate_session(&db, &id, &user_id, true).await {
         Ok(session) => HttpResponse::Created().json(session),
         Err(e) => {
             log::error!("Error recreating session: {:?}", e);
@@ -514,62 +508,41 @@ async fn get_results(
     }
 }
 
-//tod: not needed for now
-/// Rate a session
-// #[utoipa::path(
-//     post,
-//     path = "/api/v1/sessions/{id}/rate",
-//     params(
-//         ("id" = String, Path, description = "Session ID to rate")
-//     ),
-//     request_body = RateSessionDto,
-//     responses(
-//         (status = 200, description = "Session rated successfully"),
-//         (status = 400, description = "Invalid rating or cannot rate (session not completed)"),
-//         (status = 401, description = "Unauthorized"),
-//         (status = 403, description = "Only participants can rate the session"),
-//         (status = 404, description = "Session not found"),
-//         (status = 500, description = "Internal server error")
-//     ),
-//     security(
-//         ("bearer_auth" = [])
-//     ),
-//     tag = "sessions"
-// )]
-// #[post("/api/v1/sessions/{id}/rate")]
-// async fn rate_session(
-//     db: web::Data<Database>,
-//     path: web::Path<String>,
-//     rating_data: web::Json<RateSessionDto>,
-//     req: HttpRequest,
-// ) -> impl Responder {
-//     let id = path.into_inner();
+/// Get minimal public sessions with optional status filter (no authentication required)
+#[utoipa::path(
+    get,
+    path = "/api/v1/public/sessions",
+    params(
+        ("status" = Option<String>, Query, description = "Filter sessions by status (e.g., 'Open', 'InProgress', 'Completed')"),
+        ("limit" = Option<u64>, Query, description = "Limit number of results (default: 10)"),
+        ("offset" = Option<u64>, Query, description = "Offset for pagination (default: 0)")
+    ),
+    responses(
+        (status = 200, description = "List of minimal session information retrieved successfully", body = Vec<MinimalSessionDto>),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "sessions"
+)]
+#[get("/api/v1/public/sessions")]
+async fn get_public_sessions(
+    db: web::Data<Database>,
+    query: web::Query<std::collections::HashMap<String, String>>,
+) -> impl Responder {
+    let status = query.get("status").cloned();
+    let limit = query.get("limit").and_then(|v| v.parse::<u64>().ok());
+    let offset = query.get("offset").and_then(|v| v.parse::<u64>().ok());
 
-//     // Extract user_id before any await points
-//     let user_id = {
-//         let extensions = req.extensions();
-//         let claims = extensions.get::<jwt::Claims>().unwrap();
-//         claims.sub.clone()
-//     };
-
-//     // Update rating data with user ID
-//     let mut rating_data = rating_data.into_inner();
-//     rating_data.user_id = Some(user_id);
-
-//     match session_service::rate_session(&db, &id, rating_data).await {
-//         Ok(_) => HttpResponse::Ok().json(serde_json::json!({
-//             "status": "success",
-//             "message": "Session rated successfully"
-//         })),
-//         Err(e) => {
-//             log::error!("Error rating session: {:?}", e);
-//             HttpResponse::BadRequest().json(serde_json::json!({
-//                 "status": "error",
-//                 "message": e.to_string()
-//             }))
-//         }
-//     }
-// }
+    match session_service::get_minimal_sessions(&db, status, limit, offset).await {
+        Ok(sessions) => HttpResponse::Ok().json(sessions),
+        Err(e) => {
+            log::error!("Error fetching public sessions: {:?}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": "error",
+                "message": e.to_string()
+            }))
+        }
+    }
+}
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(get_sessions)
@@ -582,7 +555,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         .service(recreate_session)
         .service(update_session)
         .service(submit_result)
-        .service(get_results);
-    //tod: not needed for now
-    //.service(rate_session);
+        .service(get_results)
+        .service(get_public_sessions);
 }

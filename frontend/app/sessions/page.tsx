@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { MainLayout } from "@/components/layout";
 import { Footer } from "@/components/layout/Footer";
-import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -31,27 +30,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-interface JoinedPlayer {
-  userId: string;
-  username: string;
-  nightfarer: string;
-  joinedAt: string;
-}
-
-interface Session {
-  id: string;
-  name: string;
-  hostId: string;
-  status: "Open" | "InProgress" | "Completed";
-  nightLord: string;
-  joinedPlayers: JoinedPlayer[];
-  createdAt: string;
-  updatedAt: string;
-  startedAt: string | null;
-  completedAt: string | null;
-  password: string;
-}
+import {
+  Session, 
+  MinimalSession, 
+  fetchSessions
+} from "@/utils/api";
 
 type StatusFilter = "All" | "Open" | "InProgress" | "Completed";
 type FriendFilter = "All" | "Friends";
@@ -60,6 +43,7 @@ export default function SessionsPage() {
   const router = useRouter();
   const { isLoggedIn } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [minimalSessions, setMinimalSessions] = useState<MinimalSession[]>([]);
   const [filteredSessions, setFilteredSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +54,7 @@ export default function SessionsPage() {
   const limit = 10;
 
   useEffect(() => {
-    fetchSessions();
+    fetchSessionsData();
   }, [currentPage, statusFilter]);
 
   useEffect(() => {
@@ -86,7 +70,6 @@ export default function SessionsPage() {
     if (friendFilter === "Friends") {
       // This will be implemented later
       // For now, we'll just show a toast message
-      toast.info("Friend filtering will be implemented soon!");
     }
     
     setFilteredSessions(result);
@@ -98,48 +81,25 @@ export default function SessionsPage() {
     }
   }
 
-  async function fetchSessions() {
+  async function fetchSessionsData() {
     setIsLoading(true);
     setError(null);
 
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const token = localStorage.getItem('token');
+      const result = await fetchSessions(isLoggedIn, currentPage, limit, statusFilter);
       
-      const offset = (currentPage - 1) * limit;
-      // Add status parameter to only fetch sessions with the current status filter
-      const statusParam = statusFilter !== 'All' ? `&status=${statusFilter}` : '';
-      // Always set isPrivate=false to ensure we never show private sessions
-      const isPrivateParam = '&isPrivate=false';
-      
-      // Set up headers based on authentication status
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      
-      // Add authorization header if user is logged in
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      if (result.sessions) {
+        setSessions(result.sessions);
+        setFilteredSessions(result.sessions);
+        // For now, we'll just assume there are more pages if we get a full page of results
+        setTotalPages(result.sessions.length === limit ? currentPage + 1 : currentPage);
+      } else if (result.minimalSessions) {
+        setMinimalSessions(result.minimalSessions);
+        // For now, we'll just assume there are more pages if we get a full page of results
+        setTotalPages(result.minimalSessions.length === limit ? currentPage + 1 : currentPage);
       }
-      
-      const response = await fetch(`${apiBaseUrl}/api/v1/sessions?limit=${limit}&offset=${offset}${statusParam}${isPrivateParam}`, {
-        method: 'GET',
-        headers,
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch sessions');
-      }
-
-      const data = await response.json();
-      setSessions(data);
-      
-      // For now, we'll just assume there are more pages if we get a full page of results
-      // In a real implementation, you'd want to get the total count from the API
-      setTotalPages(data.length === limit ? currentPage + 1 : currentPage);
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "Failed to load sessions");
-      toast.error(error instanceof Error ? error.message : "Failed to load sessions");
     } finally {
       setIsLoading(false);
     }
@@ -148,7 +108,6 @@ export default function SessionsPage() {
   async function handleJoinSession(sessionId: string) {
     // Require authentication to join a session
     if (!isLoggedIn) {
-      toast.error("Authentication required to join a session");
       router.push('/login');
       return;
     }
@@ -157,14 +116,13 @@ export default function SessionsPage() {
       // Check if the session is open before attempting to join
       const session = sessions.find(s => s.id === sessionId);
       if (!session || session.status !== 'Open') {
-        toast.error("You can only join open sessions");
         return;
       }
 
       // Navigate to the join page with the session ID
       router.push(`/sessions/join?id=${sessionId}`);
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Failed to process join request");
+      console.error(error);
     }
   }
 
@@ -185,6 +143,12 @@ export default function SessionsPage() {
     const host = session.joinedPlayers.find(player => player.userId === session.hostId);
     return host ? host.username : 'Unknown';
   }
+
+  // Determine which dataset to display based on login status
+  const hasFullData = isLoggedIn && sessions.length > 0;
+  //todo
+  //const dataToDisplay = hasFullData ? filteredSessions : minimalSessions;
+  const isEmptyResult = (hasFullData && filteredSessions.length === 0) || (!hasFullData && minimalSessions.length === 0);
 
   return (
     <MainLayout footer={<Footer />}>
@@ -241,40 +205,42 @@ export default function SessionsPage() {
                 </Select>
               </div>
             </div>
-            <div className="w-full">
-              {/* Desktop View - Keep original select */}
-              <div className="hidden md:block">
-                <label htmlFor="friend-filter" className="block text-sm font-medium mb-1">Players</label>
-                <select 
-                  id="friend-filter"
-                  className="w-full p-2 rounded-md border bg-background"
-                  value={friendFilter}
-                  onChange={(e) => setFriendFilter(e.target.value as FriendFilter)}
-                >
-                  <option value="All">All Players</option>
-                  <option value="Friends">Friends Only</option>
-                </select>
-                <p className="text-xs text-muted-foreground mt-1">Friend filtering coming soon!</p>
+            {isLoggedIn && (
+              <div className="w-full">
+                {/* Desktop View - Keep original select */}
+                <div className="hidden md:block">
+                  <label htmlFor="friend-filter" className="block text-sm font-medium mb-1">Players</label>
+                  <select 
+                    id="friend-filter"
+                    className="w-full p-2 rounded-md border bg-background"
+                    value={friendFilter}
+                    onChange={(e) => setFriendFilter(e.target.value as FriendFilter)}
+                  >
+                    <option value="All">All Players</option>
+                    <option value="Friends">Friends Only</option>
+                  </select>
+                  <p className="text-xs text-muted-foreground mt-1">Friend filtering coming soon!</p>
+                </div>
+                
+                {/* Mobile View - Use styled Select component */}
+                <div className="block md:hidden">
+                  <label htmlFor="mobile-friend-filter" className="block text-sm font-medium mb-1">Players</label>
+                  <Select
+                    value={friendFilter}
+                    onValueChange={(value) => setFriendFilter(value as FriendFilter)}
+                  >
+                    <SelectTrigger id="mobile-friend-filter" className="h-10 w-full">
+                      <SelectValue placeholder="Select players" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="All">All Players</SelectItem>
+                      <SelectItem value="Friends">Friends Only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">Friend filtering coming soon!</p>
+                </div>
               </div>
-              
-              {/* Mobile View - Use styled Select component */}
-              <div className="block md:hidden">
-                <label htmlFor="mobile-friend-filter" className="block text-sm font-medium mb-1">Players</label>
-                <Select
-                  value={friendFilter}
-                  onValueChange={(value) => setFriendFilter(value as FriendFilter)}
-                >
-                  <SelectTrigger id="mobile-friend-filter" className="h-10 w-full">
-                    <SelectValue placeholder="Select players" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All">All Players</SelectItem>
-                    <SelectItem value="Friends">Friends Only</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground mt-1">Friend filtering coming soon!</p>
-              </div>
-            </div>
+            )}
           </div>
         </div>
         
@@ -286,7 +252,7 @@ export default function SessionsPage() {
           <div className="p-4 border rounded-lg bg-red-50 text-red-800 dark:bg-red-900 dark:text-red-300">
             <p>{error}</p>
           </div>
-        ) : filteredSessions.length === 0 ? (
+        ) : isEmptyResult ? (
           <div className="p-3 md:p-4 border rounded-lg shadow-sm bg-card">
             <p className="text-base md:text-lg font-medium">No matching sessions available.</p>
             <p className="text-sm md:text-base text-muted-foreground">Try adjusting your filters or create a new session.</p>
@@ -301,73 +267,118 @@ export default function SessionsPage() {
                     <TableHead className="w-[300px]">Session Name</TableHead>
                     <TableHead>Host</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
+                    {isLoggedIn && <TableHead className="text-right">Action</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredSessions
-                    .slice((currentPage - 1) * limit, currentPage * limit)
-                    .map((session) => (
-                    <TableRow key={session.id}>
-                      <TableCell className="font-medium">{session.name}</TableCell>
-                      <TableCell>{getHostName(session)}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(session.status)}`}>
-                          {session.status}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {session.status === 'Open' ? (
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => handleJoinSession(session.id)}
-                          >
-                            Join Session
-                          </Button>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Not Available</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {hasFullData ? (
+                    // Full data display for authenticated users
+                    filteredSessions
+                      .slice((currentPage - 1) * limit, currentPage * limit)
+                      .map((session) => (
+                      <TableRow key={session.id}>
+                        <TableCell className="font-medium">{session.name}</TableCell>
+                        <TableCell>{getHostName(session)}</TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(session.status)}`}>
+                            {session.status}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {session.status === 'Open' ? (
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleJoinSession(session.id)}
+                            >
+                              Join Session
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Not Available</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    // Minimal data display for non-authenticated users
+                    minimalSessions
+                      .slice((currentPage - 1) * limit, currentPage * limit)
+                      .map((session) => (
+                      <TableRow key={session.id}>
+                        <TableCell className="font-medium">{session.name}</TableCell>
+                        <TableCell>{session.hostName}</TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(session.status)}`}>
+                            {session.status}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>
 
             {/* Mobile view - Cards */}
             <div className="grid grid-cols-1 gap-4 md:hidden">
-              {filteredSessions
-                .slice((currentPage - 1) * limit, currentPage * limit)
-                .map((session) => (
-                <div key={session.id} className="p-4 border rounded-lg bg-card shadow-sm">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-medium text-base truncate">{session.name}</h3>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(session.status)}`}>
-                      {session.status}
-                    </span>
+              {hasFullData ? (
+                // Full data display for authenticated users
+                filteredSessions
+                  .slice((currentPage - 1) * limit, currentPage * limit)
+                  .map((session) => (
+                  <div key={session.id} className="p-4 border rounded-lg bg-card shadow-sm">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-medium text-base truncate">{session.name}</h3>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(session.status)}`}>
+                        {session.status}
+                      </span>
+                    </div>
+                    <div className="text-sm text-muted-foreground mb-3">
+                      <p>Host: {getHostName(session)}</p>
+                    </div>
+                    <div className="mt-3">
+                      {session.status === 'Open' ? (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          className="w-full"
+                          onClick={() => handleJoinSession(session.id)}
+                        >
+                          Join Session
+                        </Button>
+                      ) : (
+                        <div className="text-center text-xs text-muted-foreground py-1">
+                          Not Available
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-sm text-muted-foreground mb-3">
-                    <p>Host: {getHostName(session)}</p>
-                  </div>
-                  <div className="mt-3">
-                    {session.status === 'Open' ? (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="w-full"
-                        onClick={() => handleJoinSession(session.id)}
-                      >
-                        Join Session
-                      </Button>
-                    ) : (
-                      <div className="text-center text-xs text-muted-foreground py-1">
-                        Not Available
+                ))
+              ) : (
+                // Minimal data display for non-authenticated users
+                minimalSessions
+                  .slice((currentPage - 1) * limit, currentPage * limit)
+                  .map((session) => (
+                  <div key={session.id} className="p-4 border rounded-lg bg-card shadow-sm">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-medium text-base truncate">{session.name}</h3>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(session.status)}`}>
+                        {session.status}
+                      </span>
+                    </div>
+                    <div className="text-sm text-muted-foreground mb-3">
+                      <p>Host: {session.hostName}</p>
+                    </div>
+                    {!isLoggedIn && (
+                      <div className="mt-3 text-center">
+                        <Link href="/login" className="text-xs text-indigo-400 hover:text-indigo-500">
+                          Login to join sessions
+                        </Link>
                       </div>
                     )}
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
 
             <div className="mt-4">

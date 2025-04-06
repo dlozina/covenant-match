@@ -1,6 +1,5 @@
 use actix::prelude::*;
-use log::{debug, error, info, warn};
-use std::collections::HashMap;
+use log::{debug, error, info};
 use std::hash::{Hash, Hasher};
 
 use crate::sse::messages::*;

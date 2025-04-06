@@ -20,6 +20,14 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { 
+  fetchNightLords, 
+  fetchNightfarers, 
+  NightLord, 
+  Nightfarer, 
+  createSession, 
+  CreateSessionParams 
+} from "@/utils/api";
 
 // Type for our notification state
 type NotificationType = {
@@ -56,6 +64,9 @@ function CreateSessionContent() {
   const [selectedFarer, setSelectedFarer] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [notification, setNotification] = useState<NotificationType | null>(null);
+  const [nightLords, setNightLords] = useState<NightLord[]>([]);
+  const [nightfarers, setNightfarers] = useState<Nightfarer[]>([]);
+  const [isLoadingCharacters, setIsLoadingCharacters] = useState<boolean>(true);
   
   // Character counter states
   const [sessionNameLength, setSessionNameLength] = useState(0);
@@ -74,6 +85,30 @@ function CreateSessionContent() {
     },
     mode: "onBlur", // Only validate on blur and submit for better UX
   });
+
+  // Fetch nightlords and nightfarers on component mount
+  useEffect(() => {
+    const fetchCharacters = async () => {
+      try {
+        setIsLoadingCharacters(true);
+        const [lords, farers] = await Promise.all([
+          fetchNightLords(),
+          fetchNightfarers()
+        ]);
+        setNightLords(lords);
+        setNightfarers(farers);
+      } catch {
+        setNotification({
+          message: "Failed to load characters. Please refresh the page.",
+          type: 'error'
+        });
+      } finally {
+        setIsLoadingCharacters(false);
+      }
+    };
+
+    fetchCharacters();
+  }, []);
   
   // Update character counters whenever field values change
   useEffect(() => {
@@ -128,11 +163,8 @@ function CreateSessionContent() {
     setIsLoading(true);
     
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const token = localStorage.getItem('token');
-      
       // Sanitize inputs before submission
-      const sanitizedData = {
+      const sessionData: CreateSessionParams = {
         gamePassword: data.password.trim(),
         name: data.sessionName.trim(),
         nightLord: selectedLord,
@@ -140,28 +172,16 @@ function CreateSessionContent() {
         isPrivate: false
       };
       
-      const response = await fetch(`${apiBaseUrl}/api/v1/sessions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(sanitizedData),
+      const responseData = await createSession(sessionData);
+      
+      setNotification({
+        message: "Session created successfully!",
+        type: 'success'
       });
       
-      const responseData = await response.json();
-      
-      if (response.ok) {
-        setNotification({
-          message: "Session created successfully!",
-          type: 'success'
-        });
-        setTimeout(() => {
-          router.push(`/sessions/run?id=${responseData.id}`);
-        }, 1000); // Short delay to show success message
-      } else {
-        throw new Error(responseData.message || "Failed to create session");
-      }
+      setTimeout(() => {
+        router.push(`/sessions/run?id=${responseData.id}`);
+      }, 1000); // Short delay to show success message
     } catch (error) {
       setNotification({
         message: error instanceof Error ? error.message : "An unexpected error occurred",
@@ -182,19 +202,6 @@ function CreateSessionContent() {
               <Link href="/sessions">Back to Sessions</Link>
             </Button>
           </div>
-
-          {/* Notification display area */}
-          {notification && (
-            <div className={`
-              flex items-center gap-2 text-sm p-3 rounded-md 
-              ${notification.type === 'error' ? 'bg-red-100 text-red-700 border border-red-300' : 
-               notification.type === 'warning' ? 'bg-amber-100 text-amber-700 border border-amber-300' :
-               'bg-green-100 text-green-700 border border-green-300'}
-            `}>
-              <AlertCircle size={16} className="flex-shrink-0" />
-              <span>{notification.message}</span>
-            </div>
-          )}
 
           <Card>
             <CardHeader>
@@ -264,29 +271,24 @@ function CreateSessionContent() {
                       Select Nightfarer
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                      {[
-                        "Wylder", 
-                        "Guardian", 
-                        "Recluse", 
-                        "Duchess", 
-                        "Patces", 
-                        "Jolan", 
-                        "Igon", 
-                        "Alexander"
-                      ].map(farer => (
-                        <Button 
-                          key={farer} 
-                          variant="outline" 
-                          className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
-                            selectedFarer === farer ? "border-purple-500 bg-purple-950/20" : ""
-                          }`}
-                          style={{ whiteSpace: 'normal' }}
-                          onClick={() => setSelectedFarer(farer)}
-                          type="button"
-                        >
-                          <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{farer}</span>
-                        </Button>
-                      ))}
+                      {isLoadingCharacters ? (
+                        <div className="col-span-full text-center py-4">Loading Nightfarers...</div>
+                      ) : (
+                        nightfarers.map(farer => (
+                          <Button 
+                            key={farer.id} 
+                            variant="outline" 
+                            className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
+                              selectedFarer === farer.name ? "border-purple-500 bg-purple-950/20" : ""
+                            }`}
+                            style={{ whiteSpace: 'normal' }}
+                            onClick={() => setSelectedFarer(farer.name)}
+                            type="button"
+                          >
+                            <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{farer.name}</span>
+                          </Button>
+                        ))
+                      )}
                     </div>
                     {!selectedFarer && form.formState.isSubmitted && (
                       <p className="text-xs sm:text-sm text-red-600 font-medium mt-1">Please select a Nightfarer</p>
@@ -298,34 +300,42 @@ function CreateSessionContent() {
                       Select Night Lord
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                      {[
-                        "Tricephalos", 
-                        "PCR", 
-                        "Malenia, Blade of Miquella", 
-                        "Maliketh", 
-                        "Mohg", 
-                        "Midra", 
-                        "Bayle", 
-                        "Messmer"
-                      ].map(lord => (
-                        <Button 
-                          key={lord} 
-                          variant="outline" 
-                          className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
-                            selectedLord === lord ? "border-purple-500 bg-purple-950/20" : ""
-                          }`}
-                          style={{ whiteSpace: 'normal' }}
-                          onClick={() => setSelectedLord(lord)}
-                          type="button"
-                        >
-                          <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{lord}</span>
-                        </Button>
-                      ))}
+                      {isLoadingCharacters ? (
+                        <div className="col-span-full text-center py-4">Loading Night Lords...</div>
+                      ) : (
+                        nightLords.map(lord => (
+                          <Button 
+                            key={lord.id} 
+                            variant="outline" 
+                            className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
+                              selectedLord === lord.name ? "border-purple-500 bg-purple-950/20" : ""
+                            }`}
+                            style={{ whiteSpace: 'normal' }}
+                            onClick={() => setSelectedLord(lord.name)}
+                            type="button"
+                          >
+                            <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{lord.name}</span>
+                          </Button>
+                        ))
+                      )}
                     </div>
                     {!selectedLord && form.formState.isSubmitted && (
                       <p className="text-xs sm:text-sm text-red-600 font-medium mt-1">Please select a Night Lord</p>
                     )}
                   </div>
+                  
+                  {/* Notification display area */}
+                  {notification && (
+                    <div className={`
+                      flex items-center gap-2 text-sm p-3 rounded-md 
+                      ${notification.type === 'error' ? 'bg-red-100 text-red-700 border border-red-300' : 
+                      notification.type === 'warning' ? 'bg-amber-100 text-amber-700 border border-amber-300' :
+                      'bg-green-100 text-green-700 border border-green-300'}
+                    `}>
+                      <AlertCircle size={16} className="flex-shrink-0" />
+                      <span>{notification.message}</span>
+                    </div>
+                  )}
 
                   <div className="pt-4">
                     <Button 

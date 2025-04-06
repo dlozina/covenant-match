@@ -10,16 +10,13 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/lib/auth-context";
 import { jwtDecode } from "jwt-decode";
 import { Notification, NotificationType } from "@/components/ui/notification";
-
-// Define a type for session details
-interface SessionDetails {
-  id: string;
-  name: string;
-  nightLord: string;
-  nightfarer?: string;
-  players?: { userId: string; username: string; nightfarer: string }[];
-  // Add other fields as needed
-}
+import { 
+  fetchNightfarers, 
+  Nightfarer, 
+  SessionDetails, 
+  fetchSessionDetail, 
+  joinSession 
+} from "@/utils/api";
 
 // Define JWT Claims interface
 interface JwtClaims {
@@ -42,40 +39,45 @@ function JoinSessionContent() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [sessionDetails, setSessionDetails] = useState<SessionDetails | null>(null);
   const [notification, setNotification] = useState<NotificationType | null>(null);
+  const [nightfarers, setNightfarers] = useState<Nightfarer[]>([]);
+  const [isLoadingCharacters, setIsLoadingCharacters] = useState<boolean>(true);
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('id');
   const { userData } = useAuth();
   
+  // Fetch nightfarers on component mount
+  useEffect(() => {
+    const loadNightfarers = async () => {
+      try {
+        setIsLoadingCharacters(true);
+        const farers = await fetchNightfarers();
+        setNightfarers(farers);
+      } catch {
+        setNotification({
+          type: 'error',
+          message: "Failed to load Nightfarers. Please refresh the page."
+        });
+      } finally {
+        setIsLoadingCharacters(false);
+      }
+    };
+
+    loadNightfarers();
+  }, []);
+  
   // Use useCallback for fetchSessionDetails to avoid recreating it on each render
-  const fetchSessionDetails = useCallback(async () => {
+  const fetchSessionDetailsData = useCallback(async () => {
     if (!sessionId) return;
     
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const token = localStorage.getItem('token');
-      
-      const response = await fetch(`${apiBaseUrl}/api/v1/sessions/${sessionId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-      });
-      
-      const data = await response.json();
-
-      if (response.ok) {
-        setSessionDetails(data);
-      } else {
-        setNotification({
-          type: 'error',
-          message: data.message || 'Failed to fetch session details'
-        });
-      }
+      const data = await fetchSessionDetail(sessionId);
+      setSessionDetails(data);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Error fetching session details';
       setNotification({
         type: 'error',
-        message: 'Error fetching session details: ' + error
+        message: errorMessage
       });
     }
   }, [sessionId, setNotification]);
@@ -83,14 +85,14 @@ function JoinSessionContent() {
   useEffect(() => {
     // Fetch session details only once when component mounts
     if (sessionId) {
-      fetchSessionDetails();
+      fetchSessionDetailsData();
     } else {
       setNotification({
         type: 'error',
         message: 'No session ID provided'
       });
     }
-  }, [sessionId, fetchSessionDetails]);
+  }, [sessionId, fetchSessionDetailsData]);
   
   // Function to extract user ID from JWT token
   const getUserIdFromToken = (): string | null => {
@@ -148,36 +150,20 @@ function JoinSessionContent() {
     setIsLoading(true);
     
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const token = localStorage.getItem('token');
+      await joinSession(
+        sessionId,
+        selectedFarer,
+        userId,
+        userData.username,
+        userData.covenantName || 'Unknown'
+      );
       
-      const response = await fetch(`${apiBaseUrl}/api/v1/sessions/${sessionId}/join`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          nightfarer: selectedFarer,
-          userId: userId,
-          username: userData.username
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        router.push(`/sessions/run?id=${sessionId}`);
-      } else {
-        setNotification({
-          type: 'error',
-          message: data.message || "Failed to join session"
-        });
-      }
+      router.push(`/sessions/run?id=${sessionId}`);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
       setNotification({
         type: 'error',
-        message: "An unexpected error occurred: " + error
+        message: errorMessage
       });
     } finally {
       setIsLoading(false);
@@ -191,7 +177,7 @@ function JoinSessionContent() {
   
   // Render players list
   const renderPlayers = () => {
-    if (!sessionDetails || !sessionDetails.players || sessionDetails.players.length === 0) {
+    if (!sessionDetails || !sessionDetails.joinedPlayers || sessionDetails.joinedPlayers.length === 0) {
       return <p className="text-sm text-muted-foreground">No players have joined yet.</p>;
     }
     
@@ -199,7 +185,7 @@ function JoinSessionContent() {
       <div className="space-y-2 mt-4">
         <h3 className="text-sm font-medium">Players:</h3>
         <ul className="space-y-1">
-          {sessionDetails.players.map((player) => (
+          {sessionDetails.joinedPlayers.map((player) => (
             <li key={player.userId} className="text-sm">
               {player.username} - {player.nightfarer}
             </li>
@@ -226,10 +212,6 @@ function JoinSessionContent() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <Notification 
-              notification={notification} 
-              onDismiss={clearNotification}
-            />
             
             {sessionDetails && (
               <div className="space-y-2">
@@ -243,30 +225,30 @@ function JoinSessionContent() {
                 Select Nightfarer
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                {[
-                  "Wylder", 
-                  "Guardian", 
-                  "Recluse", 
-                  "Duchess", 
-                  "Patces", 
-                  "Jolan", 
-                  "Igon", 
-                  "Alexander"
-                ].map(farer => (
-                  <Button 
-                    key={farer} 
-                    variant="outline" 
-                    className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
-                      selectedFarer === farer ? "border-purple-500 bg-purple-950/20" : ""
-                    }`}
-                    style={{ whiteSpace: 'normal' }}
-                    onClick={() => setSelectedFarer(farer)}
-                  >
-                    <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{farer}</span>
-                  </Button>
-                ))}
+                {isLoadingCharacters ? (
+                  <div className="col-span-full text-center py-4">Loading Nightfarers...</div>
+                ) : (
+                  nightfarers.map(farer => (
+                    <Button 
+                      key={farer.id} 
+                      variant="outline" 
+                      className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
+                        selectedFarer === farer.name ? "border-purple-500 bg-purple-950/20" : ""
+                      }`}
+                      style={{ whiteSpace: 'normal' }}
+                      onClick={() => setSelectedFarer(farer.name)}
+                    >
+                      <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{farer.name}</span>
+                    </Button>
+                  ))
+                )}
               </div>
             </div>
+            
+            <Notification 
+              notification={notification} 
+              onDismiss={clearNotification}
+            />
 
             <div className="pt-4">
               <Button 

@@ -10,17 +10,17 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/lib/auth-context";
 import { jwtDecode } from "jwt-decode";
 import { Notification, NotificationType } from "@/components/ui/notification";
-
-// Define a type for session details
-interface SessionDetails {
-  id: string;
-  name: string;
-  nightLord: string;
-  password: string | null;
-  hostId: string;
-  nightfarer?: string;
-  joinedPlayers?: { userId: string; username: string; nightfarer: string }[];
-}
+import { 
+  fetchNightLords, 
+  fetchNightfarers, 
+  NightLord, 
+  Nightfarer, 
+  SessionDetails, 
+  fetchSessionDetail, 
+  recreateSession, 
+  updateSessionCharacters, 
+  joinSession 
+} from "@/utils/api";
 
 // Define JWT Claims interface
 interface JwtClaims {
@@ -50,6 +50,11 @@ function RecreateSessionContent() {
   // State for notifications
   const [notification, setNotification] = useState<NotificationType | null>(null);
   
+  // State for character data
+  const [nightLords, setNightLords] = useState<NightLord[]>([]);
+  const [nightfarers, setNightfarers] = useState<Nightfarer[]>([]);
+  const [isLoadingCharacters, setIsLoadingCharacters] = useState<boolean>(true);
+  
   // Navigation
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -65,7 +70,7 @@ function RecreateSessionContent() {
     // Fetch original session details when component mounts
     if (originalSessionId) {
       console.log(`Recreate page: Initializing with original session ID: ${originalSessionId}`);
-      fetchSessionDetails();
+      fetchSessionDetailsData();
     } else {
       setNotification({
         type: 'error',
@@ -73,46 +78,52 @@ function RecreateSessionContent() {
       });
       router.push('/sessions');
     }
+    
+    // Fetch character data
+    fetchCharacterData();
   }, [originalSessionId]);
   
-  const fetchSessionDetails = async () => {
-    console.log(`Recreate page: Fetching session details for session ID: ${originalSessionId}`);
+  const fetchCharacterData = async () => {
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const token = localStorage.getItem('token');
-      
-      const response = await fetch(`${apiBaseUrl}/api/v1/sessions/${originalSessionId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        setSessionDetails(data);
-        
-        // Check if the current user is the host
-        const userId = getUserIdFromToken();
-        if (userId && data.hostId === userId) {
-          setIsHost(true);
-        } else {
-          setIsHost(false);
-          // If not host, we'll need to handle this differently
-          // For non-hosts, this is a "join new session" page
-        }
-      } else {
-        setNotification({
-          type: 'error',
-          message: data.message || 'Failed to fetch session details'
-        });
-        router.push('/sessions');
-      }
-    } catch (error) {
+      setIsLoadingCharacters(true);
+      const [lords, farers] = await Promise.all([
+        fetchNightLords(),
+        fetchNightfarers()
+      ]);
+      setNightLords(lords);
+      setNightfarers(farers);
+    } catch {
       setNotification({
         type: 'error',
-        message: 'Error fetching session details: ' + error
+        message: "Failed to load characters. Please refresh the page."
+      });
+    } finally {
+      setIsLoadingCharacters(false);
+    }
+  };
+  
+  const fetchSessionDetailsData = async () => {
+    if (!originalSessionId) return;
+    
+    console.log(`Recreate page: Fetching session details for session ID: ${originalSessionId}`);
+    try {
+      const data = await fetchSessionDetail(originalSessionId);
+      setSessionDetails(data);
+      
+      // Check if the current user is the host
+      const userId = getUserIdFromToken();
+      if (userId && data.hostId === userId) {
+        setIsHost(true);
+      } else {
+        setIsHost(false);
+        // If not host, we'll need to handle this differently
+        // For non-hosts, this is a "join new session" page
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Error fetching session details";
+      setNotification({
+        type: 'error',
+        message: errorMessage
       });
       router.push('/sessions');
     }
@@ -177,42 +188,13 @@ function RecreateSessionContent() {
     setIsLoading(true);
     
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const token = localStorage.getItem('token');
-      
-      // First, recreate the session using the existing API endpoint
-      const recreateResponse = await fetch(`${apiBaseUrl}/api/v1/sessions/${originalSessionId}/recreate`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-      });
-      
-      const recreateData = await recreateResponse.json();
-      
-      if (!recreateResponse.ok) {
-        throw new Error(recreateData.message || "Failed to recreate session");
-      }
-      
+      // First, recreate the session using the API function
+      const recreateData = await recreateSession(originalSessionId);
       const newSessionId = recreateData.id;
       
       // Now, update the new session with the selected characters
-      const updateResponse = await fetch(`${apiBaseUrl}/api/v1/sessions/${newSessionId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          nightLord: selectedLord,
-          hostNightfarer: selectedFarer
-        }),
-      });
+      await updateSessionCharacters(newSessionId, selectedLord, selectedFarer);
       
-      if (!updateResponse.ok) {
-        const updateData = await updateResponse.json();
-        throw new Error(updateData.message || "Failed to update session characters");
-      }
       // Set a flag in sessionStorage so the run page knows we came from here
       sessionStorage.setItem('fromRecreatePage', 'true');
       
@@ -256,47 +238,33 @@ function RecreateSessionContent() {
         throw new Error("New session ID not found");
       }
       
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const token = localStorage.getItem('token');
       const userId = getUserIdFromToken();
       
       if (!userId || !userData) {
         throw new Error("User information not available");
       }
        
-      const response = await fetch(`${apiBaseUrl}/api/v1/sessions/${autoJoinSessionId}/join`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          nightfarer: selectedFarer,
-          userId: userId,
-          username: userData.username
-        }),
+      await joinSession(
+        autoJoinSessionId,
+        selectedFarer,
+        userId,
+        userData.username,
+        userData.covenantName || ''
+      );
+      
+      setNotification({
+        type: 'success',
+        message: "Successfully joined new session"
       });
       
-      const data = await response.json();
-      if (response.ok) {
-        setNotification({
-          type: 'success',
-          message: "Successfully joined new session"
-        });
-        // Clear the auto-join data from sessionStorage
-        sessionStorage.removeItem('autoJoinSessionId');
-        sessionStorage.removeItem('autoJoinCharacter');
-        
-        // Set a flag in sessionStorage so the run page knows we came from here
-        sessionStorage.setItem('fromRecreatePage', 'true');
-        
-        router.push(`/sessions/run?id=${autoJoinSessionId}`);
-      } else {
-        setNotification({
-          type: 'error',
-          message: data.message || "Failed to join session"
-        });
-      }
+      // Clear the auto-join data from sessionStorage
+      sessionStorage.removeItem('autoJoinSessionId');
+      sessionStorage.removeItem('autoJoinCharacter');
+      
+      // Set a flag in sessionStorage so the run page knows we came from here
+      sessionStorage.setItem('fromRecreatePage', 'true');
+      
+      router.push(`/sessions/run?id=${autoJoinSessionId}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
       setNotification({
@@ -314,114 +282,107 @@ function RecreateSessionContent() {
   
   return (
     <MainLayout footer={<Footer />}>
-      <div className="container py-6 px-4 mx-auto">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold">{pageTitle}</h1>
-          <Button variant="outline" asChild>
-            <Link href="/sessions">Back to main sessions page (Quit session)</Link>
-          </Button>
-        </div>
+      <div className="container max-w-2xl py-6 md:py-10 px-4 mx-auto">
+        <div className="space-y-4 md:space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <h1 className="text-xl md:text-2xl font-bold">{pageTitle}</h1>
+            <Button variant="outline" asChild className="h-10">
+              <Link href="/sessions">Back to Sessions</Link>
+            </Button>
+          </div>
 
-        <Card className="max-w-2xl mx-auto">
-          <CardHeader>
-            <CardTitle>
-              {sessionDetails ? sessionDetails.name : "Loading session..."}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <Notification 
-              notification={notification} 
-              onDismiss={clearNotification}
-            />
-          
-            {sessionDetails && (
-              <div className="space-y-2">
-                {isHost ? (
-                  <div className="flex flex-col space-y-4">
-                    <p className="text-muted-foreground text-sm">The session name and in-game password will remain the same as the original session.</p>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">
-                        Select New Night Lord
-                      </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                        {[
-                          "Tricephalos", 
-                          "PCR", 
-                          "Malenia, Blade of Miquella", 
-                          "Maliketh", 
-                          "Mohg", 
-                          "Midra", 
-                          "Bayle", 
-                          "Messmer"
-                        ].map(lord => (
-                          <Button 
-                            key={lord} 
-                            variant="outline" 
-                            className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
-                              selectedLord === lord ? "border-purple-500 bg-purple-950/20" : ""
-                            }`}
-                            style={{ whiteSpace: 'normal' }}
-                            onClick={() => setSelectedLord(lord)}
-                          >
-                            <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{lord}</span>
-                          </Button>
-                        ))}
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                {sessionDetails ? sessionDetails.name : "Loading session..."}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <Notification 
+                notification={notification} 
+                onDismiss={clearNotification}
+              />
+            
+              {sessionDetails && (
+                <div className="space-y-4">
+                  {isHost ? (
+                    <div className="space-y-4">
+                      <p className="text-muted-foreground text-sm">The session name and in-game password will remain the same as the original session.</p>
+                      <div className="space-y-2">
+                        <label className="text-sm md:text-base font-medium">
+                          Select New Night Lord
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                          {isLoadingCharacters ? (
+                            <div className="col-span-full text-center py-4">Loading Night Lords...</div>
+                          ) : (
+                            nightLords.map(lord => (
+                              <Button 
+                                key={lord.id} 
+                                variant="outline" 
+                                className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
+                                  selectedLord === lord.name ? "border-purple-500 bg-purple-950/20" : ""
+                                }`}
+                                style={{ whiteSpace: 'normal' }}
+                                onClick={() => setSelectedLord(lord.name)}
+                                type="button"
+                              >
+                                <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{lord.name}</span>
+                              </Button>
+                            ))
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex flex-col space-y-2">
-                    <p className="text-sm font-medium">Night Lord: {sessionDetails.nightLord}</p>
-                    <p className="text-sm text-muted-foreground">
-                      The host has created a new session with the same team. Choose your character to join.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-sm md:text-base font-medium">Night Lord: {sessionDetails.nightLord}</p>
+                      <p className="text-sm text-muted-foreground">
+                        The host has created a new session with the same team. Choose your character to join.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Select {isHost ? "Your New" : ""} Nightfarer
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                {[
-                  "Wylder", 
-                  "Guardian", 
-                  "Recluse", 
-                  "Duchess", 
-                  "Patces", 
-                  "Jolan", 
-                  "Igon", 
-                  "Alexander"
-                ].map(farer => (
-                  <Button 
-                    key={farer} 
-                    variant="outline" 
-                    className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
-                      selectedFarer === farer ? "border-purple-500 bg-purple-950/20" : ""
-                    }`}
-                    style={{ whiteSpace: 'normal' }}
-                    onClick={() => setSelectedFarer(farer)}
-                  >
-                    <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{farer}</span>
-                  </Button>
-                ))}
+              <div className="space-y-2">
+                <label className="text-sm md:text-base font-medium">
+                  Select {isHost ? "Your New" : ""} Nightfarer
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                  {isLoadingCharacters ? (
+                    <div className="col-span-full text-center py-4">Loading Nightfarers...</div>
+                  ) : (
+                    nightfarers.map(farer => (
+                      <Button 
+                        key={farer.id} 
+                        variant="outline" 
+                        className={`min-h-[4rem] h-auto py-2 px-1 flex flex-col items-center justify-center text-center hover:border-purple-500 hover:bg-purple-950/20 ${
+                          selectedFarer === farer.name ? "border-purple-500 bg-purple-950/20" : ""
+                        }`}
+                        style={{ whiteSpace: 'normal' }}
+                        onClick={() => setSelectedFarer(farer.name)}
+                        type="button"
+                      >
+                        <span className="text-sm w-full overflow-hidden" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{farer.name}</span>
+                      </Button>
+                    ))
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="pt-4">
-              <Button 
-                className="w-full" 
-                size="lg" 
-                onClick={handleAction}
-                disabled={isLoading}
-              >
-                {isLoading ? "Processing..." : buttonText}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="pt-4">
+                <Button 
+                  className="w-full h-10" 
+                  onClick={handleAction}
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Processing..." : buttonText}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </MainLayout>
   );

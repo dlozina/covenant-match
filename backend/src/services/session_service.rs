@@ -1,22 +1,19 @@
-use super::user_service;
 use crate::models::error::AppError;
 use crate::models::session::{
-    CreateSessionDto, GameResult, GameSession, JoinSessionDto, PlayerInfo, RateSessionDto,
-    SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto,
+    CovenantStats, CovenantStatsResponse, CreateSessionDto, GameResult, GameSession,
+    JoinSessionDto, MinimalSessionDto, PlayerInfo, RateSessionDto, SessionResponseDto,
+    SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto,
 };
 use crate::repository::{session_repository, statistics_repository, user_repository};
 use crate::sse::messages::{BroadcastMessage, ServerMessage as SseServerMessage};
 use crate::sse::partition::SessionRouter;
-use crate::sse::session::SessionManager as SseSessionManager;
 use crate::sse::session_pruner::SessionPrunerActor;
 use crate::ws::messages::{Broadcast, ServerMessage as WsServerMessage};
 use crate::ws::SessionManager as WsSessionManager;
 use actix::prelude::*;
 use chrono::Utc;
-use mongodb::bson::{doc, oid::ObjectId, DateTime, Document};
+use mongodb::bson::oid::ObjectId;
 use mongodb::Database;
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
 use serde_json::json;
 use std::sync::LazyLock;
 use std::sync::Mutex;
@@ -177,7 +174,7 @@ pub async fn create_session(
     session_data: CreateSessionDto,
 ) -> Result<SessionResponseDto, AppError> {
     // Verify host user exists
-    let user = user_repository::find_user_by_id(db, &user_id)
+    let user = user_repository::find_user_by_id(db, user_id)
         .await?
         .ok_or(AppError::UserNotFound)?;
 
@@ -193,6 +190,7 @@ pub async fn create_session(
             user_id: user.id.to_hex(),
             username: user.display_name.unwrap_or(user.username),
             nightfarer: session_data.nightfarer,
+            covenant_name: user.covenant_name,
             joined_at: now,
         }],
         night_lord: session_data.night_lord,
@@ -238,9 +236,53 @@ pub async fn get_sessions(
     // Convert to response DTOs (exclude passwords for listing)
     Ok(sessions
         .into_iter()
+        .map(|s| SessionResponseDto::from(s))
+        .collect())
+}
+
+/// Get minimal public session information for non-authenticated users
+pub async fn get_minimal_sessions(
+    db: &Database,
+    status: Option<String>,
+    limit: Option<u64>,
+    offset: Option<u64>,
+) -> Result<Vec<MinimalSessionDto>, AppError> {
+    let status_filter = match status {
+        Some(s) => match s.to_lowercase().as_str() {
+            "open" => Some(SessionStatus::Open),
+            "full" => Some(SessionStatus::Full),
+            "in_progress" => Some(SessionStatus::InProgress),
+            "completed" => Some(SessionStatus::Completed),
+            "cancelled" => Some(SessionStatus::Cancelled),
+            _ => None,
+        },
+        None => None,
+    };
+
+    // Always filter out private sessions for this public endpoint
+    let is_private = Some(false);
+
+    let sessions =
+        session_repository::find_sessions(db, status_filter, limit, offset, is_private).await?;
+
+    // Convert to minimal DTOs with just the necessary info
+    Ok(sessions
+        .into_iter()
         .map(|s| {
-            let mut response = SessionResponseDto::from(s);
-            response
+            // Find the host in the joined players
+            let host_name = s
+                .joined_players
+                .iter()
+                .find(|p| p.user_id == s.host_id)
+                .map_or_else(|| "Unknown".to_string(), |p| p.username.clone());
+
+            MinimalSessionDto {
+                id: s.id.to_hex(),
+                name: s.name,
+                host_name,
+                status: s.status,
+                created_at: s.created_at,
+            }
         })
         .collect())
 }
@@ -273,10 +315,6 @@ pub async fn join_session(
     // Verify user exists
     let user_id = join_data.user_id.clone();
 
-    let user = user_repository::find_user_by_id(db, &user_id)
-        .await?
-        .ok_or(AppError::UserNotFound)?;
-
     // Get the session
     let mut session = session_repository::find_by_id(db, session_id)
         .await?
@@ -301,24 +339,22 @@ pub async fn join_session(
         return Err(AppError::BadRequest("Session is full".to_string()));
     }
 
-    // Get the username and nightfarer for broadcasting
-    let username = user.display_name.clone().unwrap_or(user.username.clone());
-    let nightfarer = join_data.nightfarer.clone();
-
     // Add player to session
     let now = mongodb::bson::DateTime::now();
     session.joined_players.push(PlayerInfo {
-        user_id: user_id.clone(),
-        username,
-        nightfarer: nightfarer.clone(),
+        user_id: join_data.user_id.clone(),
+        username: join_data.username.clone(),
+        nightfarer: join_data.nightfarer.clone(),
+        covenant_name: join_data.covenant_name.clone(),
         joined_at: now,
     });
 
-    // Update session status if it's now full
+    // Update session status if full (3 players instead of 4)
     if session.joined_players.len() >= 3 {
         session.status = SessionStatus::Full;
     }
 
+    // Update timestamp
     session.updated_at = now;
 
     // Update the session in the database
@@ -329,10 +365,10 @@ pub async fn join_session(
         session_id,
         "join",
         json!({
-            "userId": user_id,
-            "username": user.display_name.unwrap_or(user.username),
-            "nightfarer": nightfarer,
-            "sessionId": session_id
+            "userId": join_data.user_id,
+            "username": join_data.username,
+            "nightfarer": join_data.nightfarer,
+            "covenantName": join_data.covenant_name
         }),
         Some(user_id.clone()),
     );
@@ -522,6 +558,7 @@ pub async fn submit_result(
                     &player.username,
                     &player.nightfarer,
                     &session.night_lord,
+                    &player.covenant_name,
                     &player_result,
                 )
                 .await?;
@@ -720,6 +757,7 @@ pub async fn recreate_session(
     db: &Database,
     session_id: &str,
     user_id: &str,
+    make_private: bool,
 ) -> Result<SessionResponseDto, AppError> {
     // Get the original session
     let original_session = session_repository::find_by_id(db, session_id)
@@ -755,20 +793,22 @@ pub async fn recreate_session(
             "Host not found in session players".to_string(),
         ))?;
 
+    // Create a new session with the same properties
     let now = mongodb::bson::DateTime::now();
 
     // Create a new session with the same name and settings
     let new_session = GameSession {
         id: ObjectId::new(),
-        name: original_session.name.clone(),
+        name: format!("{} (Replay)", original_session.name),
         host_id: user_id.to_string(),
         password: original_session.password.clone(),
-        is_private: true, // Always make recreated sessions private it will show in the sessions list
+        is_private: make_private, // Always make recreated sessions private so they don't show in the sessions list
         status: SessionStatus::Open,
         joined_players: vec![PlayerInfo {
             user_id: user_id.to_string(),
             username: host_user.display_name.unwrap_or(host_user.username),
             nightfarer: host_nightfarer,
+            covenant_name: host_user.covenant_name.clone(),
             joined_at: now,
         }],
         night_lord: original_session.night_lord.clone(),
@@ -965,4 +1005,40 @@ pub async fn broadcast_to_session(
             });
         }
     }
+}
+
+/// Get statistics for all covenants
+pub async fn get_covenant_stats(db: &Database) -> Result<CovenantStatsResponse, AppError> {
+    // Get all user statistics
+    let all_stats = statistics_repository::find_all(db).await?;
+
+    // Create a map to aggregate stats by covenant
+    let mut covenant_stats_map: std::collections::HashMap<String, CovenantStats> =
+        std::collections::HashMap::new();
+
+    // Process each user's stats
+    for user_stat in all_stats {
+        // Process covenant stats directly
+        for (covenant_name, stats) in user_stat.covenant_stats {
+            // Get or create the covenant stats entry
+            let covenant_entry = covenant_stats_map
+                .entry(covenant_name.clone())
+                .or_insert_with(|| CovenantStats {
+                    covenant_name,
+                    wins: 0,
+                    losses: 0,
+                    disconnects: 0,
+                });
+
+            // Update covenant stats
+            covenant_entry.wins += stats.wins;
+            covenant_entry.losses += stats.losses;
+            covenant_entry.disconnects += stats.disconnects;
+        }
+    }
+
+    // Convert the map to a vector
+    let covenant_stats: Vec<CovenantStats> = covenant_stats_map.into_values().collect();
+
+    Ok(CovenantStatsResponse { covenant_stats })
 }

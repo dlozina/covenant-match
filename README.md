@@ -156,6 +156,53 @@ covenant-match/
                              |    (Database)     |
                              +-------------------+ 
 
+## Docker Compose development commands
+
+Rebuild the nginx container:
+```
+docker compose -f docker-compose.dev.yml build nginx
+```
+
+Rebuild the backend container:
+```
+docker compose -f docker-compose.dev.yml build backend
+```
+
+Rebuild the frontend container:
+```
+docker compose -f docker-compose.dev.yml build frontend
+```
+
+Start the development environment:
+```
+docker compose -f docker-compose.dev.yml up
+```
+
+Stop and restart the development environment:
+```
+docker compose -f docker-compose.dev.yml down && docker compose -f docker-compose.dev.yml up
+```
+
+Access to the db:
+```
+docker exec -it covenant-match-mongodb-1 bash
+```
+
+Activate the mongo shell:
+```
+mongosh
+```
+
+Change environment variables:
+```
+docker compose -f docker-compose.dev.yml stop frontend
+```
+
+```
+docker compose -f docker-compose.dev.yml up -d --no-deps frontend
+```
+
+
 ## License
 
 Copyright (c) 2025 Dino Lozina

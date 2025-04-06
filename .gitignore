@@ -41,6 +41,9 @@ nginx/ssl/*.pem
 nginx/ssl/*.key
 nginx/ssl/*.crt
 
+# Secrets
+dev-secrets/
+
 # IDE
 .idea/
 .vscode/

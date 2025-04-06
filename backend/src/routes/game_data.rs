@@ -122,10 +122,35 @@ async fn get_nightfarers(db: web::Data<Database>) -> impl Responder {
     }
 }
 
+/// Get all night lords
+#[utoipa::path(
+    get,
+    path = "/api/v1/night-lords",
+    responses(
+        (status = 200, description = "Night Lords retrieved successfully", body = Vec<NightLordResponse>),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "game-data"
+)]
+#[get("/api/v1/night-lords")]
+async fn get_night_lords(db: web::Data<Database>) -> impl Responder {
+    match game_data_service::get_all_nightlords(&db).await {
+        Ok(night_lords) => HttpResponse::Ok().json(night_lords),
+        Err(e) => {
+            log::error!("Error fetching night lords: {:?}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": "error",
+                "message": e.to_string()
+            }))
+        }
+    }
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(get_game_data)
         .service(get_platforms)
         .service(get_regions)
         .service(get_covenants)
-        .service(get_nightfarers);
+        .service(get_nightfarers)
+        .service(get_night_lords);
 }

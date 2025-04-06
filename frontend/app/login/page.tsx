@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import ReCaptchaComponent from "@/components/auth/ReCaptcha"
 import { AlertCircle } from "lucide-react"
+import { login as apiLogin, LoginParams } from "@/utils/api"
 
 // Username validation regex - must match the one used in profile creation
 const usernameRegex = /^[a-zA-Z0-9_.-]+$/;
@@ -66,12 +67,6 @@ export default function LoginPage() {
   const [showCaptcha, setShowCaptcha] = useState(false)
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [notification, setNotification] = useState<NotificationType | null>(null)
-  
-  // Character counter state
-  const [usernameLength, setUsernameLength] = useState(0)
-  
-  // Debounce timer reference
-  const [validationTimeout, setValidationTimeout] = useState<NodeJS.Timeout | null>(null)
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
@@ -79,34 +74,8 @@ export default function LoginPage() {
       username: "",
       password: "",
     },
-    mode: "onBlur", // Only validate on blur and submit for better UX
+    mode: "onSubmit", // Only validate on submit
   })
-
-  // Update character counter whenever field value changes
-  useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      if (name === 'username' && value.username) {
-        setUsernameLength(value.username.length);
-      }
-    });
-    
-    return () => subscription.unsubscribe();
-  }, [form.watch]);
-
-  // Handle debounced validation
-  const debouncedValidate = (fieldName: keyof LoginFormValues) => {
-    // Clear any existing timeout
-    if (validationTimeout) {
-      clearTimeout(validationTimeout);
-    }
-    
-    // Set a new timeout
-    const timeout = setTimeout(() => {
-      form.trigger(fieldName);
-    }, 500); // 500ms debounce
-    
-    setValidationTimeout(timeout);
-  };
 
   // Show CAPTCHA after 3 failed attempts
   useEffect(() => {
@@ -158,44 +127,18 @@ export default function LoginPage() {
     }
 
     try {
-      // Sanitize inputs before submission
-      const sanitizedData: {
-        username: string;
-        password: string;
-        captchaToken?: string;
-      } = {
+      // Prepare login data
+      const loginData: LoginParams = {
         username: data.username.trim().toLowerCase(),
-        password: data.password // passwords should not be modified
+        password: data.password, // passwords should not be modified
       };
       
       // Add captcha token if available
       if (captchaToken) {
-        sanitizedData.captchaToken = captchaToken
+        loginData.captchaToken = captchaToken;
       }
       
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const response = await fetch(`${apiBaseUrl}/api/v1/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(sanitizedData),
-        credentials: 'include', // Include cookies for CSRF protection
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        
-        // Check if server requires CAPTCHA
-        if (errorData.requiresCaptcha) {
-          setShowCaptcha(true)
-          throw new Error(errorData.message || 'CAPTCHA verification required')
-        }
-        
-        throw new Error(errorData.message || 'Invalid username or password')
-      }
-
-      const responseData = await response.json()
+      const responseData = await apiLogin(loginData);
       
       // Use the login function from auth context
       if (responseData.token) {
@@ -213,6 +156,12 @@ export default function LoginPage() {
         throw new Error('Authentication failed')
       }
     } catch (error: unknown) {
+      // Check if error has requiresCaptcha property
+      // @ts-expect-error - Custom property on error
+      if (error instanceof Error && error.requiresCaptcha) {
+        setShowCaptcha(true);
+      }
+      
       setNotification({
         message: error instanceof Error ? error.message : "Login failed. Please try again.",
         type: 'error'
@@ -245,22 +194,12 @@ export default function LoginPage() {
                   name="username"
                   render={({ field }) => (
                     <FormItem>
-                      <div className="flex justify-between items-center">
-                        <FormLabel className="text-sm">Username</FormLabel>
-                        <span className={`text-xs ${usernameLength > 8 ? 'text-red-500' : 'text-muted-foreground'}`}>
-                          {usernameLength} / 8
-                        </span>
-                      </div>
+                      <FormLabel className="text-sm">Username</FormLabel>
                       <FormControl>
                         <Input 
                           placeholder="username" 
                           {...field} 
                           className="h-10 text-base"
-                          onChange={(e) => {
-                            field.onChange(e);
-                            setUsernameLength(e.target.value.length);
-                            debouncedValidate('username');
-                          }}
                         />
                       </FormControl>
                       <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
@@ -280,10 +219,6 @@ export default function LoginPage() {
                           type="password" 
                           {...field} 
                           className="h-10 text-base"
-                          onChange={(e) => {
-                            field.onChange(e);
-                            debouncedValidate('password');
-                          }}
                         />
                       </FormControl>
                       <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
