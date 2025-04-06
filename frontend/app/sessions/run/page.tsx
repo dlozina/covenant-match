@@ -10,7 +10,8 @@ import {
   SessionInfoSection,
   ResultReportingSection,
   FinishSessionDialog,
-  WarningDialog
+  WarningDialog,
+  DeleteSessionDialog
 } from "@/components/session/SessionComponents";
 import {
   sessionReducer,
@@ -27,6 +28,7 @@ import { useSessionTimer } from "@/components/session/SessionHooks";
 import { useAuth } from "@/lib/auth-context";
 import { useRealTimeUpdates } from "@/hooks/useEventSource";
 import { Notification, NotificationType } from "@/components/ui/notification";
+import { cancelSession, leaveSession } from "@/utils/api"; // Import new API functions
 
 // Define the session data interface
 interface JoinedPlayer {
@@ -131,7 +133,8 @@ function SessionRunContent(): JSX.Element {
   const [friendState, dispatchFriend] = useReducer(friendStatusReducer, {} as FriendState);
   const [dialogState, dispatchDialog] = useReducer(dialogReducer, {
     showConfirmDialog: false,
-    showWarningDialog: false
+    showWarningDialog: false,
+    showDeleteDialog: false
   } as DialogState);
   const [resultState, dispatchResult] = useReducer(resultReducer, {
     selectedResult: 'win',
@@ -520,6 +523,66 @@ function SessionRunContent(): JSX.Element {
       } 
     });
     
+    // Subscribe to the cancel event
+    const unsubscribeCancel = subscribe('cancel', (data) => {
+      // Safety check for data structure
+      if (!data || typeof data !== 'object') {
+        return;
+      }
+      
+      // Extract session ID from the data
+      const cancelledSessionId = typeof data === 'object' && data !== null && 'sessionId' in data 
+                  ? String(data.sessionId) : null;
+      
+      // Only process if it's for this session
+      if (cancelledSessionId === sessionId) {
+        // Show notification
+        showNotification('Session cancelled by the host', 'warning');
+        
+        // Clear session data
+        storageUtils.clearSessionData();
+        
+        // Disconnect from SSE
+        disconnect();
+        
+        // Redirect to sessions page
+        router.push('/sessions');
+      }
+    });
+
+    // Subscribe to the leave event
+    const unsubscribeLeave = subscribe('leave', (data) => {
+      // Safety check for data structure
+      if (!data || typeof data !== 'object') {
+        return;
+      }
+      
+      // Extract player data from the event
+      const userId = typeof data === 'object' && data !== null && 'userId' in data 
+            ? String(data.userId) : null;
+      
+      if (!userId) return;
+      
+      // Update the session data to remove the player
+      setSessionData(prevData => {
+        if (!prevData) return null;
+        
+        // Create a new array of joined players without the leaving player
+        const updatedPlayers = prevData.joinedPlayers.filter(player => player.userId !== userId);
+        
+        // Return updated session data
+        return {
+          ...prevData,
+          joinedPlayers: updatedPlayers,
+          // Update status from Full to Open if applicable
+          status: prevData.status === 'Full' ? 'Open' : prevData.status
+        };
+      });
+      
+      // Show notification
+      showNotification(`${data.username || 'A player'} left the session`, 'warning');
+    });
+    
     // Add additional event subscriptions here as needed
     
     return () => {
@@ -528,9 +591,11 @@ function SessionRunContent(): JSX.Element {
       unsubscribeStart();
       unsubscribeComplete();
       unsubscribeResult();
+      unsubscribeCancel();
+      unsubscribeLeave();
       unsubscribeMessage(); // DEBUG: Clean up the generic message subscription
     };
-  }, [isValidSessionId, sessionId, subscribe, sessionState.isSessionStarted, sessionState.isSessionFinished, sessionState.elapsedSeconds, disconnect, sessionData, userData, fetchWithAuth]);
+  }, [isValidSessionId, sessionId, subscribe, sessionState.isSessionStarted, sessionState.isSessionFinished, sessionState.elapsedSeconds, disconnect, sessionData, userData, fetchWithAuth, router, showNotification]);
   
   // Effect to handle page refresh detection and disconnect EventSource when truly unloading
   useEffect(() => {
@@ -937,6 +1002,54 @@ function SessionRunContent(): JSX.Element {
     });
   }, [newSessionId, resultSubmitted, isHost]);
 
+  // Add new handlers for cancel/leave session
+  const handleCancelSession = useCallback(async () => {
+    if (!isValidSessionId || !isHost()) return;
+    
+    try {
+      // Show a loading notification
+      showNotification('Cancelling session...', 'warning');
+      
+      // Call the API to cancel the session
+      await cancelSession(sessionId);
+      
+      // Clear any session data
+      storageUtils.clearSessionData();
+      
+      // Show success notification
+      showNotification('Session cancelled successfully', 'success');
+      
+      // Redirect to sessions page
+      router.push('/sessions');
+    } catch (err) {
+      showNotification('Error cancelling session: ' + err, 'error');
+    }
+  }, [isValidSessionId, sessionId, isHost, router, showNotification]);
+
+  // Handler for non-host players to leave a session
+  const handleLeaveSession = useCallback(async () => {
+    if (!isValidSessionId || isHost()) return;
+    
+    try {
+      // Show a loading notification
+      showNotification('Leaving session...', 'warning');
+      
+      // Call the API to leave the session
+      await leaveSession(sessionId);
+      
+      // Clear any session data
+      storageUtils.clearSessionData();
+      
+      // Show success notification
+      showNotification('Left session successfully', 'success');
+      
+      // Redirect to sessions page
+      router.push('/sessions');
+    } catch (err) {
+      showNotification('Error leaving session: ' + err, 'error');
+    }
+  }, [isValidSessionId, sessionId, isHost, router, showNotification]);
+
   return (
     <MainLayout footer={<Footer />}>
       <div className="container py-10 mx-auto">
@@ -1048,6 +1161,8 @@ function SessionRunContent(): JSX.Element {
                 isHost={isHost()}
                 currentSessionId={sessionId}
                 resultSubmitted={resultSubmitted}
+                onCancelSession={!sessionState.isSessionStarted ? () => dispatchDialog({ type: 'SHOW_DELETE' }) : undefined}
+                onLeaveSession={!sessionState.isSessionStarted && !isHost() ? handleLeaveSession : undefined}
               />
             </div>
 
@@ -1093,6 +1208,12 @@ function SessionRunContent(): JSX.Element {
       <WarningDialog 
         isOpen={dialogState.showWarningDialog}
         onClose={() => dispatchDialog({ type: 'HIDE_WARNING' })}
+      />
+      
+      <DeleteSessionDialog
+        isOpen={dialogState.showDeleteDialog}
+        onClose={() => dispatchDialog({ type: 'HIDE_DELETE' })}
+        onConfirm={handleCancelSession}
       />
     </MainLayout>
   );

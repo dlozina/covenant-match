@@ -520,6 +520,91 @@ pub async fn cancel_session(
     // Update the session in the database
     session_repository::update_session(db, &session).await?;
 
+    // Broadcast cancellation event to all players in the session
+    broadcast_event(
+        session_id,
+        "cancel",
+        json!({
+            "sessionId": session_id,
+            "hostId": user_id
+        }),
+        None, // Send to all players
+    );
+
+    Ok(())
+}
+
+/// Allows a player to leave a session they have joined
+pub async fn leave_session(db: &Database, session_id: &str, user_id: &str) -> Result<(), AppError> {
+    // Get the session
+    let mut session = session_repository::find_by_id(db, session_id)
+        .await?
+        .ok_or(AppError::SessionNotFound)?;
+
+    // Check if the session has already started - can't leave once started
+    if session.status == SessionStatus::InProgress
+        || session.status == SessionStatus::Completed
+        || session.status == SessionStatus::Cancelled
+    {
+        return Err(AppError::BadRequest(
+            "Cannot leave a session that has already started, completed, or been cancelled"
+                .to_string(),
+        ));
+    }
+
+    // Check if the user is trying to leave is the host - hosts can't leave, they cancel instead
+    if session.host_id == user_id {
+        return Err(AppError::BadRequest(
+            "Host cannot leave session. Use cancel endpoint instead".to_string(),
+        ));
+    }
+
+    // Find the player in the session
+    let player_index = session
+        .joined_players
+        .iter()
+        .position(|p| p.user_id == user_id);
+
+    // Check if the player is actually in the session
+    let player_index = match player_index {
+        Some(index) => index,
+        None => {
+            return Err(AppError::BadRequest(
+                "User is not in this session".to_string(),
+            ))
+        }
+    };
+
+    // Get player data for notification before removing
+    let leaving_player = session.joined_players[player_index].clone();
+
+    // Remove the player from the session
+    session.joined_players.remove(player_index);
+
+    // Update session status from Full to Open if applicable
+    if session.status == SessionStatus::Full {
+        session.status = SessionStatus::Open;
+    }
+
+    // Update timestamp
+    let now = mongodb::bson::DateTime::now();
+    session.updated_at = now;
+
+    // Update the session in the database
+    session_repository::update_session(db, &session).await?;
+
+    // Broadcast leave event to all clients in the session
+    broadcast_event(
+        session_id,
+        "leave",
+        json!({
+            "userId": leaving_player.user_id,
+            "username": leaving_player.username,
+            "nightfarer": leaving_player.nightfarer
+        }),
+        None, // Send to all players including the one leaving
+    );
+
     Ok(())
 }
 

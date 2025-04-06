@@ -79,6 +79,8 @@ interface SessionControlButtonsProps {
   isHost?: boolean;
   currentSessionId?: string;
   resultSubmitted?: boolean;
+  onCancelSession?: () => void;
+  onLeaveSession?: () => void;
 }
 
 interface SessionInfoSectionProps {
@@ -117,6 +119,13 @@ interface FinishSessionDialogProps {
 interface WarningDialogProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+// New DeleteSessionDialog interface
+interface DeleteSessionDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
 }
 
 // Helper function to determine player status badge
@@ -430,7 +439,9 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
   sessionData,
   isHost = false, // Default to false if not provided
   currentSessionId,
-  resultSubmitted = false
+  resultSubmitted = false,
+  onCancelSession,  // New prop
+  onLeaveSession    // New prop
 }) => {
   // Simplified logic for button state
   const hasEnoughPlayers = sessionData && sessionData.joinedPlayers.length >= 3;
@@ -526,6 +537,7 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
         </div>
       ) : (
         <div className="flex flex-col gap-4">
+          {/* Primary action buttons */}
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1 flex flex-col">
               <Button 
@@ -558,6 +570,35 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
             >
               Finish Session
             </Button>
+          </div>
+          
+          {/* Secondary action buttons */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Delete Session button (for host) */}
+            {isHost && !sessionState.isSessionStarted && onCancelSession && (
+              <Button 
+                variant="destructive"
+                className="h-12 flex-1"
+                onClick={onCancelSession}
+                disabled={disabled || sessionState.isSessionStarted}
+                title="Delete this session and notify all players"
+              >
+                Delete Session
+              </Button>
+            )}
+            
+            {/* Leave Party button (for non-host players) */}
+            {!isHost && !sessionState.isSessionStarted && onLeaveSession && (
+              <Button 
+                variant="outline"
+                className="h-12 flex-1 border-amber-500 text-amber-500 hover:bg-amber-500/10"
+                onClick={onLeaveSession}
+                disabled={disabled || sessionState.isSessionStarted}
+                title="Leave this session and return to session selection"
+              >
+                Leave Party
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -861,6 +902,31 @@ export const WarningDialog: React.FC<WarningDialogProps> = ({ isOpen, onClose })
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogAction>I Understand</AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+);
+
+// Delete session dialog component
+export const DeleteSessionDialog: React.FC<DeleteSessionDialogProps> = ({ isOpen, onClose, onConfirm }) => (
+  <AlertDialog 
+    open={isOpen} 
+    onOpenChange={(open) => {
+      if (!open) onClose();
+    }}
+  >
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Delete Session</AlertDialogTitle>
+        <AlertDialogDescription>
+          Are you sure you want to delete this session? All players will be notified and the session will be permanently removed.
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>Cancel</AlertDialogCancel>
+        <AlertDialogAction onClick={onConfirm} className="bg-red-600 hover:bg-red-700">
+          Yes, Delete Session
+        </AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>

@@ -61,6 +61,7 @@ use utoipa::{
         join_session,
         start_session,
         cancel_session,
+        leave_session,
         complete_session,
         recreate_session,
         update_session,

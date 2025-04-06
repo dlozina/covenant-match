@@ -22,13 +22,16 @@ export interface SessionState {
   export interface DialogState {
     showConfirmDialog: boolean;
     showWarningDialog: boolean;
+    showDeleteDialog: boolean;
   }
   
   export type DialogAction = 
     | { type: 'SHOW_CONFIRM' }
     | { type: 'HIDE_CONFIRM' }
     | { type: 'SHOW_WARNING' }
-    | { type: 'HIDE_WARNING' };
+    | { type: 'HIDE_WARNING' }
+    | { type: 'SHOW_DELETE' }
+    | { type: 'HIDE_DELETE' };
   
   export interface ResultState {
     selectedResult: string;
@@ -118,6 +121,16 @@ export interface SessionState {
         return {
           ...state,
           showWarningDialog: false
+        };
+      case 'SHOW_DELETE':
+        return {
+          ...state,
+          showDeleteDialog: true
+        };
+      case 'HIDE_DELETE':
+        return {
+          ...state,
+          showDeleteDialog: false
         };
       default:
         return state;

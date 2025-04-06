@@ -269,6 +269,55 @@ async fn cancel_session(
     }
 }
 
+/// Leave a session (joined player only, before session starts)
+#[utoipa::path(
+    post,
+    path = "/api/v1/sessions/{id}/leave",
+    params(
+        ("id" = String, Path, description = "Session ID to leave")
+    ),
+    responses(
+        (status = 200, description = "Left session successfully"),
+        (status = 400, description = "Cannot leave session (already started or not a member)"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Session not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "sessions"
+)]
+#[post("/api/v1/sessions/{id}/leave")]
+async fn leave_session(
+    db: web::Data<Database>,
+    path: web::Path<String>,
+    req: HttpRequest,
+) -> impl Responder {
+    let id = path.into_inner();
+
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.sub.clone()
+    };
+
+    match session_service::leave_session(&db, &id, &user_id).await {
+        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "message": "Left session successfully"
+        })),
+        Err(e) => {
+            log::error!("Error leaving session: {:?}", e);
+            HttpResponse::BadRequest().json(serde_json::json!({
+                "status": "error",
+                "message": e.to_string()
+            }))
+        }
+    }
+}
+
 /// Complete a session (host only)
 #[utoipa::path(
     post,
@@ -590,6 +639,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         // Then ID-based endpoints
         .service(get_session)
         .service(join_session)
+        .service(leave_session)
         .service(start_session)
         .service(cancel_session)
         .service(complete_session)
