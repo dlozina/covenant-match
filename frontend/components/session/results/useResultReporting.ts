@@ -14,8 +14,6 @@ interface ResultReportingState {
 }
 
 export function useResultReporting({
-  resultState,
-  dispatchResult,
   onSubmitResult,
   isSubmitted
 }: UseResultReportingProps): ResultReportingState {
