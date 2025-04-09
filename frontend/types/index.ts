@@ -21,6 +21,7 @@ export interface GameSession {
   }[];
   createdAt: string;
   updatedAt: string;
+  statsUpdated?: boolean;
 }
 
 export interface GameResult {

@@ -120,7 +120,7 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
         ("Guardian", "Guardian is the nightfarer of the Pact, he is the one who protects the realm from the darkness."),
         ("Recluse", "Recluse is the nightfarer of the Pact, he is the one who protects the realm from the darkness."),
         ("Duchess", "Recluse is the nightfarer of the Pact, he is the one who protects the realm from the darkness."),
-        ("Patches", "Patches is the nightfarer of the Pact, he is the one who protects the realm from the darkness."),
+        ("Ironeye", "Ironeye is the nightfarer of the Pact, he is the one who protects the realm from the darkness."),
         ("Jolan", "Jolan is the nightfarer of the Pact, he is the one who protects the realm from the darkness."),
         ("Igon", "Midra is the nightfarer of the Pact, he is the one who protects the realm from the darkness."),
         ("Alexander", "Alexander is the nightfarer of the Pact, he is the one who protects the realm from the darkness."),

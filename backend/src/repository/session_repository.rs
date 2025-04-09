@@ -84,6 +84,8 @@ pub async fn update_session(db: &Database, session: &GameSession) -> Result<(), 
             "updated_at": to_bson(&session.updated_at)?,
             "started_at": to_bson(&session.started_at)?,
             "completed_at": to_bson(&session.completed_at)?,
+            "stats_updated": session.stats_updated,
+            "is_private": session.is_private,
         }
     };
 

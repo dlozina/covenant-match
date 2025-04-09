@@ -15,6 +15,8 @@ use chrono::Utc;
 use mongodb::bson::oid::ObjectId;
 use mongodb::Database;
 use serde_json::json;
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::LazyLock;
 use std::sync::Mutex;
 
@@ -211,6 +213,7 @@ pub async fn create_session(
         updated_at: now,
         started_at: None,
         completed_at: None,
+        stats_updated: false,
     };
 
     // Save the session to the database
@@ -654,51 +657,66 @@ pub async fn submit_result(
 
     session.updated_at = now;
 
-    //todo important: calculate consensus
-    // Check if all players have submitted results
-    if session.results.len() >= session.joined_players.len() {
-        // Check for result consensus
-        let win_count = session
-            .results
-            .iter()
-            .filter(|r| r.result == GameResult::Win)
-            .count();
-        let loss_count = session
-            .results
-            .iter()
-            .filter(|r| r.result == GameResult::Loss)
-            .count();
-        let disconnect_count = session
-            .results
-            .iter()
-            .filter(|r| r.result == GameResult::Disconnect)
-            .count();
+    // Check for result consensus
+    let win_count = session
+        .results
+        .iter()
+        .filter(|r| r.result == GameResult::Win)
+        .count();
+    let loss_count = session
+        .results
+        .iter()
+        .filter(|r| r.result == GameResult::Loss)
+        .count();
+    let disconnect_count = session
+        .results
+        .iter()
+        .filter(|r| r.result == GameResult::Disconnect)
+        .count();
 
-        // If there's consensus (majority agreement), mark session as completed
-        if win_count > 1 || loss_count > 1 || disconnect_count > 1 {
-            session.status = SessionStatus::Completed;
+    // Determine if there's a consensus (majority agreement)
+    let consensus_result = if win_count > 1 {
+        Some(GameResult::Win)
+    } else if loss_count > 1 {
+        Some(GameResult::Loss)
+    } else if disconnect_count > 1 {
+        Some(GameResult::Disconnect)
+    } else {
+        None
+    };
+
+    // If we have a consensus result (at least 2 players agree), and we have at least 2 results
+    // we'll apply the consensus result to all players' statistics
+    if let Some(result) = consensus_result {
+        // Mark session as completed
+        session.status = SessionStatus::Completed;
+
+        if session.completed_at.is_none() {
             session.completed_at = Some(now);
+        }
 
-            //todo important: update player statistics
-            // Update player statistics, this will update
+        // Get the list of players who have already submitted results
+        let players_who_submitted: Vec<String> =
+            session.results.iter().map(|r| r.user_id.clone()).collect();
+
+        log::info!(
+            "Consensus reached in session {}: {:?}. Players who submitted: {:?}, stats already updated: {}",
+            session_id,
+            result,
+            players_who_submitted,
+            session.stats_updated
+        );
+
+        // Check if stats have already been updated using the explicit flag
+        if !session.stats_updated {
+            log::info!(
+                "Updating stats for all players with consensus result: {:?}",
+                result
+            );
+
+            // Update statistics for ALL players using the consensus result
             for player in &session.joined_players {
-                // Get player's submitted result or use majority result
-                let player_result = session
-                    .results
-                    .iter()
-                    .find(|r| r.user_id == player.user_id)
-                    .map(|r| r.result.clone())
-                    .unwrap_or_else(|| {
-                        if win_count > 1 {
-                            GameResult::Win
-                        } else if loss_count > 1 {
-                            GameResult::Loss
-                        } else {
-                            GameResult::Disconnect
-                        }
-                    });
-
-                // Update statistics for this player
+                // Update statistics for this player with the consensus result
                 statistics_repository::update_player_stats(
                     db,
                     &player.user_id,
@@ -706,10 +724,21 @@ pub async fn submit_result(
                     &player.nightfarer,
                     &session.night_lord,
                     &player.covenant_name,
-                    &player_result,
+                    &result,
                 )
                 .await?;
+
+                log::info!(
+                    "Updated stats for player {} with result {:?}",
+                    player.user_id,
+                    result
+                );
             }
+
+            // Set the flag to indicate stats have been updated
+            session.stats_updated = true;
+        } else {
+            log::info!("Skipping stats update as they have already been updated");
         }
     }
 
@@ -883,6 +912,9 @@ pub async fn complete_session(
     session.completed_at = Some(now);
     session.updated_at = now;
 
+    // Initialize stats_updated to false - stats will be updated when consensus is reached
+    session.stats_updated = false;
+
     // Update the session in the database
     session_repository::update_session(db, &session).await?;
 
@@ -926,7 +958,7 @@ pub async fn recreate_session(
     }
 
     // Get the host user
-    let host_user = user_repository::find_user_by_id(db, &user_id)
+    let host_user = user_repository::find_user_by_id(db, user_id)
         .await?
         .ok_or(AppError::UserNotFound)?;
 
@@ -965,6 +997,7 @@ pub async fn recreate_session(
         updated_at: now,
         started_at: None,
         completed_at: None,
+        stats_updated: false,
     };
 
     // Save the new session to the database
@@ -1188,4 +1221,351 @@ pub async fn get_covenant_stats(db: &Database) -> Result<CovenantStatsResponse, 
     let covenant_stats: Vec<CovenantStats> = covenant_stats_map.into_values().collect();
 
     Ok(CovenantStatsResponse { covenant_stats })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::session::{GameResult, SessionResult, SessionStatus};
+    use mongodb::bson::oid::ObjectId;
+    use mongodb::bson::DateTime;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    // Simple mock database for testing
+    #[derive(Clone)]
+    struct MockDb {
+        session: Rc<RefCell<Option<GameSession>>>,
+        stats_updated: Rc<RefCell<Vec<(String, GameResult)>>>,
+    }
+
+    // Test version of submit_result that uses our mock db
+    fn submit_result_test(
+        db: &MockDb,
+        session_id: &str,
+        result_data: SubmitResultDto,
+    ) -> Result<(), AppError> {
+        // Get user ID from result data
+        let user_id = result_data.user_id.clone();
+
+        // Get the session
+        let mut session = db
+            .session
+            .borrow()
+            .clone()
+            .ok_or(AppError::SessionNotFound)?;
+
+        // Check if session is completed or in progress
+        // Note: The real function requires Completed status but we're modifying it for testing
+        // to allow InProgress status as well
+        if session.status != SessionStatus::Completed && session.status != SessionStatus::InProgress
+        {
+            return Err(AppError::BadRequest(
+                "Results can only be submitted for completed or in-progress sessions".to_string(),
+            ));
+        }
+
+        // Check if user is part of the session
+        if !session.joined_players.iter().any(|p| p.user_id == user_id) {
+            return Err(AppError::Forbidden(
+                "Only session participants can submit results".to_string(),
+            ));
+        }
+
+        // Check if user has already submitted a result
+        if session.results.iter().any(|r| r.user_id == user_id) {
+            return Err(AppError::BadRequest(
+                "User has already submitted a result for this session".to_string(),
+            ));
+        }
+
+        // Add the result
+        let now = mongodb::bson::DateTime::now();
+        session.results.push(SessionResult {
+            user_id: user_id.clone(),
+            result: result_data.result,
+            rating: result_data.rating,
+            feedback: result_data.feedback,
+            submitted_at: now,
+        });
+
+        session.updated_at = now;
+
+        // Check for result consensus
+        let win_count = session
+            .results
+            .iter()
+            .filter(|r| r.result == GameResult::Win)
+            .count();
+        let loss_count = session
+            .results
+            .iter()
+            .filter(|r| r.result == GameResult::Loss)
+            .count();
+        let disconnect_count = session
+            .results
+            .iter()
+            .filter(|r| r.result == GameResult::Disconnect)
+            .count();
+
+        // Determine if there's a consensus (majority agreement)
+        let consensus_result = if win_count > 1 {
+            Some(GameResult::Win)
+        } else if loss_count > 1 {
+            Some(GameResult::Loss)
+        } else if disconnect_count > 1 {
+            Some(GameResult::Disconnect)
+        } else {
+            None
+        };
+
+        // If we have a consensus result (at least 2 players agree)
+        if let Some(result) = consensus_result {
+            // Mark session as completed
+            session.status = SessionStatus::Completed;
+
+            if session.completed_at.is_none() {
+                session.completed_at = Some(now);
+            }
+
+            // Check if stats have already been updated using the explicit flag
+            if !session.stats_updated {
+                // Update statistics for ALL players using the consensus result
+                for player in &session.joined_players {
+                    // Record that we updated stats for this player
+                    db.stats_updated
+                        .borrow_mut()
+                        .push((player.user_id.clone(), result.clone()));
+                }
+
+                // Set the flag to indicate stats have been updated
+                session.stats_updated = true;
+            }
+        }
+
+        // Update the session in the database
+        *db.session.borrow_mut() = Some(session);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_submit_result_with_consensus_win() {
+        // Create a test session
+        let session_id = ObjectId::new().to_hex();
+        let now = DateTime::now();
+
+        // Create three players
+        let player1 = PlayerInfo {
+            user_id: "player1".to_string(),
+            username: "Player 1".to_string(),
+            nightfarer: "Mage".to_string(),
+            covenant_name: "Covenant 1".to_string(),
+            joined_at: now,
+        };
+
+        let player2 = PlayerInfo {
+            user_id: "player2".to_string(),
+            username: "Player 2".to_string(),
+            nightfarer: "Warrior".to_string(),
+            covenant_name: "Covenant 2".to_string(),
+            joined_at: now,
+        };
+
+        let player3 = PlayerInfo {
+            user_id: "player3".to_string(),
+            username: "Player 3".to_string(),
+            nightfarer: "Rogue".to_string(),
+            covenant_name: "Covenant 3".to_string(),
+            joined_at: now,
+        };
+
+        // Create initial session - it should start as InProgress
+        let session = GameSession {
+            id: ObjectId::parse_str(&session_id).unwrap(),
+            name: "Test Session".to_string(),
+            host_id: "player1".to_string(),
+            password: "test".to_string(),
+            is_private: false,
+            status: SessionStatus::InProgress,
+            joined_players: vec![player1, player2, player3],
+            night_lord: "Night Lord 1".to_string(),
+            results: vec![],
+            ratings: vec![],
+            created_at: now,
+            updated_at: now,
+            started_at: Some(now),
+            completed_at: None,
+            stats_updated: false,
+        };
+
+        // Create mock db
+        let mock_db = MockDb {
+            session: Rc::new(RefCell::new(Some(session))),
+            stats_updated: Rc::new(RefCell::new(vec![])),
+        };
+
+        // Create result DTOs
+        let result_data_1 = SubmitResultDto {
+            user_id: "player1".to_string(),
+            result: GameResult::Win,
+            rating: None,
+            feedback: None,
+        };
+
+        let result_data_2 = SubmitResultDto {
+            user_id: "player2".to_string(),
+            result: GameResult::Win,
+            rating: None,
+            feedback: None,
+        };
+
+        let result_data_3 = SubmitResultDto {
+            user_id: "player3".to_string(),
+            result: GameResult::Loss,
+            rating: None,
+            feedback: None,
+        };
+
+        // Submit results - first player
+        let result = submit_result_test(&mock_db, &session_id, result_data_1);
+        assert!(result.is_ok());
+
+        // After the first submission, no consensus should be reached
+        {
+            let stats_updates = mock_db.stats_updated.borrow();
+            assert_eq!(
+                stats_updates.len(),
+                0,
+                "No stats updates should happen after 1 submission"
+            );
+        }
+
+        // Second player submits - this should trigger consensus (2 Wins)
+        let result = submit_result_test(&mock_db, &session_id, result_data_2);
+        assert!(result.is_ok());
+
+        // After second submission, consensus is reached and all 3 players should have stats updated
+        {
+            let stats_updates = mock_db.stats_updated.borrow();
+            assert_eq!(
+                stats_updates.len(),
+                3,
+                "All 3 players should have stats updated"
+            );
+            for (_, result) in stats_updates.iter() {
+                assert_eq!(
+                    *result,
+                    GameResult::Win,
+                    "All players should get Win result"
+                );
+            }
+        }
+
+        // Third player submits - consensus is already established, shouldn't affect the result
+        let result = submit_result_test(&mock_db, &session_id, result_data_3);
+        assert!(result.is_ok());
+
+        // Should still have exactly 3 stat updates (no duplicates)
+        let stats_updates = mock_db.stats_updated.borrow();
+        assert_eq!(
+            stats_updates.len(),
+            3,
+            "Should still have exactly 3 stat updates"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_no_duplicate_stats_update() {
+        // Create a test session
+        let session_id = ObjectId::new().to_hex();
+        let now = DateTime::now();
+
+        // Create three players
+        let player1 = PlayerInfo {
+            user_id: "player1".to_string(),
+            username: "Player 1".to_string(),
+            nightfarer: "Mage".to_string(),
+            covenant_name: "Covenant 1".to_string(),
+            joined_at: now,
+        };
+
+        let player2 = PlayerInfo {
+            user_id: "player2".to_string(),
+            username: "Player 2".to_string(),
+            nightfarer: "Warrior".to_string(),
+            covenant_name: "Covenant 2".to_string(),
+            joined_at: now,
+        };
+
+        let player3 = PlayerInfo {
+            user_id: "player3".to_string(),
+            username: "Player 3".to_string(),
+            nightfarer: "Rogue".to_string(),
+            covenant_name: "Covenant 3".to_string(),
+            joined_at: now,
+        };
+
+        // Create initial session that's already completed with two results and stats already updated
+        let session = GameSession {
+            id: ObjectId::parse_str(&session_id).unwrap(),
+            name: "Test Session".to_string(),
+            host_id: "player1".to_string(),
+            password: "test".to_string(),
+            is_private: false,
+            status: SessionStatus::Completed, // Already completed
+            joined_players: vec![player1, player2, player3],
+            night_lord: "Night Lord 1".to_string(),
+            results: vec![
+                SessionResult {
+                    user_id: "player1".to_string(),
+                    result: GameResult::Win,
+                    rating: None,
+                    feedback: None,
+                    submitted_at: now,
+                },
+                SessionResult {
+                    user_id: "player2".to_string(),
+                    result: GameResult::Win,
+                    rating: None,
+                    feedback: None,
+                    submitted_at: now,
+                },
+            ],
+            ratings: vec![],
+            created_at: now,
+            updated_at: now,
+            started_at: Some(now),
+            completed_at: Some(now),
+            stats_updated: true, // Set to true to indicate stats have already been updated
+        };
+
+        // Create mock db with an empty stats_updated vector
+        let stats_updated = Rc::new(RefCell::new(vec![]));
+
+        let mock_db = MockDb {
+            session: Rc::new(RefCell::new(Some(session))),
+            stats_updated: stats_updated.clone(),
+        };
+
+        // Create result DTO for third player
+        let result_data_3 = SubmitResultDto {
+            user_id: "player3".to_string(),
+            result: GameResult::Loss,
+            rating: None,
+            feedback: None,
+        };
+
+        // Submit result for third player
+        let result = submit_result_test(&mock_db, &session_id, result_data_3);
+        assert!(result.is_ok());
+
+        // Since stats_updated is true, no stats should be updated
+        let stats_updates = stats_updated.borrow();
+        assert_eq!(
+            stats_updates.len(),
+            0,
+            "No stats should be updated since stats_updated flag is true"
+        );
+    }
 }

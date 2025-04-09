@@ -84,6 +84,8 @@ pub struct GameSession {
     pub updated_at: DateTime,
     pub started_at: Option<DateTime>,
     pub completed_at: Option<DateTime>,
+    #[serde(default)] // This makes it optional for backwards compatibility
+    pub stats_updated: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -136,6 +138,7 @@ pub struct SessionResponseDto {
     pub completed_at: Option<DateTime>,
     pub password: String,
     pub is_private: bool,
+    pub stats_updated: bool,
 }
 
 impl From<GameSession> for SessionResponseDto {
@@ -153,6 +156,7 @@ impl From<GameSession> for SessionResponseDto {
             completed_at: session.completed_at,
             password: session.password,
             is_private: session.is_private,
+            stats_updated: session.stats_updated,
         }
     }
 }
