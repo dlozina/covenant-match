@@ -1,26 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Environment variable to check if tester mode is active
-const TESTER_MODE = process.env.NEXT_PUBLIC_TESTER_MODE === 'true';
+// Ensure the environment variable is properly checked for multiple truthy values
+const TESTER_MODE_VAR = process.env.NEXT_PUBLIC_TESTER_MODE;
+const TESTER_MODE = TESTER_MODE_VAR === 'true' || TESTER_MODE_VAR === '"true"';
+
 // Get tester password from environment variable with fallback
 const TESTER_PASSWORD = process.env.NEXT_PUBLIC_TESTER_PASSWORD || 'test-covenant-45#';
 
 // Enhanced debugging
 console.log(`[MIDDLEWARE] Node ENV: ${process.env.NODE_ENV}`);
-console.log(`[MIDDLEWARE] Tester mode: ${TESTER_MODE ? 'ENABLED' : 'DISABLED'}`);
+console.log(`[MIDDLEWARE] Tester mode raw value: "${TESTER_MODE_VAR}"`);
+console.log(`[MIDDLEWARE] Tester mode parsed: ${TESTER_MODE ? 'ENABLED' : 'DISABLED'}`);
 console.log(`[MIDDLEWARE] Password set: ${TESTER_PASSWORD ? 'YES' : 'NO'}`);
 
 export function middleware(request: NextRequest) {
   // Log every request to debug
   console.log(`[MIDDLEWARE] Processing request for: ${request.nextUrl.pathname}`);
 
-  // Skip middleware in development mode when tester mode is not active
-  if (process.env.NODE_ENV === 'development' && !TESTER_MODE) {
-    console.log('[MIDDLEWARE] Skipping due to development mode with tester mode disabled');
-    return NextResponse.next();
-  }
-
-  // Force tester mode in production for debugging
+  // Explicitly force production mode to always use tester validation
   const forceTesterMode = process.env.NODE_ENV === 'production' || TESTER_MODE;
   console.log(`[MIDDLEWARE] Force tester mode: ${forceTesterMode ? 'YES' : 'NO'}`);
 
