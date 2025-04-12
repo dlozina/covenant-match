@@ -12,8 +12,26 @@ export async function POST(request: NextRequest) {
     // Validate the password
     const isValid = password === correctPassword;
     
-    // Return response
-    return NextResponse.json({ valid: isValid }, { status: 200 });
+    // Create response
+    const response = NextResponse.json({ valid: isValid }, { status: 200 });
+    
+    // If password is valid, set cookie server-side
+    if (isValid) {
+      // Set cookie with proper attributes for Cloudflare environment
+      response.cookies.set({
+        name: 'tester_access',
+        value: 'granted',
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        path: '/',
+        sameSite: 'lax',
+        secure: true, // For HTTPS
+        httpOnly: false // Allow JavaScript access
+      });
+      
+      console.log('Setting tester_access cookie server-side');
+    }
+    
+    return response;
   } catch (error) {
     console.error('Error validating tester password:', error);
     return NextResponse.json(

@@ -200,10 +200,7 @@ export function middleware(request: NextRequest) {
                 .then(response => response.json())
                 .then(data => {
                   if (data.valid) {
-                    // Set cookie
-                    document.cookie = "tester_access=granted; max-age=604800; path=/; samesite=lax" + 
-                                     (location.protocol === 'https:' ? '; secure' : '');
-                    
+                    // Cookie is now set by the server API
                     // Log success and redirect
                     console.log('Password correct, redirecting...');
                     window.location.href = "/";
