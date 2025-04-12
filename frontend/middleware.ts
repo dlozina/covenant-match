@@ -5,18 +5,27 @@ const TESTER_MODE = process.env.NEXT_PUBLIC_TESTER_MODE === 'true';
 // Get tester password from environment variable with fallback
 const TESTER_PASSWORD = process.env.NEXT_PUBLIC_TESTER_PASSWORD || 'test-covenant-45#';
 
-// Just for debugging
-console.log(`Tester mode: ${TESTER_MODE ? 'ENABLED' : 'DISABLED'}`);
-console.log(`Password set: ${TESTER_PASSWORD ? 'YES' : 'NO'}`);
+// Enhanced debugging
+console.log(`[MIDDLEWARE] Node ENV: ${process.env.NODE_ENV}`);
+console.log(`[MIDDLEWARE] Tester mode: ${TESTER_MODE ? 'ENABLED' : 'DISABLED'}`);
+console.log(`[MIDDLEWARE] Password set: ${TESTER_PASSWORD ? 'YES' : 'NO'}`);
 
 export function middleware(request: NextRequest) {
+  // Log every request to debug
+  console.log(`[MIDDLEWARE] Processing request for: ${request.nextUrl.pathname}`);
+
   // Skip middleware in development mode when tester mode is not active
   if (process.env.NODE_ENV === 'development' && !TESTER_MODE) {
+    console.log('[MIDDLEWARE] Skipping due to development mode with tester mode disabled');
     return NextResponse.next();
   }
 
+  // Force tester mode in production for debugging
+  const forceTesterMode = process.env.NODE_ENV === 'production' || TESTER_MODE;
+  console.log(`[MIDDLEWARE] Force tester mode: ${forceTesterMode ? 'YES' : 'NO'}`);
+
   // When tester mode is active, we want to check if the user is authorized
-  if (TESTER_MODE) {
+  if (forceTesterMode) {
     // Public paths that should not be redirected (like images, etc.)
     const publicPaths = [
       '/favicon.ico',
@@ -30,16 +39,18 @@ export function middleware(request: NextRequest) {
 
     // Check if URL matches any of the public paths
     if (publicPaths.some(path => request.nextUrl.pathname.startsWith(path))) {
+      console.log(`[MIDDLEWARE] Skipping auth for public path: ${request.nextUrl.pathname}`);
       return NextResponse.next();
     }
 
     // Check for tester access cookie
     const hasTesterAccess = request.cookies.get('tester_access')?.value === 'granted';
-
-    // If no tester access, serve the coming soon page directly from middleware
-    if (!hasTesterAccess) {
-      // Serve a custom HTML coming soon page directly from middleware
-      return new NextResponse(
+    console.log(`[MIDDLEWARE] Has tester access cookie: ${hasTesterAccess ? 'YES' : 'NO'}`);
+    
+    // Add cache control headers to prevent caching
+    const response = hasTesterAccess ? 
+      NextResponse.next() : 
+      new NextResponse(
         `<!DOCTYPE html>
         <html lang="en">
         <head>
@@ -193,7 +204,7 @@ export function middleware(request: NextRequest) {
                 .then(data => {
                   if (data.valid) {
                     // Set cookie
-                    document.cookie = "tester_access=granted; max-age=604800; path=/; samesite=strict" + 
+                    document.cookie = "tester_access=granted; max-age=604800; path=/; samesite=lax" + 
                                      (location.protocol === 'https:' ? '; secure' : '');
                     
                     // Log success and redirect
@@ -223,13 +234,37 @@ export function middleware(request: NextRequest) {
           status: 200,
           headers: {
             'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            'Surrogate-Control': 'no-store',
           },
         }
       );
+    
+    // Always add cache control headers to prevent caching regardless of response type
+    const headersToAdd = {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+      'Surrogate-Control': 'no-store'
+    };
+
+    if (hasTesterAccess) {
+      // For authenticated users, create a new response with headers
+      const authResponse = NextResponse.next();
+      Object.entries(headersToAdd).forEach(([name, value]) => {
+        authResponse.headers.set(name, value);
+      });
+      return authResponse;
     }
+
+    console.log('[MIDDLEWARE] Returning response with no-cache headers');
+    return response;
   }
 
   // Continue with the request for authenticated users or when tester mode is off
+  console.log('[MIDDLEWARE] Allowing access - tester mode is disabled');
   return NextResponse.next();
 }
 
