@@ -581,7 +581,10 @@ function SessionRunContent(): JSX.Element {
       
       // Only show notification if it's not about the current user
       if (userId !== userData?.id) {
-        showNotification(`${data.username || 'A player'} left the session`, 'warning');
+        // Extract username safely with type assertion
+        const username = typeof data === 'object' && data !== null && 'username' in data 
+                      ? String(data.username) : 'A player';
+        showNotification(`${username} left the session`, 'warning');
       }
     });
     

@@ -8,7 +8,6 @@ const TESTER_PASSWORD = process.env.NEXT_PUBLIC_TESTER_PASSWORD || 'covenant-tes
 // Just for debugging
 console.log(`Tester mode: ${TESTER_MODE ? 'ENABLED' : 'DISABLED'}`);
 console.log(`Password set: ${TESTER_PASSWORD ? 'YES' : 'NO'}`);
-console.log(`Password value: ${TESTER_PASSWORD}`); // Debug the actual password
 
 export function middleware(request: NextRequest) {
   // Skip middleware in development mode when tester mode is not active
