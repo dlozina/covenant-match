@@ -255,7 +255,8 @@ function EditProfileContent() {
       setSessionNameLength(userData.preferredSessionName?.length || 0);
       setSessionPasswordLength(userData.preferredSessionPassword?.length || 0);
     }
-  }, [userData, isLoadingGameData, form, REGIONS, PLATFORMS, COVENANT_NAMES]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userData, isLoadingGameData, form]);
   
   // Show notification if there's an error loading game data
   useEffect(() => {

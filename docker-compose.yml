@@ -2,34 +2,44 @@ version: '3.8'
 
 services:
   frontend:
-    image: covenant-match-frontend:latest
+    image: ghcr.io/dlozina/covenant-match-frontend:latest
     build:
       context: ./frontend
       dockerfile: Dockerfile
       target: production
+      args:
+        - NEXT_PUBLIC_API_BASE_URL=https://covenant-match.com
+        - NEXT_PUBLIC_RECAPTCHA_SITE_KEY=6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI
+        - NEXT_PUBLIC_TESTER_MODE=true
     deploy:
-      replicas: 2
+      replicas: 1
       restart_policy:
         condition: on-failure
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_API_BASE_URL=/api
+      - NEXT_PUBLIC_API_BASE_URL=https://covenant-match.com
       - NEXT_PUBLIC_RECAPTCHA_SITE_KEY=6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI
+      - NEXT_PUBLIC_TESTER_MODE=true
+      - NEXT_PUBLIC_TESTER_PASSWORD_FILE=/run/secrets/tester_password
     depends_on:
       - backend
+    secrets:
+      - tester_password
     networks:
       - covenant-network
 
   backend:
-    image: covenant-match-backend:latest
+    image: ghcr.io/dlozina/covenant-match-backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
-      target: production
     deploy:
-      replicas: 2
+      replicas: 1
       restart_policy:
         condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
     environment:
       - RUST_LOG=info
       - PORT=8080
@@ -45,6 +55,12 @@ services:
       - recaptcha_secret_key
     networks:
       - covenant-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   mongodb:
     image: mongo:latest
@@ -59,10 +75,15 @@ services:
       - mongodb_data:/data/db
     networks:
       - covenant-network
-    # Note: not exposing MongoDB port in production for security
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   nginx:
-    image: covenant-match-nginx:latest
+    image: ghcr.io/dlozina/covenant-match-nginx:latest
     build:
       context: ./nginx
       dockerfile: Dockerfile
@@ -74,7 +95,8 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/ssl:/etc/nginx/ssl
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
     networks:
       - covenant-network
 
@@ -91,4 +113,6 @@ secrets:
   jwt_secret:
     external: true
   recaptcha_secret_key:
+    external: true
+  tester_password:
     external: true

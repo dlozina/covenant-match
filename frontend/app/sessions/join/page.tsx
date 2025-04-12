@@ -47,6 +47,30 @@ function JoinSessionContent() {
   const sessionId = searchParams.get('id');
   const { userData } = useAuth();
   
+  const checkActiveSession = useCallback(async () => {
+    try {
+      const activeSession = await sessionService.getActiveSession();
+      
+      // If user has an active session and it's not the one they're trying to join
+      if (activeSession && activeSession.id !== sessionId) {
+        setNotification({
+          type: 'warning',
+          message: (
+            <div>
+              You are already in an active session: &apos;{activeSession.name}&apos; (ID: {activeSession.id}) with status {activeSession.status}. 
+              <Link href={`/sessions/run?id=${activeSession.id}`} className="underline font-bold ml-1">
+                Click here
+              </Link> to go to your active session.
+            </div>
+          )
+        });
+      }
+    } catch (error) {
+      // Ignore errors checking for active sessions
+      console.error("Error checking for active sessions:", error);
+    }
+  }, [sessionId]);
+  
   // Fetch nightfarers on component mount
   useEffect(() => {
     const loadNightfarers = async () => {
@@ -64,33 +88,9 @@ function JoinSessionContent() {
       }
     };
 
-    const checkActiveSession = async () => {
-      try {
-        const activeSession = await sessionService.getActiveSession();
-        
-        // If user has an active session and it's not the one they're trying to join
-        if (activeSession && activeSession.id !== sessionId) {
-          setNotification({
-            type: 'warning',
-            message: (
-              <div>
-                You are already in an active session: &apos;{activeSession.name}&apos; (ID: {activeSession.id}) with status {activeSession.status}. 
-                <Link href={`/sessions/run?id=${activeSession.id}`} className="underline font-bold ml-1">
-                  Click here
-                </Link> to go to your active session.
-              </div>
-            )
-          });
-        }
-      } catch (error) {
-        // Ignore errors checking for active sessions
-        console.error("Error checking for active sessions:", error);
-      }
-    };
-
     loadNightfarers();
     checkActiveSession();
-  }, []);
+  }, [checkActiveSession]);
   
   // Use useCallback for fetchSessionDetails to avoid recreating it on each render
   const fetchSessionDetailsData = useCallback(async () => {
