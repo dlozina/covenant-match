@@ -18,8 +18,7 @@ COPY sites/covenant-match-${ENVIRONMENT}.conf /etc/nginx/sites/covenant-match.co
 RUN if [ "$ENVIRONMENT" = "prod" ]; then mkdir -p /etc/nginx/ssl; fi
 
 # Set the correct port to expose based on environment
-EXPOSE 80
-RUN if [ "$ENVIRONMENT" = "prod" ]; then echo "Exposing HTTPS port"; EXPOSE 443; fi
+EXPOSE 80 443
 
 # Test DNS resolution before starting Nginx
 CMD ["sh", "-c", "echo 'Testing DNS resolution:' && ping -c 1 frontend || echo 'Cannot ping frontend' && ping -c 1 backend || echo 'Cannot ping backend' && nginx -g 'daemon off;'"]
