@@ -8,14 +8,13 @@ services:
       dockerfile: Dockerfile
       target: development
     volumes:
-      - ./frontend:/app
       - frontend_node_modules:/app/node_modules
     environment:
       - NODE_ENV=development
       - NEXT_PUBLIC_API_BASE_URL=http://localhost
       - NEXT_PUBLIC_RECAPTCHA_SITE_KEY=6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI
       - NEXT_PUBLIC_TESTER_MODE=true
-      - NEXT_PUBLIC_TESTER_PASSWORD=test-covenant-45$
+      - NEXT_PUBLIC_TESTER_PASSWORD=test-covenant-45#
     ports:
       - "3000:3000"
     command: npm run dev

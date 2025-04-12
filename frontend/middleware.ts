@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // Environment variable to check if tester mode is active
 const TESTER_MODE = process.env.NEXT_PUBLIC_TESTER_MODE === 'true';
 // Get tester password from environment variable with fallback
-const TESTER_PASSWORD = process.env.NEXT_PUBLIC_TESTER_PASSWORD || 'covenant-test-22#';
+const TESTER_PASSWORD = process.env.NEXT_PUBLIC_TESTER_PASSWORD || 'test-covenant-45#';
 
 // Just for debugging
 console.log(`Tester mode: ${TESTER_MODE ? 'ENABLED' : 'DISABLED'}`);
