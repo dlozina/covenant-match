@@ -1,33 +1,65 @@
+import React from "react";
+
+interface MainLayoutProps {
+  children: React.ReactNode;
+  leftSidebar?: React.ReactNode;
+  rightSidebar?: React.ReactNode;
+  footer?: React.ReactNode;
+}
+
 export function MainLayout({ 
   children, 
   leftSidebar, 
-  rightSidebar 
+  rightSidebar,
+  footer
 }: MainLayoutProps) {
   return (
-    <div className="container mx-auto px-4">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <div className="flex flex-col min-h-screen">
+      <div className="flex flex-col md:flex-row w-full flex-grow">
+        {/* Left sidebar - fixed width on desktop */}
         {leftSidebar && (
-          <aside className="hidden lg:block lg:col-span-3">
+          <div className="hidden md:block w-64 bg-muted p-4 shrink-0">
             {leftSidebar}
-          </aside>
+          </div>
         )}
-        <main className={`${leftSidebar || rightSidebar ? 'lg:col-span-6' : 'lg:col-span-12'} col-span-1`}>
-          {children}
-        </main>
+
+        {/* Main content area - takes remaining space */}
+        <div className="flex-grow p-4 md:p-6">
+          <div className="max-w-5xl mx-auto">
+            {children}
+          </div>
+        </div>
+
+        {/* Right sidebar - fixed width on desktop */}
         {rightSidebar && (
-          <aside className="hidden lg:block lg:col-span-3">
+          <div className="hidden md:block w-64 bg-muted p-4 shrink-0">
             {rightSidebar}
-          </aside>
-        )}
-        
-        {/* Mobile sidebars (shown at bottom on mobile) */}
-        {(leftSidebar || rightSidebar) && (
-          <div className="lg:hidden col-span-1 space-y-8">
-            {leftSidebar && <div>{leftSidebar}</div>}
-            {rightSidebar && <div>{rightSidebar}</div>}
           </div>
         )}
       </div>
+      
+      {/* Mobile sidebars - shown at the bottom on small screens */}
+      <div className="md:hidden px-4 pb-6 space-y-6">
+        {leftSidebar && (
+          <div className="bg-muted/50 rounded-lg">
+            {leftSidebar}
+          </div>
+        )}
+        {rightSidebar && (
+          <div className="bg-muted/50 rounded-lg">
+            {rightSidebar}
+          </div>
+        )}
+      </div>
+      
+      {/* Footer - centered and full width */}
+      {footer && (
+        <div className="w-full mt-auto">
+          <div className="max-w-5xl mx-auto">
+            {footer}
+          </div>
+        </div>
+      )}
     </div>
   );
 } 
