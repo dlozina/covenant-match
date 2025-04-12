@@ -9,15 +9,6 @@ RUN npm ci
 # Copy the rest of the application code
 COPY . .
 
-# Create an entrypoint script to load secrets from files
-RUN echo '#!/bin/sh\n\
-if [ -f "$NEXT_PUBLIC_TESTER_PASSWORD_FILE" ]; then\n\
-  export NEXT_PUBLIC_TESTER_PASSWORD=$(cat $NEXT_PUBLIC_TESTER_PASSWORD_FILE)\n\
-  echo "Loaded tester password from file: $NEXT_PUBLIC_TESTER_PASSWORD_FILE"\n\
-fi\n\
-\n\
-exec "$@"' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
-
 # Set development environment
 ENV NODE_ENV=development
 EXPOSE 3000
@@ -64,6 +55,8 @@ RUN npm ci --omit=dev
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/next.config.ts ./
+COPY --from=builder /app/entrypoint.sh ./entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 # Runtime environment variables 
 ENV NODE_ENV=production
@@ -72,17 +65,6 @@ ENV NEXT_PUBLIC_TESTER_MODE=${NEXT_PUBLIC_TESTER_MODE}
 ENV NEXT_PUBLIC_RECAPTCHA_SITE_KEY=${NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
 
 EXPOSE 3000
-
-# Create an entrypoint script to load secrets from files
-RUN echo '#!/bin/sh\n\
-if [ -f "$NEXT_PUBLIC_TESTER_PASSWORD_FILE" ]; then\n\
-  export NEXT_PUBLIC_TESTER_PASSWORD=$(cat $NEXT_PUBLIC_TESTER_PASSWORD_FILE)\n\
-  echo "Loaded tester password from file: $NEXT_PUBLIC_TESTER_PASSWORD_FILE"\n\
-else\n\
-  echo "Warning: Password file not found: $NEXT_PUBLIC_TESTER_PASSWORD_FILE"\n\
-fi\n\
-\n\
-exec "$@"' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 # Use the entrypoint script
 ENTRYPOINT ["/app/entrypoint.sh"]
