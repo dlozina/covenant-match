@@ -58,6 +58,9 @@ COPY --from=builder /app/next.config.ts ./
 COPY --from=builder /app/entrypoint.sh ./entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
+# Create fallback entrypoint in case of issues
+RUN echo '#!/bin/sh\nif [ -f "$NEXT_PUBLIC_TESTER_PASSWORD_FILE" ]; then\n  export NEXT_PUBLIC_TESTER_PASSWORD=$(cat $NEXT_PUBLIC_TESTER_PASSWORD_FILE)\n  echo "Loaded tester password from file: $NEXT_PUBLIC_TESTER_PASSWORD_FILE"\nfi\nexec "$@"' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+
 # Runtime environment variables 
 ENV NODE_ENV=production
 ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
