@@ -13,8 +13,7 @@ COPY . .
 ENV NODE_ENV=development
 EXPOSE 3000
 
-# Use the entrypoint script
-ENTRYPOINT ["/app/entrypoint.sh"]
+# Run the development server directly
 CMD ["npm", "run", "dev"]
 
 # Stage 2: Build the application
@@ -55,20 +54,15 @@ RUN npm ci --omit=dev
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/next.config.ts ./
-COPY --from=builder /app/entrypoint.sh ./entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
 
-# Create fallback entrypoint in case of issues
-RUN echo '#!/bin/sh\nif [ -f "$NEXT_PUBLIC_TESTER_PASSWORD_FILE" ]; then\n  export NEXT_PUBLIC_TESTER_PASSWORD=$(cat $NEXT_PUBLIC_TESTER_PASSWORD_FILE)\n  echo "Loaded tester password from file: $NEXT_PUBLIC_TESTER_PASSWORD_FILE"\nfi\nexec "$@"' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
-
-# Runtime environment variables 
+# Runtime environment variables
 ENV NODE_ENV=production
 ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
 ENV NEXT_PUBLIC_TESTER_MODE=${NEXT_PUBLIC_TESTER_MODE}
+ENV NEXT_PUBLIC_TESTER_PASSWORD=${NEXT_PUBLIC_TESTER_PASSWORD}
 ENV NEXT_PUBLIC_RECAPTCHA_SITE_KEY=${NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
 
 EXPOSE 3000
 
-# Use the entrypoint script
-ENTRYPOINT ["/app/entrypoint.sh"]
+# Run the production server directly
 CMD ["npm", "start"]
