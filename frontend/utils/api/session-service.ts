@@ -1,12 +1,11 @@
 import { httpClient } from './http-client';
 import { 
-  Session, 
-  MinimalSession, 
-  SessionDetails, 
+  Session,
+  MinimalSession,
+  JoinedPlayer,
   CreateSessionParams,
   JoinSessionParams,
-  UserSessionResult,
-  SessionDto
+  UserSessionResult
 } from './types';
 import { ApiError } from './errors';
 
@@ -42,8 +41,11 @@ export class SessionService {
   private client = httpClient;
   
   /**
-   * Fetch sessions with filters and pagination
-   * @param options Filtering and pagination options
+   * Fetch all sessions with filtering option
+   * @param isLoggedIn Whether the user is logged in
+   * @param currentPage Current page number (1-indexed)
+   * @param limit Number of items per page
+   * @param statusFilter Filter by status
    * @returns List of sessions
    */
   async fetchSessions(
@@ -53,60 +55,36 @@ export class SessionService {
     statusFilter: string = 'All'
   ): Promise<{ sessions?: Session[], minimalSessions?: MinimalSession[] }> {
     try {
-      const offset = (currentPage - 1) * limit;
-      // Add status parameter to only fetch sessions with the current status filter
-      const statusParam = statusFilter !== 'All' ? `&status=${statusFilter}` : '';
+      let url = `/api/v1/sessions?page=${currentPage}&limit=${limit}`;
       
-      // Different endpoints based on authentication status
+      // Add status filter if it's not "All"
+      if (statusFilter !== 'All') {
+        url += `&status=${statusFilter}`;
+      }
+      
       if (isLoggedIn) {
-        // Use authenticated endpoint with full data for logged-in users
-        // Always set isPrivate=false to ensure we never show private sessions
-        const isPrivateParam = '&isPrivate=false';
-        
-        const sessions = await this.client.get<Session[]>(
-          `/api/v1/sessions?limit=${limit}&offset=${offset}${statusParam}${isPrivateParam}`,
-          true
-        );
-        
-        return { sessions };
+        // For logged-in users, we can fetch full session data
+        const response = await this.client.get<Session[]>(url, true);
+        return { sessions: response };
       } else {
-        // Use public endpoint with minimal data for non-authenticated users
-        const minimalSessions = await this.client.get<MinimalSession[]>(
-          `/api/v1/public/sessions?limit=${limit}&offset=${offset}${statusParam}`,
-          false
-        );
-        
-        return { minimalSessions };
+        // For non-logged-in users, fetch minimal session data
+        const response = await this.client.get<MinimalSession[]>(url, false);
+        return { minimalSessions: response };
       }
     } catch (error) {
-      console.error('Failed to fetch sessions:', error);
       throw error;
     }
   }
 
   /**
-   * Get detailed information about a specific session
-   * @param sessionId Session ID to fetch
-   * @returns Session details
+   * Fetch a session by ID
+   * @param sessionId Session ID
+   * @returns Session data
    */
   async fetchSessionDetail(sessionId: string): Promise<Session> {
-    if (!sessionId) {
-      throw new Error('Session ID is required');
-    }
-    
-    return this.client.get<Session>(`/api/v1/sessions/${sessionId}`, true);
-  }
-
-  /**
-   * Create a new session
-   * @param sessionData Session creation data
-   * @returns Created session with ID
-   */
-  async createSession(sessionData: CreateSessionParams): Promise<{ id: string }> {
     try {
-      return await this.client.post<{ id: string }>(
-        `/api/v1/sessions`, 
-        sessionData, 
+      return await this.client.get<Session>(
+        `/api/v1/sessions/${sessionId}`,
         true
       );
     } catch (error) {
@@ -115,9 +93,29 @@ export class SessionService {
   }
 
   /**
-   * Join an existing session
-   * @param sessionId Session ID to join
-   * @param joinData Join session data
+   * Create a new session
+   * @param sessionData Session data
+   * @returns Session ID
+   */
+  async createSession(sessionData: CreateSessionParams): Promise<{ id: string }> {
+    try {
+      return await this.client.post<{ id: string }>(
+        '/api/v1/sessions',
+        sessionData,
+        true
+      );
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Join a session
+   * @param sessionId Session ID
+   * @param nightfarer Night Farer character
+   * @param userId User ID
+   * @param username Username
+   * @param covenantName Covenant name
    */
   async joinSession(
     sessionId: string,
@@ -126,10 +124,6 @@ export class SessionService {
     username: string,
     covenantName: string
   ): Promise<void> {
-    if (!sessionId) {
-      throw new Error('Session ID is required');
-    }
-    
     try {
       const joinData: JoinSessionParams = {
         nightfarer,
@@ -149,15 +143,11 @@ export class SessionService {
   }
 
   /**
-   * Recreate a session from an existing one
-   * @param originalSessionId Original session ID to recreate
+   * Recreate a session with the same players
+   * @param originalSessionId Original session ID
    * @returns New session ID
    */
   async recreateSession(originalSessionId: string): Promise<{ id: string }> {
-    if (!originalSessionId) {
-      throw new Error('Original session ID is required');
-    }
-    
     try {
       return await this.client.post<{ id: string }>(
         `/api/v1/sessions/${originalSessionId}/recreate`,
@@ -171,9 +161,9 @@ export class SessionService {
 
   /**
    * Update session characters
-   * @param sessionId Session ID to update
+   * @param sessionId Session ID
    * @param nightLord Night Lord character
-   * @param hostNightfarer Host's Nightfarer character
+   * @param hostNightfarer Host's Night Farer character
    */
   async updateSessionCharacters(
     sessionId: string,
@@ -181,11 +171,11 @@ export class SessionService {
     hostNightfarer: string
   ): Promise<void> {
     try {
-      await this.client.patch<void>(
-        `/api/v1/sessions/${sessionId}`,
+      await this.client.put<void>(
+        `/api/v1/sessions/${sessionId}/characters`,
         {
           nightLord,
-          hostNightfarer
+          nightfarer: hostNightfarer
         },
         true
       );
@@ -226,9 +216,9 @@ export class SessionService {
    * Get the current user's active session if any
    * @returns The active session or null if none
    */
-  async getActiveSession(): Promise<SessionDto | null> {
+  async getActiveSession(): Promise<Session | null> {
     try {
-      return await this.client.get<SessionDto | null>(
+      return await this.client.get<Session | null>(
         '/api/v1/sessions/active',
         true
       );

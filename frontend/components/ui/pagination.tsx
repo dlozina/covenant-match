@@ -1,8 +1,9 @@
 import * as React from "react"
 import Link from "next/link"
+import { type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
-import { ButtonProps, buttonVariants } from "@/components/ui/button"
+import { buttonVariants } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react"
 
 const Pagination = ({ className, ...props }: React.ComponentProps<"nav">) => (
@@ -37,7 +38,7 @@ PaginationItem.displayName = "PaginationItem"
 
 type PaginationLinkProps = {
   isActive?: boolean
-} & Pick<ButtonProps, "size"> &
+} & Pick<VariantProps<typeof buttonVariants>, "size"> &
   React.ComponentProps<typeof Link>
 
 const PaginationLink = ({
