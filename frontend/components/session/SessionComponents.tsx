@@ -446,15 +446,20 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
   // Simplified logic for button state
   const hasEnoughPlayers = sessionData && sessionData.joinedPlayers.length >= 3;
   
+  // Check if all players have reported their results
+  const allPlayersReported = sessionData && sessionState.isSessionFinished 
+    ? sessionData.joinedPlayers.every(player => player.hasReported === true)
+    : false;
+  
   // Start button is disabled if the session has started, is disabled, not enough players, or not host
   const startButtonDisabled = sessionState.isSessionStarted || disabled || !hasEnoughPlayers || !isHost;
   
   // Finish button is disabled if session not started, is finished, disabled, or not host
   const finishButtonDisabled = !sessionState.isSessionStarted || sessionState.isSessionFinished || disabled || !isHost;
   
-  // SIMPLIFIED LOGIC: New session button is only disabled if explicitly disabled or loading
-  // The key is that it should be enabled as long as onRecreateSession exists
-  const newSessionButtonDisabled = disabled || isNewSessionLoading || !onRecreateSession;
+  // UPDATED LOGIC: New session button is disabled if loading, no handler, or (for host) if not all players reported
+  const newSessionButtonDisabled = disabled || isNewSessionLoading || !onRecreateSession || 
+    (isHost && sessionState.isSessionFinished && !allPlayersReported);
   
   // Determine if the button should be highlighted
   const shouldHighlightButton = !isHost && Boolean(onRecreateSession) && currentSessionId === sessionData?.id;
@@ -468,14 +473,17 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
                              !sessionState.isSessionStarted ? "Session must be started first" : 
                              sessionState.isSessionFinished ? "Session already finished" : "";
   
+  // Update recreation button tooltip to include the all players reported requirement
   const recreateButtonTooltip = !onRecreateSession 
                               ? "Wait for the host to create a new session" 
                               : !isHost 
-                              ? resultSubmitted 
-                                ? "You can still join the new session after submitting results" 
-                                : "Click to select your character and join the new session" 
-                              : "Create a new session with the same team and different characters";
-  
+                                ? resultSubmitted 
+                                  ? "You can still join the new session after submitting results" 
+                                  : "Click to select your character and join the new session" 
+                                : isHost && sessionState.isSessionFinished && !allPlayersReported
+                                  ? "All players must report results before creating a new session"
+                                  : "Create a new session with the same team and different characters";
+
   return (
   <Card className="mt-6">
     <CardContent className="py-6">

@@ -265,6 +265,14 @@ function SessionRunContent(): JSX.Element {
     if (!isValidSessionId || !isHost() || !userData || !sessionData) return;
     
     try {
+      // Check if all players have reported results
+      const allPlayersReported = sessionData.joinedPlayers.every(player => player.hasReported === true);
+      
+      if (!allPlayersReported) {
+        showNotification("Cannot create new session until all players have reported results", 'warning');
+        return;
+      }
+      
       setIsCreatingNewSession(true);
       // Instead of directly recreating the session, navigate to the character selection page
       router.push(`/sessions/recreate?id=${sessionId}`);
@@ -894,13 +902,18 @@ function SessionRunContent(): JSX.Element {
     }
   }, [sessionId, userData, resultState, sessionData, resultSubmitted, fetchWithAuth, setSessionData, showNotification]);
 
+  //todo: remove this after debugging
+  console.log(`[${new Date().toISOString()}] SESSION RUN PAGE LOADED - sessionId:`, sessionId);
   // Add a handler for "newSession" SSE events
   useEffect(() => {
     // Log when this effect runs
     //todo: remove this after debugging
     console.log(`[${new Date().toISOString()}] newSession EFFECT MOUNTED - isValidSessionId:`, isValidSessionId);
 
-    if (!isValidSessionId) return;
+    if (!isValidSessionId) {
+      console.log(`[${new Date().toISOString()}] EARLY RETURN from newSession effect - invalid sessionId`);
+      return;
+    }
 
     // Log when subscription happens
     //todo: remove this after debugging
@@ -915,31 +928,35 @@ function SessionRunContent(): JSX.Element {
       // Add a very visible log that won't be optimized away
       //todo: remove this after debugging
       console.warn(`[${new Date().toISOString()}] 🔴 NEW SESSION EVENT RECEIVED:`, data);
-      if (!data || typeof data !== 'object') {
-        return;
-      }
+      if (!data) return;
       
-      // Extract the new session ID and original session ID
-      const newSessionId = typeof data === 'object' && data !== null && 'sessionId' in data 
-                         ? String(data.sessionId) : null;
-      console.log('New session ID:', newSessionId);
-      
-      const originalSessionId = typeof data === 'object' && data !== null && 'originalSessionId' in data 
-                             ? String(data.originalSessionId) : null;
-      console.log('Original session ID:', originalSessionId);
-
-      // Only set newSessionId if:
-      // 1. We have both a new and original session ID
-      // 2. The current session matches the original session
-      // 3. The new session is different from our current session
-      if (newSessionId && originalSessionId && 
-          originalSessionId === sessionId && 
-          newSessionId !== sessionId) {
-        console.log('New session ID detected:', newSessionId);
-        // Store in localStorage
-        localStorage.setItem('pendingNewSessionId', newSessionId);
-        // Store the new session ID in state (for the UI button)
-        setNewSessionId(newSessionId);
+      try {
+        // Extract the new session ID and original session ID with type assertions
+        const newId = String((data as Record<string, unknown>).sessionId || '');
+        const originalId = String((data as Record<string, unknown>).originalSessionId || '');
+        
+        // Store the session ID in localStorage for persistence regardless of who receives it
+        if (newId && originalId === sessionId) {
+          localStorage.setItem('pendingNewSessionId', newId);
+          setNewSessionId(newId);
+          
+          // Only for non-hosts: automatically navigate to the recreate page
+          if (!isHost()) {
+            // Store in sessionStorage for recreation page
+            sessionStorage.setItem('autoJoinSessionId', newId);
+            
+            // Notify user
+            showNotification("Host created a new session. Redirecting...", 'success');
+            
+            // Navigate directly after a short delay
+            setTimeout(() => {
+              router.push(`/sessions/recreate?id=${sessionId}`);
+            }, 1500);
+          }
+        }
+      } catch (err) {
+        // Silent catch for production
+        console.error("Error processing newSession event:", err);
       }
     });
     
@@ -947,7 +964,7 @@ function SessionRunContent(): JSX.Element {
       unsubscribeNewSession();
       console.log(`[${new Date().toISOString()}] CLEANING UP newSession subscription`);
     };
-  }, [isValidSessionId, subscribe, sessionId]);
+  }, [isValidSessionId, subscribe, sessionId, isHost, router, showNotification]);
 
   // Handle SSE connection changes
   useEffect(() => {
