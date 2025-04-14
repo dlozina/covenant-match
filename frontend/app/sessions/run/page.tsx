@@ -278,17 +278,16 @@ function SessionRunContent(): JSX.Element {
   // CRITICAL FIX: Create a separate memoized function for non-host navigation
   // This ensures the callback remains stable even if resultSubmitted changes
   const joinNewSession = useCallback(() => {
-    console.log('joinNewSession called with newSessionId:', newSessionId);
-    if (newSessionId) {
+    const pendingSessionId = localStorage.getItem('pendingNewSessionId');
+    if (pendingSessionId) {
+      // Clear localStorage before navigation
+      localStorage.removeItem('pendingNewSessionId');
       // Store the session ID in sessionStorage so the recreate page can access it
-      sessionStorage.setItem('autoJoinSessionId', newSessionId);
-      //todo: remove this after debugging
-      console.log('Navigating to recreate page with sessionId:', newSessionId);
-      
+      sessionStorage.setItem('autoJoinSessionId', pendingSessionId); 
       // Navigate to the recreate page
       router.push(`/sessions/recreate?id=${sessionId}`);
     }
-  }, [newSessionId, sessionId, router]);
+  }, [sessionId, router]);
   
   // Fetch session data on mount
   useEffect(() => {
@@ -897,11 +896,25 @@ function SessionRunContent(): JSX.Element {
 
   // Add a handler for "newSession" SSE events
   useEffect(() => {
+    // Log when this effect runs
+    //todo: remove this after debugging
+    console.log(`[${new Date().toISOString()}] newSession EFFECT MOUNTED - isValidSessionId:`, isValidSessionId);
+
     if (!isValidSessionId) return;
+
+    // Log when subscription happens
+    //todo: remove this after debugging
+    console.log(`[${new Date().toISOString()}] SUBSCRIBING to newSession events`);
+    const storedSessionId = localStorage.getItem('pendingNewSessionId');
+    if (storedSessionId) {
+      setNewSessionId(storedSessionId);
+    }
     
     // Subscribe to the newSession event
     const unsubscribeNewSession = subscribe('newSession', (data) => {
-      // Safety check for data structure
+      // Add a very visible log that won't be optimized away
+      //todo: remove this after debugging
+      console.warn(`[${new Date().toISOString()}] 🔴 NEW SESSION EVENT RECEIVED:`, data);
       if (!data || typeof data !== 'object') {
         return;
       }
@@ -923,6 +936,8 @@ function SessionRunContent(): JSX.Element {
           originalSessionId === sessionId && 
           newSessionId !== sessionId) {
         console.log('New session ID detected:', newSessionId);
+        // Store in localStorage
+        localStorage.setItem('pendingNewSessionId', newSessionId);
         // Store the new session ID in state (for the UI button)
         setNewSessionId(newSessionId);
       }
@@ -930,6 +945,7 @@ function SessionRunContent(): JSX.Element {
     
     return () => {
       unsubscribeNewSession();
+      console.log(`[${new Date().toISOString()}] CLEANING UP newSession subscription`);
     };
   }, [isValidSessionId, subscribe, sessionId]);
 
@@ -943,17 +959,17 @@ function SessionRunContent(): JSX.Element {
   }, [isConnected]);
 
   // Add a visual indicator when a new session is available
-  useEffect(() => {
-    // Only non-hosts get the indicator (hosts create the session themselves)
-    if (newSessionId && !isHost()) {
-      console.log('New session ID detected in useEffect and is :', newSessionId);
-      console.log('Is host:', isHost());
-      // No action needed here - the UI will update based on newSessionId state
-      // The "Start New Session With Same Team" button will be enabled and highlighted
-    } else if (!newSessionId) {
-      // No action needed here - the UI will update based on newSessionId state
-    }
-  }, [newSessionId, isHost]);
+  // useEffect(() => {
+  //   // Only non-hosts get the indicator (hosts create the session themselves)
+  //   if (newSessionId && !isHost()) {
+  //     console.log('New session ID detected in useEffect and is :', newSessionId);
+  //     console.log('Is host:', isHost());
+  //     // No action needed here - the UI will update based on newSessionId state
+  //     // The "Start New Session With Same Team" button will be enabled and highlighted
+  //   } else if (!newSessionId) {
+  //     // No action needed here - the UI will update based on newSessionId state
+  //   }
+  // }, [newSessionId, isHost]);
 
   // Add effect to handle connection management for EventSource
   useEffect(() => {
@@ -975,14 +991,14 @@ function SessionRunContent(): JSX.Element {
 
   //todo: remove this after debugging
   // DEBUG: Track the critical values that affect the Join New Session button
-  useEffect(() => {
-    console.log('DEBUG VALUES CHANGED:', { 
-      newSessionId, 
-      resultSubmitted, 
-      isHost: isHost(),
-      hasOnRecreateSession: Boolean(newSessionId) || isHost()
-    });
-  }, [newSessionId, resultSubmitted, isHost]);
+  // useEffect(() => {
+  //   console.log('DEBUG VALUES CHANGED:', { 
+  //     newSessionId, 
+  //     resultSubmitted, 
+  //     isHost: isHost(),
+  //     hasOnRecreateSession: Boolean(newSessionId) || isHost()
+  //   });
+  // }, [newSessionId, resultSubmitted, isHost]);
 
   // Add new handlers for cancel/leave session
   const handleCancelSession = useCallback(async () => {
