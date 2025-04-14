@@ -3,7 +3,7 @@ export interface JoinedPlayer {
   userId: string;
   username: string;
   nightfarer: string;
-  covenantName: string;
+  covenantName?: string;
   joinedAt: string;
   hasReported?: boolean;
 }
@@ -20,4 +20,5 @@ export interface SessionData {
   startedAt: string | null;
   completedAt: string | null;
   password: string | null;
+  _version?: number;
 } 

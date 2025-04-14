@@ -753,7 +753,7 @@ pub async fn submit_result(
             "reported": user_id,
             "result": result_data.result,
         }),
-        Some(user_id),
+        None,
     );
 
     Ok(())
