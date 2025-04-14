@@ -21,7 +21,6 @@ export const ReCaptchaComponent = ({ onChange, onExpired }: ReCaptchaProps) => {
   // Effect to reset captcha on component mount
   useEffect(() => {
     resetCaptcha()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (

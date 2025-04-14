@@ -8,12 +8,14 @@ services:
       dockerfile: Dockerfile
       target: development
     volumes:
+      - frontend_node_modules:/app/node_modules
       - ./frontend:/app
-      - /app/node_modules
     environment:
       - NODE_ENV=development
       - NEXT_PUBLIC_API_BASE_URL=http://localhost
       - NEXT_PUBLIC_RECAPTCHA_SITE_KEY=6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI
+      - NEXT_PUBLIC_TESTER_MODE=true
+      - NEXT_PUBLIC_TESTER_PASSWORD=test-covenant-45#
     ports:
       - "3000:3000"
     command: npm run dev
@@ -65,8 +67,14 @@ services:
     build:
       context: ./nginx
       dockerfile: Dockerfile
+      args:
+        ENVIRONMENT: dev
     ports:
       - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/sites/covenant-match-dev.conf:/etc/nginx/sites/covenant-match.conf
+      - ./nginx/html:/usr/share/nginx/html
     depends_on:
       - frontend
       - backend
@@ -81,6 +89,7 @@ networks:
 
 volumes:
   mongodb_data_dev:
+  frontend_node_modules:
 
 secrets:
   mongodb_uri_dev:

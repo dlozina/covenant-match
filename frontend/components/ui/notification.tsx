@@ -1,10 +1,11 @@
 "use client"
 
+import { ReactNode } from "react"
 import { AlertCircle, CheckCircle, AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export type NotificationType = {
-  message: string;
+  message: string | ReactNode;
   type: 'success' | 'error' | 'warning';
 }
 

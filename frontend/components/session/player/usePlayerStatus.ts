@@ -12,34 +12,30 @@ export function usePlayerStatus(
   hasReported: boolean = false
 ): PlayerStatusBadge {
   return useMemo(() => {
-    // For finished sessions
     if (sessionState.isSessionFinished) {
-      // Only show "Reported" if the player has actually submitted a result
+      return {
+        color: "bg-gray-950/30 text-gray-500 border-gray-500",
+        text: "Finished"
+      };
+    }
+    
+    if (sessionState.isSessionStarted) {
       if (hasReported) {
         return {
-          color: "bg-emerald-950/30 text-emerald-500 border-emerald-500",
+          color: "bg-green-950/30 text-green-500 border-green-500",
           text: "Reported"
         };
       } else {
         return {
-          color: "bg-red-950/30 text-red-500 border-red-500",
-          text: "Result Pending"
+          color: "bg-blue-950/30 text-blue-500 border-blue-500",
+          text: "Playing"
         };
       }
     }
     
-    // For sessions in progress
-    if (sessionState.isSessionStarted) {
-      return {
-        color: "bg-purple-950/30 text-purple-500 border-purple-500",
-        text: "Running"
-      };
-    }
-    
-    // For sessions not yet started
     return {
       color: "bg-amber-950/30 text-amber-500 border-amber-500",
       text: "Ready"
     };
-  }, [sessionState.isSessionFinished, sessionState.isSessionStarted, hasReported, isHost]);
+  }, [sessionState.isSessionFinished, sessionState.isSessionStarted, hasReported]);
 } 

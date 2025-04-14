@@ -37,6 +37,7 @@ mime = "0.3.17"
 bytes = "1.5.0"
 reqwest = { version = "0.12", features = ["json"] }
 clap = { version = "4.4.2", features = ["derive"] }
+mockall = "0.13.1"
 
 [dev-dependencies]
 actix-rt = "2.9.0"

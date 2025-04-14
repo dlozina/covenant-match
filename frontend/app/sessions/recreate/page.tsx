@@ -4,7 +4,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/lib/auth-context";
@@ -66,43 +66,8 @@ function RecreateSessionContent() {
   // Check if user is host
   const [isHost, setIsHost] = useState<boolean>(false);
   
-  useEffect(() => {
-    // Fetch original session details when component mounts
-    if (originalSessionId) {
-      console.log(`Recreate page: Initializing with original session ID: ${originalSessionId}`);
-      fetchSessionDetailsData();
-    } else {
-      setNotification({
-        type: 'error',
-        message: "No session ID provided"
-      });
-      router.push('/sessions');
-    }
-    
-    // Fetch character data
-    fetchCharacterData();
-  }, [originalSessionId]);
-  
-  const fetchCharacterData = async () => {
-    try {
-      setIsLoadingCharacters(true);
-      const [lords, farers] = await Promise.all([
-        fetchNightLords(),
-        fetchNightfarers()
-      ]);
-      setNightLords(lords);
-      setNightfarers(farers);
-    } catch {
-      setNotification({
-        type: 'error',
-        message: "Failed to load characters. Please refresh the page."
-      });
-    } finally {
-      setIsLoadingCharacters(false);
-    }
-  };
-  
-  const fetchSessionDetailsData = async () => {
+  // Memoize functions to prevent them from being recreated on each render
+  const fetchSessionDetailsData = useCallback(async () => {
     if (!originalSessionId) return;
     
     console.log(`Recreate page: Fetching session details for session ID: ${originalSessionId}`);
@@ -126,6 +91,42 @@ function RecreateSessionContent() {
         message: errorMessage
       });
       router.push('/sessions');
+    }
+  }, [originalSessionId, router]);
+  
+  useEffect(() => {
+    if (!originalSessionId) {
+      setNotification({
+        type: 'error',
+        message: "No session ID provided"
+      });
+      router.push('/sessions');
+      return;
+    }
+    
+    // Fetch session details when component mounts
+    fetchSessionDetailsData();
+    
+    // Fetch character data
+    fetchCharacterData();
+  }, [originalSessionId, fetchSessionDetailsData, router]);
+  
+  const fetchCharacterData = async () => {
+    try {
+      setIsLoadingCharacters(true);
+      const [lords, farers] = await Promise.all([
+        fetchNightLords(),
+        fetchNightfarers()
+      ]);
+      setNightLords(lords);
+      setNightfarers(farers);
+    } catch {
+      setNotification({
+        type: 'error',
+        message: "Failed to load characters. Please refresh the page."
+      });
+    } finally {
+      setIsLoadingCharacters(false);
     }
   };
   

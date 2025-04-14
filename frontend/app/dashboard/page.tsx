@@ -29,7 +29,6 @@ import {
   AlertDialog,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -58,6 +57,29 @@ interface UserStats {
   reputation_score: number;
 }
 
+// Add this interface to describe the session result structure
+interface SessionResult {
+  user_id: string;
+  result: string;
+  rating?: number;
+  feedback?: string;
+  submitted_at: string;
+}
+
+// Add this interface to describe the session results response
+interface SessionResultsResponse {
+  sessionId: string;
+  status: string;
+  results: SessionResult[];
+  consensus: {
+    hasConsensus: boolean;
+    result: string | null;
+    submittedCount: number;
+    totalPlayers: number;
+  };
+  completed: boolean;
+}
+
 export default function DashboardPage() {
   return (
     <ProtectedRoute>
@@ -76,6 +98,7 @@ function DashboardContent() {
   const [activeNightfarer, setActiveNightfarer] = useState<string | null>(null);
   const [activeNightLord, setActiveNightLord] = useState<string | null>(null);
   const [sessionHistory, setSessionHistory] = useState<SessionHistoryEntry[]>([]);
+  const [sessionConsensusResults, setSessionConsensusResults] = useState<Record<string, string>>({});
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [pagination, setPagination] = useState<PaginationInfo>({
@@ -150,12 +173,42 @@ function DashboardContent() {
         setSessionHistory(response.data.sessions);
         setFilteredHistory(response.data.sessions);
         setPagination(response.data.pagination);
+        
+        // Fetch consensus results for completed sessions
+        fetchConsensusResults(response.data.sessions);
       } catch (err) {
         console.error('Error fetching session history:', err);
         setHistoryError(err instanceof Error ? err.message : 'Unknown error');
       } finally {
         setIsLoadingHistory(false);
       }
+    };
+    
+    // Function to fetch consensus results for sessions
+    const fetchConsensusResults = async (sessions: SessionHistoryEntry[]) => {
+      // Only fetch results for completed sessions
+      const completedSessions = sessions.filter(s => s.completed_at);
+      if (completedSessions.length === 0) return;
+      
+      const consensusResults: Record<string, string> = {};
+      
+      // Get consensus results for each completed session
+      for (const session of completedSessions) {
+        try {
+          const response = await fetchWithAuth<SessionResultsResponse>(
+            `/api/v1/sessions/${session.session_id}/results`
+          );
+          
+          if (response.consensus && response.consensus.hasConsensus) {
+            consensusResults[session.session_id] = response.consensus.result || '';
+          }
+        } catch (err) {
+          console.error(`Error fetching results for session ${session.session_id}:`, err);
+          // Continue with other sessions even if one fails
+        }
+      }
+      
+      setSessionConsensusResults(consensusResults);
     };
 
     fetchStats();
@@ -396,6 +449,35 @@ function DashboardContent() {
     }
   };
 
+  // Function to determine the display result and its value
+  const getDisplayResultInfo = (session: SessionHistoryEntry) => {
+    // For completed sessions with consensus result, use the consensus
+    if (session.completed_at && sessionConsensusResults[session.session_id]) {
+      const consensusResult = sessionConsensusResults[session.session_id];
+      return {
+        text: consensusResult.charAt(0).toUpperCase() + consensusResult.slice(1).toLowerCase(),
+        value: consensusResult.toLowerCase()
+      };
+    }
+    
+    // For completed sessions without a fetched consensus, use the player's result
+    // (this should be accurate for most cases as completed sessions have consensus)
+    if (session.completed_at) {
+      const cleanResult = session.player_result.replace(/^"/, '').replace(/"$/, ''); // Remove quotes if present
+      return {
+        text: cleanResult.charAt(0).toUpperCase() + cleanResult.slice(1).toLowerCase(), // Capitalize first letter
+        value: cleanResult.toLowerCase()
+      };
+    }
+    
+    // For non-completed sessions, show the individual result with a "Reported: " prefix
+    const cleanResult = session.player_result.replace(/^"/, '').replace(/"$/, '');
+    return {
+      text: `Reported: ${cleanResult}`,
+      value: cleanResult.toLowerCase()
+    };
+  };
+
   // Session History Section
   const renderSessionHistory = () => {
     if (isLoadingHistory) {
@@ -567,8 +649,8 @@ function DashboardContent() {
                     <TableCell>{session.night_lord}</TableCell>
                     <TableCell>{session.player_nightfarer}</TableCell>
                     <TableCell>
-                      <span className={getResultColor(session.player_result)}>
-                        {session.player_result}
+                      <span className={getResultColor(getDisplayResultInfo(session).value)}>
+                        {getDisplayResultInfo(session).text}
                       </span>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
@@ -597,8 +679,8 @@ function DashboardContent() {
               <div key={session.session_id} className="p-3 border border-purple-900/20 rounded-lg bg-card/50 shadow-sm">
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="font-medium text-base">{session.session_name}</h3>
-                  <span className={getResultColor(session.player_result)}>
-                    {session.player_result}
+                  <span className={getResultColor(getDisplayResultInfo(session).value)}>
+                    {getDisplayResultInfo(session).text}
                   </span>
                 </div>
                 <div className="text-sm space-y-1 mb-3">
@@ -1050,7 +1132,7 @@ function DashboardContent() {
                   <>Session: {sessionDetails?.session_name || 'Unknown'} <span className="text-xs text-muted-foreground">({selectedSessionId})</span></>
                 )}
               </AlertDialogTitle>
-              <AlertDialogDescription>
+              <div className="text-sm text-muted-foreground mt-2">
                 {isLoadingDetails ? (
                   <div className="py-8 flex justify-center">
                     <Loader2 className="h-6 w-6 animate-spin text-purple-500" />
@@ -1063,63 +1145,65 @@ function DashboardContent() {
                   <div className="space-y-4 py-2">
                     <div className="grid grid-cols-2 gap-4 mb-2">
                       <div>
-                        <p className="text-xs text-muted-foreground mb-1">Night Lord</p>
-                        <p className="font-medium">{sessionDetails.night_lord}</p>
+                        <div className="text-xs text-muted-foreground mb-1">Night Lord</div>
+                        <div className="font-medium">{sessionDetails.night_lord}</div>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground mb-1">Status</p>
-                        <p className="font-medium">{sessionDetails.status}</p>
+                        <div className="text-xs text-muted-foreground mb-1">Status</div>
+                        <div className="font-medium">{sessionDetails.status}</div>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground mb-1">Created</p>
-                        <p className="text-sm">{formatDate(sessionDetails.created_at)}</p>
+                        <div className="text-xs text-muted-foreground mb-1">Created</div>
+                        <div className="text-sm">{formatDate(sessionDetails.created_at)}</div>
                       </div>
                       {sessionDetails.completed_at && (
                         <div>
-                          <p className="text-xs text-muted-foreground mb-1">Completed</p>
-                          <p className="text-sm">{formatDate(sessionDetails.completed_at)}</p>
+                          <div className="text-xs text-muted-foreground mb-1">Completed</div>
+                          <div className="text-sm">{formatDate(sessionDetails.completed_at)}</div>
                         </div>
                       )}
                     </div>
                     
                     <div>
-                      <h4 className="text-sm font-medium mb-2">Players</h4>
+                      <div className="text-sm font-medium mb-2">Players</div>
                       <div className="border border-purple-900/20 rounded-md overflow-hidden">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Player</TableHead>
-                              <TableHead>Nightfarer</TableHead>
-                              <TableHead>Result</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {sessionDetails.players.map((player) => (
-                              <TableRow key={player.user_id} className="hover:bg-purple-900/5">
-                                <TableCell className="py-2">{player.username}</TableCell>
-                                <TableCell className="py-2">{player.nightfarer}</TableCell>
-                                <TableCell className="py-2">
-                                  {player.result ? (
-                                    <span className={getResultColor(player.result)}>
-                                      {player.result}
-                                    </span>
-                                  ) : (
-                                    <span className="text-muted-foreground text-xs">No result</span>
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-            </div>
-          </div>
-        </div>
+                        <div className="relative w-full overflow-auto">
+                          <table className="w-full caption-bottom text-sm">
+                            <thead>
+                              <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                                <th className="h-10 px-2 text-left align-middle font-medium">Player</th>
+                                <th className="h-10 px-2 text-left align-middle font-medium">Nightfarer</th>
+                                <th className="h-10 px-2 text-left align-middle font-medium">Result</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {sessionDetails.players.map((player) => (
+                                <tr key={player.user_id} className="border-b transition-colors hover:bg-purple-900/5">
+                                  <td className="p-2 align-middle">{player.username}</td>
+                                  <td className="p-2 align-middle">{player.nightfarer}</td>
+                                  <td className="p-2 align-middle">
+                                    {player.result ? (
+                                      <span className={getResultColor(player.result)}>
+                                        {player.result}
+                                      </span>
+                                    ) : (
+                                      <span className="text-muted-foreground text-xs">No result</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <div className="text-center py-4 text-muted-foreground">
                     No session details available
                   </div>
                 )}
-              </AlertDialogDescription>
+              </div>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Close</AlertDialogCancel>

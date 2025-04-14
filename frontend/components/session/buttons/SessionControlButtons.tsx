@@ -5,7 +5,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { storageUtils } from '@/components/session/SessionUtils';
 import { SessionState } from '@/components/session/SessionReducers';
 import { SessionData } from '@/components/session/common/types';
-import { useSessionControls } from './useSessionControls';
 
 interface SessionControlButtonsProps {
   sessionState: SessionState;

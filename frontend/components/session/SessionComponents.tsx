@@ -77,8 +77,9 @@ interface SessionControlButtonsProps {
   disabled?: boolean;
   sessionData?: SessionData;
   isHost?: boolean;
-  currentSessionId?: string;
   resultSubmitted?: boolean;
+  onCancelSession?: () => void;
+  onLeaveSession?: () => void;
 }
 
 interface SessionInfoSectionProps {
@@ -117,6 +118,13 @@ interface FinishSessionDialogProps {
 interface WarningDialogProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+// New DeleteSessionDialog interface
+interface DeleteSessionDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
 }
 
 // Helper function to determine player status badge
@@ -429,11 +437,17 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
   disabled,
   sessionData,
   isHost = false, // Default to false if not provided
-  currentSessionId,
-  resultSubmitted = false
+  resultSubmitted = false,
+  onCancelSession,  // New prop
+  onLeaveSession    // New prop
 }) => {
   // Simplified logic for button state
   const hasEnoughPlayers = sessionData && sessionData.joinedPlayers.length >= 3;
+  
+  // Check if all players have reported their results
+  const allPlayersReported = sessionData && sessionState.isSessionFinished 
+    ? sessionData.joinedPlayers.every(player => player.hasReported === true)
+    : false;
   
   // Start button is disabled if the session has started, is disabled, not enough players, or not host
   const startButtonDisabled = sessionState.isSessionStarted || disabled || !hasEnoughPlayers || !isHost;
@@ -441,12 +455,9 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
   // Finish button is disabled if session not started, is finished, disabled, or not host
   const finishButtonDisabled = !sessionState.isSessionStarted || sessionState.isSessionFinished || disabled || !isHost;
   
-  // SIMPLIFIED LOGIC: New session button is only disabled if explicitly disabled or loading
-  // The key is that it should be enabled as long as onRecreateSession exists
-  const newSessionButtonDisabled = disabled || isNewSessionLoading || !onRecreateSession;
-  
-  // Determine if the button should be highlighted
-  const shouldHighlightButton = !isHost && Boolean(onRecreateSession) && currentSessionId === sessionData?.id;
+  // UPDATED LOGIC: New session button is disabled if loading, no handler, or (for host) if not all players reported
+  const newSessionButtonDisabled = disabled || isNewSessionLoading || !onRecreateSession || 
+    (isHost && sessionState.isSessionFinished && !allPlayersReported);
   
   // Create tooltips for the buttons
   const startButtonTooltip = !isHost ? "Only the host can start the session" : 
@@ -457,52 +468,56 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
                              !sessionState.isSessionStarted ? "Session must be started first" : 
                              sessionState.isSessionFinished ? "Session already finished" : "";
   
+  // Update recreation button tooltip to include the all players reported requirement
   const recreateButtonTooltip = !onRecreateSession 
                               ? "Wait for the host to create a new session" 
                               : !isHost 
-                              ? resultSubmitted 
-                                ? "You can still join the new session after submitting results" 
-                                : "Click to select your character and join the new session" 
-                              : "Create a new session with the same team and different characters";
-  
+                                ? resultSubmitted 
+                                  ? "You can still join the new session after submitting results" 
+                                  : "Click to select your character and join the new session" 
+                                : isHost && sessionState.isSessionFinished && !allPlayersReported
+                                  ? "All players must report results before creating a new session"
+                                  : "Create a new session with the same team and different characters";
+
   return (
   <Card className="mt-6">
     <CardContent className="py-6">
       {sessionState.isSessionFinished ? (
         <div className="space-y-4">
-          {/* Primary action button */}
-          <div className="flex">
-            <Button 
-              size="lg" 
-              className={`flex-1 h-14 text-lg ${shouldHighlightButton ? 'bg-emerald-600 hover:bg-emerald-700 animate-pulse' : ''}`}
-              onClick={onRecreateSession || resetSession}
-              disabled={newSessionButtonDisabled}
-              title={recreateButtonTooltip}
-            >
-              {isNewSessionLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
-                  {isHost ? "Creating New Session..." : "Navigating..."}
-                </span>
-              ) : (
-                <>
-                  <span className="sm:hidden flex flex-col items-center">
-                    <span>New Session</span>
-                    <span className="text-xs text-muted-foreground">with same team</span>
+          {/* Primary action button - only shown for hosts */}
+          {isHost && (
+            <div className="flex">
+              <Button 
+                size="lg" 
+                className="flex-1 h-14 text-lg"
+                onClick={onRecreateSession || resetSession}
+                disabled={newSessionButtonDisabled}
+                title={recreateButtonTooltip}
+              >
+                {isNewSessionLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
+                    {"Creating New Session..."}
                   </span>
-                  <span className="hidden sm:inline">
-                    {shouldHighlightButton 
-                      ? "➤ Select Character & Join New Session" 
-                      : isHost 
-                        ? "Create New Session With Same Team" 
-                        : "Start New Session With Same Team"}
-                  </span>
-                </>
-              )}
-            </Button>
-          </div>
+                ) : (
+                  "Create New Session With Same Team"
+                )}
+              </Button>
+            </div>
+          )}
           
-          {/* Navigation buttons - only shown after session is finished */}
+          {/* For non-hosts, show a status message about waiting for the host */}
+          {!isHost && sessionState.isSessionFinished && (
+            <div className="bg-secondary/30 p-4 rounded-md mb-4">
+              <p className="text-center text-muted-foreground">
+                {resultSubmitted 
+                  ? "Thanks for submitting results! The host will create a new session when everyone has reported."
+                  : "Please submit your results. When everyone has reported, the host can create a new session."}
+              </p>
+            </div>
+          )}
+          
+          {/* Navigation buttons - shown for all players after session is finished */}
           <div className="flex flex-col sm:flex-row gap-4">
             <Button 
               variant="outline" 
@@ -526,6 +541,7 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
         </div>
       ) : (
         <div className="flex flex-col gap-4">
+          {/* Primary action buttons */}
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1 flex flex-col">
               <Button 
@@ -558,6 +574,35 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
             >
               Finish Session
             </Button>
+          </div>
+          
+          {/* Secondary action buttons */}
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Delete Session button (for host) */}
+            {isHost && !sessionState.isSessionStarted && onCancelSession && (
+              <Button 
+                variant="destructive"
+                className="h-12 flex-1"
+                onClick={onCancelSession}
+                disabled={disabled || sessionState.isSessionStarted}
+                title="Delete this session and notify all players"
+              >
+                Delete Session
+              </Button>
+            )}
+            
+            {/* Leave Party button (for non-host players) */}
+            {!isHost && !sessionState.isSessionStarted && onLeaveSession && (
+              <Button 
+                variant="outline"
+                className="h-12 flex-1 border-amber-500 text-amber-500 hover:bg-amber-500/10"
+                onClick={onLeaveSession}
+                disabled={disabled || sessionState.isSessionStarted}
+                title="Leave this session and return to session selection"
+              >
+                Leave Party
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -861,6 +906,31 @@ export const WarningDialog: React.FC<WarningDialogProps> = ({ isOpen, onClose })
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogAction>I Understand</AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+);
+
+// Delete session dialog component
+export const DeleteSessionDialog: React.FC<DeleteSessionDialogProps> = ({ isOpen, onClose, onConfirm }) => (
+  <AlertDialog 
+    open={isOpen} 
+    onOpenChange={(open) => {
+      if (!open) onClose();
+    }}
+  >
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Delete Session</AlertDialogTitle>
+        <AlertDialogDescription>
+          Are you sure you want to delete this session? All players will be notified and the session will be permanently removed.
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>Cancel</AlertDialogCancel>
+        <AlertDialogAction onClick={onConfirm} className="bg-red-600 hover:bg-red-700">
+          Yes, Delete Session
+        </AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>

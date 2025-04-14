@@ -255,6 +255,7 @@ function EditProfileContent() {
       setSessionNameLength(userData.preferredSessionName?.length || 0);
       setSessionPasswordLength(userData.preferredSessionPassword?.length || 0);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userData, isLoadingGameData, form]);
   
   // Show notification if there's an error loading game data
@@ -282,7 +283,7 @@ function EditProfileContent() {
     });
     
     return () => subscription.unsubscribe();
-  }, [form.watch]);
+  }, [form, form.watch]);
 
   // Handle debounced validation
   const debouncedValidate = (fieldName: keyof ProfileFormValues) => {

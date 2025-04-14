@@ -1,0 +1,86 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # Build and push Rust backend image
+      - name: Build and push Backend image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          target: production
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/covenant-match-backend:latest
+            ghcr.io/${{ github.repository_owner }}/covenant-match-backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Build and push Frontend image
+      - name: Build and push Frontend image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          target: production
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/covenant-match-frontend:latest
+            ghcr.io/${{ github.repository_owner }}/covenant-match-frontend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Build and push Nginx Production image
+      - name: Build and push Nginx Production image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./nginx
+          file: ./nginx/Dockerfile
+          build-args: |
+            ENVIRONMENT=prod
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/covenant-match-nginx:latest
+            ghcr.io/${{ github.repository_owner }}/covenant-match-nginx:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+            
+      # Build and push Nginx Development image
+      - name: Build and push Nginx Development image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./nginx
+          file: ./nginx/Dockerfile
+          build-args: |
+            ENVIRONMENT=dev
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/covenant-match-nginx:dev
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

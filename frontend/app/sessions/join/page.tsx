@@ -17,6 +17,7 @@ import {
   fetchSessionDetail, 
   joinSession 
 } from "@/utils/api";
+import { sessionService } from "@/utils/api/session-service";
 
 // Define JWT Claims interface
 interface JwtClaims {
@@ -46,6 +47,30 @@ function JoinSessionContent() {
   const sessionId = searchParams.get('id');
   const { userData } = useAuth();
   
+  const checkActiveSession = useCallback(async () => {
+    try {
+      const activeSession = await sessionService.getActiveSession();
+      
+      // If user has an active session and it's not the one they're trying to join
+      if (activeSession && activeSession.id !== sessionId) {
+        setNotification({
+          type: 'warning',
+          message: (
+            <div>
+              You are already in an active session: &apos;{activeSession.name}&apos; (ID: {activeSession.id}) with status {activeSession.status}. 
+              <Link href={`/sessions/run?id=${activeSession.id}`} className="underline font-bold ml-1">
+                Click here
+              </Link> to go to your active session.
+            </div>
+          )
+        });
+      }
+    } catch (error) {
+      // Ignore errors checking for active sessions
+      console.error("Error checking for active sessions:", error);
+    }
+  }, [sessionId]);
+  
   // Fetch nightfarers on component mount
   useEffect(() => {
     const loadNightfarers = async () => {
@@ -64,7 +89,8 @@ function JoinSessionContent() {
     };
 
     loadNightfarers();
-  }, []);
+    checkActiveSession();
+  }, [checkActiveSession]);
   
   // Use useCallback for fetchSessionDetails to avoid recreating it on each render
   const fetchSessionDetailsData = useCallback(async () => {
@@ -161,10 +187,34 @@ function JoinSessionContent() {
       router.push(`/sessions/run?id=${sessionId}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
-      setNotification({
-        type: 'error',
-        message: errorMessage
-      });
+      
+      // Check if error message contains information about already being in a session
+      if (errorMessage.includes("You are already in an active session")) {
+        // Extract session ID from the error message using regex
+        const sessionIdMatch = errorMessage.match(/\(ID: ([a-f0-9]+)\)/i);
+        const sessionId = sessionIdMatch ? sessionIdMatch[1] : null;
+        
+        if (sessionId) {
+          setNotification({
+            type: 'warning',
+            message: (
+              <div>
+                {errorMessage}. <Link href={`/sessions/run?id=${sessionId}`} className="underline font-bold">Click here</Link> to go to your active session.
+              </div>
+            )
+          });
+        } else {
+          setNotification({
+            type: 'warning',
+            message: errorMessage
+          });
+        }
+      } else {
+        setNotification({
+          type: 'error',
+          message: errorMessage
+        });
+      }
     } finally {
       setIsLoading(false);
     }

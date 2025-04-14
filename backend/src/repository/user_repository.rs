@@ -52,17 +52,40 @@ pub async fn find_by_username_or_email(
 }
 
 pub async fn find_user_by_id(db: &Database, id: &str) -> Result<Option<User>, AppError> {
+    log::info!("Finding user by ID: {}", id);
     let collection = db.collection::<User>(COLLECTION_NAME);
+
+    // Check if the ID looks like a valid ObjectId (24 hex chars)
+    if id.len() != 24 || !id.chars().all(|c| c.is_digit(16)) {
+        log::warn!(
+            "Invalid user ID format (not a valid MongoDB ObjectId): {}",
+            id
+        );
+        return Err(AppError::InvalidId);
+    }
 
     // Convert string ID to ObjectId
     let object_id = ObjectId::parse_str(id).map_err(|e| {
-        error!("Invalid ObjectId format: {:?}", e);
+        log::error!("Failed to parse ObjectId from string {}: {:?}", id, e);
         AppError::InvalidId
     })?;
 
     let filter = doc! { "_id": object_id };
 
-    collection.find_one(filter).await.map_err(|e| {
+    log::info!(
+        "Querying database for user with ObjectId: {}",
+        object_id.to_hex()
+    );
+
+    let result = collection.find_one(filter).await;
+
+    match &result {
+        Ok(Some(_)) => log::info!("User found with ID: {}", id),
+        Ok(None) => log::info!("No user found with ID: {}", id),
+        Err(e) => log::error!("Database error finding user by id {}: {:?}", id, e),
+    }
+
+    result.map_err(|e| {
         error!("Database error finding user by id: {:?}", e);
         AppError::DatabaseError(e)
     })

@@ -3,19 +3,8 @@
 import * as React from "react"
 import { TooltipProps } from "recharts"
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
-  XAxis,
-  YAxis,
 } from "recharts"
 
 import { cn } from "@/lib/utils"
@@ -63,7 +52,7 @@ export function ChartContainer({
       {...props}
     >
       <ResponsiveContainer width="100%" height="100%">
-        {children}
+        {children as React.ReactElement}
       </ResponsiveContainer>
     </div>
   )
@@ -71,7 +60,11 @@ export function ChartContainer({
 
 interface ChartTooltipContentProps {
   active?: boolean
-  payload?: any[]
+  payload?: Array<{
+    dataKey?: string | number;
+    name?: string;
+    value?: number;
+  }>
   config: ChartConfig
   className?: string
   formatter?: (value: number, label: string) => React.ReactNode
@@ -91,7 +84,9 @@ export function ChartTooltipContent({
   }
 
   const { dataKey, name, value } = payload[0]
-  const { label } = config[dataKey] || config[name] || { label: name }
+  const dataKeyStr = dataKey !== undefined ? String(dataKey) : '';
+  const nameStr = name !== undefined ? String(name) : '';
+  const { label } = config[dataKeyStr] || config[nameStr] || { label: nameStr }
 
   return (
     <div
@@ -104,13 +99,13 @@ export function ChartTooltipContent({
         <p className="text-sm text-muted-foreground">{label}</p>
       )}
       <p className="font-medium">
-        {formatter ? formatter(value, label) : value}
+        {formatter && value !== undefined ? formatter(value, label) : value}
       </p>
     </div>
   )
 }
 
-interface ChartTooltipProps extends TooltipProps<any, any> {
+interface ChartTooltipProps extends Omit<TooltipProps<number, string>, 'payload'> {
   config?: ChartConfig
   formatter?: (value: number, label: string) => React.ReactNode
   hideLabel?: boolean

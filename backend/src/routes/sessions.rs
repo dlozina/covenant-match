@@ -269,6 +269,55 @@ async fn cancel_session(
     }
 }
 
+/// Leave a session (joined player only, before session starts)
+#[utoipa::path(
+    post,
+    path = "/api/v1/sessions/{id}/leave",
+    params(
+        ("id" = String, Path, description = "Session ID to leave")
+    ),
+    responses(
+        (status = 200, description = "Left session successfully"),
+        (status = 400, description = "Cannot leave session (already started or not a member)"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Session not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "sessions"
+)]
+#[post("/api/v1/sessions/{id}/leave")]
+async fn leave_session(
+    db: web::Data<Database>,
+    path: web::Path<String>,
+    req: HttpRequest,
+) -> impl Responder {
+    let id = path.into_inner();
+
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.sub.clone()
+    };
+
+    match session_service::leave_session(&db, &id, &user_id).await {
+        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "message": "Left session successfully"
+        })),
+        Err(e) => {
+            log::error!("Error leaving session: {:?}", e);
+            HttpResponse::BadRequest().json(serde_json::json!({
+                "status": "error",
+                "message": e.to_string()
+            }))
+        }
+    }
+}
+
 /// Complete a session (host only)
 #[utoipa::path(
     post,
@@ -544,17 +593,58 @@ async fn get_public_sessions(
     }
 }
 
+/// Get active session for the current user
+#[utoipa::path(
+    get,
+    path = "/api/v1/sessions/active",
+    responses(
+        (status = 200, description = "User's active session information or null if none", body = Option<SessionResponseDto>),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "sessions"
+)]
+#[get("/api/v1/sessions/active")]
+async fn get_user_active_session(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.sub.clone()
+    };
+
+    match session_service::check_user_active_session(&db, &user_id).await {
+        Ok(session) => HttpResponse::Ok().json(session),
+        Err(e) => {
+            log::error!("Error checking active session: {:?}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": "error",
+                "message": e.to_string()
+            }))
+        }
+    }
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
-    cfg.service(get_sessions)
+    // Register paths from most specific to most general
+    // Global endpoints first
+    cfg.service(get_public_sessions)
+        // Then specific action endpoints
+        .service(get_user_active_session) // /api/v1/sessions/active must be before {id} routes
+        .service(get_sessions)
         .service(create_session)
+        // Then ID-based endpoints
         .service(get_session)
         .service(join_session)
+        .service(leave_session)
         .service(start_session)
         .service(cancel_session)
         .service(complete_session)
         .service(recreate_session)
         .service(update_session)
         .service(submit_result)
-        .service(get_results)
-        .service(get_public_sessions);
+        .service(get_results);
 }

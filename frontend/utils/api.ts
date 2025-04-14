@@ -574,6 +574,50 @@ export const joinSession = async (
   }
 };
 
+// Function for a player to leave a session
+export const leaveSession = async (sessionId: string): Promise<void> => {
+  try {
+    const token = getToken();
+    
+    const response = await fetch(`${API_URL}/api/v1/sessions/${sessionId}/leave`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.message || 'Failed to leave session');
+    }
+  } catch (error) {
+    console.error('Failed to leave session:', error);
+    throw error;
+  }
+};
+
+// Function for a host to cancel/delete a session
+export const cancelSession = async (sessionId: string): Promise<void> => {
+  try {
+    const token = getToken();
+    
+    const response = await fetch(`${API_URL}/api/v1/sessions/${sessionId}/cancel`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.message || 'Failed to cancel session');
+    }
+  } catch (error) {
+    console.error('Failed to cancel session:', error);
+    throw error;
+  }
+};
+
 // Interface for session creation
 export interface CreateSessionParams {
   gamePassword: string;

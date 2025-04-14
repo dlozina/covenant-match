@@ -10,7 +10,8 @@ import {
   SessionInfoSection,
   ResultReportingSection,
   FinishSessionDialog,
-  WarningDialog
+  WarningDialog,
+  DeleteSessionDialog
 } from "@/components/session/SessionComponents";
 import {
   sessionReducer,
@@ -27,6 +28,7 @@ import { useSessionTimer } from "@/components/session/SessionHooks";
 import { useAuth } from "@/lib/auth-context";
 import { useRealTimeUpdates } from "@/hooks/useEventSource";
 import { Notification, NotificationType } from "@/components/ui/notification";
+import { cancelSession, leaveSession } from "@/utils/api"; // Import new API functions
 
 // Define the session data interface
 interface JoinedPlayer {
@@ -131,7 +133,8 @@ function SessionRunContent(): JSX.Element {
   const [friendState, dispatchFriend] = useReducer(friendStatusReducer, {} as FriendState);
   const [dialogState, dispatchDialog] = useReducer(dialogReducer, {
     showConfirmDialog: false,
-    showWarningDialog: false
+    showWarningDialog: false,
+    showDeleteDialog: false
   } as DialogState);
   const [resultState, dispatchResult] = useReducer(resultReducer, {
     selectedResult: 'win',
@@ -262,6 +265,14 @@ function SessionRunContent(): JSX.Element {
     if (!isValidSessionId || !isHost() || !userData || !sessionData) return;
     
     try {
+      // Check if all players have reported results
+      const allPlayersReported = sessionData.joinedPlayers.every(player => player.hasReported === true);
+      
+      if (!allPlayersReported) {
+        showNotification("Cannot create new session until all players have reported results", 'warning');
+        return;
+      }
+      
       setIsCreatingNewSession(true);
       // Instead of directly recreating the session, navigate to the character selection page
       router.push(`/sessions/recreate?id=${sessionId}`);
@@ -275,15 +286,16 @@ function SessionRunContent(): JSX.Element {
   // CRITICAL FIX: Create a separate memoized function for non-host navigation
   // This ensures the callback remains stable even if resultSubmitted changes
   const joinNewSession = useCallback(() => {
-    console.log('joinNewSession called with newSessionId:', newSessionId);
-    if (newSessionId) {
+    const pendingSessionId = localStorage.getItem('pendingNewSessionId');
+    if (pendingSessionId) {
+      // Clear localStorage before navigation
+      localStorage.removeItem('pendingNewSessionId');
       // Store the session ID in sessionStorage so the recreate page can access it
-      sessionStorage.setItem('autoJoinSessionId', newSessionId);
-      
+      sessionStorage.setItem('autoJoinSessionId', pendingSessionId); 
       // Navigate to the recreate page
       router.push(`/sessions/recreate?id=${sessionId}`);
     }
-  }, [newSessionId, sessionId, router]);
+  }, [sessionId, router]);
   
   // Fetch session data on mount
   useEffect(() => {
@@ -305,13 +317,11 @@ function SessionRunContent(): JSX.Element {
         // Ensure proper initialization of hasReported flag for all players
         if (data && data.joinedPlayers) {
           // Log the players' reported status
-          console.log("Fetched session data - Player reported status:");
           data.joinedPlayers.forEach((player: JoinedPlayer) => {
             // Make sure hasReported is explicitly set to false if not provided by API
             if (player.hasReported === undefined) {
               player.hasReported = false;
             }
-            console.log(`Player ${player.username} (${player.userId}): hasReported = ${player.hasReported}`);
           });
         }
         
@@ -357,7 +367,6 @@ function SessionRunContent(): JSX.Element {
         covenantName: typeof data === 'object' && data !== null && 'covenantName' in data 
                    ? String(data.covenantName) : 'Unknown Covenant'
       };
-      // No toast notification - UI will update through session data changes
       
       // Update the session data with the new player
       setSessionData(prevData => {
@@ -380,7 +389,7 @@ function SessionRunContent(): JSX.Element {
               nightfarer: playerData.nightfarer,
               covenantName: playerData.covenantName,
               joinedAt: new Date().toISOString(),
-              hasReported: false  // Explicitly set to false for new players
+              hasReported: false
             }
           ];
           
@@ -426,8 +435,6 @@ function SessionRunContent(): JSX.Element {
             startedAt: new Date().toISOString()
           };
         });
-        
-        // No toast notification needed - UI changes provide sufficient indication
       }
     });
     
@@ -458,8 +465,6 @@ function SessionRunContent(): JSX.Element {
           };
         });
         
-        // No toast notification needed - UI changes clearly indicate status
-        
         // NOTE: We're not disconnecting from SSE here anymore to continue receiving result updates
         // This allows players to see who has submitted their results in real-time
       }
@@ -481,20 +486,6 @@ function SessionRunContent(): JSX.Element {
         // Get the user ID who reported their result
         const reportedUserId = eventData.reported;
         
-        // todo: Log for debugging only
-        if (process.env.NODE_ENV !== 'production') {
-          console.log(`Result event received by ${userData?.id === sessionData?.hostId ? 'HOST' : 'PLAYER'}`);
-          console.log(`Player ${reportedUserId} has reported with result: ${eventData.result}`);
-          console.log(`Current user is ${userData?.id}, Host is ${sessionData?.hostId}`);
-          console.log(`Is host reporting: ${reportedUserId === sessionData?.hostId ? 'YES' : 'NO'}`);
-          
-          // Debug the current reported status of all players
-          console.log('Current reported status of players:');
-          sessionData?.joinedPlayers.forEach(player => {
-            console.log(`Player ${player.username} (${player.userId}): ${player.hasReported ? 'REPORTED' : 'PENDING'}`);
-          });
-        }
-        
         // Update the session data to mark the player as reported
         setSessionData(prevData => {
           if (!prevData) return null;
@@ -515,9 +506,72 @@ function SessionRunContent(): JSX.Element {
             joinedPlayers: updatedPlayers
           };
         });
-        
-      // No toast notification needed - badges provide visual feedback
       } 
+    });
+    
+    // Subscribe to the cancel event
+    const unsubscribeCancel = subscribe('cancel', (data) => {
+      // Safety check for data structure
+      if (!data || typeof data !== 'object') {
+        return;
+      }
+      
+      // Extract session ID from the data
+      const cancelledSessionId = typeof data === 'object' && data !== null && 'sessionId' in data 
+                  ? String(data.sessionId) : null;
+      
+      // Only process if it's for this session
+      if (cancelledSessionId === sessionId) {
+        // Show notification
+        showNotification('Session cancelled by the host', 'warning');
+        
+        // Clear session data
+        storageUtils.clearSessionData();
+        
+        // Disconnect from SSE
+        disconnect();
+        
+        // Redirect to sessions page
+        router.push('/sessions');
+      }
+    });
+
+    // Subscribe to the leave event
+    const unsubscribeLeave = subscribe('leave', (data) => {
+      // Safety check for data structure
+      if (!data || typeof data !== 'object') {
+        return;
+      }
+      
+      // Extract player data from the event
+      const userId = typeof data === 'object' && data !== null && 'userId' in data 
+            ? String(data.userId) : null;
+      
+      if (!userId) return;
+      
+      // Update the session data to remove the player
+      setSessionData(prevData => {
+        if (!prevData) return null;
+        
+        // Create a new array of joined players without the leaving player
+        const updatedPlayers = prevData.joinedPlayers.filter(player => player.userId !== userId);
+        
+        // Return updated session data
+        return {
+          ...prevData,
+          joinedPlayers: updatedPlayers,
+          // Update status from Full to Open if applicable
+          status: prevData.status === 'Full' ? 'Open' : prevData.status
+        };
+      });
+      
+      // Only show notification if it's not about the current user
+      if (userId !== userData?.id) {
+        // Extract username safely with type assertion
+        const username = typeof data === 'object' && data !== null && 'username' in data 
+                      ? String(data.username) : 'A player';
+        showNotification(`${username} left the session`, 'warning');
+      }
     });
     
     // Add additional event subscriptions here as needed
@@ -528,9 +582,11 @@ function SessionRunContent(): JSX.Element {
       unsubscribeStart();
       unsubscribeComplete();
       unsubscribeResult();
-      unsubscribeMessage(); // DEBUG: Clean up the generic message subscription
+      unsubscribeCancel();
+      unsubscribeLeave();
+      unsubscribeMessage();
     };
-  }, [isValidSessionId, sessionId, subscribe, sessionState.isSessionStarted, sessionState.isSessionFinished, sessionState.elapsedSeconds, disconnect, sessionData, userData, fetchWithAuth]);
+  }, [isValidSessionId, sessionId, subscribe, sessionState.isSessionStarted, sessionState.isSessionFinished, sessionState.elapsedSeconds, disconnect, sessionData, userData, fetchWithAuth, router, showNotification]);
   
   // Effect to handle page refresh detection and disconnect EventSource when truly unloading
   useEffect(() => {
@@ -748,7 +804,6 @@ function SessionRunContent(): JSX.Element {
     
     // Check if already submitted - throw an error to trigger the catch block in ResultReportingSection
     if (resultSubmitted) {
-      console.log('Result already submitted, ignoring duplicate submission attempt');
       throw new Error('Result already submitted');
     }
     
@@ -768,7 +823,7 @@ function SessionRunContent(): JSX.Element {
           resultValue = 'Disconnect';
           break;
         default:
-          resultValue = 'Win'; // Default to Win if somehow we get an unexpected value
+          resultValue = 'Disconnect'; // Default to Disconnect if somehow we get an unexpected value
       }
       
       // Prepare submission data
@@ -788,11 +843,6 @@ function SessionRunContent(): JSX.Element {
       
       // Mark as submitted
       setResultSubmitted(true);
-      
-      // CRITICAL FIX: Log current newSessionId to ensure it's preserved
-      if (process.env.NODE_ENV !== 'production') {
-        console.log(`Result submitted - Current newSessionId: ${newSessionId}`);
-      }
       
       // Update session data to mark current user as reported
       setSessionData(prevData => {
@@ -818,7 +868,6 @@ function SessionRunContent(): JSX.Element {
       // Check if this is an "already submitted" error
       if (errorMessage.toLowerCase().includes('already submitted') || 
           errorMessage.toLowerCase().includes('has already submitted')) {
-        console.log('Handling already submitted error:', errorMessage);
         
         // Update UI to show submitted state even though we caught an error
         setResultSubmitted(true);
@@ -851,43 +900,71 @@ function SessionRunContent(): JSX.Element {
         throw err;
       }
     }
-  }, [sessionId, userData, resultState, sessionData, resultSubmitted, fetchWithAuth, setSessionData, showNotification, newSessionId]);
+  }, [sessionId, userData, resultState, sessionData, resultSubmitted, fetchWithAuth, setSessionData, showNotification]);
 
+  //todo: remove this after debugging
+  console.log(`[${new Date().toISOString()}] SESSION RUN PAGE LOADED - sessionId:`, sessionId);
   // Add a handler for "newSession" SSE events
   useEffect(() => {
-    if (!isValidSessionId) return;
+    // Log when this effect runs
+    //todo: remove this after debugging
+    console.log(`[${new Date().toISOString()}] newSession EFFECT MOUNTED - isValidSessionId:`, isValidSessionId);
+
+    if (!isValidSessionId) {
+      console.log(`[${new Date().toISOString()}] EARLY RETURN from newSession effect - invalid sessionId`);
+      return;
+    }
+
+    // Log when subscription happens
+    //todo: remove this after debugging
+    console.log(`[${new Date().toISOString()}] SUBSCRIBING to newSession events`);
+    const storedSessionId = localStorage.getItem('pendingNewSessionId');
+    if (storedSessionId) {
+      setNewSessionId(storedSessionId);
+    }
     
     // Subscribe to the newSession event
     const unsubscribeNewSession = subscribe('newSession', (data) => {
-      // Safety check for data structure
-      if (!data || typeof data !== 'object') {
-        return;
-      }
+      // Add a very visible log that won't be optimized away
+      //todo: remove this after debugging
+      console.warn(`[${new Date().toISOString()}] 🔴 NEW SESSION EVENT RECEIVED:`, data);
+      if (!data) return;
       
-      // Extract the new session ID and original session ID
-      const newSessionId = typeof data === 'object' && data !== null && 'sessionId' in data 
-                         ? String(data.sessionId) : null;
-      
-      const originalSessionId = typeof data === 'object' && data !== null && 'originalSessionId' in data 
-                             ? String(data.originalSessionId) : null;
-      
-      // Only set newSessionId if:
-      // 1. We have both a new and original session ID
-      // 2. The current session matches the original session
-      // 3. The new session is different from our current session
-      if (newSessionId && originalSessionId && 
-          originalSessionId === sessionId && 
-          newSessionId !== sessionId) {
+      try {
+        // Extract the new session ID and original session ID with type assertions
+        const newId = String((data as Record<string, unknown>).sessionId || '');
+        const originalId = String((data as Record<string, unknown>).originalSessionId || '');
         
-        // Store the new session ID in state (for the UI button)
-        setNewSessionId(newSessionId);
+        // Store the session ID in localStorage for persistence regardless of who receives it
+        if (newId && originalId === sessionId) {
+          localStorage.setItem('pendingNewSessionId', newId);
+          setNewSessionId(newId);
+          
+          // Only for non-hosts: automatically navigate to the recreate page
+          if (!isHost()) {
+            // Store in sessionStorage for recreation page
+            sessionStorage.setItem('autoJoinSessionId', newId);
+            
+            // Notify user
+            showNotification("Host created a new session. Redirecting...", 'success');
+            
+            // Navigate directly after a short delay
+            setTimeout(() => {
+              router.push(`/sessions/recreate?id=${sessionId}`);
+            }, 1500);
+          }
+        }
+      } catch (err) {
+        // Silent catch for production
+        console.error("Error processing newSession event:", err);
       }
     });
     
     return () => {
       unsubscribeNewSession();
+      console.log(`[${new Date().toISOString()}] CLEANING UP newSession subscription`);
     };
-  }, [isValidSessionId, subscribe, sessionId]);
+  }, [isValidSessionId, subscribe, sessionId, isHost, router, showNotification]);
 
   // Handle SSE connection changes
   useEffect(() => {
@@ -899,15 +976,17 @@ function SessionRunContent(): JSX.Element {
   }, [isConnected]);
 
   // Add a visual indicator when a new session is available
-  useEffect(() => {
-    // Only non-hosts get the indicator (hosts create the session themselves)
-    if (newSessionId && !isHost()) {
-      // No action needed here - the UI will update based on newSessionId state
-      // The "Start New Session With Same Team" button will be enabled and highlighted
-    } else if (!newSessionId) {
-      // No action needed here - the UI will update based on newSessionId state
-    }
-  }, [newSessionId, isHost]);
+  // useEffect(() => {
+  //   // Only non-hosts get the indicator (hosts create the session themselves)
+  //   if (newSessionId && !isHost()) {
+  //     console.log('New session ID detected in useEffect and is :', newSessionId);
+  //     console.log('Is host:', isHost());
+  //     // No action needed here - the UI will update based on newSessionId state
+  //     // The "Start New Session With Same Team" button will be enabled and highlighted
+  //   } else if (!newSessionId) {
+  //     // No action needed here - the UI will update based on newSessionId state
+  //   }
+  // }, [newSessionId, isHost]);
 
   // Add effect to handle connection management for EventSource
   useEffect(() => {
@@ -927,15 +1006,64 @@ function SessionRunContent(): JSX.Element {
     };
   }, [isValidSessionId, rtConnected, reconnectWithFreshToken]);
 
+  //todo: remove this after debugging
   // DEBUG: Track the critical values that affect the Join New Session button
-  useEffect(() => {
-    console.log('DEBUG VALUES CHANGED:', { 
-      newSessionId, 
-      resultSubmitted, 
-      isHost: isHost(),
-      hasOnRecreateSession: Boolean(newSessionId) || isHost()
-    });
-  }, [newSessionId, resultSubmitted, isHost]);
+  // useEffect(() => {
+  //   console.log('DEBUG VALUES CHANGED:', { 
+  //     newSessionId, 
+  //     resultSubmitted, 
+  //     isHost: isHost(),
+  //     hasOnRecreateSession: Boolean(newSessionId) || isHost()
+  //   });
+  // }, [newSessionId, resultSubmitted, isHost]);
+
+  // Add new handlers for cancel/leave session
+  const handleCancelSession = useCallback(async () => {
+    if (!isValidSessionId || !isHost()) return;
+    
+    try {
+      // Show a loading notification
+      showNotification('Cancelling session...', 'warning');
+      
+      // Call the API to cancel the session
+      await cancelSession(sessionId);
+      
+      // Clear any session data
+      storageUtils.clearSessionData();
+      
+      // Show success notification
+      showNotification('Session cancelled successfully', 'success');
+      
+      // Redirect to sessions page
+      router.push('/sessions');
+    } catch (err) {
+      showNotification('Error cancelling session: ' + err, 'error');
+    }
+  }, [isValidSessionId, sessionId, isHost, router, showNotification]);
+
+  // Handler for non-host players to leave a session
+  const handleLeaveSession = useCallback(async () => {
+    if (!isValidSessionId || isHost()) return;
+    
+    try {
+      // Show a loading notification
+      showNotification('Leaving session...', 'warning');
+      
+      // Call the API to leave the session
+      await leaveSession(sessionId);
+      
+      // Clear any session data
+      storageUtils.clearSessionData();
+      
+      // Show success notification
+      showNotification('Left session successfully', 'success');
+      
+      // Redirect to sessions page
+      router.push('/sessions');
+    } catch (err) {
+      showNotification('Error leaving session: ' + err, 'error');
+    }
+  }, [isValidSessionId, sessionId, isHost, router, showNotification]);
 
   return (
     <MainLayout footer={<Footer />}>
@@ -1046,8 +1174,9 @@ function SessionRunContent(): JSX.Element {
                 disabled={!isValidSessionId}
                 sessionData={sessionData}
                 isHost={isHost()}
-                currentSessionId={sessionId}
                 resultSubmitted={resultSubmitted}
+                onCancelSession={!sessionState.isSessionStarted ? () => dispatchDialog({ type: 'SHOW_DELETE' }) : undefined}
+                onLeaveSession={!sessionState.isSessionStarted && !isHost() ? handleLeaveSession : undefined}
               />
             </div>
 
@@ -1093,6 +1222,12 @@ function SessionRunContent(): JSX.Element {
       <WarningDialog 
         isOpen={dialogState.showWarningDialog}
         onClose={() => dispatchDialog({ type: 'HIDE_WARNING' })}
+      />
+      
+      <DeleteSessionDialog
+        isOpen={dialogState.showDeleteDialog}
+        onClose={() => dispatchDialog({ type: 'HIDE_DELETE' })}
+        onConfirm={handleCancelSession}
       />
     </MainLayout>
   );

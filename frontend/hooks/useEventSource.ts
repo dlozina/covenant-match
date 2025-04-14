@@ -175,8 +175,6 @@ class EventSourceService {
         this.reconnectAttempts = 0;
         this.isReconnectingFlag = false;
         this.updateActivity();
-        // todo: Remove this once testing is done
-        //toast.success('Real-time updates connected');
       };
       
       // Handle reconnection
@@ -293,8 +291,9 @@ class EventSourceService {
           // Create a local timestamp for received time (browser time)
           const localTime = new Date().toLocaleTimeString();
           
+          //todo: remove this after debugging
           // Improved logging for heartbeats
-          console.log(`❤️ Heartbeat received at ${localTime} - server timestamp: ${data.timestamp || 'unknown'}, sequence: ${data.sequence || 'unknown'}`);
+          //console.log(`❤️ Heartbeat received at ${localTime} - server timestamp: ${data.timestamp || 'unknown'}, sequence: ${data.sequence || 'unknown'}`);
           
           // Dispatch a custom event for heartbeat visualization
           const heartbeatEvent = new CustomEvent('sse-heartbeat', { 
@@ -329,12 +328,6 @@ class EventSourceService {
       // Set up a generic message handler for any other event types
       newEventSource.onmessage = (event) => {
         this.updateActivity();
-        
-        // Log the raw event for debugging (only log beginning of data to avoid huge logs)
-        console.log('Default message event received:', { 
-          type: event.type,
-          data: typeof event.data === 'string' ? event.data.substring(0, 100) : event.data
-        });
         
         try {
           // Parse the JSON data

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 
 // Global constants
@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Function to fetch user data from the API
-  const fetchUserData = async (token: string): Promise<UserData | null> => {
+  const fetchUserData = useCallback(async (token: string): Promise<UserData | null> => {
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       const response = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
@@ -113,10 +113,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("Error fetching user data:", error);
       return null;
     }
-  };
+  }, []);
 
   // Function to refresh the auth token
-  const refreshToken = async (): Promise<boolean> => {
+  const refreshToken = useCallback(async (): Promise<boolean> => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return false;
@@ -172,10 +172,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return false;
     }
-  };
+  }, [lastTokenRefresh]);
 
   // Function to refresh user data
-  const refreshUserData = async (): Promise<void> => {
+  const refreshUserData = useCallback(async (): Promise<void> => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
@@ -185,10 +185,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUserData(data);
       setIsLoggedIn(true);
     }
-  };
+  }, [fetchUserData]);
 
   // Login function
-  const login = (token: string) => {
+  const login = useCallback((token: string) => {
     // Store the token directly without Next.js caching
     localStorage.setItem('token', token);
     
@@ -201,10 +201,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoggedIn(true);
     setLastTokenRefresh(now);
     refreshUserData();
-  };
+  }, [refreshUserData]);
 
   // Logout function
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('token');
     setIsLoggedIn(false);
     setUserData(null);
@@ -214,72 +214,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (protectedRoutes.some(route => pathname?.startsWith(route))) {
       router.push('/');
     }
-  };
+  }, [pathname, router]);
+
+  // Check authentication status function
+  const checkAuthStatus = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        setIsLoggedIn(false);
+        setUserData(null);
+        setIsLoading(false);
+        return;
+      }
+
+      // Try to fetch user data with current token
+      let data = await fetchUserData(token);
+      
+      // If fetching user data fails, try to refresh the token
+      if (!data) {
+        const refreshed = await refreshToken();
+        if (refreshed) {
+          // Try again with the new token
+          const newToken = localStorage.getItem('token');
+          data = await fetchUserData(newToken!);
+        }
+      }
+      
+      if (data) {
+        setUserData(data);
+        setIsLoggedIn(true);
+      } else {
+        // Invalid token and refresh failed
+        localStorage.removeItem('token');
+        setIsLoggedIn(false);
+        setUserData(null);
+      }
+    } catch (error) {
+      console.error("Auth check failed:", error);
+      
+      // Try to refresh token on error before giving up
+      try {
+        const refreshed = await refreshToken();
+        if (refreshed) {
+          const token = localStorage.getItem('token');
+          const data = await fetchUserData(token!);
+          if (data) {
+            setUserData(data);
+            setIsLoggedIn(true);
+            setIsLoading(false);
+            return;
+          }
+        }
+      } catch (refreshError) {
+        console.error("Token refresh attempt failed:", refreshError);
+      }
+      
+      setIsLoggedIn(false);
+      setUserData(null);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [fetchUserData, refreshToken]);
 
   // Check authentication status on initial load and when pathname changes
   useEffect(() => {
-    async function checkAuthStatus() {
-      try {
-        const token = localStorage.getItem('token');
-        
-        if (!token) {
-          setIsLoggedIn(false);
-          setUserData(null);
-          setIsLoading(false);
-          return;
-        }
-
-        // Try to fetch user data with current token
-        let data = await fetchUserData(token);
-        
-        // If fetching user data fails, try to refresh the token
-        if (!data) {
-          const refreshed = await refreshToken();
-          if (refreshed) {
-            // Try again with the new token
-            const newToken = localStorage.getItem('token');
-            data = await fetchUserData(newToken!);
-          }
-        }
-        
-        if (data) {
-          setUserData(data);
-          setIsLoggedIn(true);
-        } else {
-          // Invalid token and refresh failed
-          localStorage.removeItem('token');
-          setIsLoggedIn(false);
-          setUserData(null);
-        }
-      } catch (error) {
-        console.error("Auth check failed:", error);
-        
-        // Try to refresh token on error before giving up
-        try {
-          const refreshed = await refreshToken();
-          if (refreshed) {
-            const token = localStorage.getItem('token');
-            const data = await fetchUserData(token!);
-            if (data) {
-              setUserData(data);
-              setIsLoggedIn(true);
-              setIsLoading(false);
-              return;
-            }
-          }
-        } catch (refreshError) {
-          console.error("Token refresh attempt failed:", refreshError);
-        }
-        
-        setIsLoggedIn(false);
-        setUserData(null);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
     checkAuthStatus();
-  }, [pathname]);
+  }, [pathname, checkAuthStatus]);
 
   // Periodic token refresh for long-running sessions - updated for 12-hour expiry
   useEffect(() => {
@@ -311,10 +312,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       return () => clearInterval(refreshInterval);
     }
-  }, [isLoggedIn]);
+  }, [isLoggedIn, refreshToken]);
 
   // Add fetchWithAuth implementation inside AuthProvider
-  const fetchWithAuth = async <T = unknown>(url: string, options: RequestInit = {}): Promise<T> => {
+  const fetchWithAuth = useCallback(async <T = unknown>(url: string, options: RequestInit = {}): Promise<T> => {
     // Get token from storage
     let token = localStorage.getItem('token');
     if (!token) {
@@ -399,7 +400,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('API request error:', error);
       throw error;
     }
-  };
+  }, [refreshToken, logout]);
 
   return (
     <AuthContext.Provider
