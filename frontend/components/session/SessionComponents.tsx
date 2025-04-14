@@ -77,7 +77,6 @@ interface SessionControlButtonsProps {
   disabled?: boolean;
   sessionData?: SessionData;
   isHost?: boolean;
-  currentSessionId?: string;
   resultSubmitted?: boolean;
   onCancelSession?: () => void;
   onLeaveSession?: () => void;
@@ -438,7 +437,6 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
   disabled,
   sessionData,
   isHost = false, // Default to false if not provided
-  currentSessionId,
   resultSubmitted = false,
   onCancelSession,  // New prop
   onLeaveSession    // New prop
@@ -460,9 +458,6 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
   // UPDATED LOGIC: New session button is disabled if loading, no handler, or (for host) if not all players reported
   const newSessionButtonDisabled = disabled || isNewSessionLoading || !onRecreateSession || 
     (isHost && sessionState.isSessionFinished && !allPlayersReported);
-  
-  // Determine if the button should be highlighted
-  const shouldHighlightButton = !isHost && Boolean(onRecreateSession) && currentSessionId === sessionData?.id;
   
   // Create tooltips for the buttons
   const startButtonTooltip = !isHost ? "Only the host can start the session" : 
@@ -489,39 +484,40 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
     <CardContent className="py-6">
       {sessionState.isSessionFinished ? (
         <div className="space-y-4">
-          {/* Primary action button */}
-          <div className="flex">
-            <Button 
-              size="lg" 
-              className={`flex-1 h-14 text-lg ${shouldHighlightButton ? 'bg-emerald-600 hover:bg-emerald-700 animate-pulse' : ''}`}
-              onClick={onRecreateSession || resetSession}
-              disabled={newSessionButtonDisabled}
-              title={recreateButtonTooltip}
-            >
-              {isNewSessionLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
-                  {isHost ? "Creating New Session..." : "Navigating..."}
-                </span>
-              ) : (
-                <>
-                  <span className="sm:hidden flex flex-col items-center">
-                    <span>New Session</span>
-                    <span className="text-xs text-muted-foreground">with same team</span>
+          {/* Primary action button - only shown for hosts */}
+          {isHost && (
+            <div className="flex">
+              <Button 
+                size="lg" 
+                className="flex-1 h-14 text-lg"
+                onClick={onRecreateSession || resetSession}
+                disabled={newSessionButtonDisabled}
+                title={recreateButtonTooltip}
+              >
+                {isNewSessionLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
+                    {"Creating New Session..."}
                   </span>
-                  <span className="hidden sm:inline">
-                    {shouldHighlightButton 
-                      ? "➤ Select Character & Join New Session" 
-                      : isHost 
-                        ? "Create New Session With Same Team" 
-                        : "Start New Session With Same Team"}
-                  </span>
-                </>
-              )}
-            </Button>
-          </div>
+                ) : (
+                  "Create New Session With Same Team"
+                )}
+              </Button>
+            </div>
+          )}
           
-          {/* Navigation buttons - only shown after session is finished */}
+          {/* For non-hosts, show a status message about waiting for the host */}
+          {!isHost && sessionState.isSessionFinished && (
+            <div className="bg-secondary/30 p-4 rounded-md mb-4">
+              <p className="text-center text-muted-foreground">
+                {resultSubmitted 
+                  ? "Thanks for submitting results! The host will create a new session when everyone has reported."
+                  : "Please submit your results. When everyone has reported, the host can create a new session."}
+              </p>
+            </div>
+          )}
+          
+          {/* Navigation buttons - shown for all players after session is finished */}
           <div className="flex flex-col sm:flex-row gap-4">
             <Button 
               variant="outline" 

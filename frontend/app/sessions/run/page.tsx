@@ -1174,7 +1174,6 @@ function SessionRunContent(): JSX.Element {
                 disabled={!isValidSessionId}
                 sessionData={sessionData}
                 isHost={isHost()}
-                currentSessionId={sessionId}
                 resultSubmitted={resultSubmitted}
                 onCancelSession={!sessionState.isSessionStarted ? () => dispatchDialog({ type: 'SHOW_DELETE' }) : undefined}
                 onLeaveSession={!sessionState.isSessionStarted && !isHost() ? handleLeaveSession : undefined}
