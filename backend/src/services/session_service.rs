@@ -975,10 +975,17 @@ pub async fn recreate_session(
     // Create a new session with the same properties
     let now = mongodb::bson::DateTime::now();
 
+    // Create a new session name that avoids duplicate "(Replay)" suffix
+    let new_name = if original_session.name.contains("(Replay)") {
+        original_session.name.clone()
+    } else {
+        format!("{} (Replay)", original_session.name)
+    };
+
     // Create a new session with the same name and settings
     let new_session = GameSession {
         id: ObjectId::new(),
-        name: format!("{} (Replay)", original_session.name),
+        name: new_name,
         host_id: user_id.to_string(),
         password: original_session.password.clone(),
         is_private: make_private, // Always make recreated sessions private so they don't show in the sessions list
