@@ -31,6 +31,7 @@ export interface SessionData {
   startedAt: string | null;
   completedAt: string | null;
   password: string | null;
+  results?: Array<{ userId: string; result: string; rating: number; feedback: string; submittedAt: string }>;
   _version?: number; // Used to force re-renders
   newSessionId?: string; // Track ID of new session created by host
 }
@@ -259,7 +260,46 @@ export function SessionEventManager({
           });
         }
         
-        setSessionData(data);
+        // Compare with current state and update accordingly
+        setSessionData(prevData => {
+          if (!prevData) return data;
+          
+          // If status has changed or joinedPlayers count changed
+          const statusChanged = prevData.status !== data.status;
+          const playersChanged = prevData.joinedPlayers.length !== data.joinedPlayers.length;
+          const resultsChanged = (prevData.results?.length || 0) !== (data.results?.length || 0);
+          
+          // Check if there are more substantive changes
+          const startedChanged = prevData.startedAt !== data.startedAt;
+          const completedChanged = prevData.completedAt !== data.completedAt;
+          
+          // If changes detected, apply all updates from server
+          if (statusChanged || playersChanged || resultsChanged || startedChanged || completedChanged) {
+            console.log('Session state refreshed from server - detected changes');
+            
+            // If session went from not started to started, update local state
+            if (!prevData.startedAt && data.startedAt && data.status === 'InProgress') {
+              dispatchSession({ type: 'START_SESSION' });
+              const startTime = new Date(data.startedAt).getTime();
+              sessionStartTimeRef.current = startTime;
+              lastSyncTimeRef.current = startTime;
+              storageUtils.saveSessionStart(startTime, sessionId);
+            }
+            
+            // If session went from not finished to finished, update local state
+            if (!prevData.completedAt && data.completedAt && data.status === 'Completed') {
+              dispatchSession({ type: 'FINISH_SESSION' });
+              storageUtils.saveSessionFinish(sessionState.elapsedSeconds);
+            }
+            
+            return {
+              ...data,
+              _version: Date.now() // Force re-render
+            };
+          }
+          
+          return prevData;
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
       } finally {
@@ -270,7 +310,30 @@ export function SessionEventManager({
     // Initial fetch
     fetchSessionData();
     
-  }, [sessionId, fetchWithAuth]);
+    // Add Page Visibility API handler to refresh when user returns to tab
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('Page became visible, refreshing session state');
+        
+        // Check if WebSocket connection is active, reconnect if needed
+        if (!isConnected()) {
+          console.log('WebSocket disconnected, reconnecting...');
+          reconnectWithFreshToken();
+        }
+        
+        // Always fetch latest session data when returning to the page
+        fetchSessionData();
+      }
+    };
+    
+    // Set up visibility change listener
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Clean up
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [sessionId, fetchWithAuth, isConnected, reconnectWithFreshToken, sessionState.elapsedSeconds]);
   
   // Set up event subscriptions
   useEffect(() => {

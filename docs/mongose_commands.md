@@ -4,6 +4,11 @@ This guide provides essential MongoDB CLI commands using `mongosh`.
 
 ---
 
+Connect to the MongoDB container
+```bash
+docker exec -it covenant-match-mongodb-1 mongosh
+```
+
 ## 🛠 Getting Started
 
 ### Start the Mongo Shell
