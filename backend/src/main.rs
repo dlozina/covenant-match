@@ -30,6 +30,7 @@ use std::time::Duration;
 use tokio::sync::Mutex;
 use tokio::task;
 use utoipa_swagger_ui::SwaggerUi;
+use ws::session::SessionManager as WsSessionManager;
 
 /// Starts a background task to periodically clean up old login attempts
 async fn start_login_attempts_cleanup(db: mongodb::Database) {
@@ -133,28 +134,59 @@ async fn main() -> std::io::Result<()> {
         info!("Users collection doesn't exist yet - it will be created on first user registration");
     }
 
-    // Start SSE session manager actor (standalone without WebSocket)
-    let sse_router = SessionRouter::new(DEFAULT_PARTITION_COUNT, None).start();
+    // Check if we should use WebSockets or SSE
+    let use_websockets = get_config().use_websockets();
+    let inactive_timeout = get_config().session_inactive_timeout() as i64;
 
-    // Start the session pruner with a 1-hour interval and 24-hour max inactivity
-    let _session_pruner = SessionPrunerActor::new(
-        sse_router.clone(),
-        3600,  // Run every hour
-        86400, // Prune sessions inactive for 24 hours
-    )
-    .start();
+    info!(
+        "Realtime configuration: use_websockets = {}, inactive_timeout = {} seconds",
+        use_websockets, inactive_timeout
+    );
 
-    // Start the HeartbeatActor to send periodic heartbeat events
-    let _heartbeat_actor = HeartbeatActor::new(sse_router.clone()).start();
+    // Initialize either WebSockets or SSE based on configuration
+    let sse_router = if !use_websockets {
+        // Initialize SSE (Server-Sent Events)
+        info!("Initializing SSE for real-time communications");
+        let router = SessionRouter::new(DEFAULT_PARTITION_COUNT, None).start();
 
-    // Register the router with the session service (which needs updating)
-    session_service::set_sse_router(sse_router.clone());
+        // Start the session pruner with configurable interval
+        let _session_pruner = SessionPrunerActor::new(
+            router.clone(),
+            3600,             // Run every hour
+            inactive_timeout, // Prune sessions inactive for configured time
+        )
+        .start();
+
+        // Start the HeartbeatActor to send periodic heartbeat events
+        let _heartbeat_actor = HeartbeatActor::new(router.clone()).start();
+
+        // Register the router with the session service
+        session_service::set_sse_router(router.clone());
+
+        Some(router)
+    } else {
+        None
+    };
+
+    // Initialize WebSocket session manager if needed
+    let ws_session_manager = if use_websockets {
+        info!("Initializing WebSockets for real-time communications");
+        let session_manager = WsSessionManager::default().start();
+
+        // Register the WebSocket session manager with the session service
+        session_service::set_session_manager(session_manager.clone());
+
+        Some(session_manager)
+    } else {
+        None
+    };
 
     info!(
         "Starting HTTP server on {}:{}",
-        config.server_host(),
-        config.server_port()
+        get_config().server_host(),
+        get_config().server_port()
     );
+
     HttpServer::new(move || {
         // Configure CORS
         let cors = Cors::default()
@@ -165,27 +197,44 @@ async fn main() -> std::io::Result<()> {
             .supports_credentials()
             .max_age(3600);
 
-        App::new()
+        let mut app = App::new()
             .wrap(Logger::default())
             .wrap(cors)
             .app_data(Data::new(db.clone()))
-            .app_data(Data::new(sse_router.clone()))
             // Register routes directly (not inside a scope) -> scope has issues
             .wrap(Auth::user())
             .configure(health::config)
             .configure(users::config)
             .configure(sessions::config)
             .configure(game_data::config)
-            .configure(routes::sse::config)
             .configure(statistics::config)
             // Add Swagger UI with the OpenAPI schema from our new module
             .service(
                 SwaggerUi::new("/api/docs/{_:.*}")
                     .url("/api-docs/openapi.json", openapi::get_openapi()),
-            )
+            );
+
+        // Conditionally add SSE or WebSocket routes based on config
+        if let Some(router) = &sse_router {
+            app = app
+                .app_data(Data::new(router.clone()))
+                .configure(routes::sse::config);
+        }
+
+        if let Some(manager) = &ws_session_manager {
+            app = app
+                .app_data(Data::new(manager.clone()))
+                .configure(routes::ws::config);
+        }
+
+        app
     })
-    .workers(config.workers())
-    .bind(format!("{}:{}", config.server_host(), config.server_port()))?
+    .workers(get_config().workers())
+    .bind(format!(
+        "{}:{}",
+        get_config().server_host(),
+        get_config().server_port()
+    ))?
     .run()
     .await
 }

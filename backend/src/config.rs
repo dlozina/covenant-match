@@ -49,11 +49,18 @@ pub struct ServerConfig {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct RealtimeConfig {
+    pub use_websockets: bool,
+    pub session_inactive_timeout: u64,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct Config {
     pub environment: String,
     pub database: DatabaseConfig,
     pub jwt: JwtConfig,
     pub server: ServerConfig,
+    pub realtime: RealtimeConfig,
     pub auth: AuthConfig,
 }
 
@@ -194,6 +201,10 @@ impl Config {
                 host: "0.0.0.0".to_string(),
                 workers: 1,
             },
+            realtime: RealtimeConfig {
+                use_websockets: true,
+                session_inactive_timeout: 86400,
+            },
             auth: auth_config,
         }
     }
@@ -221,6 +232,14 @@ impl Config {
 
     pub fn workers(&self) -> usize {
         self.server.workers
+    }
+
+    pub fn use_websockets(&self) -> bool {
+        self.realtime.use_websockets
+    }
+
+    pub fn session_inactive_timeout(&self) -> u64 {
+        self.realtime.session_inactive_timeout
     }
 }
 

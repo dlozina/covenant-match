@@ -52,7 +52,7 @@ pub fn get_session_manager() -> Option<Addr<WsSessionManager>> {
     manager.clone()
 }
 
-// Helper function to broadcast to both WebSocket and SSE clients
+// Helper function to broadcast to WebSocket and/or SSE clients based on configuration
 pub fn broadcast_event(
     session_id: &str,
     event_type: &str,
@@ -70,10 +70,28 @@ pub fn broadcast_event(
             .unwrap_or_else(|| "none".to_string())
     );
 
-    // Get current timestamp - use chrono here as we're just using it for a simple timestamp
+    // Get current timestamp
     let now = Utc::now().timestamp();
 
-    // Broadcast to WebSocket clients
+    // Check configuration to determine which communication method to use
+    let use_websockets = crate::config::get_config().use_websockets();
+
+    if use_websockets {
+        // Use WebSockets
+        broadcast_to_websockets(session_id, event_type, &data, exclude_client_id.clone());
+    } else {
+        // Use SSE
+        broadcast_to_sse(session_id, event_type, &data, exclude_client_id, now);
+    }
+}
+
+// Helper function to broadcast only to WebSocket clients
+fn broadcast_to_websockets(
+    session_id: &str,
+    event_type: &str,
+    data: &serde_json::Value,
+    exclude_client_id: Option<String>,
+) {
     if let Some(ws_manager) = get_session_manager() {
         log::debug!("Broadcasting to WebSocket clients");
         let message = WsServerMessage {
@@ -84,23 +102,31 @@ pub fn broadcast_event(
         let broadcast = Broadcast {
             session_id: session_id.to_string(),
             message,
-            exclude_client_id: exclude_client_id.clone(),
+            exclude_client_id,
         };
 
         // Send the broadcast message
         ws_manager.do_send(broadcast);
     } else {
-        log::warn!("WebSocket session manager not available for broadcasting");
+        log::error!("WebSocket session manager not available for broadcasting - configured to use WebSockets but manager is not initialized");
     }
+}
 
-    // Broadcast to SSE clients
+// Helper function to broadcast only to SSE clients
+fn broadcast_to_sse(
+    session_id: &str,
+    event_type: &str,
+    data: &serde_json::Value,
+    exclude_client_id: Option<String>,
+    timestamp: i64,
+) {
     match get_sse_router() {
         Some(router) => {
-            log::debug!("Broadcasting to SSE clients - router found");
+            log::debug!("Broadcasting to SSE clients");
             let message = SseServerMessage {
                 message_type: event_type.to_string(),
                 data: data.clone(),
-                timestamp: now,
+                timestamp,
             };
 
             let broadcast = BroadcastMessage {
@@ -109,48 +135,32 @@ pub fn broadcast_event(
                 exclude_client: exclude_client_id,
             };
 
-            // Send the broadcast message
-            log::debug!("Sending BroadcastMessage to SSE router");
-
             // Use do_send which doesn't wait for a response
             router.do_send(broadcast);
-
-            // Log success
-            log::debug!("BroadcastMessage sent to SSE router");
         }
         None => {
             log::error!(
                 "SSE router not available for broadcasting - get_sse_router() returned None"
             );
 
-            // Attempt to recover by creating a new router - similar to your existing code
+            // Attempt to recover by creating a new router
             log::info!("Attempting to recover by creating a new router");
 
-            // First try to get the WebSocket session manager
-            let ws_manager = match get_session_manager() {
-                Some(mgr) => {
-                    log::info!("Found existing WebSocket session manager, using it");
-                    Some(mgr)
-                }
-                None => {
-                    log::warn!("WebSocket session manager not available");
-                    None
-                }
-            };
+            // Get configuration for inactive timeout
+            let inactive_timeout = crate::config::get_config().session_inactive_timeout() as i64;
 
-            // Create a new router with the WebSocket manager (or None)
+            // Create a new router
             let new_router =
-                SessionRouter::new(crate::sse::partition::DEFAULT_PARTITION_COUNT, ws_manager)
-                    .start();
+                SessionRouter::new(crate::sse::partition::DEFAULT_PARTITION_COUNT, None).start();
 
             // Set the new router
             set_sse_router(new_router.clone());
 
-            // Start the session pruner with a 1-hour interval and 24-hour max inactivity
+            // Start the session pruner with configurable inactivity timeout
             let _session_pruner = SessionPrunerActor::new(
                 new_router.clone(),
-                3600,  // Run every hour
-                86400, // Prune sessions inactive for 24 hours
+                3600,             // Run every hour
+                inactive_timeout, // Prune sessions inactive based on config
             )
             .start();
 
@@ -158,7 +168,7 @@ pub fn broadcast_event(
             let message = SseServerMessage {
                 message_type: event_type.to_string(),
                 data: data.clone(),
-                timestamp: now,
+                timestamp,
             };
 
             new_router.do_send(BroadcastMessage {
@@ -1101,97 +1111,6 @@ pub async fn update_session(
 
     // Return the updated session
     Ok(SessionResponseDto::from(session))
-}
-
-// Function to broadcast to SSE clients
-pub async fn broadcast_to_session(
-    session_id: &str,
-    event_type: &str,
-    data: serde_json::Value,
-    exclude_client_id: Option<String>,
-) {
-    log::debug!(
-        "Broadcasting to session {}: {} (exclude: {:?})",
-        session_id,
-        event_type,
-        exclude_client_id
-    );
-
-    // Broadcast to SSE clients
-    match get_sse_router() {
-        Some(router) => {
-            log::debug!("Broadcasting to SSE clients - router found");
-            let message = SseServerMessage {
-                message_type: event_type.to_string(),
-                data: data.clone(),
-                timestamp: chrono::Utc::now().timestamp(),
-            };
-
-            let broadcast = BroadcastMessage {
-                session_id: session_id.to_string(),
-                message,
-                exclude_client: exclude_client_id.clone(),
-            };
-
-            // Send the broadcast message
-            log::debug!("Sending BroadcastMessage to SSE router");
-
-            // Use do_send which doesn't wait for a response
-            router.do_send(broadcast);
-
-            // Log success
-            log::debug!("BroadcastMessage sent to SSE router");
-        }
-        None => {
-            log::error!(
-                "SSE router not available for broadcasting - get_sse_router() returned None"
-            );
-
-            // Attempt to recover by creating a new router - similar to your existing code
-            log::info!("Attempting to recover by creating a new router");
-
-            // First try to get the WebSocket session manager
-            let ws_manager = match get_session_manager() {
-                Some(mgr) => {
-                    log::info!("Found existing WebSocket session manager, using it");
-                    Some(mgr)
-                }
-                None => {
-                    log::warn!("WebSocket session manager not available");
-                    None
-                }
-            };
-
-            // Create a new router with the WebSocket manager (or None)
-            let new_router =
-                SessionRouter::new(crate::sse::partition::DEFAULT_PARTITION_COUNT, ws_manager)
-                    .start();
-
-            // Set the new router
-            set_sse_router(new_router.clone());
-
-            // Start the session pruner with a 1-hour interval and 24-hour max inactivity
-            let _session_pruner = SessionPrunerActor::new(
-                new_router.clone(),
-                3600,  // Run every hour
-                86400, // Prune sessions inactive for 24 hours
-            )
-            .start();
-
-            // Try broadcasting again with the new router
-            let message = SseServerMessage {
-                message_type: event_type.to_string(),
-                data: data.clone(),
-                timestamp: chrono::Utc::now().timestamp(),
-            };
-
-            new_router.do_send(BroadcastMessage {
-                session_id: session_id.to_string(),
-                message,
-                exclude_client: exclude_client_id,
-            });
-        }
-    }
 }
 
 /// Get statistics for all covenants

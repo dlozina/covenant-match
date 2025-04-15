@@ -1,10 +1,12 @@
 import { createContext, useContext, ReactNode, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { useRealTimeUpdates } from '@/hooks/useEventSource';
+import { useWebSocketUpdates } from '@/hooks/useWebSocket';
 import { initialSessionState, sessionReducer } from '../SessionReducers';
 import { useReducer } from 'react';
 import { storageUtils } from '../SessionUtils';
 import { useRouter } from 'next/navigation';
+import realtimeConfig from '@/config/realtimeConfig';
 
 // Define joined player interface
 export interface JoinedPlayer {
@@ -106,8 +108,21 @@ export function SessionEventManager({
   // Get auth context
   const { userData, fetchWithAuth } = useAuth();
   
-  // Initialize real-time updates connection
-  const { subscribe, isConnected, disconnect, reconnectWithFreshToken } = useRealTimeUpdates(sessionId);
+  // Initialize real-time updates connection based on configuration
+  const useWs = realtimeConfig.useWebSockets;
+  
+  // Use WebSockets or SSE based on configuration
+  const wsConnection = useWebSocketUpdates(useWs ? sessionId : null);
+  const sseConnection = useRealTimeUpdates(!useWs ? sessionId : null);
+  
+  // Use the appropriate connection based on configuration
+  const { subscribe, isConnected, disconnect, reconnectWithFreshToken } = 
+    useWs ? wsConnection : sseConnection;
+  
+  // Log the connection type
+  useEffect(() => {
+    console.log(`Using ${useWs ? 'WebSockets' : 'Server-Sent Events'} for real-time communication`);
+  }, [useWs]);
   
   // Format time function - memoized
   const formatTime = useCallback((totalSeconds: number): string => {
@@ -519,14 +534,6 @@ export function SessionEventManager({
       }
     });
     
-    // Handle heartbeat event subscription
-    const handleHeartbeat = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      setLastHeartbeat(customEvent.detail.timestamp);
-    };
-    
-    window.addEventListener('sse-heartbeat', handleHeartbeat);
-    
     // Check connection status periodically
     const statusInterval = setInterval(() => {
       setRtConnected(isConnected());
@@ -542,9 +549,8 @@ export function SessionEventManager({
       unsubscribeLeave();
       unsubscribeNewSession();
       clearInterval(statusInterval);
-      window.removeEventListener('sse-heartbeat', handleHeartbeat);
       
-      // Disconnect SSE when component unmounts
+      // Disconnect when component unmounts
       disconnect();
     };
   }, [
@@ -558,6 +564,24 @@ export function SessionEventManager({
     isHost,
     router
   ]);
+  
+  // Handle heartbeat events
+  useEffect(() => {
+    if (!sessionId) return;
+    
+    const heartbeatEventName = useWs ? 'ws-heartbeat' : 'sse-heartbeat';
+    
+    const handleHeartbeat = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      setLastHeartbeat(customEvent.detail.timestamp);
+    };
+    
+    window.addEventListener(heartbeatEventName, handleHeartbeat);
+    
+    return () => {
+      window.removeEventListener(heartbeatEventName, handleHeartbeat);
+    };
+  }, [sessionId, useWs]);
   
   // Handle connection changes
   useEffect(() => {
