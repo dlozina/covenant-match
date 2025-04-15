@@ -292,8 +292,23 @@ export function SessionEventManager({
               storageUtils.saveSessionFinish(sessionState.elapsedSeconds);
             }
             
+            // Make sure players' hasReported flags are properly synced with results
+            const updatedData = { ...data };
+            
+            // Only process if the session has results
+            if (data.results && data.results.length > 0) {
+              // Create a set of user IDs who have reported results for quick lookup
+              const reportedUserIds = new Set(data.results.map(result => result.userId));
+              
+              // Update the hasReported flag for each player based on results
+              updatedData.joinedPlayers = data.joinedPlayers.map(player => ({
+                ...player,
+                hasReported: reportedUserIds.has(player.userId)
+              }));
+            }
+            
             return {
-              ...data,
+              ...updatedData,
               _version: Date.now() // Force re-render
             };
           }
