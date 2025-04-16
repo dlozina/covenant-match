@@ -43,7 +43,7 @@ const PlayerRowComponent = ({
   return (
     <div className="flex items-center space-x-4">
       <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary">
-        <span>P{index + 1}</span>
+        <span>{index + 1 === 1 ? "⚔️" : "🛡️"}</span>
       </Avatar>
       <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
         <div className="bg-secondary/50 px-3 py-2 rounded-md">
@@ -53,11 +53,6 @@ const PlayerRowComponent = ({
           <span className="text-foreground">{player.nightfarer}</span>
         </div>
         <div className="flex items-center gap-2 ml-auto">
-          {isHost && (
-            <Badge variant="outline" className="bg-blue-950/30 text-blue-500 border-blue-500">
-              Host
-            </Badge>
-          )}
           {/* Show friend button only if session is finished and this is not the current user */}
           {sessionState.isSessionFinished && !isCurrentUser && (
             <FriendButton 
@@ -101,7 +96,7 @@ interface EmptyPlayerSlotProps {
 const EmptyPlayerSlotComponent = ({ position }: EmptyPlayerSlotProps) => (
   <div className="flex items-center space-x-4">
     <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary/50">
-      <span>P{position}</span>
+    <span>{position === 1 ? "⚔️" : "🛡️"} {position}</span>
     </Avatar>
     <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
       <div className="bg-secondary/30 px-3 py-2 rounded-md">

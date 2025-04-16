@@ -527,7 +527,13 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
                     {"Creating New Session..."}
                   </span>
                 ) : (
-                  "Create New Session With Same Team"
+                  <>
+                    <span className="hidden sm:inline">Create New Session With Same Team</span>
+                    <span className="sm:hidden flex flex-col items-center">
+                      <span className="font-medium">New Session</span>
+                      <span className="text-xs">with same team</span>
+                    </span>
+                  </>
                 )}
               </Button>
             </div>
