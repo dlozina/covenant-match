@@ -245,10 +245,10 @@ export function SessionChat() {
       </div>
       
       {/* Chat input */}
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <Input
           ref={inputRef}
-          className="gothic-input"
+          className="gothic-input w-full"
           placeholder="Type your message..."
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
@@ -258,7 +258,7 @@ export function SessionChat() {
         <Button 
           onClick={handleSendMessage}
           disabled={!inputValue.trim() || !rtConnected || !userData}
-          className="gothic-button"
+          className="gothic-button w-full sm:w-auto sm:px-4"
           size="icon"
         >
           <PaperAirplaneIcon className="h-4 w-4" />
