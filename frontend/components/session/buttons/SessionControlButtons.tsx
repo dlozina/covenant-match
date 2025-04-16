@@ -6,6 +6,7 @@ import { storageUtils } from '@/components/session/SessionUtils';
 import { SessionState } from '@/components/session/SessionReducers';
 import { SessionData } from '@/components/session/common/types';
 import { useAuth } from '@/lib/auth-context';
+import { Bell } from "lucide-react";
 
 interface SessionControlButtonsProps {
   sessionState: SessionState;
@@ -107,7 +108,10 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
             {/* Participant message when session is finished */}
             {!isHost && (
               <div className="px-4 py-3 bg-purple-900/30 border border-purple-500 rounded-md text-white text-center">
-                <p className="text-sm">Waiting for the host to create a new session. You&apos;ll be redirected automatically when that happens.</p>
+                <p className="text-sm flex items-center justify-center gap-2">
+                  <Bell className="text-white" size={28} />
+                  Waiting for the host to create a new session. You&apos;ll be redirected automatically when that happens.
+                </p>
               </div>
             )}
             
