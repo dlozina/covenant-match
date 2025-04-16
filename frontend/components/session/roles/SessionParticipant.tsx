@@ -30,7 +30,8 @@ export function SessionParticipant() {
     error,
     isHost,
     formatTime,
-    resetSession
+    resetSession,
+    updatePlayerReportedStatus
   } = useSessionContext();
   
   // Get auth context - moved before conditional return
@@ -129,14 +130,17 @@ export function SessionParticipant() {
         covenantName: userData.covenantName
       };
       
-      // Submit result
+      // Set state to submitted immediately for better UI feedback
+      setResultSubmitted(true);
+      
+      // Also update the session data to show this player has reported
+      updatePlayerReportedStatus(userData.id, true);
+      
+      // Submit result to server
       await fetchWithAuth(`/api/v1/sessions/${sessionData.id}/results`, {
         method: 'POST',
         body: JSON.stringify(submissionData)
       });
-      
-      // Mark as submitted
-      setResultSubmitted(true);
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
@@ -152,12 +156,16 @@ export function SessionParticipant() {
         // For other errors, show the error notification
         showNotification('Error submitting result: ' + errorMessage, 'error');
         setSubmissionError(errorMessage);
+        
+        // Revert the optimistic update
+        setResultSubmitted(false);
+        updatePlayerReportedStatus(userData.id, false);
       }
       
       // Rethrow all errors to let the component handle them
       throw err;
     }
-  }, [sessionData, userData, resultState, resultSubmitted, fetchWithAuth, showNotification]);
+  }, [sessionData, userData, resultState, resultSubmitted, fetchWithAuth, showNotification, updatePlayerReportedStatus]);
   
   // Handle leave session
   const handleLeaveSession = useCallback(async () => {

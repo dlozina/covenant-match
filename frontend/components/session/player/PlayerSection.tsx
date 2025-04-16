@@ -165,31 +165,6 @@ const PlayerSectionComponent = ({
           </React.Fragment>
         ))}
 
-        {/* If no session data, show default player */}
-        {(!sessionData || sessionData.joinedPlayers.length === 0) && (
-          <div className="flex items-start sm:items-center space-x-4">
-            <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary mt-1 sm:mt-0">
-              <span>P1</span>
-            </Avatar>
-            <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
-              <div className="bg-secondary/50 px-3 py-2 rounded-md">
-                <span className="text-foreground">DarkKnight88</span>
-              </div>
-              <div className="bg-secondary/50 px-3 py-2 rounded-md">
-                <span className="text-foreground">Shadow Lord</span>
-              </div>
-              <div className="flex items-center gap-2 ml-auto">
-                <Badge variant="outline" className="bg-blue-950/30 text-blue-500 border-blue-500">
-                  Host
-                </Badge>
-                <Badge variant="outline" className="bg-amber-950/30 text-amber-500 border-amber-500">
-                  Ready
-                </Badge>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Add divider before empty slots if we have any real players */}
         {(!sessionData || sessionData.joinedPlayers.length < 3) && sessionData && sessionData.joinedPlayers.length > 0 && (
           <div className="border-t border-border"></div>

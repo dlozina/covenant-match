@@ -67,6 +67,8 @@ interface SessionContextType {
   resetSession: () => void;
   startSession: () => void;
   handleFinishSession: () => void;
+  // Added for manual updates of session data
+  updatePlayerReportedStatus: (userId: string, hasReported: boolean) => void;
   // WebSocket methods using compatible types
   subscribe: (eventType: string, handler: (data: unknown) => void) => (() => void);
   isConnected: () => boolean;
@@ -88,6 +90,7 @@ export const SessionContext = createContext<SessionContextType>({
   resetSession: () => {},
   startSession: () => {},
   handleFinishSession: () => {},
+  updatePlayerReportedStatus: () => {},
   subscribe: () => () => {},
   isConnected: () => false,
   sendMessage: () => false,
@@ -379,7 +382,7 @@ export function SessionEventManager({
         username: typeof data === 'object' && data !== null && 'username' in data 
                   ? String(data.username) : 'Unknown Player',
         nightfarer: typeof data === 'object' && data !== null && 'nightfarer' in data 
-                  ? String(data.nightfarer) : 'Unknown Class',
+                  ? String(data.nightfarer) : 'Unknown Nightfarer',
         userId: typeof data === 'object' && data !== null && 'userId' in data 
                 ? String(data.userId) : `user-${Date.now()}`,
         covenantName: typeof data === 'object' && data !== null && 'covenantName' in data 
@@ -716,7 +719,28 @@ export function SessionEventManager({
     // WebSocket methods
     subscribe,
     isConnected,
-    sendMessage: wsConnection.sendMessage
+    sendMessage: wsConnection.sendMessage,
+    updatePlayerReportedStatus: (userId: string, hasReported: boolean) => {
+      setSessionData(prevData => {
+        if (!prevData) return null;
+        
+        const updatedPlayers = prevData.joinedPlayers.map(player => {
+          if (player.userId === userId) {
+            return {
+              ...player,
+              hasReported: hasReported
+            };
+          }
+          return player;
+        });
+        
+        return {
+          ...prevData,
+          joinedPlayers: updatedPlayers,
+          _version: Date.now() // Force re-render
+        };
+      });
+    }
   }), [
     sessionData,
     isLoading,
@@ -732,7 +756,8 @@ export function SessionEventManager({
     handleFinishSession,
     subscribe,
     isConnected,
-    wsConnection.sendMessage
+    wsConnection.sendMessage,
+    setSessionData
   ]);
   
   return (
