@@ -8,7 +8,8 @@ import {
   SessionEventManager,
   SessionHeader,
   SessionHost,
-  SessionParticipant
+  SessionParticipant,
+  SessionChat
 } from "@/components/session";
 import { Notification, NotificationType } from "@/components/ui/notification";
 
@@ -100,6 +101,9 @@ function SessionRunContent(): JSX.Element {
           )}
           
           <ParticipantOrHostView />
+          
+          {/* Chat is available to everyone regardless of role */}
+          <SessionChat />
         </SessionEventManager>
       </div>
     </MainLayout>
