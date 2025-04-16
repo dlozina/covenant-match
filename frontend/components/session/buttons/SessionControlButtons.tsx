@@ -5,12 +5,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { storageUtils } from '@/components/session/SessionUtils';
 import { SessionState } from '@/components/session/SessionReducers';
 import { SessionData } from '@/components/session/common/types';
+import { useAuth } from '@/lib/auth-context';
 
 interface SessionControlButtonsProps {
   sessionState: SessionState;
-  startSession: () => void;
+  startSession?: () => void;
   resetSession: () => void;
-  showConfirmDialog: () => void;
+  showConfirmDialog?: () => void;
   onRecreateSession?: () => void;
   isNewSessionLoading?: boolean;
   disabled?: boolean;
@@ -18,88 +19,91 @@ interface SessionControlButtonsProps {
   isHost?: boolean;
   currentSessionId?: string;
   resultSubmitted?: boolean;
+  onCancelSession?: () => void;
+  onLeaveSession?: () => void;
 }
 
 export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({ 
   sessionState, 
   startSession, 
-  resetSession, 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  resetSession,
   showConfirmDialog, 
   onRecreateSession,
   isNewSessionLoading = false,
   disabled = false,
   sessionData,
   isHost = false,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   currentSessionId,
-  resultSubmitted = false
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  resultSubmitted = false,
+  onCancelSession,
+  onLeaveSession
 }) => {
+  // Get current user ID from auth context
+  const { userData } = useAuth();
+  const currentUserId = userData?.id;
+  
   // Simplified logic for button state
   const hasEnoughPlayers = Boolean(sessionData && sessionData.joinedPlayers.length >= 3);
   
   // Start button is disabled if the session has started, is disabled, not enough players, or not host
-  const startButtonDisabled = sessionState.isSessionStarted || disabled || !hasEnoughPlayers || !isHost;
+  const startButtonDisabled = !startSession || sessionState.isSessionStarted || disabled || !hasEnoughPlayers || !isHost;
   
   // Finish button is disabled if session not started, is finished, disabled, or not host
-  const finishButtonDisabled = !sessionState.isSessionStarted || sessionState.isSessionFinished || disabled || !isHost;
+  const finishButtonDisabled = !showConfirmDialog || !sessionState.isSessionStarted || sessionState.isSessionFinished || disabled || !isHost;
   
-  // SIMPLIFIED LOGIC: New session button is only disabled if explicitly disabled or loading
-  // The key is that it should be enabled as long as onRecreateSession exists
-  const newSessionButtonDisabled = disabled || isNewSessionLoading || !onRecreateSession;
+  // Check if all players have reported results
+  // If host is logged in AND they've submitted a result locally, consider them as reported
+  const hostHasReportedLocally = isHost && resultSubmitted;
   
-  // Determine if the button should be highlighted
-  const shouldHighlightButton = !isHost && Boolean(onRecreateSession) && currentSessionId === sessionData?.id;
+  const haveAllPlayersReported = sessionData?.joinedPlayers.every(player => {
+    // If this is the host and they've reported locally, treat them as reported
+    if (hostHasReportedLocally && player.userId === currentUserId) {
+      return true;
+    }
+    // Otherwise use the server data
+    return player.hasReported === true;
+  }) || false;
   
-  // Create tooltips for the buttons
-  const startButtonTooltip = !isHost ? "Only the host can start the session" : 
-                           !hasEnoughPlayers ? "Need at least 3 players to start" : 
-                           sessionState.isSessionStarted ? "Session already started" : "";
-                            
-  const finishButtonTooltip = !isHost ? "Only the host can finish the session" : 
-                             !sessionState.isSessionStarted ? "Session must be started first" : 
-                             sessionState.isSessionFinished ? "Session already finished" : "";
+  // NEW SESSION LOGIC - only hosts can create new sessions
+  // Non-hosts will be auto-redirected when the host creates a new session
+  const canCreateNewSession = isHost && haveAllPlayersReported && sessionState.isSessionFinished && Boolean(onRecreateSession);
+  const newSessionButtonDisabled = disabled || isNewSessionLoading || !canCreateNewSession;
   
-  const recreateButtonTooltip = !onRecreateSession 
-                              ? "Wait for the host to create a new session" 
-                              : !isHost 
-                              ? resultSubmitted 
-                                ? "You can still join the new session after submitting results" 
-                                : "Click to join the new session" 
-                              : "Create a new session with the same team";
-
   return (
     <Card className="mt-6">
       <CardContent className="py-6">
         {sessionState.isSessionFinished ? (
           <div className="space-y-4">
             {/* Primary action button */}
-            <div className="flex">
-              <Button 
-                size="lg" 
-                className={`flex-1 h-14 text-lg ${shouldHighlightButton ? 'bg-emerald-600 hover:bg-emerald-700 animate-pulse' : ''}`}
-                onClick={onRecreateSession || resetSession}
-                disabled={newSessionButtonDisabled}
-                title={recreateButtonTooltip}
-              >
-                {isNewSessionLoading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
-                    {isHost ? "Creating New Session..." : "Joining New Session..."}
-                  </span>
-                ) : (
-                  <>
-                    <span className="sm:hidden flex flex-col items-center">
-                      <span>New Session</span>
-                      <span className="text-xs text-muted-foreground">with same team</span>
+            {isHost && (
+              <div className="flex">
+                <Button 
+                  size="lg" 
+                  className="w-full h-14 text-lg"
+                  onClick={onRecreateSession}
+                  disabled={newSessionButtonDisabled}
+                >
+                  {isNewSessionLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
+                      Creating New Session...
                     </span>
-                    <span className="hidden sm:inline">
-                      {shouldHighlightButton 
-                        ? "➤ Join New Session With Same Team"
-                        : "Start New Session With Same Team"}
-                    </span>
-                  </>
-                )}
-              </Button>
-            </div>
+                  ) : (
+                    "Start New Session With Same Team"
+                  )}
+                </Button>
+              </div>
+            )}
+            
+            {/* Participant message when session is finished */}
+            {!isHost && (
+              <div className="px-4 py-3 bg-blue-50 border border-blue-100 rounded-md text-blue-700">
+                <p className="text-sm">Waiting for the host to create a new session. You&apos;ll be redirected automatically when that happens.</p>
+              </div>
+            )}
             
             {/* Navigation buttons - only shown after session is finished */}
             <div className="flex flex-col sm:flex-row gap-4">
@@ -112,51 +116,73 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
               >
                 <Link href="/sessions">Back to Sessions</Link>
               </Button>
-              <Button 
-                variant="outline" 
-                className="flex-1 h-12"
-                onClick={() => storageUtils.clearSessionData()}
-                asChild
-                disabled={disabled}
-              >
-                <Link href="/sessions/create">Create New Session</Link>
-              </Button>
+              {isHost && (
+                <Button 
+                  variant="outline" 
+                  className="flex-1 h-12"
+                  onClick={() => storageUtils.clearSessionData()}
+                  asChild
+                  disabled={disabled}
+                >
+                  <Link href="/sessions/create">Create New Session</Link>
+                </Button>
+              )}
             </div>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
             <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1 flex flex-col">
+              {startSession && isHost && (
+                <div className="flex-1 flex flex-col">
+                  <Button 
+                    size="lg" 
+                    className="h-14 text-lg w-full"
+                    onClick={startSession}
+                    disabled={startButtonDisabled}
+                  >
+                    {sessionState.isSessionStarted ? 'Session Started' : 'Start Session'}
+                  </Button>
+                  {!hasEnoughPlayers && !sessionState.isSessionStarted && sessionData && (
+                    <p className="text-xs text-red-500 mt-1 text-center">
+                      3 players required ({sessionData.joinedPlayers.length}/3 joined)
+                    </p>
+                  )}
+                </div>
+              )}
+              
+              {showConfirmDialog && isHost && (
                 <Button 
                   size="lg" 
-                  className="h-14 text-lg w-full"
-                  onClick={startSession}
-                  disabled={startButtonDisabled}
-                  title={startButtonTooltip}
+                  variant="destructive" 
+                  className="flex-1 h-14 text-lg"
+                  onClick={showConfirmDialog}
+                  disabled={finishButtonDisabled}
                 >
-                  {sessionState.isSessionStarted ? 'Session Started' : 'Start Session'}
+                  Finish Session
                 </Button>
-                {!hasEnoughPlayers && !sessionState.isSessionStarted && sessionData && (
-                  <p className="text-xs text-red-500 mt-1 text-center">
-                    3 players required ({sessionData.joinedPlayers.length}/3 joined)
-                  </p>
-                )}
-                {!isHost && !sessionState.isSessionStarted && (
-                  <p className="text-xs text-amber-500 mt-1 text-center">
-                    Only the host can start the session
-                  </p>
-                )}
-              </div>
-              <Button 
-                size="lg" 
-                variant="destructive" 
-                className="flex-1 h-14 text-lg"
-                onClick={showConfirmDialog}
-                disabled={finishButtonDisabled}
-                title={finishButtonTooltip}
-              >
-                Finish Session
-              </Button>
+              )}
+              
+              {onCancelSession && !sessionState.isSessionStarted && isHost && (
+                <Button 
+                  size="lg" 
+                  variant="destructive" 
+                  className="flex-1 h-14 text-lg"
+                  onClick={onCancelSession}
+                >
+                  Cancel Session
+                </Button>
+              )}
+              
+              {onLeaveSession && !sessionState.isSessionStarted && !isHost && (
+                <Button 
+                  size="lg" 
+                  variant="secondary" 
+                  className="flex-1 h-14 text-lg"
+                  onClick={onLeaveSession}
+                >
+                  Leave Session
+                </Button>
+              )}
             </div>
           </div>
         )}

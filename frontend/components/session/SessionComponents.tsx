@@ -138,7 +138,7 @@ const getPlayerStatusBadge = (
     // Only show "Reported" if the player has actually submitted a result
     if (hasReported) {
       return {
-        color: "bg-emerald-950/30 text-emerald-500 border-emerald-500",
+        color: "bg-green-950/30 text-green-500 border-green-500",
         text: "Reported"
       };
     } else {

@@ -16,7 +16,7 @@ use crate::routes::statistics::NightLordStatsResponse;
 use crate::routes::users::{JwtInfoDto, TokenInfoResponse};
 use crate::sse::messages::{ServerMessage, SessionInfo, SseSessionStatus};
 
-use crate::routes::{game_data::*, health::*, sessions::*, sse::*, statistics::*, users::*};
+use crate::routes::{game_data::*, health::*, sessions::*, sse::*, statistics::*, users::*, ws::*};
 
 // Import SSE models
 use crate::config::get_config;
@@ -79,6 +79,9 @@ use utoipa::{
         // SSE routes
         events_route,
         events_status,
+        // WebSocket routes
+        ws_session_route,
+        ws_status,
         // Statistics routes
         get_current_user_statistics,
         get_user_statistics,

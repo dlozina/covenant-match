@@ -36,7 +36,7 @@ const PlayerRowComponent = ({
   isCurrentUser, 
   sessionState, 
   friendState, 
-  addFriend 
+  addFriend
 }: PlayerRowProps) => {
   const playerStatus = usePlayerStatus(isHost, sessionState, player.hasReported);
   
@@ -115,7 +115,7 @@ const PlayerSectionComponent = ({
   friendState, 
   addFriend, 
   sessionData,
-  currentUserId 
+  currentUserId
 }: PlayerSectionProps) => {
   // Function to check if a player is the host
   const isPlayerHost = (playerId: string): boolean => {
