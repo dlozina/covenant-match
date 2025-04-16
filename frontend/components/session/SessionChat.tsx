@@ -3,12 +3,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSessionContext } from './context/SessionContext';
 import { useAuth } from '@/lib/auth-context';
-import { useWebSocketUpdates } from '@/hooks/useWebSocket';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
-import realtimeConfig from '@/config/realtimeConfig';
 
 // Define the chat message structure for display
 interface ChatMessage {
@@ -20,30 +18,23 @@ interface ChatMessage {
 }
 
 export function SessionChat() {
-  const { sessionData } = useSessionContext();
+  // Use the shared WebSocket connection from SessionContext
+  const { 
+    sessionData,
+    subscribe,
+    isConnected,
+    sendMessage,
+    rtConnected
+  } = useSessionContext();
+  
   const { userData } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [chatRole, setChatRole] = useState<'host' | 'participant1' | 'participant2' | 'unknown'>('unknown');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const wsRef = useRef<{
-    isConnected: () => boolean;
-    sendMessage: (message: { message_type: string; data: Record<string, unknown> }) => boolean;
-    subscribe: (eventType: string, handler: (data: Record<string, unknown>) => void) => () => void;
-    disconnect: (force?: boolean) => void;
-    reconnectWithFreshToken: (sid?: string) => void;
-  } | null>(null);
   
   const sessionId = sessionData?.id || null;
-  
-  // Get the WebSocket connection
-  const { isConnected, sendMessage, subscribe, disconnect, reconnectWithFreshToken } = useWebSocketUpdates(
-    realtimeConfig.useWebSockets ? sessionId : null
-  );
-  
-  // Store connection reference to use in effects
-  wsRef.current = { isConnected, sendMessage, subscribe, disconnect, reconnectWithFreshToken };
   
   // Determine player role in this session
   useEffect(() => {
@@ -79,13 +70,7 @@ export function SessionChat() {
     console.log("SessionChat - Session ID:", sessionId);
     console.log("SessionChat - User ID:", userData?.id);
     console.log("SessionChat - Role:", chatRole);
-    
-    // Ensure connection is active
-    if (sessionId && !isConnected()) {
-      console.log("SessionChat - Attempting to reconnect WebSocket...");
-      reconnectWithFreshToken();
-    }
-  }, [isConnected, sessionId, userData?.id, chatRole, reconnectWithFreshToken]);
+  }, [isConnected, sessionId, userData?.id, chatRole]);
   
   // Scroll to the bottom when messages change
   useEffect(() => {
@@ -99,14 +84,8 @@ export function SessionChat() {
     
     console.log(`SessionChat - Setting up chat message subscription for ${chatRole} role`);
     
-    // Force reconnect if needed
-    if (!isConnected()) {
-      console.log("SessionChat - Reconnecting WebSocket for chat subscription");
-      reconnectWithFreshToken();
-    }
-    
     // Handler for chat messages
-    const handleChatMessage = (data: Record<string, unknown>) => {
+    const handleChatMessage = (data: unknown) => {
       console.log("SessionChat - Received chat message data:", data);
       
       if (!data || typeof data !== 'object') {
@@ -114,9 +93,10 @@ export function SessionChat() {
         return;
       }
       
-      const userId = String(data.userId || '');
-      const messageText = String(data.message || '');
-      const timestamp = Number(data.timestamp || Date.now());
+      const messageData = data as Record<string, unknown>;
+      const userId = String(messageData.userId || '');
+      const messageText = String(messageData.message || '');
+      const timestamp = Number(messageData.timestamp || Date.now());
       
       // Skip empty messages
       if (!messageText.trim()) {
@@ -184,27 +164,14 @@ export function SessionChat() {
       });
     };
     
-    // Subscribe to chat messages
+    // Subscribe to chat messages using the shared WebSocket connection
     const unsubscribe = subscribe('chat', handleChatMessage);
-    
-    // Re-subscribe when connection state changes
-    const handleConnectionChange = () => {
-      if (wsRef.current && wsRef.current.isConnected && wsRef.current.isConnected()) {
-        console.log("SessionChat - WebSocket reconnected, resubscribing to chat events");
-        unsubscribe(); // Clean up previous subscription
-        wsRef.current.subscribe('chat', handleChatMessage);
-      }
-    };
-    
-    // Listen for connection changes
-    window.addEventListener('websocket-reconnected', handleConnectionChange);
     
     return () => {
       console.log("SessionChat - Cleaning up chat subscription");
       unsubscribe();
-      window.removeEventListener('websocket-reconnected', handleConnectionChange);
     };
-  }, [sessionId, userData?.id, sessionData, chatRole, isConnected, subscribe, reconnectWithFreshToken]);
+  }, [sessionId, userData?.id, sessionData, chatRole, subscribe]);
   
   // Handle sending a message
   const handleSendMessage = () => {
@@ -218,7 +185,8 @@ export function SessionChat() {
     sendMessage({
       message_type: 'chat',
       data: {
-        message: messageText
+        message: messageText,
+        userId: userData.id  // Include user ID in the message data
       }
     });
     
@@ -285,11 +253,11 @@ export function SessionChat() {
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyPress}
-          disabled={!isConnected()}
+          disabled={!rtConnected}
         />
         <Button 
           onClick={handleSendMessage}
-          disabled={!inputValue.trim() || !isConnected() || !userData}
+          disabled={!inputValue.trim() || !rtConnected || !userData}
           className="gothic-button"
           size="icon"
         >
@@ -298,7 +266,7 @@ export function SessionChat() {
       </div>
       
       {/* Connection status */}
-      {!isConnected() && (
+      {!rtConnected && (
         <p className="text-red-400 text-xs mt-1">
           Not connected. Messages cannot be sent at this time.
         </p>

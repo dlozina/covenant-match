@@ -67,6 +67,10 @@ interface SessionContextType {
   resetSession: () => void;
   startSession: () => void;
   handleFinishSession: () => void;
+  // WebSocket methods using compatible types
+  subscribe: (eventType: string, handler: (data: unknown) => void) => (() => void);
+  isConnected: () => boolean;
+  sendMessage: (message: { message_type: string; data: Record<string, unknown> }) => boolean;
 }
 
 // Create the context with a default value
@@ -84,6 +88,9 @@ export const SessionContext = createContext<SessionContextType>({
   resetSession: () => {},
   startSession: () => {},
   handleFinishSession: () => {},
+  subscribe: () => () => {},
+  isConnected: () => false,
+  sendMessage: () => false,
 });
 
 // Custom hook to use the session context
@@ -706,6 +713,10 @@ export function SessionEventManager({
     resetSession,
     startSession,
     handleFinishSession,
+    // WebSocket methods
+    subscribe,
+    isConnected,
+    sendMessage: wsConnection.sendMessage
   }), [
     sessionData,
     isLoading,
@@ -718,7 +729,10 @@ export function SessionEventManager({
     isHost,
     resetSession,
     startSession, 
-    handleFinishSession
+    handleFinishSession,
+    subscribe,
+    isConnected,
+    wsConnection.sendMessage
   ]);
   
   return (
