@@ -18,6 +18,14 @@ export interface JoinedPlayer {
   covenantName?: string;
 }
 
+export interface Result {
+  userId: string;
+  result: string;
+  rating: number;
+  feedback: string;
+  submittedAt: string;
+}
+
 // Define session data interface
 export interface SessionData {
   id: string;
@@ -31,7 +39,7 @@ export interface SessionData {
   startedAt: string | null;
   completedAt: string | null;
   password: string | null;
-  results?: Array<{ userId: string; result: string; rating: number; feedback: string; submittedAt: string }>;
+  results?: Result[];
   _version?: number; // Used to force re-renders
   newSessionId?: string; // Track ID of new session created by host
 }
@@ -59,6 +67,12 @@ interface SessionContextType {
   resetSession: () => void;
   startSession: () => void;
   handleFinishSession: () => void;
+  // Added for manual updates of session data
+  updatePlayerReportedStatus: (userId: string, hasReported: boolean) => void;
+  // WebSocket methods using compatible types
+  subscribe: (eventType: string, handler: (data: unknown) => void) => (() => void);
+  isConnected: () => boolean;
+  sendMessage: (message: { message_type: string; data: Record<string, unknown> }) => boolean;
 }
 
 // Create the context with a default value
@@ -76,6 +90,10 @@ export const SessionContext = createContext<SessionContextType>({
   resetSession: () => {},
   startSession: () => {},
   handleFinishSession: () => {},
+  updatePlayerReportedStatus: () => {},
+  subscribe: () => () => {},
+  isConnected: () => false,
+  sendMessage: () => false,
 });
 
 // Custom hook to use the session context
@@ -364,7 +382,7 @@ export function SessionEventManager({
         username: typeof data === 'object' && data !== null && 'username' in data 
                   ? String(data.username) : 'Unknown Player',
         nightfarer: typeof data === 'object' && data !== null && 'nightfarer' in data 
-                  ? String(data.nightfarer) : 'Unknown Class',
+                  ? String(data.nightfarer) : 'Unknown Nightfarer',
         userId: typeof data === 'object' && data !== null && 'userId' in data 
                 ? String(data.userId) : `user-${Date.now()}`,
         covenantName: typeof data === 'object' && data !== null && 'covenantName' in data 
@@ -476,10 +494,13 @@ export function SessionEventManager({
       if (!data || typeof data !== 'object') return;
       
       // Get reported user ID
-      const eventData = data as { reported?: string; result?: string };
+      const eventData = data as { reported?: string; result?: string; userId?: string };
       
-      if (eventData.reported) {
-        const reportedUserId = eventData.reported;
+      // Check for user ID in both standard formats (reported or userId property)
+      const reportedUserId = eventData.reported || eventData.userId;
+      
+      if (reportedUserId) {
+        console.log(`Setting hasReported=true for user: ${reportedUserId}`);
         
         // Update session data
         setSessionData(prevData => {
@@ -487,12 +508,14 @@ export function SessionEventManager({
           
           // Update player's reported status
           const updatedPlayers = prevData.joinedPlayers.map(player => {
-            const hasReported = player.userId === reportedUserId || (player.hasReported === true);
-            
-            return {
-              ...player,
-              hasReported: hasReported
-            };
+            if (player.userId === reportedUserId) {
+              console.log(`Updating player ${player.username} to hasReported=true`);
+              return {
+                ...player,
+                hasReported: true
+              };
+            }
+            return player;
           });
           
           return {
@@ -693,6 +716,31 @@ export function SessionEventManager({
     resetSession,
     startSession,
     handleFinishSession,
+    // WebSocket methods
+    subscribe,
+    isConnected,
+    sendMessage: wsConnection.sendMessage,
+    updatePlayerReportedStatus: (userId: string, hasReported: boolean) => {
+      setSessionData(prevData => {
+        if (!prevData) return null;
+        
+        const updatedPlayers = prevData.joinedPlayers.map(player => {
+          if (player.userId === userId) {
+            return {
+              ...player,
+              hasReported: hasReported
+            };
+          }
+          return player;
+        });
+        
+        return {
+          ...prevData,
+          joinedPlayers: updatedPlayers,
+          _version: Date.now() // Force re-render
+        };
+      });
+    }
   }), [
     sessionData,
     isLoading,
@@ -705,7 +753,11 @@ export function SessionEventManager({
     isHost,
     resetSession,
     startSession, 
-    handleFinishSession
+    handleFinishSession,
+    subscribe,
+    isConnected,
+    wsConnection.sendMessage,
+    setSessionData
   ]);
   
   return (

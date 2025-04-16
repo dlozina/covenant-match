@@ -6,7 +6,7 @@ use serde_json::json;
 use std::time::{Duration, Instant};
 
 use crate::utils::jwt;
-use crate::ws::messages::{ClientMessage, Connect, Disconnect, ServerMessage};
+use crate::ws::messages::{Broadcast, ClientMessage, Connect, Disconnect, ServerMessage};
 use crate::ws::session::SessionManager;
 
 // How often heartbeat pings are sent
@@ -96,6 +96,39 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                     data: json!({"timestamp": chrono::Utc::now().timestamp()}),
                                 };
                                 ctx.text(serde_json::to_string(&response).unwrap());
+                            }
+                            "chat" => {
+                                // Forward chat message to all clients in the session
+                                if let Some(message) = client_msg.data.get("message") {
+                                    if let Some(message_str) = message.as_str() {
+                                        // Create a message with sender information
+                                        let server_msg = ServerMessage {
+                                            message_type: "chat".to_string(),
+                                            data: json!({
+                                                "userId": self.client_id,
+                                                "message": message_str,
+                                                "timestamp": chrono::Utc::now().timestamp()
+                                            }),
+                                        };
+
+                                        // Log the chat message for debugging
+                                        debug!(
+                                            "Broadcasting chat message from {}: {}",
+                                            self.client_id, message_str
+                                        );
+
+                                        // Broadcast to all clients in this session
+                                        self.session_manager.do_send(Broadcast {
+                                            session_id: self.session_id.clone(),
+                                            message: server_msg,
+                                            exclude_client_id: None, // Include all clients
+                                        });
+                                    } else {
+                                        warn!("Chat message is not a string");
+                                    }
+                                } else {
+                                    warn!("Chat message is missing 'message' field");
+                                }
                             }
                             // Add more message types as needed
                             _ => {

@@ -197,17 +197,17 @@ export default function Home() {
       footer={footer}
     >
       {/* Hero Section */}
-      <div className="relative rounded-lg overflow-hidden mb-8 md:mb-12">
+      <div className="relative rounded-lg overflow-hidden mb-8 lg:mb-12">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900/80 to-indigo-900/80 z-10"></div>
         <div className="absolute inset-0 bg-[url('/nightreign-bg.jpeg')] bg-cover bg-center opacity-100"></div>
-        <div className="relative z-20 px-4 py-12 md:px-6 md:py-24 max-w-4xl mx-auto text-center">
-          <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 bg-clip-text text-transparent bg-gradient-to-r from-purple-300 to-indigo-200">
+        <div className="relative z-20 px-4 py-12 lg:px-6 lg:py-24 max-w-4xl mx-auto text-center">
+          <h1 className="text-3xl lg:text-5xl lg:text-6xl font-bold mb-4 lg:mb-6 bg-clip-text text-transparent bg-gradient-to-r from-purple-300 to-indigo-200">
             Welcome to Covenant Match
           </h1>
-          <p className="text-lg md:text-xl mb-6 md:mb-8 text-slate-300">
+          <p className="text-lg lg:text-xl mb-6 lg:mb-8 text-slate-300">
             Find worthy allies, forge unbreakable covenants, and rise through the ranks in Nightreign.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 lg:gap-4 justify-center">
             {!isLoading && (
               <>
                 {!isLoggedIn && (
@@ -231,19 +231,19 @@ export default function Home() {
       </div>
       
       {/* Feature Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 my-8 md:my-12">
-        <div className="group bg-gradient-to-br from-background to-purple-950/10 rounded-lg p-4 md:p-6 border border-purple-900/20 shadow-md transition-all relative overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 my-8 lg:my-12">
+        <div className="group bg-gradient-to-br from-background to-purple-950/10 rounded-lg p-4 lg:p-6 border border-purple-900/20 shadow-md transition-all relative overflow-hidden">
           {/* Background effect - always visible, not just on hover */}
           <div className="absolute inset-0 bg-gradient-to-br from-purple-600/10 to-indigo-600/10 pointer-events-none"></div>
           
           {/* Content */}
-          <div className="flex items-start gap-3 md:gap-4 relative z-10">
-            <div className="bg-purple-900/30 p-2 md:p-3 rounded-lg">
-              <Sword className="h-5 w-5 md:h-6 md:w-6 text-purple-400" />
+          <div className="flex items-start gap-3 lg:gap-4 relative z-10">
+            <div className="bg-purple-900/30 p-2 lg:p-3 rounded-lg">
+              <Sword className="h-5 w-5 lg:h-6 lg:w-6 text-purple-400" />
             </div>
             <div className="flex-1">
-              <h2 className="text-xl md:text-2xl font-semibold mb-2">Find Sessions</h2>
-              <p className="mb-4 text-sm md:text-base text-muted-foreground">Join other nightfarer&apos;s looking for allies and begin your hunt immediately.</p>
+              <h2 className="text-xl lg:text-2xl font-semibold mb-2">Find Sessions</h2>
+              <p className="mb-4 text-sm lg:text-base text-muted-foreground">Join other nightfarer&apos;s looking for allies and begin your hunt immediately.</p>
               <div className="relative z-20">
                 <Button asChild variant="outline" className="border-purple-700/50 bg-purple-950/20 hover:bg-purple-950/30 text-purple-300 w-full sm:w-auto">
                   <Link href="/sessions" className="flex items-center justify-center">
@@ -256,18 +256,18 @@ export default function Home() {
           </div>
         </div>
         
-        <div className="group bg-gradient-to-br from-background to-indigo-950/10 rounded-lg p-4 md:p-6 border border-indigo-900/20 shadow-md transition-all relative overflow-hidden">
+        <div className="group bg-gradient-to-br from-background to-indigo-950/10 rounded-lg p-4 lg:p-6 border border-indigo-900/20 shadow-md transition-all relative overflow-hidden">
           {/* Background effect - always visible, not just on hover */}
           <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/10 to-blue-600/10 pointer-events-none"></div>
           
           {/* Content */}
-          <div className="flex items-start gap-3 md:gap-4 relative z-10">
-            <div className="bg-indigo-900/30 p-2 md:p-3 rounded-lg">
-              <Users className="h-5 w-5 md:h-6 md:w-6 text-indigo-400" />
+          <div className="flex items-start gap-3 lg:gap-4 relative z-10">
+            <div className="bg-indigo-900/30 p-2 lg:p-3 rounded-lg">
+              <Users className="h-5 w-5 lg:h-6 lg:w-6 text-indigo-400" />
             </div>
             <div className="flex-1">
-              <h2 className="text-xl md:text-2xl font-semibold mb-2">Create Session</h2>
-              <p className="mb-4 text-sm md:text-base text-muted-foreground">Host a new session and invite fellow nightfarer&apos;s to join your quest.</p>
+              <h2 className="text-xl lg:text-2xl font-semibold mb-2">Create Session</h2>
+              <p className="mb-4 text-sm lg:text-base text-muted-foreground">Host a new session and invite fellow nightfarer&apos;s to join your quest.</p>
               <div className="relative z-20">
                 {isLoading ? (
                   <Button variant="outline" className="border-indigo-700/50 bg-indigo-950/20 text-indigo-300 w-full sm:w-auto" disabled>
@@ -298,9 +298,9 @@ export default function Home() {
       </div>
       
       {/* Features Section */}
-      <div className="bg-card/30 border border-accent/20 p-4 md:p-6 rounded-lg mt-6 md:mt-8 backdrop-blur-sm">
-        <h2 className="text-xl md:text-2xl font-semibold mb-4 md:mb-6 pb-2 border-b border-purple-900/20">The Covenant Awaits</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
+      <div className="bg-card/30 border border-accent/20 p-4 lg:p-6 rounded-lg mt-6 lg:mt-8 backdrop-blur-sm">
+        <h2 className="text-xl lg:text-2xl font-semibold mb-4 lg:mb-6 pb-2 border-b border-purple-900/20">The Covenant Awaits</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6">
           <div className="flex items-start gap-3">
             <div className="bg-purple-900/30 p-2 rounded-lg">
               <Users className="h-4 w-4 text-purple-400" />

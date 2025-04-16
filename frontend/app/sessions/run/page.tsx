@@ -8,7 +8,8 @@ import {
   SessionEventManager,
   SessionHeader,
   SessionHost,
-  SessionParticipant
+  SessionParticipant,
+  SessionChat
 } from "@/components/session";
 import { Notification, NotificationType } from "@/components/ui/notification";
 
@@ -22,7 +23,7 @@ export default function SessionRunPage(): JSX.Element {
 
 // Helper component to determine if user is host or participant
 function ParticipantOrHostView(): JSX.Element {
-  // In a real implementation, this would determine the role based on authentication
+  // In a real implementation, this would determine the role based on authentication or maybe DB info
   // and session data. For now, showing both components for demonstration.
   return (
     <div className="space-y-6">
@@ -98,8 +99,10 @@ function SessionRunContent(): JSX.Element {
               className="mb-4"
             />
           )}
-          
+          {/* Show the host or participant view based on the role */}
           <ParticipantOrHostView />
+          {/* Chat is available to everyone regardless of role */}
+          <SessionChat />
         </SessionEventManager>
       </div>
     </MainLayout>

@@ -38,12 +38,12 @@ const PlayerRowComponent = ({
   friendState, 
   addFriend
 }: PlayerRowProps) => {
-  const playerStatus = usePlayerStatus(isHost, sessionState, player.hasReported);
+  const playerStatus = usePlayerStatus(isHost, sessionState);
   
   return (
     <div className="flex items-center space-x-4">
       <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary">
-        <span>P{index + 1}</span>
+        <span>{index + 1 === 1 ? "⚔️" : "🛡️"}</span>
       </Avatar>
       <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
         <div className="bg-secondary/50 px-3 py-2 rounded-md">
@@ -53,11 +53,6 @@ const PlayerRowComponent = ({
           <span className="text-foreground">{player.nightfarer}</span>
         </div>
         <div className="flex items-center gap-2 ml-auto">
-          {isHost && (
-            <Badge variant="outline" className="bg-blue-950/30 text-blue-500 border-blue-500">
-              Host
-            </Badge>
-          )}
           {/* Show friend button only if session is finished and this is not the current user */}
           {sessionState.isSessionFinished && !isCurrentUser && (
             <FriendButton 
@@ -66,12 +61,25 @@ const PlayerRowComponent = ({
               onAddFriend={addFriend} 
             />
           )}
+          {/* Session state badge */}
           <Badge 
             variant="outline" 
             className={playerStatus.color}
           >
             {playerStatus.text}
           </Badge>
+          
+          {/* Display result reporting badge only when session is finished */}
+          {sessionState.isSessionFinished && (
+            <Badge 
+              variant="outline" 
+              className={player.hasReported 
+                ? "bg-green-950/30 text-green-500 border-green-500" 
+                : "bg-red-950/30 text-red-500 border-red-500"}
+            >
+              {player.hasReported ? "Reported" : "Result Pending"}
+            </Badge>
+          )}
         </div>
       </div>
     </div>
@@ -88,7 +96,7 @@ interface EmptyPlayerSlotProps {
 const EmptyPlayerSlotComponent = ({ position }: EmptyPlayerSlotProps) => (
   <div className="flex items-center space-x-4">
     <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary/50">
-      <span>P{position}</span>
+    <span>{position === 1 ? "⚔️" : "🛡️"} {position}</span>
     </Avatar>
     <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
       <div className="bg-secondary/30 px-3 py-2 rounded-md">
@@ -151,31 +159,6 @@ const PlayerSectionComponent = ({
             )}
           </React.Fragment>
         ))}
-
-        {/* If no session data, show default player */}
-        {(!sessionData || sessionData.joinedPlayers.length === 0) && (
-          <div className="flex items-start sm:items-center space-x-4">
-            <Avatar className="h-12 w-12 flex items-center justify-center bg-secondary mt-1 sm:mt-0">
-              <span>P1</span>
-            </Avatar>
-            <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
-              <div className="bg-secondary/50 px-3 py-2 rounded-md">
-                <span className="text-foreground">DarkKnight88</span>
-              </div>
-              <div className="bg-secondary/50 px-3 py-2 rounded-md">
-                <span className="text-foreground">Shadow Lord</span>
-              </div>
-              <div className="flex items-center gap-2 ml-auto">
-                <Badge variant="outline" className="bg-blue-950/30 text-blue-500 border-blue-500">
-                  Host
-                </Badge>
-                <Badge variant="outline" className="bg-amber-950/30 text-amber-500 border-amber-500">
-                  Ready
-                </Badge>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Add divider before empty slots if we have any real players */}
         {(!sessionData || sessionData.joinedPlayers.length < 3) && sessionData && sessionData.joinedPlayers.length > 0 && (

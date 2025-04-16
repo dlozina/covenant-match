@@ -131,6 +131,8 @@ class WebSocketService {
           const eventType = message.message_type;
           const data = message.data;
           
+          console.log(`WebSocket received message: type=${eventType}`, data);
+          
           // Process heartbeat/pong messages
           if (eventType === 'pong') {
             console.log('Received pong from server');
@@ -145,6 +147,7 @@ class WebSocketService {
           // Handle event-specific messages
           const handlers = this.messageHandlers.get(eventType) || [];
           if (handlers.length > 0) {
+            console.log(`Found ${handlers.length} handlers for event type: ${eventType}`);
             handlers.forEach(handler => {
               try {
                 handler(data);
@@ -152,6 +155,8 @@ class WebSocketService {
                 console.error(`Error executing ${eventType} handler:`, error);
               }
             });
+          } else {
+            console.warn(`No handlers registered for event type: ${eventType}`);
           }
           
           // Also handle generic message handlers
@@ -166,7 +171,7 @@ class WebSocketService {
             });
           }
         } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
+          console.error('Error parsing WebSocket message:', error, event.data);
         }
       };
       
@@ -248,6 +253,31 @@ class WebSocketService {
     };
   }
   
+  // Send custom message to server
+  sendMessage(message: { message_type: string; data: Record<string, unknown> }): boolean {
+    console.log(`Attempting to send message: ${message.message_type}`, message.data);
+    
+    if (!this.socket) {
+      console.error('Cannot send message - WebSocket is null');
+      return false;
+    }
+    
+    if (this.socket.readyState !== WebSocket.OPEN) {
+      console.error(`Cannot send message - WebSocket is not open (state: ${this.socket.readyState})`);
+      return false;
+    }
+    
+    try {
+      const jsonMessage = JSON.stringify(message);
+      console.log(`Sending JSON message: ${jsonMessage}`);
+      this.socket.send(jsonMessage);
+      return true;
+    } catch (error) {
+      console.error('Error sending message:', error);
+      return false;
+    }
+  }
+  
   // Check if connected
   isConnected(): boolean {
     return this.connectionStatus === 'connected' && 
@@ -287,11 +317,34 @@ class WebSocketService {
     this.reconnectAttempts = 0;
   }
   
-  // Reconnect with fresh token
-  reconnectWithFreshToken(sessionId: string): void {
-    console.log('Reconnecting WebSocket with fresh token');
-    this.disconnect(true);
-    this.connect(sessionId);
+  // Reconnect with a fresh token
+  reconnectWithFreshToken(sessionId: string = ''): void {
+    try {
+      // Clear any existing WebSocket connection
+      this.disconnect(true);
+      
+      // If a specific sessionId was provided, use that
+      const sid = sessionId || this.sessionId || '';
+      
+      if (!sid) {
+        console.error('No session ID available for reconnection');
+        return;
+      }
+      
+      console.log(`Reconnecting WebSocket for session: ${sid}`);
+      
+      // Connect with the new session ID
+      this.connect(sid);
+      
+      // Dispatch a custom event to notify subscribers of reconnection
+      const reconnectEvent = new CustomEvent('websocket-reconnected', { 
+        detail: { timestamp: Date.now(), sessionId: sid }
+      });
+      window.dispatchEvent(reconnectEvent);
+      
+    } catch (err) {
+      console.error('Error reconnecting with fresh token:', err);
+    }
   }
   
   // Track active connections
@@ -353,21 +406,24 @@ export function useWebSocketUpdates(sessionId: string | null) {
   // Return the public API
   return {
     subscribe: useCallback((eventType: string, handler: MessageHandler): UnsubscribeFunction => {
+      if (!sessionId) return () => {};
       return service.on(eventType, handler);
-    }, [service]),
+    }, [sessionId]),
     
     isConnected: useCallback((): boolean => {
       return service.isConnected();
-    }, [service]),
+    }, []),
     
     disconnect: useCallback((force: boolean = false): void => {
       service.disconnect(force);
-    }, [service]),
+    }, []),
     
-    reconnectWithFreshToken: useCallback((sid: string = sessionId || ''): void => {
-      if (sid) {
-        service.reconnectWithFreshToken(sid);
-      }
-    }, [service, sessionId])
+    reconnectWithFreshToken: useCallback((sid?: string) => {
+      service.reconnectWithFreshToken(sid || sessionId || '');
+    }, [sessionId]),
+    
+    sendMessage: useCallback((message: { message_type: string; data: Record<string, unknown> }) => {
+      return service.sendMessage(message);
+    }, [])
   };
 } 
