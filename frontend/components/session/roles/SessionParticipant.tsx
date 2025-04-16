@@ -202,6 +202,23 @@ export function SessionParticipant() {
     };
   }, []);
   
+  // Check if result state needs to be updated from server data
+  useEffect(() => {
+    if (sessionData && userData) {
+      // Find current user in joined players
+      const currentUserPlayer = sessionData.joinedPlayers.find(
+        player => player.userId === userData.id
+      );
+      
+      // If server indicates user has reported but local state doesn't reflect it,
+      // update the local state
+      if (currentUserPlayer && currentUserPlayer.hasReported && !resultSubmitted) {
+        console.log('Server indicates result was submitted, updating local state');
+        setResultSubmitted(true);
+      }
+    }
+  }, [sessionData, userData, resultSubmitted]);
+  
   // Make sure we're not the host - moved after hooks
   if (isHost()) {
     return null;

@@ -38,7 +38,7 @@ const PlayerRowComponent = ({
   friendState, 
   addFriend
 }: PlayerRowProps) => {
-  const playerStatus = usePlayerStatus(isHost, sessionState, player.hasReported);
+  const playerStatus = usePlayerStatus(isHost, sessionState);
   
   return (
     <div className="flex items-center space-x-4">
@@ -66,12 +66,25 @@ const PlayerRowComponent = ({
               onAddFriend={addFriend} 
             />
           )}
+          {/* Session state badge */}
           <Badge 
             variant="outline" 
             className={playerStatus.color}
           >
             {playerStatus.text}
           </Badge>
+          
+          {/* Display result reporting badge only when session is finished */}
+          {sessionState.isSessionFinished && (
+            <Badge 
+              variant="outline" 
+              className={player.hasReported 
+                ? "bg-green-950/30 text-green-500 border-green-500" 
+                : "bg-red-950/30 text-red-500 border-red-500"}
+            >
+              {player.hasReported ? "Reported" : "Result Pending"}
+            </Badge>
+          )}
         </div>
       </div>
     </div>

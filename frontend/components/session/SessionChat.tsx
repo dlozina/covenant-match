@@ -163,8 +163,6 @@ export function SessionChat() {
         }
       }
       
-      console.log(`SessionChat - Found username: ${username} with role: ${role}`);
-      
       // Add message to state
       setMessages(prev => {
         // Create the new message

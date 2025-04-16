@@ -8,22 +8,15 @@ interface PlayerStatusBadge {
 
 export function usePlayerStatus(
   isHost: boolean, 
-  sessionState: SessionState, 
-  hasReported: boolean = false
+  sessionState: SessionState
 ): PlayerStatusBadge {
   return useMemo(() => {
+    // First check session state
     if (sessionState.isSessionFinished) {
-      if (hasReported) {
-        return {
-          color: "bg-green-950/30 text-green-500 border-green-500",
-          text: "Reported"
-        };
-      } else {
-        return {
-          color: "bg-red-950/30 text-red-500 border-red-500",
-          text: "Result Pending"
-        };
-      }
+      return {
+        color: "bg-purple-950/30 text-purple-500 border-purple-500",
+        text: "Finished"
+      };
     }
     
     if (sessionState.isSessionStarted) {
@@ -37,5 +30,5 @@ export function usePlayerStatus(
       color: "bg-amber-950/30 text-amber-500 border-amber-500",
       text: "Ready"
     };
-  }, [sessionState.isSessionFinished, sessionState.isSessionStarted, hasReported]);
+  }, [sessionState.isSessionFinished, sessionState.isSessionStarted]);
 } 

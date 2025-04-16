@@ -130,23 +130,14 @@ interface DeleteSessionDialogProps {
 // Helper function to determine player status badge
 const getPlayerStatusBadge = (
   isHost: boolean, 
-  sessionState: SessionState, 
-  hasReported: boolean = false
+  sessionState: SessionState
 ) => {
-  // For finished sessions
+  // First check session state
   if (sessionState.isSessionFinished) {
-    // Only show "Reported" if the player has actually submitted a result
-    if (hasReported) {
-      return {
-        color: "bg-green-950/30 text-green-500 border-green-500",
-        text: "Reported"
-      };
-    } else {
-      return {
-        color: "bg-red-950/30 text-red-500 border-red-500",
-        text: "Result Pending"
-      };
-    }
+    return {
+      color: "bg-purple-950/30 text-purple-500 border-purple-500",
+      text: "Finished"
+    };
   }
   
   // For sessions in progress
@@ -164,6 +155,19 @@ const getPlayerStatusBadge = (
   };
 };
 
+// Helper function to determine reporting status badge
+const getReportingStatusBadge = (hasReported: boolean) => {
+  return hasReported
+    ? {
+        color: "bg-green-950/30 text-green-500 border-green-500",
+        text: "Reported"
+      }
+    : {
+        color: "bg-red-950/30 text-red-500 border-red-500",
+        text: "Result Pending"
+      };
+};
+
 // Player section component
 export const PlayerSection: React.FC<PlayerSectionProps> = ({ 
   sessionState, 
@@ -175,8 +179,7 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({
   // Get status for host player - get hasReported flag from the host player data
   const hostStatus = getPlayerStatusBadge(
     true, 
-    sessionState, 
-    sessionData?.joinedPlayers?.find(p => p.userId === sessionData?.hostId)?.hasReported || false
+    sessionState
   );
   
   // Function to check if a player is the host
@@ -225,6 +228,20 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({
               <Badge variant="outline" className={hostStatus.color}>
                 {hostStatus.text}
               </Badge>
+              
+              {/* Show reporting status badge only for finished sessions */}
+              {sessionState.isSessionFinished && (
+                <Badge 
+                  variant="outline" 
+                  className={getReportingStatusBadge(
+                    sessionData.joinedPlayers.find(p => p.userId === sessionData.joinedPlayers[0].userId)?.hasReported || false
+                  ).color}
+                >
+                  {getReportingStatusBadge(
+                    sessionData.joinedPlayers.find(p => p.userId === sessionData.joinedPlayers[0].userId)?.hasReported || false
+                  ).text}
+                </Badge>
+              )}
             </div>
           </div>
         </div>
@@ -233,7 +250,7 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({
       {/* Additional players from joinedPlayers array (starting from index 1) */}
       {sessionData && sessionData.joinedPlayers.slice(1).map((player, index) => {
         // Get status for this player
-        const playerStatus = getPlayerStatusBadge(false, sessionState, player.hasReported);
+        const playerStatus = getPlayerStatusBadge(false, sessionState);
         
         // Add divider before the first additional player (i.e., between host and first additional player)
         const isFirstAdditionalPlayer = index === 0;
@@ -274,6 +291,16 @@ export const PlayerSection: React.FC<PlayerSectionProps> = ({
                   >
                     {playerStatus.text}
                   </Badge>
+                  
+                  {/* Show reporting status badge only for finished sessions */}
+                  {sessionState.isSessionFinished && (
+                    <Badge 
+                      variant="outline" 
+                      className={getReportingStatusBadge(player.hasReported || false).color}
+                    >
+                      {getReportingStatusBadge(player.hasReported || false).text}
+                    </Badge>
+                  )}
                 </div>
               </div>
             </div>
@@ -638,14 +665,14 @@ export const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({ sessionS
       <div className="border-t border-border"></div>
       <div className="flex justify-between items-center">
         <span className="text-muted-foreground">Night Lord:</span>
-        <span className="text-foreground">{sessionData ? sessionData.nightLord : 'Tricephalos'}</span>
+        <span className="text-foreground">{sessionData ? sessionData.nightLord : 'Unknown'}</span>
       </div>
       <div className="flex justify-between items-center">
         <span className="text-muted-foreground">Created By:</span>
         <span className="text-foreground">
           {sessionData && sessionData.joinedPlayers.length > 0 
             ? sessionData.joinedPlayers[0].username 
-            : 'DarkKnight88'}
+            : 'DarkKnight'}
         </span>
       </div>
       <div className="flex justify-between items-center">

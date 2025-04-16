@@ -18,6 +18,14 @@ export interface JoinedPlayer {
   covenantName?: string;
 }
 
+export interface Result {
+  userId: string;
+  result: string;
+  rating: number;
+  feedback: string;
+  submittedAt: string;
+}
+
 // Define session data interface
 export interface SessionData {
   id: string;
@@ -31,7 +39,7 @@ export interface SessionData {
   startedAt: string | null;
   completedAt: string | null;
   password: string | null;
-  results?: Array<{ userId: string; result: string; rating: number; feedback: string; submittedAt: string }>;
+  results?: Result[];
   _version?: number; // Used to force re-renders
   newSessionId?: string; // Track ID of new session created by host
 }
@@ -476,10 +484,13 @@ export function SessionEventManager({
       if (!data || typeof data !== 'object') return;
       
       // Get reported user ID
-      const eventData = data as { reported?: string; result?: string };
+      const eventData = data as { reported?: string; result?: string; userId?: string };
       
-      if (eventData.reported) {
-        const reportedUserId = eventData.reported;
+      // Check for user ID in both standard formats (reported or userId property)
+      const reportedUserId = eventData.reported || eventData.userId;
+      
+      if (reportedUserId) {
+        console.log(`Setting hasReported=true for user: ${reportedUserId}`);
         
         // Update session data
         setSessionData(prevData => {
@@ -487,12 +498,14 @@ export function SessionEventManager({
           
           // Update player's reported status
           const updatedPlayers = prevData.joinedPlayers.map(player => {
-            const hasReported = player.userId === reportedUserId || (player.hasReported === true);
-            
-            return {
-              ...player,
-              hasReported: hasReported
-            };
+            if (player.userId === reportedUserId) {
+              console.log(`Updating player ${player.username} to hasReported=true`);
+              return {
+                ...player,
+                hasReported: true
+              };
+            }
+            return player;
           });
           
           return {
