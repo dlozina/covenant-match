@@ -1,6 +1,7 @@
 import { useCallback, useReducer, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import Link from "next/link";
 import { 
   PlayerSection,
   SessionControlButtons,
@@ -58,13 +59,15 @@ export function SessionParticipant() {
   
   // State for new session
   const [newSessionId, setNewSessionId] = useState<string | null>(null);
+  // Track if we've already shown notification for new session
+  const [hasShownNewSessionNotification, setHasShownNewSessionNotification] = useState<boolean>(false);
   
   // Function to handle notifications
-  const showNotification = useCallback((message: string, type: 'error' | 'success' | 'warning') => {
+  const showNotification = useCallback((message: string | JSX.Element, type: 'error' | 'success' | 'warning', persist: boolean = false) => {
     setNotification({ message, type });
     
-    // Auto-clear success notifications after 5 seconds
-    if (type === 'success') {
+    // Auto-clear success notifications after 5 seconds, unless persist is true
+    if (type === 'success' && !persist) {
       setTimeout(() => {
         setNotification(null);
       }, 5000);
@@ -187,6 +190,54 @@ export function SessionParticipant() {
       showNotification('Error leaving session: ' + err, 'error');
     }
   }, [sessionData, router, showNotification]);
+  
+  // Effect to detect when host has created a new session based on server data
+  useEffect(() => {
+    if (
+      sessionData?.newSessionCreated && 
+      sessionData.newSessionCreatedId && 
+      !hasShownNewSessionNotification
+    ) {
+      // Save the new session ID
+      setNewSessionId(sessionData.newSessionCreatedId);
+      
+      // Show notification with link to join the new session
+      // Make notification type success but also persist longer for users waking from sleep
+      setNotification({
+        type: 'success',
+        message: (
+          <div>
+            The host has created a new session. <Link href={`/sessions/run?id=${sessionData.newSessionCreatedId}`} className="underline font-bold">Click here</Link> to join the new session.
+          </div>
+        )
+      });
+      
+      // Mark that we've shown the notification
+      setHasShownNewSessionNotification(true);
+      
+      // Also store the ID in case the user refreshes
+      localStorage.setItem('pendingNewSessionId', sessionData.newSessionCreatedId);
+    }
+  }, [sessionData, hasShownNewSessionNotification]);
+  
+  // Additional effect to check for redirects that might have failed due to sleep mode
+  useEffect(() => {
+    // Check if newSessionCreated flag is true but we're still on this page
+    // This indicates the automatic redirect might have failed
+    if (
+      sessionData?.newSessionCreated && 
+      sessionData.newSessionCreatedId && 
+      !window.location.href.includes(sessionData.newSessionCreatedId)
+    ) {
+      // Ensure the notification is shown and persistent (doesn't auto-clear)
+      const message = (
+        <div className="font-medium">
+          Device woke from sleep mode. A new session is available. <Link href={`/sessions/run?id=${sessionData.newSessionCreatedId}`} className="underline font-bold">Click here</Link> to join the new session.
+        </div>
+      );
+      showNotification(message, 'success', true);
+    }
+  }, [sessionData, showNotification]);
   
   // Effect to update newSessionId when it changes in localStorage
   useEffect(() => {

@@ -224,6 +224,8 @@ pub async fn create_session(
         started_at: None,
         completed_at: None,
         stats_updated: false,
+        new_session_created: false,
+        new_session_created_id: None,
     };
 
     // Save the session to the database
@@ -992,9 +994,12 @@ pub async fn recreate_session(
         format!("{} (Replay)", original_session.name)
     };
 
+    // Create a new session id
+    let new_session_id = ObjectId::new();
+
     // Create a new session with the same name and settings
     let new_session = GameSession {
-        id: ObjectId::new(),
+        id: new_session_id,
         name: new_name,
         host_id: user_id.to_string(),
         password: original_session.password.clone(),
@@ -1015,6 +1020,8 @@ pub async fn recreate_session(
         started_at: None,
         completed_at: None,
         stats_updated: false,
+        new_session_created: true,
+        new_session_created_id: Some(new_session_id),
     };
 
     // Save the new session to the database
@@ -1323,6 +1330,8 @@ mod tests {
             started_at: Some(now),
             completed_at: None,
             stats_updated: false,
+            new_session_created: false,
+            new_session_created_id: None,
         };
 
         // Create mock db
@@ -1464,6 +1473,8 @@ mod tests {
             started_at: Some(now),
             completed_at: Some(now),
             stats_updated: true, // Set to true to indicate stats have already been updated
+            new_session_created: false,
+            new_session_created_id: None,
         };
 
         // Create mock db with an empty stats_updated vector

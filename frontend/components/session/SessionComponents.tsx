@@ -38,6 +38,8 @@ interface SessionData {
   startedAt: string | null;
   completedAt: string | null;
   password: string | null;
+  newSessionCreated?: boolean;
+  newSessionCreatedId?: string;
 }
 
 interface PlayerSectionProps {

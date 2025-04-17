@@ -42,6 +42,8 @@ export interface SessionData {
   results?: Result[];
   _version?: number; // Used to force re-renders
   newSessionId?: string; // Track ID of new session created by host
+  newSessionCreated?: boolean;
+  newSessionCreatedId?: string;
 }
 
 // Define action type for sessionReducer
@@ -607,13 +609,15 @@ export function SessionEventManager({
         // Store the session ID in localStorage for persistence
         localStorage.setItem('pendingNewSessionId', newId);
         
-        // Update session data with new session ID
+        // Update session data with new session ID and set newSessionCreated flags
         setSessionData(prevData => {
           if (!prevData) return null;
           
           return {
             ...prevData,
             newSessionId: newId,
+            newSessionCreated: true,
+            newSessionCreatedId: newId,
             _version: Date.now() // Force re-render
           };
         });
