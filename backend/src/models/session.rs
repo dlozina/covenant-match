@@ -142,6 +142,7 @@ pub struct SessionResponseDto {
     pub is_private: bool,
     pub stats_updated: bool,
     pub new_session_created: bool,
+    #[schema(value_type = String)]
     pub new_session_created_id: Option<ObjectId>,
 }
 

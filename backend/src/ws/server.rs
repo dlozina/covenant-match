@@ -43,6 +43,7 @@ impl Actor for WsSession {
                 client_id: self.client_id.clone(),
                 addr: addr.recipient(),
                 session_id: self.session_id.clone(),
+                user_id: Some(self.client_id.clone()),
             })
             .into_actor(self)
             .then(|res, _, ctx| {

@@ -1,3 +1,4 @@
+use crate::models::chat::ChatMessage;
 use crate::models::game_data::{
     Covenant, CovenantResponse, GameDataResponse, NightLord, NightLordResponse, Nightfarer,
     NightfarerResponse, Platform, PlatformResponse, Region, RegionResponse,
@@ -16,7 +17,9 @@ use crate::routes::statistics::NightLordStatsResponse;
 use crate::routes::users::{JwtInfoDto, TokenInfoResponse};
 use crate::sse::messages::{ServerMessage, SessionInfo, SseSessionStatus};
 
-use crate::routes::{game_data::*, health::*, sessions::*, sse::*, statistics::*, users::*, ws::*};
+use crate::routes::{
+    chat::*, game_data::*, health::*, sessions::*, sse::*, statistics::*, users::*, ws::*,
+};
 
 // Import SSE models
 use crate::config::get_config;
@@ -76,6 +79,8 @@ use utoipa::{
         get_covenants,
         get_nightfarers,
         get_night_lords,
+        // Chat routes
+        get_chat_history,
         // SSE routes
         events_route,
         events_status,
@@ -138,6 +143,8 @@ use utoipa::{
             CovenantResponse,
             NightfarerResponse,
             NightLordResponse,
+            // Chat models
+            ChatMessage,
             // SSE models
             ServerMessage,
             SessionInfo,
@@ -164,6 +171,7 @@ use utoipa::{
         (name = "sessions", description = "Session management endpoints"),
         (name = "game-data", description = "Game data endpoints"),
         (name = "statistics", description = "Statistics endpoints"),
+        (name = "chat", description = "Chat messaging endpoints"),
         (name = "realtime", description = "Real-time communication endpoints")
     ),
     modifiers(&SecurityAddon),

@@ -75,6 +75,9 @@ interface SessionContextType {
   subscribe: (eventType: string, handler: (data: unknown) => void) => (() => void);
   isConnected: () => boolean;
   sendMessage: (message: { message_type: string; data: Record<string, unknown> }) => boolean;
+  // Register handlers for visibility changes
+  registerVisibilityHandler: (id: string, handler: () => void) => void;
+  unregisterVisibilityHandler: (id: string) => void;
 }
 
 // Create the context with a default value
@@ -96,6 +99,8 @@ export const SessionContext = createContext<SessionContextType>({
   subscribe: () => () => {},
   isConnected: () => false,
   sendMessage: () => false,
+  registerVisibilityHandler: () => {},
+  unregisterVisibilityHandler: () => {},
 });
 
 // Custom hook to use the session context
@@ -125,6 +130,9 @@ export function SessionEventManager({
   // References - wrap in useRef instead of plain objects
   const sessionStartTimeRef = useRef<number | null>(null);
   const lastSyncTimeRef = useRef<number | null>(null);
+  
+  // Create a ref to store visibility change handlers
+  const visibilityHandlersRef = useRef<Record<string, () => void>>({});
   
   // Get auth context
   const { userData, fetchWithAuth } = useAuth();
@@ -358,6 +366,15 @@ export function SessionEventManager({
         
         // Always fetch latest session data when returning to the page
         fetchSessionData();
+        
+        // Notify all registered visibility change handlers
+        Object.values(visibilityHandlersRef.current).forEach(handler => {
+          try {
+            handler();
+          } catch (e) {
+            console.error('Error in visibility change handler:', e);
+          }
+        });
       }
     };
     
@@ -744,6 +761,13 @@ export function SessionEventManager({
           _version: Date.now() // Force re-render
         };
       });
+    },
+    // Register handlers for visibility changes
+    registerVisibilityHandler: (id: string, handler: () => void) => {
+      visibilityHandlersRef.current[id] = handler;
+    },
+    unregisterVisibilityHandler: (id: string) => {
+      delete visibilityHandlersRef.current[id];
     }
   }), [
     sessionData,
@@ -761,7 +785,8 @@ export function SessionEventManager({
     subscribe,
     isConnected,
     wsConnection.sendMessage,
-    setSessionData
+    setSessionData,
+    visibilityHandlersRef
   ]);
   
   return (

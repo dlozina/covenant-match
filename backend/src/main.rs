@@ -11,7 +11,7 @@ mod utils;
 mod ws;
 
 use crate::config::get_config;
-use crate::routes::{health, statistics, users};
+use crate::routes::{chat, health, statistics, users};
 use actix::Actor;
 use actix_cors::Cors;
 use actix_web::web::Data;
@@ -21,7 +21,7 @@ use log::{info, warn};
 use middleware::auth::Auth;
 use mongodb::{options::ClientOptions, Client};
 use routes::{game_data, sessions};
-use services::{auth_service, session_service, user_service};
+use services::{auth_service, session_service, user_service, chat_service};
 use sse::heartbeat::HeartbeatActor;
 use sse::partition::{SessionRouter, DEFAULT_PARTITION_COUNT};
 use sse::session_pruner::SessionPrunerActor;
@@ -56,6 +56,39 @@ async fn start_login_attempts_cleanup(db: mongodb::Database) {
 
             // Release the lock
             drop(db_lock);
+        }
+    });
+}
+
+/// Starts a background task to periodically clean up inactive chat sessions
+async fn start_chat_cleanup(chat_service: Arc<chat_service::ChatService>) {
+    task::spawn(async move {
+        let cleanup_interval_minutes = std::env::var("CHAT_CLEANUP_INTERVAL_MINUTES")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(30); // Default: run every 30 minutes
+
+        let inactive_minutes = std::env::var("CHAT_INACTIVE_MINUTES")
+            .ok()
+            .and_then(|v| v.parse::<i64>().ok())
+            .unwrap_or(30); // Default: clean up chats inactive for 30 minutes
+
+        loop {
+            // Sleep first to avoid cleanup immediately on startup
+            tokio::time::sleep(Duration::from_secs(cleanup_interval_minutes * 60)).await;
+
+            info!("Running scheduled cleanup of inactive chat sessions");
+
+            match chat_service
+                .cleanup_inactive_sessions(inactive_minutes)
+                .await
+            {
+                Ok(_) => info!(
+                    "Cleaned up inactive chat sessions (older than {} minutes)",
+                    inactive_minutes
+                ),
+                Err(e) => warn!("Failed to clean up inactive chat sessions: {:?}", e),
+            }
         }
     });
 }
@@ -171,15 +204,27 @@ async fn main() -> std::io::Result<()> {
     // Initialize WebSocket session manager if needed
     let ws_session_manager = if use_websockets {
         info!("Initializing WebSockets for real-time communications");
-        let session_manager = WsSessionManager::default().start();
+
+        // Initialize chat service
+        let chat_service = Arc::new(chat_service::ChatService::new(&db));
+        info!("Chat service initialized");
+
+        // Create session manager with chat service
+        let session_manager = WsSessionManager::new(Some(chat_service.clone())).start();
 
         // Register the WebSocket session manager with the session service
         session_service::set_session_manager(session_manager.clone());
 
-        Some(session_manager)
+        Some((session_manager, chat_service))
     } else {
         None
     };
+
+    // Start the periodic cleanup of inactive chat sessions
+    if let Some((_, chat_service)) = &ws_session_manager {
+        start_chat_cleanup(chat_service.clone()).await;
+        info!("Started periodic cleanup task for inactive chat sessions");
+    }
 
     info!(
         "Starting HTTP server on {}:{}",
@@ -208,6 +253,7 @@ async fn main() -> std::io::Result<()> {
             .configure(sessions::config)
             .configure(game_data::config)
             .configure(statistics::config)
+            .configure(chat::config)
             // Add Swagger UI with the OpenAPI schema from our new module
             .service(
                 SwaggerUi::new("/api/docs/{_:.*}")
@@ -221,9 +267,10 @@ async fn main() -> std::io::Result<()> {
                 .configure(routes::sse::config);
         }
 
-        if let Some(manager) = &ws_session_manager {
+        if let Some((manager, chat_service)) = &ws_session_manager {
             app = app
                 .app_data(Data::new(manager.clone()))
+                .app_data(Data::new(chat_service.clone()))
                 .configure(routes::ws::config);
         }
 
