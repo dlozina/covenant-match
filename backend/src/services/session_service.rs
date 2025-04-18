@@ -557,13 +557,10 @@ pub async fn leave_session(db: &Database, session_id: &str, user_id: &str) -> Re
         .ok_or(AppError::SessionNotFound)?;
 
     // Check if the session has already started - can't leave once started
-    if session.status == SessionStatus::InProgress
-        || session.status == SessionStatus::Completed
-        || session.status == SessionStatus::Cancelled
-    {
+    // We can leave if a session is completed or cancelled
+    if session.status == SessionStatus::InProgress {
         return Err(AppError::BadRequest(
-            "Cannot leave a session that has already started, completed, or been cancelled"
-                .to_string(),
+            "Cannot leave a session that has already started.".to_string(),
         ));
     }
 
@@ -1154,6 +1151,78 @@ pub async fn get_covenant_stats(db: &Database) -> Result<CovenantStatsResponse, 
     let covenant_stats: Vec<CovenantStats> = covenant_stats_map.into_values().collect();
 
     Ok(CovenantStatsResponse { covenant_stats })
+}
+
+/// Reset the session flags for new session creation
+/// This is used to reset the flags once enough players have joined
+pub async fn reset_session_flags(
+    db: &Database,
+    session_id: &str,
+    user_id: &str,
+) -> Result<(), AppError> {
+    // Get the session
+    let mut session = session_repository::find_by_id(db, session_id)
+        .await?
+        .ok_or(AppError::SessionNotFound)?;
+
+    // Check if user is a participant in the session
+    let is_participant = session.joined_players.iter().any(|p| p.user_id == user_id);
+
+    if !is_participant {
+        return Err(AppError::Forbidden(
+            "Only session participants can reset flags".to_string(),
+        ));
+    }
+
+    // Log current state of flags
+    log::info!(
+        "Current state of flags for session {}: new_session_created={}, new_session_created_id={:?}",
+        session_id,
+        session.new_session_created,
+        session.new_session_created_id
+    );
+
+    // Check if the session has the flags set
+    if !session.new_session_created {
+        log::info!(
+            "No flags to reset for session {}, skipping update",
+            session_id
+        );
+        // No flags to reset
+        return Ok(());
+    }
+
+    log::info!(
+        "Resetting new session flags for session {} - joined players: {}",
+        session_id,
+        session.joined_players.len()
+    );
+
+    // Reset the flags
+    session.new_session_created = false;
+    session.new_session_created_id = None;
+
+    // Update timestamp
+    session.updated_at = mongodb::bson::DateTime::now();
+
+    // Update the session in the database
+    match session_repository::update_session(db, &session).await {
+        Ok(_) => {
+            log::info!(
+                "Successfully reset new session flags for session {}",
+                session_id
+            );
+            Ok(())
+        }
+        Err(e) => {
+            log::error!(
+                "Failed to reset new session flags for session {}: {:?}",
+                session_id,
+                e
+            );
+            Err(e)
+        }
+    }
 }
 
 #[cfg(test)]

@@ -269,7 +269,7 @@ async fn cancel_session(
     }
 }
 
-/// Leave a session (joined player only, before session starts)
+/// Leave a session (joined player only, before session starts, after it's completed or cancelled)
 #[utoipa::path(
     post,
     path = "/api/v1/sessions/{id}/leave",
@@ -628,6 +628,54 @@ async fn get_user_active_session(db: web::Data<Database>, req: HttpRequest) -> i
     }
 }
 
+/// Reset the new session flags (once enough players have joined)
+#[utoipa::path(
+    post,
+    path = "/api/v1/sessions/{id}/reset-flags",
+    params(
+        ("id" = String, Path, description = "Session ID to reset flags for")
+    ),
+    responses(
+        (status = 200, description = "Session flags reset successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Session not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "sessions"
+)]
+#[post("/api/v1/sessions/{id}/reset-flags")]
+async fn reset_session_flags(
+    db: web::Data<Database>,
+    path: web::Path<String>,
+    req: HttpRequest,
+) -> impl Responder {
+    let id = path.into_inner();
+
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions.get::<jwt::Claims>().unwrap();
+        claims.sub.clone()
+    };
+
+    match session_service::reset_session_flags(&db, &id, &user_id).await {
+        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "message": "Session flags reset successfully"
+        })),
+        Err(e) => {
+            log::error!("Error resetting session flags: {:?}", e);
+            HttpResponse::BadRequest().json(serde_json::json!({
+                "status": "error",
+                "message": e.to_string()
+            }))
+        }
+    }
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     // Register paths from most specific to most general
     // Global endpoints first
@@ -646,5 +694,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         .service(recreate_session)
         .service(update_session)
         .service(submit_result)
-        .service(get_results);
+        .service(get_results)
+        .service(reset_session_flags);
 }

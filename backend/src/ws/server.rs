@@ -102,14 +102,31 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                 // Forward chat message to all clients in the session
                                 if let Some(message) = client_msg.data.get("message") {
                                     if let Some(message_str) = message.as_str() {
-                                        // Create a message with sender information
+                                        // Extract client_id if provided
+                                        let client_id_value = client_msg
+                                            .data
+                                            .get("clientId")
+                                            .and_then(|v| v.as_str())
+                                            .map(|s| s.to_string());
+
+                                        // Create message data with sender information
+                                        let mut message_data = json!({
+                                            "userId": self.client_id,
+                                            "message": message_str,
+                                            "timestamp": chrono::Utc::now().timestamp()
+                                        });
+
+                                        // Add client_id to the message data if available
+                                        if let Some(client_id) = client_id_value {
+                                            message_data
+                                                .as_object_mut()
+                                                .unwrap()
+                                                .insert("clientId".to_string(), json!(client_id));
+                                        }
+
                                         let server_msg = ServerMessage {
                                             message_type: "chat".to_string(),
-                                            data: json!({
-                                                "userId": self.client_id,
-                                                "message": message_str,
-                                                "timestamp": chrono::Utc::now().timestamp()
-                                            }),
+                                            data: message_data,
                                         };
 
                                         // Log the chat message for debugging

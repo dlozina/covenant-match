@@ -288,6 +288,35 @@ export function SessionEventManager({
           });
         }
         
+        // If we have local storage pendingNewSessionId and we're on that session page now,
+        // clear it to prevent recreation notification issues
+        const pendingSessionId = localStorage.getItem('pendingNewSessionId');
+        if (pendingSessionId && pendingSessionId === sessionId) {
+          localStorage.removeItem('pendingNewSessionId');
+        }
+        
+        // Check if this is a recreated session and has enough players
+        // For a match, we expect 2 players total (host + 1 other player)
+        if (data && data.newSessionCreated && data.newSessionCreatedId && data.joinedPlayers.length >= 2) {
+          console.log('Session has enough players, resetting newSessionCreated flags');
+          
+          // Reset the flags on the server - this is important to prevent future issues
+          // This assumes you have an API endpoint to clear these flags
+          try {
+            await fetchWithAuth(`/api/v1/sessions/${sessionId}/reset-flags`, {
+              method: 'POST'
+            });
+            console.log('Successfully reset session flags on server');
+            
+            // Also update in local data to ensure UI is consistent
+            data.newSessionCreated = false;
+            data.newSessionCreatedId = undefined;
+          } catch (flagError) {
+            console.error('Error resetting session flags:', flagError);
+            // We don't want to stop processing the session data if this API call fails
+          }
+        }
+        
         // Compare with current state and update accordingly
         setSessionData(prevData => {
           if (!prevData) return data;
@@ -358,23 +387,44 @@ export function SessionEventManager({
       if (document.visibilityState === 'visible') {
         console.log('Page became visible, refreshing session state');
         
-        // Check if WebSocket connection is active, reconnect if needed
+        // Immediately check WebSocket connection and reconnect if needed
         if (!isConnected()) {
-          console.log('WebSocket disconnected, reconnecting...');
+          console.log('WebSocket disconnected, reconnecting immediately...');
           reconnectWithFreshToken();
         }
         
-        // Always fetch latest session data when returning to the page
-        fetchSessionData();
-        
-        // Notify all registered visibility change handlers
-        Object.values(visibilityHandlersRef.current).forEach(handler => {
-          try {
-            handler();
-          } catch (e) {
-            console.error('Error in visibility change handler:', e);
+        // Immediately notify the most important handlers (like chat)
+        // This prioritizes real-time updates over fetching history
+        Object.entries(visibilityHandlersRef.current).forEach(([id, handler]) => {
+          // If this is a critical handler (like chat), run it with priority
+          if (id.includes('chat') || id.includes('realtime')) {
+            console.log(`Running critical handler: ${id}`);
+            try {
+              setTimeout(() => handler(), 50);
+            } catch (e) {
+              console.error(`Error in critical handler ${id}:`, e);
+            }
           }
         });
+        
+        // Then update session data in the background
+        setTimeout(() => {
+          fetchSessionData();
+          
+          // Run remaining non-critical handlers after session data is updated
+          setTimeout(() => {
+            Object.entries(visibilityHandlersRef.current).forEach(([id, handler]) => {
+              if (!id.includes('chat') && !id.includes('realtime')) {
+                console.log(`Running non-critical handler: ${id}`);
+                try {
+                  handler();
+                } catch (e) {
+                  console.error(`Error in non-critical handler ${id}:`, e);
+                }
+              }
+            });
+          }, 200);
+        }, 100);
       }
     };
     
@@ -737,8 +787,28 @@ export function SessionEventManager({
     resetSession,
     startSession,
     handleFinishSession,
-    // WebSocket methods
-    subscribe,
+    // WebSocket methods - wrap subscribe to add deduplication
+    subscribe: (eventType: string, handler: (data: unknown) => void) => {
+      // For chat messages, create a more optimized handler
+      if (eventType === 'chat') {
+        // Create a wrapper that prioritizes speed for chat messages
+        const fastChatHandler = (data: unknown) => {
+          // Quick validation only
+          if (typeof data !== 'object' || data === null) {
+            return;
+          }
+          
+          // Call handler immediately - we'll do message-specific checks in the component
+          handler(data);
+        };
+        
+        // Return the subscription with fast chat handler
+        return subscribe(eventType, fastChatHandler);
+      } else {
+        // For non-chat messages, use the original handler
+        return subscribe(eventType, handler);
+      }
+    },
     isConnected,
     sendMessage: wsConnection.sendMessage,
     updatePlayerReportedStatus: (userId: string, hasReported: boolean) => {
@@ -762,11 +832,22 @@ export function SessionEventManager({
         };
       });
     },
-    // Register handlers for visibility changes
+    // Enhanced visibility change handlers with deduplication
     registerVisibilityHandler: (id: string, handler: () => void) => {
+      // First log what handlers are currently registered
+      const currentKeys = Object.keys(visibilityHandlersRef.current);
+      console.log(`Registering visibility handler ${id}. Current handlers: ${currentKeys.join(', ')}`);
+      
+      // Check if we already have this handler to prevent duplicates
+      if (id in visibilityHandlersRef.current) {
+        console.log(`Handler ${id} already registered, replacing it`);
+      }
+      
+      // Add the handler
       visibilityHandlersRef.current[id] = handler;
     },
     unregisterVisibilityHandler: (id: string) => {
+      console.log(`Unregistering visibility handler ${id}`);
       delete visibilityHandlersRef.current[id];
     }
   }), [

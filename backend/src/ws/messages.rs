@@ -60,4 +60,5 @@ pub struct ChatHistoryMessage {
     pub sender_name: String,
     pub message: String,
     pub timestamp: i64,
+    pub client_id: Option<String>,
 }

@@ -39,7 +39,7 @@ pub async fn get_chat_history(
     // Use find() without options
     let cursor = get_messages_collection(db).find(filter).await?;
 
-    // Convert to documents and limit manually
+    // Convert to documents
     let mut docs: Vec<Document> = cursor.try_collect().await?;
 
     // Sort by timestamp (ascending)
@@ -57,9 +57,12 @@ pub async fn get_chat_history(
         a_time.cmp(b_time)
     });
 
-    // Apply limit
+    // Apply limit - keep the LATEST messages by taking from the end
+    // instead of truncating from the beginning
     if docs.len() > limit as usize {
-        docs.truncate(limit as usize);
+        // Take the last 'limit' documents (most recent messages)
+        let skip_count = docs.len() - limit as usize;
+        docs = docs.into_iter().skip(skip_count).collect();
     }
 
     let messages = docs

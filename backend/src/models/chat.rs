@@ -16,6 +16,8 @@ pub struct ChatMessage {
     #[schema(value_type = i64)]
     pub timestamp: DateTime<Utc>,
     pub delivered: bool,
+    #[serde(default)]
+    pub client_id: Option<String>,
 }
 
 impl ChatMessage {
@@ -24,6 +26,7 @@ impl ChatMessage {
         sender_id: String,
         sender_name: String,
         content: String,
+        client_id: Option<String>,
     ) -> Self {
         Self {
             id: None,
@@ -33,6 +36,7 @@ impl ChatMessage {
             content,
             timestamp: Utc::now(),
             delivered: false,
+            client_id,
         }
     }
 }

@@ -91,6 +91,9 @@ export function SessionParticipant() {
     // Store in sessionStorage for recreation page
     sessionStorage.setItem('autoJoinSessionId', newSessionId);
     
+    // Clear the pending session ID from localStorage
+    localStorage.removeItem('pendingNewSessionId');
+    
     // Navigate to recreate
     router.push(`/sessions/recreate?id=${sessionData?.id}`);
   }, [newSessionId, router, sessionData]);
@@ -226,16 +229,24 @@ export function SessionParticipant() {
     // This indicates the automatic redirect might have failed
     if (
       sessionData?.newSessionCreated && 
-      sessionData.newSessionCreatedId && 
-      !window.location.href.includes(sessionData.newSessionCreatedId)
+      sessionData.newSessionCreatedId
     ) {
-      // Ensure the notification is shown and persistent (doesn't auto-clear)
-      const message = (
-        <div className="font-medium">
-          Device woke from sleep mode. A new session is available. <Link href={`/sessions/run?id=${sessionData.newSessionCreatedId}`} className="underline font-bold">Click here</Link> to join the new session.
-        </div>
-      );
-      showNotification(message, 'success', true);
+      // Check if we're already on the new session page
+      if (
+        window.location.href.includes(sessionData.newSessionCreatedId) ||
+        window.location.href.includes(`/sessions/run?id=${sessionData.newSessionCreatedId}`)
+      ) {
+        // We're already on the new session page, clear the localStorage
+        localStorage.removeItem('pendingNewSessionId');
+      } else {
+        // We're not on the new session page, show the notification
+        const message = (
+          <div className="font-medium">
+            Device woke from sleep mode. A new session is available. <Link href={`/sessions/run?id=${sessionData.newSessionCreatedId}`} className="underline font-bold">Click here</Link> to join the new session.
+          </div>
+        );
+        showNotification(message, 'success', true);
+      }
     }
   }, [sessionData, showNotification]);
   

@@ -235,6 +235,7 @@ impl Handler<GetChatHistory> for SessionManager {
                                 sender_name: msg.sender_name,
                                 message: msg.content,
                                 timestamp: msg.timestamp.timestamp_millis(),
+                                client_id: msg.client_id,
                             })
                             .collect();
                     }
@@ -267,6 +268,12 @@ impl SessionManager {
                     .unwrap_or("Unknown User")
                     .to_string();
 
+                // Extract client_id if present
+                let client_id = data
+                    .get("clientId")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+
                 if let Some(chat_service) = self.chat_service.clone() {
                     let session_id = msg.session_id.clone();
                     let content = message_text.to_string();
@@ -276,8 +283,13 @@ impl SessionManager {
                     // Spawn an async task to store the message
                     ctx.spawn(
                         async move {
-                            let chat_message =
-                                ChatMessage::new(session_id, sender_id, sender_name, content);
+                            let chat_message = ChatMessage::new(
+                                session_id,
+                                sender_id,
+                                sender_name,
+                                content,
+                                client_id,
+                            );
 
                             match chat_service.save_message(&chat_message).await {
                                 Ok(_) => {
