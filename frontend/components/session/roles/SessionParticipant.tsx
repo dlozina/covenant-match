@@ -210,7 +210,7 @@ export function SessionParticipant() {
         type: 'success',
         message: (
           <div>
-            The host has created a new session. <Link href={`/sessions/run?id=${sessionData.newSessionCreatedId}`} className="underline font-bold">Click here</Link> to join the new session.
+            The host has created a new session. <Link href={`/sessions/recreate?id=${sessionData.id}`} className="underline font-bold">Click here</Link> to join the new session.
           </div>
         )
       });
@@ -220,6 +220,9 @@ export function SessionParticipant() {
       
       // Also store the ID in case the user refreshes
       localStorage.setItem('pendingNewSessionId', sessionData.newSessionCreatedId);
+      
+      // NOTE: We've removed the auto-redirect logic from here since it's handled in SessionContext.tsx
+      // through the WebSocket/SSE newSession event. This avoids redundant redirection code.
     }
   }, [sessionData, hasShownNewSessionNotification]);
   
@@ -242,7 +245,7 @@ export function SessionParticipant() {
         // We're not on the new session page, show the notification
         const message = (
           <div className="font-medium">
-            Device woke from sleep mode. A new session is available. <Link href={`/sessions/run?id=${sessionData.newSessionCreatedId}`} className="underline font-bold">Click here</Link> to join the new session.
+            A new session is available. <Link href={`/sessions/recreate?id=${sessionData.id}`} className="underline font-bold">Click here</Link> to join the new session.
           </div>
         );
         showNotification(message, 'success', true);

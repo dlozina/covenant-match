@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { toast } from "sonner"
 import { MainLayout } from "@/components/layout"
 import { Button } from "@/components/ui/button"
 import {
@@ -50,7 +49,6 @@ function ProfileContent() {
 
   const handleLogout = () => {
     logout();
-    toast.success("Logged out successfully");
     router.push('/');
   };
 

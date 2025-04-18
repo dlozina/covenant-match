@@ -13,6 +13,7 @@ services:
       - NODE_ENV=development
       - NEXT_PUBLIC_API_BASE_URL=http://localhost
       - NEXT_PUBLIC_RECAPTCHA_SITE_KEY=6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI
+      - NEXT_PUBLIC_DISABLE_AUTO_REDIRECT=true
       - NEXT_PUBLIC_TESTER_MODE=true
       - NEXT_PUBLIC_TESTER_PASSWORD=test-covenant-45#
     ports:

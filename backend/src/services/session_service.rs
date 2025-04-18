@@ -948,7 +948,7 @@ pub async fn recreate_session(
     make_private: bool,
 ) -> Result<SessionResponseDto, AppError> {
     // Get the original session
-    let original_session = session_repository::find_by_id(db, session_id)
+    let mut original_session = session_repository::find_by_id(db, session_id)
         .await?
         .ok_or(AppError::SessionNotFound)?;
 
@@ -1017,12 +1017,22 @@ pub async fn recreate_session(
         started_at: None,
         completed_at: None,
         stats_updated: false,
-        new_session_created: true,
-        new_session_created_id: Some(new_session_id),
+        new_session_created: false,
+        new_session_created_id: None,
     };
 
     // Save the new session to the database
     session_repository::create_session(db, &new_session).await?;
+
+    // Update the original session to point to the new session
+    // This allows participants to find the new session from the old one
+    original_session.new_session_created = true;
+    original_session.new_session_created_id = Some(new_session_id);
+    original_session.updated_at = now;
+
+    // Save the updated original session
+    session_repository::update_session(db, &original_session).await?;
+
 
     // Create response DTO
     let response = SessionResponseDto::from(new_session.clone());
