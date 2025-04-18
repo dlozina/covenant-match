@@ -261,7 +261,8 @@ export function SessionEventManager({
     }
   }, [sessionState.elapsedSeconds, sessionId, sessionData, fetchWithAuth]);
   
-  // Fetch session data on mount
+  // Fetch session data on mount -> Important to do this first
+  // Important when device wakes from sleep mode ex. when user returns to tab, iPad, iPhone etc.
   useEffect(() => {
     if (!sessionId) {
       setIsLoading(false);
@@ -293,28 +294,6 @@ export function SessionEventManager({
         const pendingSessionId = localStorage.getItem('pendingNewSessionId');
         if (pendingSessionId && pendingSessionId === sessionId) {
           localStorage.removeItem('pendingNewSessionId');
-        }
-        
-        // Check if this is a recreated session and has enough players
-        // For a match, we expect 2 players total (host + 1 other player)
-        if (data && data.newSessionCreated && data.newSessionCreatedId && data.joinedPlayers.length >= 2) {
-          console.log('Session has enough players, resetting newSessionCreated flags');
-          
-          // Reset the flags on the server - this is important to prevent future issues
-          // This assumes you have an API endpoint to clear these flags
-          try {
-            await fetchWithAuth(`/api/v1/sessions/${sessionId}/reset-flags`, {
-              method: 'POST'
-            });
-            console.log('Successfully reset session flags on server');
-            
-            // Also update in local data to ensure UI is consistent
-            data.newSessionCreated = false;
-            data.newSessionCreatedId = undefined;
-          } catch (flagError) {
-            console.error('Error resetting session flags:', flagError);
-            // We don't want to stop processing the session data if this API call fails
-          }
         }
         
         // Compare with current state and update accordingly

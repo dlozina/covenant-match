@@ -116,14 +116,14 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
 
     // Define default nightfarers
     let default_nightfarers = vec![
-        ("Wylder", "Wylder is the nightfarer of the Pact, he is the one who protects the realm from the darkness."),
-        ("Guardian", "Guardian is the nightfarer of the Pact, he is the one who protects the realm from the darkness."),
-        ("Recluse", "Recluse is the nightfarer of the Pact, he is the one who protects the realm from the darkness."),
-        ("Duchess", "Recluse is the nightfarer of the Pact, he is the one who protects the realm from the darkness."),
-        ("Ironeye", "Ironeye is the nightfarer of the Pact, he is the one who protects the realm from the darkness."),
-        ("Jolan", "Jolan is the nightfarer of the Pact, he is the one who protects the realm from the darkness."),
-        ("Igon", "Midra is the nightfarer of the Pact, he is the one who protects the realm from the darkness."),
-        ("Alexander", "Alexander is the nightfarer of the Pact, he is the one who protects the realm from the darkness."),
+        ("Wylder", "Quality build"),
+        ("Guardian", "Tank build"),
+        ("Recluse", "Sorcerer build"),
+        ("Duchess", "Dexterity build"),
+        ("Ironeye", "Dexterity build with long range"),
+        ("Rider", "Strength build"),
+        ("Igon", "Balance build"),
+        ("Alexander", "Strength build"),
     ];
 
     // Seed nightfarers collection
