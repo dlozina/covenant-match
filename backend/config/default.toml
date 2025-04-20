@@ -21,7 +21,11 @@ workers = 1
 # Use WebSockets (true) or Server-Sent Events (false)
 use_websockets = true
 # Configure max age of inactive sessions in seconds (default 24h)
-session_inactive_timeout = 86400
+session_inactive_timeout = 86400 # 24 hours
+
+[chat]
+cleanup_interval_minutes = 60 # 1 hour
+inactive_minutes = 60 # 1 hour
 
 [auth]
 # Exclude patterns format: [path, method, is_regex]

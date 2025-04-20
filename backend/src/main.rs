@@ -21,7 +21,7 @@ use log::{info, warn};
 use middleware::auth::Auth;
 use mongodb::{options::ClientOptions, Client};
 use routes::{game_data, sessions};
-use services::{auth_service, session_service, user_service, chat_service};
+use services::{auth_service, chat_service, session_service, user_service};
 use sse::heartbeat::HeartbeatActor;
 use sse::partition::{SessionRouter, DEFAULT_PARTITION_COUNT};
 use sse::session_pruner::SessionPrunerActor;
@@ -33,7 +33,7 @@ use utoipa_swagger_ui::SwaggerUi;
 use ws::session::SessionManager as WsSessionManager;
 
 /// Starts a background task to periodically clean up old login attempts
-async fn start_login_attempts_cleanup(db: mongodb::Database) {
+fn start_login_attempts_cleanup(db: mongodb::Database) {
     let db = Arc::new(Mutex::new(db));
 
     task::spawn(async move {
@@ -61,17 +61,11 @@ async fn start_login_attempts_cleanup(db: mongodb::Database) {
 }
 
 /// Starts a background task to periodically clean up inactive chat sessions
-async fn start_chat_cleanup(chat_service: Arc<chat_service::ChatService>) {
+fn start_chat_cleanup(chat_service: Arc<chat_service::ChatService>) {
     task::spawn(async move {
-        let cleanup_interval_minutes = std::env::var("CHAT_CLEANUP_INTERVAL_MINUTES")
-            .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .unwrap_or(30); // Default: run every 30 minutes
-
-        let inactive_minutes = std::env::var("CHAT_INACTIVE_MINUTES")
-            .ok()
-            .and_then(|v| v.parse::<i64>().ok())
-            .unwrap_or(30); // Default: clean up chats inactive for 30 minutes
+        let config = get_config();
+        let cleanup_interval_minutes = config.chat_cleanup_interval_minutes();
+        let inactive_minutes = config.chat_inactive_minutes();
 
         loop {
             // Sleep first to avoid cleanup immediately on startup
@@ -142,7 +136,7 @@ async fn main() -> std::io::Result<()> {
     let db = client.database("covenant-match");
 
     // Start the periodic cleanup of old login attempts
-    start_login_attempts_cleanup(db.clone()).await;
+    start_login_attempts_cleanup(db.clone());
     info!("Started periodic cleanup task for login attempts");
 
     // Initialize database with error handling
@@ -169,7 +163,7 @@ async fn main() -> std::io::Result<()> {
 
     // Check if we should use WebSockets or SSE
     let use_websockets = get_config().use_websockets();
-    let inactive_timeout = get_config().session_inactive_timeout() as i64;
+    let inactive_timeout = i64::try_from(get_config().session_inactive_timeout()).unwrap_or(86400); // Default to 24 hours if conversion fails
 
     info!(
         "Realtime configuration: use_websockets = {}, inactive_timeout = {} seconds",
@@ -177,7 +171,9 @@ async fn main() -> std::io::Result<()> {
     );
 
     // Initialize either WebSockets or SSE based on configuration
-    let sse_router = if !use_websockets {
+    let sse_router = if use_websockets {
+        None
+    } else {
         // Initialize SSE (Server-Sent Events)
         info!("Initializing SSE for real-time communications");
         let router = SessionRouter::new(DEFAULT_PARTITION_COUNT, None).start();
@@ -197,8 +193,6 @@ async fn main() -> std::io::Result<()> {
         session_service::set_sse_router(router.clone());
 
         Some(router)
-    } else {
-        None
     };
 
     // Initialize WebSocket session manager if needed
@@ -222,7 +216,7 @@ async fn main() -> std::io::Result<()> {
 
     // Start the periodic cleanup of inactive chat sessions
     if let Some((_, chat_service)) = &ws_session_manager {
-        start_chat_cleanup(chat_service.clone()).await;
+        start_chat_cleanup(chat_service.clone());
         info!("Started periodic cleanup task for inactive chat sessions");
     }
 
