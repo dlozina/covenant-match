@@ -51,7 +51,9 @@ async fn get_chat_history(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
@@ -105,7 +107,7 @@ async fn get_chat_history(
                     let sender_name = user_map
                         .get(&msg.sender_id)
                         .cloned()
-                        .unwrap_or_else(|| msg.sender_name);
+                        .unwrap_or(msg.sender_name);
 
                     ChatMessage {
                         sender_id: msg.sender_id,

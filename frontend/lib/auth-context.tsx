@@ -8,13 +8,15 @@ export const TOKEN_REFRESH_INTERVAL = 60 * 60 * 1000; // 1 hour in milliseconds 
 
 // Define the user data type
 type UserData = {
-  id: string;  // Add user ID
+  id: string;
   username: string;
   displayName: string;
   email: string;
   region?: string;
   platform?: string;
   autoRegion?: boolean;
+  cmRegion?: string;
+  cfRegion?: string;
   covenantName?: string;
   preferredSessionName?: string;
   preferredSessionPassword?: string;
@@ -104,6 +106,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         region: data.region,
         platform: data.platform,
         autoRegion: data.autoRegion,
+        cmRegion: data.cmRegion,
+        cfRegion: data.cfRegion,
         covenantName: data.covenantName,
         preferredSessionName: data.preferredSessionName,
         preferredSessionPassword: data.preferredSessionPassword,

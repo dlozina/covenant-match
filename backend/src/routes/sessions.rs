@@ -67,7 +67,9 @@ async fn create_session(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
@@ -111,7 +113,9 @@ async fn get_session(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
@@ -204,7 +208,9 @@ async fn start_session(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
@@ -250,12 +256,14 @@ async fn cancel_session(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
     match session_service::cancel_session(&db, &id, &user_id).await {
-        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+        Ok(()) => HttpResponse::Ok().json(serde_json::json!({
             "status": "success",
             "message": "Session cancelled successfully"
         })),
@@ -299,12 +307,14 @@ async fn leave_session(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
     match session_service::leave_session(&db, &id, &user_id).await {
-        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+        Ok(()) => HttpResponse::Ok().json(serde_json::json!({
             "status": "success",
             "message": "Left session successfully"
         })),
@@ -350,12 +360,14 @@ async fn complete_session(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
     // Extract duration from request body if provided
-    let duration = body.and_then(|b| b.get("duration").and_then(|d| d.as_i64()));
+    let duration = body.and_then(|b| b.get("duration").and_then(serde_json::Value::as_i64));
 
     match session_service::complete_session(&db, &id, &user_id, duration).await {
         Ok(session) => HttpResponse::Ok().json(session),
@@ -400,7 +412,9 @@ async fn recreate_session(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
@@ -449,7 +463,9 @@ async fn update_session(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
@@ -497,7 +513,7 @@ async fn submit_result(
     let result_data = result_data.into_inner();
 
     match session_service::submit_result(&db, &id, result_data).await {
-        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+        Ok(()) => HttpResponse::Ok().json(serde_json::json!({
             "status": "success",
             "message": "Result submitted successfully"
         })),
@@ -541,7 +557,9 @@ async fn get_results(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
@@ -612,7 +630,9 @@ async fn get_user_active_session(db: web::Data<Database>, req: HttpRequest) -> i
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
@@ -657,12 +677,14 @@ async fn reset_session_flags(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
     match session_service::reset_session_flags(&db, &id, &user_id).await {
-        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+        Ok(()) => HttpResponse::Ok().json(serde_json::json!({
             "status": "success",
             "message": "Session flags reset successfully"
         })),

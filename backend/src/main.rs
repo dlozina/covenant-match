@@ -248,6 +248,7 @@ async fn main() -> std::io::Result<()> {
             .configure(game_data::config)
             .configure(statistics::config)
             .configure(chat::config)
+            .configure(routes::user_data::config)
             // Add Swagger UI with the OpenAPI schema from our new module
             .service(
                 SwaggerUi::new("/api/docs/{_:.*}")

@@ -46,7 +46,9 @@ pub async fn events_route(
 
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
@@ -91,9 +93,9 @@ pub async fn events_route(
 
         // Format as SSE event
         let sse_data = if event_type == "heartbeat" {
-            format!(": keepalive\nevent: {}\ndata: {}\n\n", event_type, data)
+            format!(": keepalive\nevent: {event_type}\ndata: {data}\n\n")
         } else {
-            format!("event: {}\ndata: {}\n\n", event_type, data)
+            format!("event: {event_type}\ndata: {data}\n\n")
         };
 
         Ok::<Bytes, std::convert::Infallible>(Bytes::from(sse_data))
@@ -145,7 +147,9 @@ pub async fn events_status(
     // Get the user role from the request extensions
     let user_role = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.role.clone()
     };
 

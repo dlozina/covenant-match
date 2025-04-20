@@ -18,7 +18,7 @@ pub async fn initialize_database(db: &Database) -> Result<(), Error> {
     seed_default_data(db).await?;
 
     // Update schemas
-    //update_schemas(db).await?;
+    update_schemas(db).await?;
 
     Ok(())
 }
@@ -89,6 +89,8 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
                 "display_name": "Akri",
                 "region": "Europe",
                 "auto_region": true,
+                "cm_region": "Europe",
+                "cf_region": "Europe",
                 "platform": "PlayStation",
                 "role": "admin",
                 "covenant_name": "Warriors of Sunlight",
@@ -203,22 +205,67 @@ async fn seed_collection(
 }
 
 // Example of how to update schemas
-// async fn update_schemas(db: &Database) -> Result<(), Error> {
-//     let settings: Collection<Document> = db.collection("settings");
+async fn update_schemas(db: &Database) -> Result<(), Error> {
+    // Update users collection schema
+    let users: Collection<Document> = db.collection("users");
 
-//     // Update from v1 to v2 (adding new fields)
-//     settings
-//         .update_many(
-//             doc! { "schema_version": 1 },
-//             doc! {
-//                 "$set": {
-//                     "new_feature_flag": false,
-//                     "analytics_enabled": true,
-//                     "schema_version": 2  // Bump version
-//                 }
-//             },
-//         )
-//         .await?;
+    // Update users who don't have required fields from the latest schema
+    users
+        .update_many(
+            doc! {
+                "$or": [
+                    { "auto_region": { "$exists": false } },
+                    { "cm_region": { "$exists": false } },
+                    { "cf_region": { "$exists": false } },
+                    { "avatar_url": { "$exists": false } },
+                    { "preferred_session_name": { "$exists": false } },
+                    { "preferred_session_password": { "$exists": false } },
+                    { "preferred_nightfarer": { "$exists": false } },
+                    { "schema_version": { "$exists": false } }
+                ]
+            },
+            doc! {
+                "$set": {
+                    "auto_region": true,
+                    "cm_region": "Europe",
+                    "cf_region": "Europe",
+                    "avatar_url": null,
+                    "preferred_session_name": null,
+                    "preferred_session_password": null,
+                    "preferred_nightfarer": null,
+                    "schema_version": 2  // Bump version
+                }
+            },
+        )
+        .await?;
 
-//     Ok(())
-// }
+    info!("Updated user schemas to version 2");
+
+    // Ensure login_attempts collection exists
+    if !db
+        .list_collection_names()
+        .await?
+        .contains(&"login_attempts".to_string())
+    {
+        db.create_collection("login_attempts").await?;
+        info!("Created login_attempts collection");
+    }
+
+    // Create TTL index on login_attempts to automatically delete old records
+    let login_attempts_index = IndexModel::builder()
+        .keys(doc! { "created_at": 1 })
+        .options(
+            IndexOptions::builder()
+                .expire_after(std::time::Duration::from_secs(60 * 60 * 24 * 7)) // 7 days
+                .build(),
+        )
+        .build();
+
+    db.collection::<Document>("login_attempts")
+        .create_index(login_attempts_index)
+        .await?;
+
+    info!("Created TTL index on login_attempts collection");
+
+    Ok(())
+}

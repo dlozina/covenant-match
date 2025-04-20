@@ -1,4 +1,5 @@
 use crate::models::error::AppError;
+use crate::models::geo_location::GeoLocation;
 use crate::models::user::{CreateUserDto, LoginUserDto, UpdateUserProfileDto, User, UserResponse};
 use crate::repository::user_repository;
 use crate::utils::jwt;
@@ -11,6 +12,7 @@ pub async fn create_user(
     db: &Database,
     user_data: CreateUserDto,
     requesting_user_role: Option<&str>,
+    client_region: GeoLocation,
 ) -> Result<UserResponse, AppError> {
     // Check if username or email already exists
     if user_repository::find_by_username_or_email(db, &user_data.username, &user_data.email)
@@ -38,8 +40,8 @@ pub async fn create_user(
     // Only allow admin role if the requesting user is an admin
     let role = match (user_data.role, requesting_user_role) {
         (Some(role), Some("admin")) if role == "admin" => "admin".to_string(),
-        (Some(_), _) => "user".to_string(), // Default to user if not admin or no requesting user
-        (None, _) => "user".to_string(),    // Default role is user
+        // Default to user for all other cases
+        _ => "user".to_string(),
     };
 
     let now = mongodb::bson::DateTime::now();
@@ -53,6 +55,8 @@ pub async fn create_user(
         region: user_data.region,
         platform: user_data.platform,
         auto_region: user_data.auto_region,
+        cm_region: client_region.cm_region,
+        cf_region: client_region.cf_region,
         covenant_name: user_data.covenant_name,
         preferred_session_name: user_data.preferred_session_name,
         preferred_session_password: user_data.preferred_session_password,
@@ -73,6 +77,8 @@ pub async fn create_user(
         avatar_url: user.avatar_url,
         role: user.role,
         region: user.region,
+        cm_region: user.cm_region,
+        cf_region: user.cf_region,
         platform: user.platform,
         auto_region: user.auto_region,
         covenant_name: user.covenant_name,
@@ -113,6 +119,8 @@ pub async fn login_user(
         avatar_url: user.avatar_url,
         region: user.region,
         auto_region: user.auto_region,
+        cm_region: user.cm_region,
+        cf_region: user.cf_region,
         platform: user.platform,
         covenant_name: user.covenant_name,
         role: user.role,
@@ -138,6 +146,8 @@ pub async fn get_user_by_id(db: &Database, user_id: &str) -> Result<UserResponse
             avatar_url: user.avatar_url,
             region: user.region,
             auto_region: user.auto_region,
+            cm_region: user.cm_region,
+            cf_region: user.cf_region,
             platform: user.platform,
             covenant_name: user.covenant_name,
             role: user.role,
@@ -157,7 +167,10 @@ pub async fn ensure_admin_exists(db: &Database) -> Result<(), AppError> {
     // Check if any admin exists
     let admin_exists = user_repository::admin_exists(db).await?;
 
-    if !admin_exists {
+    if admin_exists {
+        info!("Admin user already exists");
+        Ok(())
+    } else {
         // Get admin credentials from environment
         let admin_username =
             std::env::var("ADMIN_USERNAME").unwrap_or_else(|_| "admin".to_string());
@@ -176,6 +189,8 @@ pub async fn ensure_admin_exists(db: &Database) -> Result<(), AppError> {
             display_name: Some("Akri".to_string()),
             region: "EU".to_string(),
             auto_region: true,
+            cm_region: "Europe".to_string(),
+            cf_region: Some("Europe".to_string()),
             platform: "PlayStation".to_string(),
             covenant_name: "Covenant".to_string(),
             preferred_session_name: None,
@@ -184,8 +199,23 @@ pub async fn ensure_admin_exists(db: &Database) -> Result<(), AppError> {
             role: Some("admin".to_string()),
         };
 
+        // Create client region
+        let client_region = GeoLocation {
+            cm_region: "Europe".to_string(),
+            cf_region: None,
+            country: "Unknown".to_string(),
+            city: None,
+            continent: None,
+            region_code: None,
+            metro_code: None,
+            postal_code: None,
+            timezone: None,
+            latitude: None,
+            longitude: None,
+        };
+
         // Create admin with admin role (None for requesting_user_role will be overridden)
-        match create_user(db, admin_data, Some("admin")).await {
+        match create_user(db, admin_data, Some("admin"), client_region).await {
             Ok(_) => {
                 info!("Created default admin user successfully");
                 Ok(())
@@ -195,9 +225,6 @@ pub async fn ensure_admin_exists(db: &Database) -> Result<(), AppError> {
                 Err(e)
             }
         }
-    } else {
-        info!("Admin user already exists");
-        Ok(())
     }
 }
 
@@ -205,6 +232,7 @@ pub async fn update_user_profile(
     db: &Database,
     user_id: &str,
     update_data: UpdateUserProfileDto,
+    client_region: GeoLocation,
 ) -> Result<UserResponse, AppError> {
     // Convert string ID to ObjectId for comparison
     let object_id = ObjectId::parse_str(user_id).map_err(|_| AppError::InvalidId)?;
@@ -254,6 +282,14 @@ pub async fn update_user_profile(
     if let Some(auto_region) = update_data.auto_region {
         update_doc.insert("auto_region", auto_region);
     }
+
+    // Region update if user is logging in from a different region
+    let cm_region = client_region.cm_region;
+    update_doc.insert("cm_region", cm_region);
+
+    if let Some(cf_region) = client_region.cf_region {
+        update_doc.insert("cf_region", cf_region);
+    }
     if let Some(platform) = update_data.platform.clone() {
         update_doc.insert("platform", platform);
     }
@@ -288,14 +324,13 @@ pub async fn delete_user(db: &Database, user_id: &str) -> Result<(), AppError> {
     // Check if the user exists first
     let user_exists = user_repository::find_user_by_id(db, user_id).await?;
 
-    if user_exists.is_none() {
-        return Err(AppError::UserNotFound);
+    if user_exists.is_some() {
+        // Delete the user
+        user_repository::delete_user(db, user_id).await?;
+        Ok(())
+    } else {
+        Err(AppError::UserNotFound)
     }
-
-    // Delete the user
-    user_repository::delete_user(db, user_id).await?;
-
-    Ok(())
 }
 
 /// Get paginated list of users, optionally filtered by role
@@ -316,10 +351,41 @@ pub async fn get_users_paginated(
     let users = user_repository::find_users_by_role_paginated(db, role, page, limit).await?;
 
     // Convert to UserResponse objects
-    let user_responses = users
-        .into_iter()
-        .map(|user| UserResponse::from(user))
-        .collect();
+    let user_responses = users.into_iter().map(UserResponse::from).collect();
 
     Ok((user_responses, total, page))
+}
+
+pub async fn update_user_region(
+    db: &Database,
+    username: &str,
+    client_region: GeoLocation,
+) -> Result<(), AppError> {
+    // Get the current timestamp
+    let now = mongodb::bson::DateTime::now();
+
+    // Find the user by username to get their ID
+    let user = user_repository::find_by_username(db, username)
+        .await?
+        .ok_or(AppError::UserNotFound)?;
+
+    // Create update document with region information
+    let mut update_doc = doc! {
+        "cm_region": client_region.cm_region,
+        "updated_at": now,
+    };
+
+    // Add cloudflare region if available
+    if let Some(cf_region) = client_region.cf_region {
+        update_doc.insert("cf_region", cf_region);
+    }
+
+    // Use the repository layer to update the user
+    let result = user_repository::update_user_with_doc(db, &user.id.to_hex(), update_doc).await?;
+
+    if result.is_none() {
+        return Err(AppError::UserNotFound);
+    }
+
+    Ok(())
 }

@@ -3,6 +3,7 @@ use crate::models::game_data::{
     Covenant, CovenantResponse, GameDataResponse, NightLord, NightLordResponse, Nightfarer,
     NightfarerResponse, Platform, PlatformResponse, Region, RegionResponse,
 };
+use crate::models::geo_location::{CoordinatesDto, GeoLocationDataDto};
 use crate::models::session::{
     CovenantStats, CovenantStatsResponse, CreateSessionDto, GameResult, JoinSessionDto,
     MinimalSessionDto, PlayerInfo, RateSessionDto, ResultsResponseDto, SessionResponseDto,
@@ -13,12 +14,14 @@ use crate::models::user::{
     AuthResponse, CreateUserDto, GetUsersQuery, LoginUserDto, PaginationInfo, RefreshTokenResponse,
     UpdateUserDto, UpdateUserProfileDto, User, UserResponse, UsersListData, UsersListResponse,
 };
+use crate::models::user_data::UserDataResponseDto;
 use crate::routes::statistics::NightLordStatsResponse;
 use crate::routes::users::{JwtInfoDto, TokenInfoResponse};
 use crate::sse::messages::{ServerMessage, SessionInfo, SseSessionStatus};
 
 use crate::routes::{
-    chat::*, game_data::*, health::*, sessions::*, sse::*, statistics::*, users::*, ws::*,
+    chat::*, game_data::*, health::*, sessions::*, sse::*, statistics::*, user_data::*, users::*,
+    ws::*,
 };
 
 // Import SSE models
@@ -57,6 +60,8 @@ use utoipa::{
         get_user_by_id_admin,
         update_user_admin,
         delete_user_admin,
+        // User data routes
+        get_current_user_data,
         // Session routes
         get_sessions,
         create_session,
@@ -116,6 +121,10 @@ use utoipa::{
             PaginationInfo,
             JwtInfoDto,
             TokenInfoResponse,
+            // User data models
+            UserDataResponseDto,
+            GeoLocationDataDto,
+            CoordinatesDto,
             // Session models
             CreateSessionDto,
             JoinSessionDto,
@@ -169,6 +178,7 @@ use utoipa::{
         (name = "health", description = "Health check endpoints"),
         (name = "users", description = "User management endpoints"),
         (name = "admin", description = "Admin-only endpoints"),
+        (name = "users-data", description = "User data endpoints with geolocation information"),
         (name = "sessions", description = "Session management endpoints"),
         (name = "game-data", description = "Game data endpoints"),
         (name = "statistics", description = "Statistics endpoints"),

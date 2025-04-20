@@ -3,7 +3,7 @@ use mongodb::bson::{oid::ObjectId, DateTime};
 use serde::{Deserialize, Serialize};
 
 /// Structure to track login attempts for security measures
-/// Stored in MongoDB to enforce CAPTCHA requirements
+/// Stored in `MongoDB` to enforce CAPTCHA requirements
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LoginAttempt {
     #[serde(rename = "_id")]

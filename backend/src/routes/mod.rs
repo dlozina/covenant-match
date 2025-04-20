@@ -6,3 +6,4 @@ pub mod sse;
 pub mod statistics;
 pub mod users;
 pub mod ws;
+pub mod user_data;
