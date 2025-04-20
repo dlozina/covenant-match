@@ -35,6 +35,8 @@ use utoipa::{
     Modify, OpenApi,
 };
 
+use std::collections::HashMap;
+
 #[derive(OpenApi)]
 #[openapi(
     info(
@@ -62,6 +64,7 @@ use utoipa::{
         delete_user_admin,
         // User data routes
         get_current_user_data,
+        test_cloudflare_headers,
         // Session routes
         get_sessions,
         create_session,

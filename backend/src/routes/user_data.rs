@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use actix_web::{get, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use mongodb::Database;
 
@@ -72,6 +74,47 @@ async fn get_current_user_data(db: web::Data<Database>, req: HttpRequest) -> imp
     }
 }
 
+/// Test endpoint to display all Cloudflare geolocation headers
+#[utoipa::path(
+    get,
+    path = "/api/v1/users-data/cf-headers",
+    responses(
+        (status = 200, description = "Cloudflare headers retrieved successfully", body = HashMap<String, String>),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "users-data"
+)]
+#[get("/api/v1/users-data/cf-headers")]
+async fn test_cloudflare_headers(req: HttpRequest) -> impl Responder {
+    let mut headers = HashMap::new();
+
+    // Standard header for IP address
+    headers.insert("ip_address".to_string(), ip_address::get_client_ip(&req));
+
+    // Cloudflare geolocation headers
+    let cf_headers = [
+        "cf-ipcountry",
+        "cf-ipcity",
+        "cf-ipcontinent",
+        "cf-iplatitude",
+        "cf-iplongitude",
+        "cf-region",
+        "cf-region-code",
+        "cf-metro-code",
+        "cf-postal-code",
+        "cf-timezone",
+    ];
+
+    for header in &cf_headers {
+        if let Some(value) = req.headers().get(*header).and_then(|v| v.to_str().ok()) {
+            headers.insert((*header).to_string(), value.to_string());
+        }
+    }
+
+    HttpResponse::Ok().json(headers)
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
-    cfg.service(get_current_user_data);
+    cfg.service(get_current_user_data)
+        .service(test_cloudflare_headers);
 }

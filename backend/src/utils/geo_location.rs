@@ -3,7 +3,7 @@ use actix_web::HttpRequest;
 use log::{error, info};
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{self, BufRead, BufReader};
+use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::sync::OnceLock;
 
