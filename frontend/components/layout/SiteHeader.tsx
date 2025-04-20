@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu, UserPlus, Sword, Users, LayoutDashboard, User, LogOut, LogIn } from "lucide-react";
-import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -26,7 +25,6 @@ export function SiteHeader() {
 
   const handleLogout = () => {
     logout();
-    toast.success("Logged out successfully");
     router.push('/');
   };
 
@@ -118,6 +116,17 @@ export function SiteHeader() {
                         Edit Profile
                       </Link>
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                      <div className="flex items-center justify-between mb-1">
+                        <span>Platform:</span>
+                        <span className="font-medium">{userData.platform}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Region:</span>
+                        <span className="font-medium">{userData.autoRegion ? userData.cmRegion : userData.region}</span>
+                      </div>
+                    </div>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout} className="w-full flex items-center text-red-500 focus:text-red-500">
                       <LogOut className="h-4 w-4 mr-2" />

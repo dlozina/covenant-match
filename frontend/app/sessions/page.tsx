@@ -86,8 +86,9 @@ export default function SessionsPage() {
     
     // Apply friend filter (placeholder for future implementation)
     if (friendFilter === "Friends") {
+      //todo
       // This will be implemented later
-      // For now, we'll just show a toast message
+      
     }
     
     setFilteredSessions(result);
