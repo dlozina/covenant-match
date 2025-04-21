@@ -35,8 +35,6 @@ use utoipa::{
     Modify, OpenApi,
 };
 
-use std::collections::HashMap;
-
 #[derive(OpenApi)]
 #[openapi(
     info(

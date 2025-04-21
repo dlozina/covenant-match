@@ -12,6 +12,7 @@ pub struct PlayerInfo {
     pub nightfarer: String,
     pub covenant_name: String,
     pub region: String,
+    pub platform: String,
     #[serde(alias = "joined_at")]
     pub joined_at: DateTime,
 }
@@ -75,6 +76,7 @@ pub struct GameSession {
     pub name: String,
     pub host_id: String,
     pub region: String,
+    pub platform: String,
     pub password: String,
     pub is_private: bool,
     pub night_lord: String,
@@ -96,6 +98,7 @@ pub struct GameSession {
 pub struct CreateSessionDto {
     pub name: String,
     pub region: String,
+    pub platform: String,
     pub game_password: String,
     pub nightfarer: String,
     pub night_lord: String,
@@ -117,6 +120,7 @@ pub struct JoinSessionDto {
     pub nightfarer: String,
     pub covenant_name: String,
     pub region: String,
+    pub platform: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
@@ -135,6 +139,7 @@ pub struct SessionResponseDto {
     pub name: String,
     pub host_id: String,
     pub region: String,
+    pub platform: String,
     pub status: SessionStatus,
     pub night_lord: String,
     pub joined_players: Vec<PlayerInfo>,
@@ -158,6 +163,7 @@ impl From<GameSession> for SessionResponseDto {
             name: session.name,
             host_id: session.host_id,
             region: session.region,
+            platform: session.platform,
             status: session.status,
             night_lord: session.night_lord,
             joined_players: session.joined_players,
@@ -178,7 +184,7 @@ impl From<GameSession> for SessionResponseDto {
 /// Combined review DTO for submitting results, ratings, and feedback in one request
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct SessionReviewDto {
-    pub result: Option<String>,   // win, loss, etc.
+    pub result: Option<String>,   // win, loss, d/c.
     pub rating: Option<i32>,      // 1-5 stars
     pub feedback: Option<String>, // Optional text feedback
 }

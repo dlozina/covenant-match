@@ -51,9 +51,10 @@ pub async fn find_sessions(
         filter = doc! { "$and": [filter, doc! { "joined_players.region": region_val }] };
     }
 
-    // Add platform filter if provided (platform is stored in user profile, not in session)
-    // We can't easily filter by player platform since it's not stored in the session document
-    // This filtering will need to be done on the application level if needed
+    // Add platform filter if provided
+    if let Some(platform_val) = platform {
+        filter = doc! { "$and": [filter, doc! { "platform": platform_val }] };
+    }
 
     // Get all sessions matching the filter
     let cursor = get_collection(db).find(filter).await?;

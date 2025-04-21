@@ -15,8 +15,6 @@ use chrono::Utc;
 use mongodb::bson::oid::ObjectId;
 use mongodb::Database;
 use serde_json::json;
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::LazyLock;
 use std::sync::Mutex;
 
@@ -207,12 +205,14 @@ pub async fn create_session(
         name: session_data.name,
         host_id: user_id.to_string(),
         region: session_data.region.clone(),
+        platform: session_data.platform,
         password: session_data.game_password,
         is_private: session_data.is_private,
         status: SessionStatus::Open,
         joined_players: vec![PlayerInfo {
             user_id: user.id.to_hex(),
             region: session_data.region,
+            platform: user.platform,
             username: user.display_name.unwrap_or(user.username),
             nightfarer: session_data.nightfarer,
             covenant_name: user.covenant_name,
@@ -307,7 +307,7 @@ pub async fn get_sessions(
     // Convert to response DTOs (exclude passwords for listing)
     Ok(sessions
         .into_iter()
-        .map(|s| SessionResponseDto::from(s))
+        .map(SessionResponseDto::from)
         .collect())
 }
 
@@ -443,6 +443,7 @@ pub async fn join_session(
     session.joined_players.push(PlayerInfo {
         user_id: join_data.user_id.clone(),
         region: join_data.region.clone(),
+        platform: join_data.platform.clone(),
         username: join_data.username.clone(),
         nightfarer: join_data.nightfarer.clone(),
         covenant_name: join_data.covenant_name.clone(),
@@ -1023,12 +1024,14 @@ pub async fn recreate_session(
         name: new_name,
         host_id: user_id.to_string(),
         region: original_session.region.clone(),
+        platform: original_session.platform.clone(),
         password: original_session.password.clone(),
         is_private: make_private, // Always make recreated sessions private so they don't show in the sessions list
         status: SessionStatus::Open,
         joined_players: vec![PlayerInfo {
             user_id: user_id.to_string(),
             region: original_session.region.clone(),
+            platform: original_session.platform.clone(),
             username: host_user.display_name.unwrap_or(host_user.username),
             nightfarer: host_nightfarer,
             covenant_name: host_user.covenant_name.clone(),
@@ -1398,6 +1401,7 @@ mod tests {
             nightfarer: "Mage".to_string(),
             covenant_name: "Covenant 1".to_string(),
             region: "Europe".to_string(),
+            platform: "Playstation".to_string(),
             joined_at: now,
         };
 
@@ -1407,6 +1411,7 @@ mod tests {
             nightfarer: "Warrior".to_string(),
             covenant_name: "Covenant 2".to_string(),
             region: "Europe".to_string(),
+            platform: "Playstation".to_string(),
             joined_at: now,
         };
 
@@ -1416,6 +1421,7 @@ mod tests {
             nightfarer: "Rogue".to_string(),
             covenant_name: "Covenant 3".to_string(),
             region: "Europe".to_string(),
+            platform: "Playstation".to_string(),
             joined_at: now,
         };
 
@@ -1425,6 +1431,7 @@ mod tests {
             name: "Test Session".to_string(),
             host_id: "player1".to_string(),
             region: "Europe".to_string(),
+            platform: "Playstation".to_string(),
             password: "test".to_string(),
             is_private: false,
             status: SessionStatus::InProgress,
@@ -1530,6 +1537,7 @@ mod tests {
             nightfarer: "Mage".to_string(),
             covenant_name: "Covenant 1".to_string(),
             region: "Europe".to_string(),
+            platform: "Playstation".to_string(),
             joined_at: now,
         };
 
@@ -1539,6 +1547,7 @@ mod tests {
             nightfarer: "Warrior".to_string(),
             covenant_name: "Covenant 2".to_string(),
             region: "Europe".to_string(),
+            platform: "Playstation".to_string(),
             joined_at: now,
         };
 
@@ -1548,6 +1557,7 @@ mod tests {
             nightfarer: "Rogue".to_string(),
             covenant_name: "Covenant 3".to_string(),
             region: "Europe".to_string(),
+            platform: "Playstation".to_string(),
             joined_at: now,
         };
 
@@ -1557,6 +1567,7 @@ mod tests {
             name: "Test Session".to_string(),
             host_id: "player1".to_string(),
             region: "Europe".to_string(),
+            platform: "Playstation".to_string(),
             password: "test".to_string(),
             is_private: false,
             status: SessionStatus::Completed, // Already completed

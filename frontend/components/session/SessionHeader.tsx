@@ -35,7 +35,7 @@ export function SessionHeader({ title }: SessionHeaderProps) {
       <div className="flex flex-col">
         <h1 className="text-2xl font-bold">{displayName}</h1>
         <div className="flex items-center gap-1 text-sm text-muted-foreground">
-          <span>ID: {sessionId.substring(0, 8)}</span>
+          <span>Session ID: {sessionId.substring(0, 8)}</span>
         </div>
       </div>
       

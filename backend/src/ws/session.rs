@@ -5,7 +5,6 @@ use crate::ws::messages::{
 };
 use actix::prelude::*;
 use log::{debug, error, info};
-use mongodb::Database;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 

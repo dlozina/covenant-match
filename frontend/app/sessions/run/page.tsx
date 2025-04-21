@@ -91,7 +91,6 @@ function SessionRunContent(): JSX.Element {
       <div className="container py-10 mx-auto">  
         <SessionEventManager sessionId={sessionId}>
           <SessionHeader title={`Session #${sessionId}`} />
-          
           {notification && (
             <Notification 
               notification={notification} 

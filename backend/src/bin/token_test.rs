@@ -77,14 +77,13 @@ fn generate_token(user_id: &ObjectId, role: &str) -> Result<String, String> {
     // Calculate expiration time based on the configured duration
     let expiration = if let Some(seconds) = parse_duration_to_seconds(&expires_in) {
         let now = Utc::now().timestamp();
-        (now + seconds) as usize
+        now.saturating_add(seconds) as usize
     } else {
         eprintln!(
-            "Warning: Invalid duration format in config: '{}'. Using default of 12h",
-            expires_in
+            "Warning: Invalid duration format in config: '{expires_in}'. Using default of 12h"
         );
         let now = Utc::now().timestamp();
-        (now + 12 * 3600) as usize
+        now.saturating_add(12 * 3600) as usize
     };
 
     let issued_at = Utc::now().timestamp() as usize;
@@ -102,7 +101,7 @@ fn generate_token(user_id: &ObjectId, role: &str) -> Result<String, String> {
         &claims,
         &EncodingKey::from_secret(jwt_secret.as_bytes()),
     )
-    .map_err(|e| format!("Token generation error: {}", e))
+    .map_err(|e| format!("Token generation error: {e}"))
 }
 
 // Decode token without validating expiration
@@ -119,7 +118,7 @@ fn decode_token(token: &str) -> Result<Claims, String> {
         &validation,
     )
     .map(|token_data| token_data.claims)
-    .map_err(|e| format!("Token decode error: {}", e))
+    .map_err(|e| format!("Token decode error: {e}"))
 }
 
 #[derive(Parser, Debug)]
@@ -167,7 +166,7 @@ fn main() {
             let user_obj_id = match ObjectId::parse_str(&user_id) {
                 Ok(id) => id,
                 Err(e) => {
-                    eprintln!("Invalid user ID format: {}", e);
+                    eprintln!("Invalid user ID format: {e}");
                     std::process::exit(1);
                 }
             };
@@ -175,7 +174,7 @@ fn main() {
             // Generate the token
             match generate_token(&user_obj_id, &role) {
                 Ok(token) => {
-                    println!("\nGenerated token: {}", token);
+                    println!("\nGenerated token: {token}");
 
                     // Decode token immediately to verify values
                     match decode_token(&token) {
@@ -208,13 +207,13 @@ fn main() {
                             }
                         }
                         Err(e) => {
-                            eprintln!("Failed to decode generated token: {}", e);
+                            eprintln!("Failed to decode generated token: {e}");
                             std::process::exit(1);
                         }
                     }
                 }
                 Err(e) => {
-                    eprintln!("Failed to generate token: {}", e);
+                    eprintln!("Failed to generate token: {e}");
                     std::process::exit(1);
                 }
             }
@@ -249,7 +248,7 @@ fn main() {
                 }
             }
             Err(e) => {
-                eprintln!("Failed to decode token: {}", e);
+                eprintln!("Failed to decode token: {e}");
                 std::process::exit(1);
             }
         },
@@ -271,12 +270,12 @@ fn format_duration(seconds: u64) -> String {
     let secs = seconds % 60;
 
     if days > 0 {
-        format!("{}d {}h {}m {}s", days, hours, minutes, secs)
+        format!("{days}d {hours}h {minutes}m {secs}s")
     } else if hours > 0 {
-        format!("{}h {}m {}s", hours, minutes, secs)
+        format!("{hours}h {minutes}m {secs}s")
     } else if minutes > 0 {
-        format!("{}m {}s", minutes, secs)
+        format!("{minutes}m {secs}s")
     } else {
-        format!("{}s", secs)
+        format!("{secs}s")
     }
 }

@@ -184,6 +184,17 @@ function JoinSessionContent() {
       return;
     }
     
+    // Get platform from user data
+    const userPlatform = userData.platform;
+    
+    if (!userPlatform) {
+      setNotification({
+        type: 'error',
+        message: "User platform information is missing"
+      });
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
@@ -193,7 +204,8 @@ function JoinSessionContent() {
         userId,
         userData.username,
         userData.covenantName || 'Unknown',
-        userRegion
+        userRegion,
+        userPlatform
       );
       
       router.push(`/sessions/run?id=${sessionId}`);

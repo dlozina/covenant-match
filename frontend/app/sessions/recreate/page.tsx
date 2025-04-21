@@ -251,6 +251,13 @@ function RecreateSessionContent() {
       if (!userRegion) {
         throw new Error("User region information is missing");
       }
+      
+      // Get platform from user data
+      const userPlatform = userData.platform;
+      
+      if (!userPlatform) {
+        throw new Error("User platform information is missing");
+      }
        
       await joinSession(
         autoJoinSessionId,
@@ -258,7 +265,8 @@ function RecreateSessionContent() {
         userId,
         userData.username,
         userData.covenantName || '',
-        userRegion
+        userRegion,
+        userPlatform
       );
       
       setNotification({

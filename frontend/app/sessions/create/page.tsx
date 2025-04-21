@@ -197,6 +197,13 @@ function CreateSessionContent() {
         throw new Error("User region information is missing");
       }
       
+      // Get platform from user data
+      const userPlatform = userData?.platform;
+      
+      if (!userPlatform) {
+        throw new Error("User platform information is missing");
+      }
+      
       // Sanitize inputs before submission
       const sessionData: CreateSessionParams = {
         gamePassword: data.password.trim(),
@@ -204,7 +211,8 @@ function CreateSessionContent() {
         nightLord: selectedLord,
         nightfarer: selectedFarer,
         isPrivate: false,
-        region: userRegion
+        region: userRegion,
+        platform: userPlatform
       };
       
       const responseData = await createSession(sessionData);
