@@ -32,7 +32,8 @@ export function SessionParticipant() {
     isHost,
     formatTime,
     resetSession,
-    updatePlayerReportedStatus
+    updatePlayerReportedStatus,
+    lastHeartbeat
   } = useSessionContext();
   
   // Get auth context - moved before conditional return
@@ -377,6 +378,7 @@ export function SessionParticipant() {
                 sessionState={sessionState}
                 formatTime={formatTime}
                 sessionData={sessionData}
+                lastHeartbeat={lastHeartbeat}
               />
             )}
           </div>
@@ -415,6 +417,7 @@ export function SessionParticipant() {
               sessionState={sessionState}
               formatTime={formatTime}
               sessionData={sessionData}
+              lastHeartbeat={lastHeartbeat}
             />
           )}
         </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSessionContext } from './context/SessionContext';
 import { useAuth } from '@/lib/auth-context';
 import { Card } from '@/components/ui/card';
@@ -30,6 +30,112 @@ interface ChatHistoryMessage {
   client_id?: string; // Add client_id field
 }
 
+// Create a singleton chat manager that persists across component remounts
+class ChatManager {
+  private static instance: ChatManager | null = null;
+  private registeredSessions: Record<string, {
+    handlerId: string;
+    lastFetchTime: number | null;
+    unsubscribe: (() => void) | null;
+  }> = {};
+  
+  // Private constructor for singleton
+  private constructor() {}
+  
+  // Get the singleton instance
+  public static getInstance(): ChatManager {
+    if (!ChatManager.instance) {
+      ChatManager.instance = new ChatManager();
+    }
+    return ChatManager.instance;
+  }
+  
+  // Register a session handler
+  public registerSession(
+    sessionId: string, 
+    registerHandler: (id: string, handler: () => void) => void,
+    chatFetcher: () => Promise<void>,
+    chatMessageHandler: (data: unknown) => void,
+    subscribe: (eventType: string, handler: (data: unknown) => void) => (() => void)
+  ): void {
+    // If already registered, don't register again
+    if (this.registeredSessions[sessionId]) {
+      console.log(`ChatManager - Session ${sessionId} already registered`);
+      return;
+    }
+    
+    // Handler ID for this session
+    const handlerId = `chat_sync_${sessionId}`;
+    
+    // Register chat sync handler
+    console.log(`ChatManager - Registering session ${sessionId}`);
+    registerHandler(handlerId, () => {
+      // Only fetch if necessary (debounce)
+      const lastFetch = this.registeredSessions[sessionId]?.lastFetchTime || 0;
+      if (Date.now() - lastFetch > 15000) {
+        console.log(`ChatManager - Syncing chat for session ${sessionId}`);
+        chatFetcher().catch(err => {
+          console.error(`ChatManager - Error syncing chat: ${err}`);
+        });
+      } else {
+        console.log(`ChatManager - Skipping sync fetch (too recent) for session ${sessionId}`);
+      }
+    });
+    
+    // Subscribe to chat messages
+    const unsubscribe = subscribe('chat', chatMessageHandler);
+    
+    // Store session info
+    this.registeredSessions[sessionId] = {
+      handlerId,
+      lastFetchTime: null,
+      unsubscribe
+    };
+    
+    // Initial fetch
+    chatFetcher().catch(err => {
+      console.error(`ChatManager - Error during initial fetch: ${err}`);
+    });
+  }
+  
+  // Update last fetch time
+  public updateLastFetchTime(sessionId: string): void {
+    if (this.registeredSessions[sessionId]) {
+      this.registeredSessions[sessionId].lastFetchTime = Date.now();
+    }
+  }
+  
+  // Get last fetch time
+  public getLastFetchTime(sessionId: string): number | null {
+    return this.registeredSessions[sessionId]?.lastFetchTime || null;
+  }
+  
+  // Unregister a session
+  public unregisterSession(
+    sessionId: string, 
+    unregisterHandler: (id: string) => void
+  ): void {
+    const session = this.registeredSessions[sessionId];
+    if (session) {
+      console.log(`ChatManager - Unregistering session ${sessionId}`);
+      
+      // Unregister visibility handler
+      unregisterHandler(session.handlerId);
+      
+      // Unsubscribe from chat messages
+      if (session.unsubscribe) {
+        session.unsubscribe();
+      }
+      
+      // Remove from registered sessions
+      delete this.registeredSessions[sessionId];
+    }
+  }
+}
+
+// Get the chat manager instance
+const chatManager = ChatManager.getInstance();
+
 export function SessionChat() {
   // Use the shared WebSocket connection from SessionContext
   const { 
@@ -42,188 +148,16 @@ export function SessionChat() {
     unregisterVisibilityHandler
   } = useSessionContext();
   
-  const { userData} = useAuth();
+  const { userData } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [chatRole, setChatRole] = useState<'host' | 'participant1' | 'participant2' | 'unknown'>('unknown');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false);
-  // Add a set to track message IDs being processed to prevent duplication
   const [processedIds, setProcessedIds] = useState<Set<string>>(new Set());
   
   const sessionId = sessionData?.id || null;
-  
-  // Fetch chat history from the server - wrapped in useCallback
-  const fetchChatHistory = useCallback(async () => {
-    if (!sessionId || !userData || isLoadingHistory) return;
-    
-    try {
-      setIsLoadingHistory(true);
-      console.log("SessionChat - Fetching chat history for session", sessionId);
-      
-      // Create the request with the full URL
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      // Only fetch the last 9 messages
-      const url = `${apiBaseUrl}/api/v1/chat/history?session_id=${sessionId}&limit=9`;
-      
-      // Get token from storage
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Not authenticated');
-      }
-      
-      // Make direct fetch call with proper typing
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch chat history: ${response.status}`);
-      }
-      
-      const historyMessages: ChatHistoryMessage[] = await response.json();
-      console.log("SessionChat - Received history messages:", historyMessages.length);
-      
-      if (historyMessages.length > 0) {
-        // Prepare a new set of processed IDs
-        const newProcessedIds = new Set<string>();
-        
-        // Convert to our message format
-        const formattedMessages = historyMessages.map(msg => {
-          // Add to processed IDs to prevent duplicates
-          if (msg.client_id) {
-            newProcessedIds.add(msg.client_id);
-          }
-          
-          // Determine role from sender
-          let role: 'host' | 'participant1' | 'participant2' | 'unknown' = 'unknown';
-          
-          // Check if this is the host
-          if (sessionData?.hostId === msg.sender_id) {
-            role = 'host';
-          } else {
-            // Sort participants by join time
-            const participants = sessionData?.joinedPlayers
-              .filter(p => p.userId !== sessionData.hostId)
-              .sort((a, b) => new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime());
-            
-            if (participants && participants.length > 0) {
-              // First participant
-              if (participants[0].userId === msg.sender_id) {
-                role = 'participant1';
-              } 
-              // Second participant
-              else if (participants.length > 1 && participants[1].userId === msg.sender_id) {
-                role = 'participant2';
-              }
-            }
-          }
-          
-          return {
-            userId: msg.sender_id,
-            username: msg.sender_name,
-            message: msg.message,
-            timestamp: msg.timestamp,
-            role,
-            clientId: msg.client_id
-          } as ChatMessage;
-        });
-        
-        // Update the processed IDs
-        setProcessedIds(newProcessedIds);
-        
-        // Replace messages with the last 9 messages from history
-        setMessages(formattedMessages.sort((a, b) => {
-          // Extract timestamps from client IDs
-          const aTime = a.clientId ? getTimestampFromClientId(a.clientId) : a.timestamp;
-          const bTime = b.clientId ? getTimestampFromClientId(b.clientId) : b.timestamp;
-          
-          // Sort by extracted time
-          return aTime - bTime;
-        }));
-      }
-    } catch (error) {
-      console.error("Error fetching chat history:", error);
-    } finally {
-      setIsLoadingHistory(false);
-    }
-  }, [sessionId, userData, sessionData]);
-  
-  // Determine player role in this session
-  useEffect(() => {
-    if (!sessionData || !userData) return;
-    
-    // First identify the host
-    if (sessionData.hostId === userData.id) {
-      setChatRole('host');
-      console.log("SessionChat - User role: HOST");
-      return;
-    }
-    
-    // Then identify participants by join order
-    const participants = sessionData.joinedPlayers
-      .filter(p => p.userId !== sessionData.hostId)
-      .sort((a, b) => new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime());
-    
-    if (participants.length >= 1 && participants[0].userId === userData.id) {
-      setChatRole('participant1');
-      console.log("SessionChat - User role: PARTICIPANT 1");
-    } else if (participants.length >= 2 && participants[1].userId === userData.id) {
-      setChatRole('participant2');
-      console.log("SessionChat - User role: PARTICIPANT 2");
-    } else {
-      setChatRole('unknown');
-      console.log("SessionChat - User role: UNKNOWN");
-    }
-  }, [sessionData, userData]);
-  
-  // Register for visibility changes using SessionContext
-  useEffect(() => {
-    if (sessionId && userData) {
-      // Create a unique ID for this component
-      const handlerId = `session_chat_${sessionId}`;
-      
-      // Register our handler with SessionContext to fetch history on visibility change
-      registerVisibilityHandler(handlerId, fetchChatHistory);
-      
-      // Initial fetch when component mounts
-      fetchChatHistory();
-      
-      return () => {
-        // Clean up handler on unmount
-        unregisterVisibilityHandler(handlerId);
-      };
-    }
-  }, [sessionId, userData, registerVisibilityHandler, unregisterVisibilityHandler, fetchChatHistory]);
-  
-  // Debugging connection
-  useEffect(() => {
-    console.log("SessionChat - WebSocket connected:", isConnected());
-    console.log("SessionChat - Session ID:", sessionId);
-    console.log("SessionChat - User ID:", userData?.id);
-    console.log("SessionChat - Role:", chatRole);
-  }, [isConnected, sessionId, userData?.id, chatRole]);
-  
-  // Scroll to the bottom when messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    
-    // Debug message ordering
-    console.log("SessionChat - Current messages:", 
-      messages.map(m => ({
-        text: m.message,
-        user: m.username,
-        time: m.timestamp,
-        pending: m.isPending
-      }))
-    );
-  }, [messages]);
   
   // Function to extract timestamp from client ID
   const getTimestampFromClientId = (clientId?: string): number => {
@@ -388,6 +322,199 @@ export function SessionChat() {
     });
   };
   
+  // Fetch chat history function
+  const fetchChatHistory = async () => {
+    if (!sessionId || !userData) return;
+    
+    // Check if we've fetched recently using the chat manager
+    const lastFetchTime = chatManager.getLastFetchTime(sessionId);
+    if (lastFetchTime && Date.now() - lastFetchTime < 15000) {
+      console.log("SessionChat - Skipping fetch, last fetch was less than 15 seconds ago");
+      return;
+    }
+    
+    // Skip if already loading
+    if (isLoadingHistory) return;
+    
+    // Set loading state
+    setIsLoadingHistory(true);
+    
+    console.log("SessionChat - Fetching chat history for session", sessionId);
+    
+    try {
+      // Create the request with the full URL
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      // Only fetch the last 9 messages
+      const url = `${apiBaseUrl}/api/v1/chat/history?session_id=${sessionId}&limit=9`;
+      
+      // Get token from storage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+      
+      // Make direct fetch call with proper typing
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch chat history: ${response.status}`);
+      }
+      
+      const historyMessages: ChatHistoryMessage[] = await response.json();
+      console.log("SessionChat - Received history messages:", historyMessages.length);
+      
+      // Update last fetch time in chat manager
+      chatManager.updateLastFetchTime(sessionId);
+      
+      if (historyMessages.length > 0) {
+        // Prepare a new set of processed IDs
+        const newProcessedIds = new Set<string>();
+        
+        // Convert to our message format
+        const formattedMessages = historyMessages.map(msg => {
+          // Add to processed IDs to prevent duplicates
+          if (msg.client_id) {
+            newProcessedIds.add(msg.client_id);
+          }
+          
+          // Determine role from sender
+          let role: 'host' | 'participant1' | 'participant2' | 'unknown' = 'unknown';
+          
+          // Check if this is the host
+          if (sessionData?.hostId === msg.sender_id) {
+            role = 'host';
+          } else {
+            // Sort participants by join time
+            const participants = sessionData?.joinedPlayers
+              .filter(p => p.userId !== sessionData.hostId)
+              .sort((a, b) => new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime());
+            
+            if (participants && participants.length > 0) {
+              // First participant
+              if (participants[0].userId === msg.sender_id) {
+                role = 'participant1';
+              } 
+              // Second participant
+              else if (participants.length > 1 && participants[1].userId === msg.sender_id) {
+                role = 'participant2';
+              }
+            }
+          }
+          
+          return {
+            userId: msg.sender_id,
+            username: msg.sender_name,
+            message: msg.message,
+            timestamp: msg.timestamp,
+            role,
+            clientId: msg.client_id
+          } as ChatMessage;
+        });
+        
+        // Update the processed IDs
+        setProcessedIds(newProcessedIds);
+        
+        // Replace messages with the last 9 messages from history
+        setMessages(formattedMessages.sort((a, b) => {
+          // Extract timestamps from client IDs
+          const aTime = a.clientId ? getTimestampFromClientId(a.clientId) : a.timestamp;
+          const bTime = b.clientId ? getTimestampFromClientId(b.clientId) : b.timestamp;
+          
+          // Sort by extracted time
+          return aTime - bTime;
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching chat history:", error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+  
+  // Determine player role in this session
+  useEffect(() => {
+    if (!sessionData || !userData) return;
+    
+    // First identify the host
+    if (sessionData.hostId === userData.id) {
+      setChatRole('host');
+      console.log("SessionChat - User role: HOST");
+      return;
+    }
+    
+    // Then identify participants by join order
+    const participants = sessionData.joinedPlayers
+      .filter(p => p.userId !== sessionData.hostId)
+      .sort((a, b) => new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime());
+    
+    if (participants.length >= 1 && participants[0].userId === userData.id) {
+      setChatRole('participant1');
+      console.log("SessionChat - User role: PARTICIPANT 1");
+    } else if (participants.length >= 2 && participants[1].userId === userData.id) {
+      setChatRole('participant2');
+      console.log("SessionChat - User role: PARTICIPANT 2");
+    } else {
+      setChatRole('unknown');
+      console.log("SessionChat - User role: UNKNOWN");
+    }
+  }, [sessionData, userData]);
+  
+  // Register with ChatManager for visibility changes and chat handling
+  useEffect(() => {
+    if (sessionId && userData?.id) {
+      console.log(`SessionChat - Setting up ChatManager for session ${sessionId}`);
+      
+      // Register with the ChatManager
+      chatManager.registerSession(
+        sessionId,
+        registerVisibilityHandler,
+        fetchChatHistory,
+        handleChatMessage,
+        subscribe
+      );
+      
+      // Set up chat role once we have session data
+      if (sessionData) {
+        console.log(`SessionChat - Setting up chat message subscription for ${chatRole} role`);
+      }
+      
+      return () => {
+        console.log(`SessionChat - Cleaning up ChatManager for session ${sessionId}`);
+        chatManager.unregisterSession(sessionId, unregisterVisibilityHandler);
+      };
+    }
+  }, [sessionId, userData?.id]);
+  
+  // Debugging connection
+  useEffect(() => {
+    console.log("SessionChat - WebSocket connected:", isConnected());
+    console.log("SessionChat - Session ID:", sessionId);
+    console.log("SessionChat - User ID:", userData?.id);
+    console.log("SessionChat - Role:", chatRole);
+  }, [isConnected, sessionId, userData?.id, chatRole]);
+  
+  // Scroll to the bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    
+    // Debug message ordering
+    console.log("SessionChat - Current messages:", 
+      messages.map(m => ({
+        text: m.message,
+        user: m.username,
+        time: m.timestamp,
+        pending: m.isPending
+      }))
+    );
+  }, [messages]);
+  
   // Handle sending a message
   const handleSendMessage = () => {
     if (!inputValue.trim() || !sessionId || !isConnected() || !userData) return;
@@ -487,22 +614,6 @@ export function SessionChat() {
         return username;
     }
   };
-  
-  // Add the missing subscription code
-  // Subscribe to chat messages
-  useEffect(() => {
-    if (!sessionId || !userData?.id) return;
-    
-    console.log(`SessionChat - Setting up chat message subscription for ${chatRole} role`);
-    
-    // Subscribe to chat messages using the shared WebSocket connection
-    const unsubscribe = subscribe('chat', handleChatMessage);
-    
-    return () => {
-      console.log("SessionChat - Cleaning up chat subscription");
-      unsubscribe();
-    };
-  }, [sessionId, userData?.id, sessionData, chatRole, subscribe, processedIds, isLoadingHistory]);
   
   return (
     <Card className="gothic-card p-3 mt-4">

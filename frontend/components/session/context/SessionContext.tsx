@@ -49,7 +49,7 @@ export interface SessionData {
 // Define action type for sessionReducer
 export type SessionAction = 
   | { type: 'START_SESSION' }
-  | { type: 'FINISH_SESSION' }
+  | { type: 'FINISH_SESSION'; payload?: number }
   | { type: 'RESET_SESSION' }
   | { type: 'UPDATE_ELAPSED'; payload: number }
   | { type: 'RESTORE_SESSION'; payload: { isSessionStarted: boolean; isSessionFinished?: boolean; elapsedSeconds?: number; finalDuration?: number } };
@@ -155,9 +155,18 @@ export function SessionEventManager({
   
   // Format time function - memoized
   const formatTime = useCallback((totalSeconds: number): string => {
+    // Check for invalid values
+    if (typeof totalSeconds !== 'number' || isNaN(totalSeconds) || totalSeconds < 0) {
+      // Only log error for development, return default value for production
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Invalid time value for formatting:', totalSeconds);
+      }
+      return '0m 00s';
+    }
+    
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
+    const seconds = Math.floor(totalSeconds % 60);
     
     if (hours > 0) {
       return `${hours}h ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`;
@@ -185,7 +194,12 @@ export function SessionEventManager({
   
   // Start session - memoized
   const startSession = useCallback((): void => {
-    if (sessionState.isSessionStarted || !sessionId) return;
+    if (sessionState.isSessionStarted || !sessionId) {
+      console.log('Cannot start session: already started or no sessionId', 
+                  'isStarted:', sessionState.isSessionStarted, 
+                  'sessionId:', sessionId);
+      return;
+    }
     
     // Set session as started
     dispatchSession({ type: 'START_SESSION' });
@@ -226,11 +240,36 @@ export function SessionEventManager({
   
   // Handle finish session - memoized
   const handleFinishSession = useCallback((): void => {
-    // Store the final duration and update state
-    dispatchSession({ type: 'FINISH_SESSION' });
+    // Calculate the current elapsed time accurately
+    let finalDuration = sessionState.elapsedSeconds;
     
-    // Mark session as finished in localStorage
-    storageUtils.saveSessionFinish(sessionState.elapsedSeconds);
+    // If we have a startTime reference, calculate elapsed time from there to ensure accuracy
+    if (sessionStartTimeRef.current) {
+      const now = Date.now();
+      const calculatedElapsed = Math.floor((now - sessionStartTimeRef.current) / 1000);
+      
+      // Use the calculated value if it seems valid (i.e., not zero or negative)
+      if (calculatedElapsed > 0) {
+        finalDuration = calculatedElapsed;
+        console.log(`Using calculated finalDuration: ${finalDuration}s`);
+      }
+    }
+
+    // Ensure we never have a zero duration for a finished session
+    if (finalDuration <= 0) {
+      // Fallback to a minimum duration (1 second) if we somehow got zero
+      finalDuration = Math.max(1, sessionState.elapsedSeconds);
+      console.log(`Corrected zero finalDuration to: ${finalDuration}s`);
+    }
+    
+    // Store the final duration and update state with the calculated duration
+    dispatchSession({ 
+      type: 'FINISH_SESSION', 
+      payload: finalDuration // Pass the duration explicitly
+    });
+    
+    // Mark session as finished in localStorage with accurate duration
+    storageUtils.saveSessionFinish(finalDuration);
     
     // Send API request to end session on server
     if (sessionData) {
@@ -238,7 +277,7 @@ export function SessionEventManager({
       fetchWithAuth(`/api/v1/sessions/${sessionId}/complete`, {
         method: 'POST',
         body: JSON.stringify({
-          duration: sessionState.elapsedSeconds
+          duration: finalDuration
         })
       }).catch(err => {
         setError('Error completing session: ' + err);
@@ -252,6 +291,7 @@ export function SessionEventManager({
           ...prevData,
           status: 'Completed',
           completedAt: new Date().toISOString(),
+          finalDuration: finalDuration, // Store finalDuration in sessionData too
           _version: Date.now() // Force re-render
         };
       });
@@ -273,9 +313,20 @@ export function SessionEventManager({
     // Function to fetch session data
     const fetchSessionData = async () => {
       try {
+        // Skip if we've fetched very recently (within 10 seconds)
+        const now = Date.now();
+        const lastFetchTime = lastSyncTimeRef.current;
+        if (lastFetchTime && now - lastFetchTime < 10000) {
+          console.log('Skipping session fetch - last fetch was less than 10 seconds ago');
+          return;
+        }
+        
         setIsLoading(true);
         setError(null);
 
+        // Update last sync time
+        lastSyncTimeRef.current = now;
+        
         // Use fetchWithAuth to ensure token is valid
         const data = await fetchWithAuth<SessionData>(`/api/v1/sessions/${sessionId}`);
         
@@ -313,6 +364,21 @@ export function SessionEventManager({
           if (statusChanged || playersChanged || resultsChanged || startedChanged || completedChanged) {
             console.log('Session state refreshed from server - detected changes');
             
+            // After state update, notify any chat handlers that should update
+            // Only trigger chat sync for meaningful changes
+            setTimeout(() => {
+              Object.entries(visibilityHandlersRef.current).forEach(([id, handler]) => {
+                if (id.includes('chat_sync')) {
+                  console.log(`Syncing chat handler ${id} after meaningful session update`);
+                  try {
+                    handler();
+                  } catch (e) {
+                    console.error(`Error in chat sync handler ${id}:`, e);
+                  }
+                }
+              });
+            }, 100);
+            
             // If session went from not started to started, update local state
             if (!prevData.startedAt && data.startedAt && data.status === 'InProgress') {
               dispatchSession({ type: 'START_SESSION' });
@@ -324,8 +390,23 @@ export function SessionEventManager({
             
             // If session went from not finished to finished, update local state
             if (!prevData.completedAt && data.completedAt && data.status === 'Completed') {
-              dispatchSession({ type: 'FINISH_SESSION' });
-              storageUtils.saveSessionFinish(sessionState.elapsedSeconds);
+              // Calculate elapsed time based on server timestamps if possible
+              let calculatedDuration = sessionState.elapsedSeconds;
+              if (data.startedAt && data.completedAt) {
+                try {
+                  const startTime = new Date(data.startedAt).getTime();
+                  const endTime = new Date(data.completedAt).getTime();
+                  if (!isNaN(startTime) && !isNaN(endTime) && endTime > startTime) {
+                    calculatedDuration = Math.floor((endTime - startTime) / 1000);
+                    console.log(`Calculated session duration from server timestamps: ${calculatedDuration}s`);
+                  }
+                } catch (e) {
+                  console.error('Error calculating duration from timestamps:', e);
+                }
+              }
+              
+              dispatchSession({ type: 'FINISH_SESSION', payload: calculatedDuration });
+              storageUtils.saveSessionFinish(calculatedDuration);
             }
             
             // Make sure players' hasReported flags are properly synced with results
@@ -372,38 +453,32 @@ export function SessionEventManager({
           reconnectWithFreshToken();
         }
         
-        // Immediately notify the most important handlers (like chat)
-        // This prioritizes real-time updates over fetching history
-        Object.entries(visibilityHandlersRef.current).forEach(([id, handler]) => {
-          // If this is a critical handler (like chat), run it with priority
-          if (id.includes('chat') || id.includes('realtime')) {
-            console.log(`Running critical handler: ${id}`);
-            try {
-              setTimeout(() => handler(), 50);
-            } catch (e) {
-              console.error(`Error in critical handler ${id}:`, e);
-            }
-          }
-        });
+        // Create a timestamp to track when we started processing
+        const visibilityChangeTime = Date.now();
         
-        // Then update session data in the background
-        setTimeout(() => {
-          fetchSessionData();
+        // First fetch the session data
+        fetchSessionData().then(() => {
+          // After session data refresh, run chat handlers if needed
+          const timeSinceVisChange = Date.now() - visibilityChangeTime;
           
-          // Run remaining non-critical handlers after session data is updated
-          setTimeout(() => {
+          // Only process sync handlers if they're actually needed
+          // If session data fetch took long, the chat sync might already be
+          // taken care of via the changes detected in fetchSessionData
+          if (timeSinceVisChange < 1000) {
             Object.entries(visibilityHandlersRef.current).forEach(([id, handler]) => {
-              if (!id.includes('chat') && !id.includes('realtime')) {
-                console.log(`Running non-critical handler: ${id}`);
+              if (id.includes('chat_sync')) {
+                console.log(`Running chat sync handler after visibility change: ${id}`);
                 try {
                   handler();
                 } catch (e) {
-                  console.error(`Error in non-critical handler ${id}:`, e);
+                  console.error(`Error in chat sync handler ${id}:`, e);
                 }
               }
             });
-          }, 200);
-        }, 100);
+          }
+        }).catch(err => {
+          console.error('Error fetching session data after visibility change:', err);
+        });
       }
     };
     
@@ -513,11 +588,21 @@ export function SessionEventManager({
       
       // Only update if not already finished
       if (sessionState.isSessionStarted && !sessionState.isSessionFinished) {
+        // Calculate current elapsed time
+        let calculatedDuration = sessionState.elapsedSeconds;
+        if (sessionStartTimeRef.current) {
+          const now = Date.now();
+          const elapsed = Math.floor((now - sessionStartTimeRef.current) / 1000);
+          if (elapsed > 0) {
+            calculatedDuration = elapsed;
+          }
+        }
+        
         // Store final duration
-        dispatchSession({ type: 'FINISH_SESSION' });
+        dispatchSession({ type: 'FINISH_SESSION', payload: calculatedDuration });
         
         // Mark session as finished
-        storageUtils.saveSessionFinish(sessionState.elapsedSeconds);
+        storageUtils.saveSessionFinish(calculatedDuration);
         
         // Update session data
         setSessionData(prevData => {
@@ -832,7 +917,7 @@ export function SessionEventManager({
         console.log(`Handler ${id} already registered, replacing it`);
       }
       
-      // Add the handler
+      // Add the handler with debounce protection
       visibilityHandlersRef.current[id] = handler;
     },
     unregisterVisibilityHandler: (id: string) => {
