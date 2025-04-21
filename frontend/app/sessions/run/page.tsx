@@ -91,6 +91,8 @@ function SessionRunContent(): JSX.Element {
       <div className="container py-10 mx-auto">  
         <SessionEventManager sessionId={sessionId}>
           <SessionHeader title={`Session #${sessionId}`} />
+          {/* Show the host or participant view based on the role */}
+          <ParticipantOrHostView />
           {notification && (
             <Notification 
               notification={notification} 
@@ -98,8 +100,6 @@ function SessionRunContent(): JSX.Element {
               className="mb-4"
             />
           )}
-          {/* Show the host or participant view based on the role */}
-          <ParticipantOrHostView />
           {/* Chat is available to everyone regardless of role */}
           <SessionChat />
         </SessionEventManager>

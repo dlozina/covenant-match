@@ -338,13 +338,6 @@ export function SessionParticipant() {
   
   return (
     <>
-      {/* Notification component */}
-      <Notification 
-        notification={notification} 
-        onDismiss={clearNotification}
-        className="mb-4"
-      />
-    
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column for Desktop / Main Content for Mobile */}
@@ -399,6 +392,8 @@ export function SessionParticipant() {
           />
         </div>
 
+        
+
         {/* Right Column for Desktop Only */}
         <div className="hidden lg:flex lg:col-span-1 flex-col h-full">
           {/* Report Your Result Section - Only shown after session is finished */}
@@ -422,6 +417,13 @@ export function SessionParticipant() {
           )}
         </div>
       </div>
+
+      {/* Notification component */}
+      <Notification 
+        notification={notification} 
+        onDismiss={clearNotification}
+        className="mb-4"
+      />
 
       {/* Dialogs */}
       <WarningDialog 
