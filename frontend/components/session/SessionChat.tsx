@@ -265,9 +265,6 @@ export function SessionChat() {
       return;
     }
     
-    // For other users' messages, process normally
-    console.log(`SessionChat - Adding message from ${userId}: ${messageText}`);
-    
     // Find the username and role
     let username = messageData.username as string || 'Unknown Player';
     let role: 'host' | 'participant1' | 'participant2' | 'unknown' = 'unknown';
@@ -282,23 +279,8 @@ export function SessionChat() {
         }
       }
       
-      // Role determination
-      if (sessionData.hostId === userId) {
-        role = 'host';
-      } else {
-        // Everyone who is not a host is a participant with shield emoji
-        // Just for better colors in the UI, we'll keep participant1/participant2 distinction
-        const participants = sessionData.joinedPlayers
-          .filter(p => p.userId !== sessionData.hostId)
-          .sort((a, b) => new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime());
-        
-        // First participant gets blue color, others get green
-        if (participants && participants.length > 0 && participants[0].userId === userId) {
-          role = 'participant1';
-        } else {
-          role = 'participant2';
-        }
-      }
+      // Simplified role determination - just check if host or not
+      role = sessionData.hostId === userId ? 'host' : 'participant1';
     }
     
     // Add the message with proper tracking
@@ -397,18 +379,9 @@ export function SessionChat() {
           if (sessionData?.hostId === msg.sender_id) {
             role = 'host';
           } else {
-            // Everyone who is not a host is a participant with shield emoji
-            // Just for better colors in the UI, we'll keep participant1/participant2 distinction
-            const participants = sessionData?.joinedPlayers
-              .filter(p => p.userId !== sessionData.hostId)
-              .sort((a, b) => new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime());
-            
-            // First participant gets blue color, others get green
-            if (participants && participants.length > 0 && participants[0].userId === msg.sender_id) {
-              role = 'participant1';
-            } else {
-              role = 'participant2';
-            }
+            // Non-host players all get the participant1 role
+            // The actual color will be determined by getColorForUser
+            role = 'participant1';
           }
           
           return {
@@ -589,22 +562,6 @@ export function SessionChat() {
     }
   };
   
-  // Get appropriate color for each role
-  const getRoleColor = (role: string, isCurrentUser: boolean) => {
-    if (isCurrentUser) return 'text-purple-400';
-    
-    switch (role) {
-      case 'host':
-        return 'text-red-400';
-      case 'participant1':
-        return 'text-blue-400';
-      case 'participant2':
-        return 'text-green-400';
-      default:
-        return 'text-gray-400';
-    }
-  };
-  
   // Format username with appropriate emoji based on role
   const formatUsername = (username: string, role: string) => {
     switch (role) {
@@ -615,6 +572,24 @@ export function SessionChat() {
       // For all non-host roles, add shield emoji
       default:
         return `${username} 🛡️`;
+    }
+  };
+  
+  // Simple function to get consistent color based on userId
+  const getColorForUser = (userId: string, isCurrentUser: boolean, isHost: boolean) => {
+    if (isCurrentUser) return 'text-purple-400';
+    if (isHost) return 'text-red-400';
+    
+    // Generate a consistent color based on userId
+    // This ensures the same user always gets the same color
+    const colorIndex = userId.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) % 4;
+    
+    switch (colorIndex) {
+      case 0: return 'text-blue-400';
+      case 1: return 'text-green-400';
+      case 2: return 'text-yellow-400';
+      case 3: return 'text-pink-400';
+      default: return 'text-gray-400';
     }
   };
   
@@ -642,7 +617,7 @@ export function SessionChat() {
               data-userid={msg.userId}
             >
               <span 
-                className={`font-medium ${getRoleColor(msg.role, msg.userId === userData?.id)}`}
+                className={`font-medium ${getColorForUser(msg.userId, msg.userId === userData?.id, msg.role === 'host')}`}
               >
                 {formatUsername(msg.username, msg.role)}:
               </span>{' '}
