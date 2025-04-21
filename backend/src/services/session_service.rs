@@ -278,12 +278,14 @@ pub async fn get_sessions(
     limit: Option<u64>,
     offset: Option<u64>,
     is_private: Option<bool>,
+    region: Option<String>,
+    platform: Option<String>,
 ) -> Result<Vec<SessionResponseDto>, AppError> {
     let status_filter = match status {
         Some(s) => match s.to_lowercase().as_str() {
             "open" => Some(SessionStatus::Open),
             "full" => Some(SessionStatus::Full),
-            "in_progress" => Some(SessionStatus::InProgress),
+            "in_progress" | "inprogress" => Some(SessionStatus::InProgress),
             "completed" => Some(SessionStatus::Completed),
             "cancelled" => Some(SessionStatus::Cancelled),
             _ => None,
@@ -291,8 +293,16 @@ pub async fn get_sessions(
         None => None,
     };
 
-    let sessions =
-        session_repository::find_sessions(db, status_filter, limit, offset, is_private).await?;
+    let sessions = session_repository::find_sessions(
+        db,
+        status_filter,
+        limit,
+        offset,
+        is_private,
+        region,
+        platform,
+    )
+    .await?;
 
     // Convert to response DTOs (exclude passwords for listing)
     Ok(sessions
@@ -307,12 +317,14 @@ pub async fn get_minimal_sessions(
     status: Option<String>,
     limit: Option<u64>,
     offset: Option<u64>,
+    region: Option<String>,
+    platform: Option<String>,
 ) -> Result<Vec<MinimalSessionDto>, AppError> {
     let status_filter = match status {
         Some(s) => match s.to_lowercase().as_str() {
             "open" => Some(SessionStatus::Open),
             "full" => Some(SessionStatus::Full),
-            "in_progress" => Some(SessionStatus::InProgress),
+            "in_progress" | "inprogress" => Some(SessionStatus::InProgress),
             "completed" => Some(SessionStatus::Completed),
             "cancelled" => Some(SessionStatus::Cancelled),
             _ => None,
@@ -323,8 +335,16 @@ pub async fn get_minimal_sessions(
     // Always filter out private sessions for this public endpoint
     let is_private = Some(false);
 
-    let sessions =
-        session_repository::find_sessions(db, status_filter, limit, offset, is_private).await?;
+    let sessions = session_repository::find_sessions(
+        db,
+        status_filter,
+        limit,
+        offset,
+        is_private,
+        region,
+        platform,
+    )
+    .await?;
 
     // Convert to minimal DTOs with just the necessary info
     Ok(sessions

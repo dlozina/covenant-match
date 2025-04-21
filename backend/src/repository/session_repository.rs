@@ -34,6 +34,8 @@ pub async fn find_sessions(
     limit: Option<u64>,
     offset: Option<u64>,
     is_private: Option<bool>,
+    region: Option<String>,
+    platform: Option<String>,
 ) -> Result<Vec<GameSession>, AppError> {
     let mut filter = match status {
         Some(status) => doc! { "status": to_bson(&status)? },
@@ -43,6 +45,15 @@ pub async fn find_sessions(
     if let Some(is_private) = is_private {
         filter = doc! { "$and": [filter, doc! { "is_private": is_private }] };
     }
+
+    // Add region filter if provided
+    if let Some(region_val) = region {
+        filter = doc! { "$and": [filter, doc! { "joined_players.region": region_val }] };
+    }
+
+    // Add platform filter if provided (platform is stored in user profile, not in session)
+    // We can't easily filter by player platform since it's not stored in the session document
+    // This filtering will need to be done on the application level if needed
 
     // Get all sessions matching the filter
     let cursor = get_collection(db).find(filter).await?;

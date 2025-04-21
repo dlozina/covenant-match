@@ -12,7 +12,9 @@ use mongodb::Database;
         ("status" = Option<String>, Query, description = "Filter sessions by status (e.g., 'Open', 'InProgress', 'Completed')"),
         ("limit" = Option<u64>, Query, description = "Limit number of results (default: 10)"),
         ("offset" = Option<u64>, Query, description = "Offset for pagination (default: 0)"),
-        ("isPrivate" = Option<bool>, Query, description = "Filter sessions by private status (default: false)")
+        ("isPrivate" = Option<bool>, Query, description = "Filter sessions by private status (default: false)"),
+        ("region" = Option<String>, Query, description = "Filter sessions by player region"),
+        ("platform" = Option<String>, Query, description = "Filter sessions by player platform")
     ),
     responses(
         (status = 200, description = "List of sessions retrieved successfully", body = Vec<SessionResponseDto>),
@@ -29,8 +31,12 @@ async fn get_sessions(
     let limit = query.get("limit").and_then(|v| v.parse::<u64>().ok());
     let offset = query.get("offset").and_then(|v| v.parse::<u64>().ok());
     let is_private = query.get("isPrivate").and_then(|v| v.parse::<bool>().ok());
+    let region = query.get("region").cloned();
+    let platform = query.get("platform").cloned();
 
-    match session_service::get_sessions(&db, status, limit, offset, is_private).await {
+    match session_service::get_sessions(&db, status, limit, offset, is_private, region, platform)
+        .await
+    {
         Ok(sessions) => HttpResponse::Ok().json(sessions),
         Err(e) => {
             log::error!("Error fetching sessions: {:?}", e);
@@ -582,7 +588,9 @@ async fn get_results(
     params(
         ("status" = Option<String>, Query, description = "Filter sessions by status (e.g., 'Open', 'InProgress', 'Completed')"),
         ("limit" = Option<u64>, Query, description = "Limit number of results (default: 10)"),
-        ("offset" = Option<u64>, Query, description = "Offset for pagination (default: 0)")
+        ("offset" = Option<u64>, Query, description = "Offset for pagination (default: 0)"),
+        ("region" = Option<String>, Query, description = "Filter sessions by player region"),
+        ("platform" = Option<String>, Query, description = "Filter sessions by player platform")
     ),
     responses(
         (status = 200, description = "List of minimal session information retrieved successfully", body = Vec<MinimalSessionDto>),
@@ -598,8 +606,11 @@ async fn get_public_sessions(
     let status = query.get("status").cloned();
     let limit = query.get("limit").and_then(|v| v.parse::<u64>().ok());
     let offset = query.get("offset").and_then(|v| v.parse::<u64>().ok());
+    let region = query.get("region").cloned();
+    let platform = query.get("platform").cloned();
 
-    match session_service::get_minimal_sessions(&db, status, limit, offset).await {
+    match session_service::get_minimal_sessions(&db, status, limit, offset, region, platform).await
+    {
         Ok(sessions) => HttpResponse::Ok().json(sessions),
         Err(e) => {
             log::error!("Error fetching public sessions: {:?}", e);
