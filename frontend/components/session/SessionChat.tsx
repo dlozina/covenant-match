@@ -269,27 +269,33 @@ export function SessionChat() {
     console.log(`SessionChat - Adding message from ${userId}: ${messageText}`);
     
     // Find the username and role
-    let username = 'Unknown Player';
+    let username = messageData.username as string || 'Unknown Player';
     let role: 'host' | 'participant1' | 'participant2' | 'unknown' = 'unknown';
     
     if (sessionData) {
-      // Player lookup
-      const player = sessionData.joinedPlayers.find(p => p.userId === userId);
-      if (player) {
-        username = player.username || 'Unknown Player';
+      // If username wasn't in the message data, try to look it up from session data
+      if (!username || username === 'Unknown Player') {
+        // Player lookup
+        const player = sessionData.joinedPlayers.find(p => p.userId === userId);
+        if (player) {
+          username = player.username || 'Unknown Player';
+        }
       }
       
       // Role determination
       if (sessionData.hostId === userId) {
         role = 'host';
       } else {
+        // Everyone who is not a host is a participant with shield emoji
+        // Just for better colors in the UI, we'll keep participant1/participant2 distinction
         const participants = sessionData.joinedPlayers
           .filter(p => p.userId !== sessionData.hostId)
           .sort((a, b) => new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime());
         
-        if (participants.length > 0 && participants[0].userId === userId) {
+        // First participant gets blue color, others get green
+        if (participants && participants.length > 0 && participants[0].userId === userId) {
           role = 'participant1';
-        } else if (participants.length > 1 && participants[1].userId === userId) {
+        } else {
           role = 'participant2';
         }
       }
@@ -391,20 +397,17 @@ export function SessionChat() {
           if (sessionData?.hostId === msg.sender_id) {
             role = 'host';
           } else {
-            // Sort participants by join time
+            // Everyone who is not a host is a participant with shield emoji
+            // Just for better colors in the UI, we'll keep participant1/participant2 distinction
             const participants = sessionData?.joinedPlayers
               .filter(p => p.userId !== sessionData.hostId)
               .sort((a, b) => new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime());
             
-            if (participants && participants.length > 0) {
-              // First participant
-              if (participants[0].userId === msg.sender_id) {
-                role = 'participant1';
-              } 
-              // Second participant
-              else if (participants.length > 1 && participants[1].userId === msg.sender_id) {
-                role = 'participant2';
-              }
+            // First participant gets blue color, others get green
+            if (participants && participants.length > 0 && participants[0].userId === msg.sender_id) {
+              role = 'participant1';
+            } else {
+              role = 'participant2';
             }
           }
           
@@ -609,9 +612,9 @@ export function SessionChat() {
         return `${username} ⚔️`;
       case 'participant1':
       case 'participant2':
-        return `${username} 🛡️`;
+      // For all non-host roles, add shield emoji
       default:
-        return username;
+        return `${username} 🛡️`;
     }
   };
   
