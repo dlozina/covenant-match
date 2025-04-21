@@ -116,20 +116,23 @@ export class SessionService {
    * @param userId User ID
    * @param username Username
    * @param covenantName Covenant name
+   * @param region User region
    */
   async joinSession(
     sessionId: string,
     nightfarer: string,
     userId: string,
     username: string,
-    covenantName: string
+    covenantName: string,
+    region: string
   ): Promise<void> {
     try {
       const joinData: JoinSessionParams = {
         nightfarer,
         userId,
         username,
-        covenantName
+        covenantName,
+        region
       };
       
       await this.client.post<void>(

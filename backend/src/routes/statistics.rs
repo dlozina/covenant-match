@@ -514,7 +514,8 @@ pub struct PlayerDetail {
     get,
     path = "/api/v1/statistics/sessions-stats",
     params(
-        ("status" = Option<String>, Query, description = "Filter sessions by status (e.g., 'Open', 'InProgress', 'Completed')")
+        ("status" = Option<String>, Query, description = "Filter sessions by status (e.g., 'Open', 'InProgress', 'Completed')"),
+        ("is_private" = Option<bool>, Query, description = "Filter sessions by private status")
     ),
     responses(
         (status = 200, description = "Sessions count retrieved successfully", body = SessionsStatsResponse),
@@ -529,7 +530,13 @@ async fn get_sessions_stats(
 ) -> impl Responder {
     let status = query.get("status").cloned();
 
-    match session_repository::count_sessions_by_status(&db, status).await {
+    // Parse is_private from query if provided, default to false if not provided
+    let is_private = query
+        .get("is_private")
+        .map(|val| matches!(val.to_lowercase().as_str(), "true"))
+        .or(Some(false)); // Default to false when not provided
+
+    match session_repository::count_sessions_by_status(&db, status, is_private).await {
         Ok(count) => HttpResponse::Ok().json(json!({
             "status": "success",
             "data": {

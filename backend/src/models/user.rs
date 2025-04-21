@@ -43,8 +43,6 @@ pub struct CreateUserDto {
     pub display_name: Option<String>,
     pub region: String,
     pub auto_region: bool,
-    pub cm_region: String,
-    pub cf_region: Option<String>,
     pub platform: String,
     pub covenant_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]

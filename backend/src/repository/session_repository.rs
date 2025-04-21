@@ -197,11 +197,21 @@ pub async fn find_active_sessions_for_user(
 pub async fn count_sessions_by_status(
     db: &Database,
     status: Option<String>,
+    is_private: Option<bool>,
 ) -> Result<u64, AppError> {
-    let filter = match status {
+    let mut filter = match status {
         Some(status_str) => doc! { "status": status_str },
         None => doc! {},
     };
+
+    if let Some(is_private_val) = is_private {
+        filter = doc! {
+            "$and": [
+                filter,
+                { "is_private": is_private_val }
+            ]
+        };
+    }
 
     let count = get_collection(db).count_documents(filter).await?;
     Ok(count)

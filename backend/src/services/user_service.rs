@@ -189,8 +189,6 @@ pub async fn ensure_admin_exists(db: &Database) -> Result<(), AppError> {
             display_name: Some("Akri".to_string()),
             region: "EU".to_string(),
             auto_region: true,
-            cm_region: "Europe".to_string(),
-            cf_region: Some("Europe".to_string()),
             platform: "PlayStation".to_string(),
             covenant_name: "Covenant".to_string(),
             preferred_session_name: None,

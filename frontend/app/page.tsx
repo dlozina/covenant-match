@@ -211,19 +211,19 @@ export default function Home() {
             {!isLoading && (
               <>
                 {!isLoggedIn && (
-                  <Button size="lg" className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white">
-                    <Link href="/profile/create" className="flex items-center">
+                  <Link href="/profile/create">
+                    <Button size="lg" className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white w-full">
                       <Users className="mr-2 h-5 w-5" />
                       Join Now
-                    </Link>
-                  </Button>
+                    </Button>
+                  </Link>
                 )}
-                <Button size="lg" variant="outline" className="border-purple-500 text-purple-300 hover:bg-purple-950/50">
-                  <Link href="/sessions" className="flex items-center">
+                <Link href="/sessions">
+                  <Button size="lg" variant="outline" className="border-purple-500 text-purple-300 hover:bg-purple-950/50 w-full">
                     <Compass className="mr-2 h-5 w-5" />
                     Explore Sessions
-                  </Link>
-                </Button>
+                  </Button>
+                </Link>
               </>
             )}
           </div>
@@ -245,12 +245,12 @@ export default function Home() {
               <h2 className="text-xl lg:text-2xl font-semibold mb-2">Find Sessions</h2>
               <p className="mb-4 text-sm lg:text-base text-muted-foreground">Join other nightfarer&apos;s looking for allies and begin your hunt immediately.</p>
               <div className="relative z-20">
-                <Button asChild variant="outline" className="border-purple-700/50 bg-purple-950/20 hover:bg-purple-950/30 text-purple-300 w-full sm:w-auto">
-                  <Link href="/sessions" className="flex items-center justify-center">
+                <Link href="/sessions">
+                  <Button variant="outline" className="border-purple-700/50 bg-purple-950/20 hover:bg-purple-950/30 text-purple-300 w-full sm:w-auto">
                     Browse Sessions
                     <Shield className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
+                  </Button>
+                </Link>
               </div>
             </div>
           </div>
@@ -277,19 +277,19 @@ export default function Home() {
                     </span>
                   </Button>
                 ) : isLoggedIn ? (
-                  <Button asChild variant="outline" className="border-indigo-700/50 bg-indigo-950/20 hover:bg-indigo-950/30 text-indigo-300 w-full sm:w-auto">
-                    <Link href="/sessions/create" className="flex items-center justify-center">
+                  <Link href="/sessions/create">
+                    <Button variant="outline" className="border-indigo-700/50 bg-indigo-950/20 hover:bg-indigo-950/30 text-indigo-300 w-full sm:w-auto">
                       Create Session
                       <Skull className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
+                    </Button>
+                  </Link>
                 ) : (
-                  <Button asChild variant="outline" className="border-indigo-700/50 bg-indigo-950/20 hover:bg-indigo-950/30 text-indigo-300 w-full sm:w-auto">
-                    <Link href="/profile/create" className="flex items-center justify-center">
+                  <Link href="/profile/create">
+                    <Button variant="outline" className="border-indigo-700/50 bg-indigo-950/20 hover:bg-indigo-950/30 text-indigo-300 w-full sm:w-auto">
                       Join to Create
                       <Users className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
+                    </Button>
+                  </Link>
                 )}
               </div>
             </div>

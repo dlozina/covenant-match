@@ -244,13 +244,21 @@ function RecreateSessionContent() {
       if (!userId || !userData) {
         throw new Error("User information not available");
       }
+      
+      // Get region based on user settings
+      const userRegion = userData.autoRegion ? userData.cmRegion : userData.region;
+      
+      if (!userRegion) {
+        throw new Error("User region information is missing");
+      }
        
       await joinSession(
         autoJoinSessionId,
         selectedFarer,
         userId,
         userData.username,
-        userData.covenantName || ''
+        userData.covenantName || '',
+        userRegion
       );
       
       setNotification({

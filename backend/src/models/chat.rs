@@ -3,7 +3,7 @@ use mongodb::bson::{doc, oid::ObjectId, Bson, Document};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// Chat message model for MongoDB
+/// Chat message model for `MongoDB`
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct ChatMessage {
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
@@ -41,7 +41,7 @@ impl ChatMessage {
     }
 }
 
-/// Chat session model for MongoDB
+/// Chat session model for `MongoDB`
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct ChatSession {
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]

@@ -206,11 +206,13 @@ pub async fn create_session(
         id: ObjectId::new(),
         name: session_data.name,
         host_id: user_id.to_string(),
+        region: session_data.region.clone(),
         password: session_data.game_password,
         is_private: session_data.is_private,
         status: SessionStatus::Open,
         joined_players: vec![PlayerInfo {
             user_id: user.id.to_hex(),
+            region: session_data.region,
             username: user.display_name.unwrap_or(user.username),
             nightfarer: session_data.nightfarer,
             covenant_name: user.covenant_name,
@@ -420,6 +422,7 @@ pub async fn join_session(
     let now = mongodb::bson::DateTime::now();
     session.joined_players.push(PlayerInfo {
         user_id: join_data.user_id.clone(),
+        region: join_data.region.clone(),
         username: join_data.username.clone(),
         nightfarer: join_data.nightfarer.clone(),
         covenant_name: join_data.covenant_name.clone(),
@@ -894,7 +897,7 @@ pub async fn complete_session(
     db: &Database,
     session_id: &str,
     user_id: &str,
-    duration: Option<i64>,
+    _duration: Option<i64>,
 ) -> Result<SessionResponseDto, AppError> {
     // Get the session
     let mut session = session_repository::find_by_id(db, session_id)
@@ -999,11 +1002,13 @@ pub async fn recreate_session(
         id: new_session_id,
         name: new_name,
         host_id: user_id.to_string(),
+        region: original_session.region.clone(),
         password: original_session.password.clone(),
         is_private: make_private, // Always make recreated sessions private so they don't show in the sessions list
         status: SessionStatus::Open,
         joined_players: vec![PlayerInfo {
             user_id: user_id.to_string(),
+            region: original_session.region.clone(),
             username: host_user.display_name.unwrap_or(host_user.username),
             nightfarer: host_nightfarer,
             covenant_name: host_user.covenant_name.clone(),
@@ -1032,7 +1037,6 @@ pub async fn recreate_session(
 
     // Save the updated original session
     session_repository::update_session(db, &original_session).await?;
-
 
     // Create response DTO
     let response = SessionResponseDto::from(new_session.clone());
@@ -1254,7 +1258,7 @@ mod tests {
     // Test version of submit_result that uses our mock db
     fn submit_result_test(
         db: &MockDb,
-        session_id: &str,
+        _session_id: &str,
         result_data: SubmitResultDto,
     ) -> Result<(), AppError> {
         // Get user ID from result data
@@ -1373,6 +1377,7 @@ mod tests {
             username: "Player 1".to_string(),
             nightfarer: "Mage".to_string(),
             covenant_name: "Covenant 1".to_string(),
+            region: "Europe".to_string(),
             joined_at: now,
         };
 
@@ -1381,6 +1386,7 @@ mod tests {
             username: "Player 2".to_string(),
             nightfarer: "Warrior".to_string(),
             covenant_name: "Covenant 2".to_string(),
+            region: "Europe".to_string(),
             joined_at: now,
         };
 
@@ -1389,6 +1395,7 @@ mod tests {
             username: "Player 3".to_string(),
             nightfarer: "Rogue".to_string(),
             covenant_name: "Covenant 3".to_string(),
+            region: "Europe".to_string(),
             joined_at: now,
         };
 
@@ -1397,6 +1404,7 @@ mod tests {
             id: ObjectId::parse_str(&session_id).unwrap(),
             name: "Test Session".to_string(),
             host_id: "player1".to_string(),
+            region: "Europe".to_string(),
             password: "test".to_string(),
             is_private: false,
             status: SessionStatus::InProgress,
@@ -1501,6 +1509,7 @@ mod tests {
             username: "Player 1".to_string(),
             nightfarer: "Mage".to_string(),
             covenant_name: "Covenant 1".to_string(),
+            region: "Europe".to_string(),
             joined_at: now,
         };
 
@@ -1509,6 +1518,7 @@ mod tests {
             username: "Player 2".to_string(),
             nightfarer: "Warrior".to_string(),
             covenant_name: "Covenant 2".to_string(),
+            region: "Europe".to_string(),
             joined_at: now,
         };
 
@@ -1517,6 +1527,7 @@ mod tests {
             username: "Player 3".to_string(),
             nightfarer: "Rogue".to_string(),
             covenant_name: "Covenant 3".to_string(),
+            region: "Europe".to_string(),
             joined_at: now,
         };
 
@@ -1525,6 +1536,7 @@ mod tests {
             id: ObjectId::parse_str(&session_id).unwrap(),
             name: "Test Session".to_string(),
             host_id: "player1".to_string(),
+            region: "Europe".to_string(),
             password: "test".to_string(),
             is_private: false,
             status: SessionStatus::Completed, // Already completed

@@ -545,7 +545,8 @@ export const joinSession = async (
   nightfarer: string,
   userId: string,
   username: string,
-  covenantName: string
+  covenantName: string,
+  region: string
 ): Promise<void> => {
   try {
     const token = getToken();
@@ -560,7 +561,8 @@ export const joinSession = async (
         nightfarer,
         userId,
         username,
-        covenantName
+        covenantName,
+        region
       }),
     });
     
@@ -625,6 +627,7 @@ export interface CreateSessionParams {
   nightLord: string;
   nightfarer: string;
   isPrivate: boolean;
+  region: string;
 }
 
 // Function to create a session

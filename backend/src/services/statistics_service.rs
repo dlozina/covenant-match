@@ -50,6 +50,7 @@ pub async fn get_leaderboard(db: &Database, limit: i64) -> Result<Vec<Leaderboar
 }
 
 // User session history with pagination
+
 pub async fn get_user_session_history_paginated(
     db: &Database,
     user_id: &str,
@@ -130,15 +131,13 @@ pub async fn get_session_details(
     requesting_user_id: &str,
 ) -> Result<Option<SessionDetail>, AppError> {
     // Convert session_id string to ObjectId
-    let obj_id = match ObjectId::parse_str(session_id) {
-        Ok(id) => id,
-        Err(_) => return Err(AppError::InvalidObjectId(session_id.to_string())),
+    let Ok(obj_id) = ObjectId::parse_str(session_id) else {
+        return Err(AppError::InvalidObjectId(session_id.to_string()));
     };
 
     // Get the session from the repository
-    let session = match session_repository::find_session_by_id(db, obj_id).await? {
-        Some(s) => s,
-        None => return Ok(None),
+    let Some(session) = session_repository::find_session_by_id(db, obj_id).await? else {
+        return Ok(None);
     };
 
     // Verify the user is a participant in this session
@@ -168,7 +167,7 @@ pub async fn get_session_details(
         .iter()
         .find(|p| p.user_id == session.host_id)
     {
-        let result = result_map.get(&host.user_id).map(|r| r.to_string());
+        let result = result_map.get(&host.user_id).map(ToString::to_string);
 
         // Convert MongoDB DateTime to chrono DateTime
         let joined_at_chrono =
@@ -190,7 +189,7 @@ pub async fn get_session_details(
         .iter()
         .filter(|p| p.user_id != session.host_id)
     {
-        let result = result_map.get(&player.user_id).map(|r| r.to_string());
+        let result = result_map.get(&player.user_id).map(ToString::to_string);
 
         // Convert MongoDB DateTime to chrono DateTime
         let joined_at_chrono =

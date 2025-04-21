@@ -31,7 +31,7 @@ impl LoginAttempt {
     }
 
     /// Check if this attempt is within the relevant time window
-    pub fn is_recent(&self, window_minutes: i64) -> bool {
+    pub fn _is_recent(&self, window_minutes: i64) -> bool {
         let window = Utc::now() - Duration::minutes(window_minutes);
 
         // Convert MongoDB DateTime to chrono DateTime for comparison

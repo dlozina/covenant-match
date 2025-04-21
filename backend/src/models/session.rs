@@ -11,6 +11,7 @@ pub struct PlayerInfo {
     pub username: String,
     pub nightfarer: String,
     pub covenant_name: String,
+    pub region: String,
     #[serde(alias = "joined_at")]
     pub joined_at: DateTime,
 }
@@ -73,6 +74,7 @@ pub struct GameSession {
     pub id: ObjectId,
     pub name: String,
     pub host_id: String,
+    pub region: String,
     pub password: String,
     pub is_private: bool,
     pub night_lord: String,
@@ -93,6 +95,7 @@ pub struct GameSession {
 #[serde(rename_all = "camelCase")]
 pub struct CreateSessionDto {
     pub name: String,
+    pub region: String,
     pub game_password: String,
     pub nightfarer: String,
     pub night_lord: String,
@@ -113,6 +116,7 @@ pub struct JoinSessionDto {
     pub username: String,
     pub nightfarer: String,
     pub covenant_name: String,
+    pub region: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
@@ -130,6 +134,7 @@ pub struct SessionResponseDto {
     pub id: String,
     pub name: String,
     pub host_id: String,
+    pub region: String,
     pub status: SessionStatus,
     pub night_lord: String,
     pub joined_players: Vec<PlayerInfo>,
@@ -152,6 +157,7 @@ impl From<GameSession> for SessionResponseDto {
             id: session.id.to_hex(),
             name: session.name,
             host_id: session.host_id,
+            region: session.region,
             status: session.status,
             night_lord: session.night_lord,
             joined_players: session.joined_players,
