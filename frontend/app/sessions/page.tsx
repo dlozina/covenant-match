@@ -62,7 +62,7 @@ export default function SessionsPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setShouldFetch(true);
-    }, 500);
+    }, 100); // 100ms delay to ensure userData is loaded
     
     return () => clearTimeout(timer);
   }, []);
