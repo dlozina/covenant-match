@@ -1,5 +1,5 @@
 import { httpClient } from './http-client';
-import { UserProfile, UpdateProfileParams } from './types';
+import { FriendList, UserProfile, UpdateProfileParams } from './types';
 
 export class UserService {
   /**
@@ -63,6 +63,42 @@ export class UserService {
         false
       );
       return response.available;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get the current user's friend list
+   * @returns List of friends
+   */
+  static async getFriendList(): Promise<FriendList> {
+    try {
+      return await httpClient.get<FriendList>('/api/v1/friends', true);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Add a friend to the current user's friend list
+   * @param friendId ID of the friend to add
+   */
+  static async addFriend(friendId: string): Promise<void> {
+    try {
+      await httpClient.post<void>('/api/v1/friends', { friendId }, true);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Remove a friend from the current user's friend list
+   * @param friendId ID of the friend to remove
+   */
+  static async removeFriend(friendId: string): Promise<void> {
+    try {
+      await httpClient.delete<void>(`/api/v1/friends/${friendId}`, true);
     } catch (error) {
       throw error;
     }

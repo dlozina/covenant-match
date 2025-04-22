@@ -11,8 +11,9 @@ use crate::models::session::{
 };
 use crate::models::statistics::{LeaderboardEntry, Stats, UserStatistics};
 use crate::models::user::{
-    AuthResponse, CreateUserDto, GetUsersQuery, LoginUserDto, PaginationInfo, RefreshTokenResponse,
-    UpdateUserDto, UpdateUserProfileDto, User, UserResponse, UsersListData, UsersListResponse,
+    AddFriendDto, AuthResponse, CreateUserDto, FriendDto, FriendListResponse, GetUsersQuery,
+    LoginUserDto, PaginationInfo, RefreshTokenResponse, RemoveFriendDto, UpdateUserDto,
+    UpdateUserProfileDto, User, UserResponse, UsersListData, UsersListResponse,
 };
 use crate::models::user_data::UserDataResponseDto;
 use crate::routes::statistics::NightLordStatsResponse;
@@ -55,6 +56,10 @@ use utoipa::{
         create_admin_user,
         update_profile,
         delete_user,
+        // Friend routes
+        get_friend_list,
+        add_friend,
+        remove_friend,
         // Admin routes
         get_all_users,
         get_user_by_id_admin,
@@ -78,6 +83,7 @@ use utoipa::{
         get_results,
         get_public_sessions,
         get_user_active_session,
+        get_friends_sessions,
         reset_session_flags,
         // Game data routes
         get_game_data,
@@ -122,6 +128,11 @@ use utoipa::{
             PaginationInfo,
             JwtInfoDto,
             TokenInfoResponse,
+            // Friend models
+            AddFriendDto,
+            RemoveFriendDto,
+            FriendDto,
+            FriendListResponse,
             // User data models
             UserDataResponseDto,
             GeoLocationDataDto,

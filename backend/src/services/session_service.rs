@@ -1293,6 +1293,57 @@ pub async fn reset_session_flags(
     }
 }
 
+/// Get sessions created by friends of the specified user
+pub async fn get_friends_sessions(
+    db: &Database,
+    user_id: &str,
+    status: Option<String>,
+    limit: Option<u64>,
+    offset: Option<u64>,
+    is_private: Option<bool>,
+    region: Option<String>,
+    platform: Option<String>,
+) -> Result<Vec<SessionResponseDto>, AppError> {
+    // First, get the user to find their friend list
+    let user = user_repository::find_user_by_id(db, user_id)
+        .await?
+        .ok_or(AppError::UserNotFound)?;
+
+    // If the user has no friends, return an empty list
+    if user.friend_list.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // Convert status string to enum if provided
+    let status_filter = match status {
+        Some(s) => match s.to_lowercase().as_str() {
+            "open" => Some(SessionStatus::Open),
+            "full" => Some(SessionStatus::Full),
+            "in_progress" | "inprogress" => Some(SessionStatus::InProgress),
+            "completed" => Some(SessionStatus::Completed),
+            "cancelled" => Some(SessionStatus::Cancelled),
+            _ => None,
+        },
+        None => None,
+    };
+
+    // Find sessions created by friends
+    let sessions = session_repository::find_friends_sessions(
+        db,
+        &user.friend_list,
+        status_filter,
+        limit,
+        offset,
+        is_private,
+        region,
+        platform,
+    )
+    .await?;
+
+    // Convert to response DTOs
+    Ok(sessions.into_iter().map(SessionResponseDto::from).collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

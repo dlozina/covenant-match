@@ -82,6 +82,12 @@ pub enum AppError {
 
     #[error("Invalid object id: {0}")]
     InvalidObjectId(String),
+
+    #[error("Friend limit reached")]
+    FriendLimitReached,
+
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
 }
 
 impl ResponseError for AppError {
@@ -129,6 +135,10 @@ impl ResponseError for AppError {
             AppError::InvalidId => StatusCode::BAD_REQUEST,
 
             AppError::InvalidObjectId(_) => StatusCode::BAD_REQUEST,
+
+            AppError::FriendLimitReached => StatusCode::CONFLICT,
+
+            AppError::InvalidInput(_) => StatusCode::BAD_REQUEST,
         }
     }
 }

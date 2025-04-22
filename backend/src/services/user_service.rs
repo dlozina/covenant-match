@@ -1,6 +1,8 @@
 use crate::models::error::AppError;
 use crate::models::geo_location::GeoLocation;
-use crate::models::user::{CreateUserDto, LoginUserDto, UpdateUserProfileDto, User, UserResponse};
+use crate::models::user::{
+    CreateUserDto, FriendDto, LoginUserDto, UpdateUserProfileDto, User, UserResponse,
+};
 use crate::repository::user_repository;
 use crate::utils::jwt;
 use bcrypt::{hash, verify, DEFAULT_COST};
@@ -64,6 +66,7 @@ pub async fn create_user(
         role,
         created_at: now,
         updated_at: now,
+        friend_list: Vec::new(),
     };
 
     // Save the user to the database
@@ -87,6 +90,7 @@ pub async fn create_user(
         preferred_nightfarer: user.preferred_nightfarer,
         created_at: user.created_at,
         updated_at: user.updated_at,
+        friend_list: user.friend_list.iter().map(|id| id.to_hex()).collect(),
     })
 }
 
@@ -129,6 +133,7 @@ pub async fn login_user(
         preferred_nightfarer: user.preferred_nightfarer,
         created_at: user.created_at,
         updated_at: user.updated_at,
+        friend_list: user.friend_list.iter().map(|id| id.to_hex()).collect(),
     };
 
     Ok((token, user_response))
@@ -156,6 +161,7 @@ pub async fn get_user_by_id(db: &Database, user_id: &str) -> Result<UserResponse
             preferred_nightfarer: user.preferred_nightfarer,
             created_at: user.created_at,
             updated_at: user.updated_at,
+            friend_list: user.friend_list.iter().map(|id| id.to_hex()).collect(),
         })
     } else {
         Err(AppError::UserNotFound)
@@ -386,4 +392,43 @@ pub async fn update_user_region(
     }
 
     Ok(())
+}
+
+/// Add a friend to the user's friend list
+pub async fn add_friend(db: &Database, user_id: &str, friend_id: &str) -> Result<(), AppError> {
+    // Cannot add yourself as a friend
+    if user_id == friend_id {
+        return Err(AppError::InvalidInput(
+            "Cannot add yourself as a friend".to_string(),
+        ));
+    }
+
+    // Add friend to user's friend list
+    user_repository::add_friend(db, user_id, friend_id).await
+}
+
+/// Remove a friend from the user's friend list
+pub async fn remove_friend(db: &Database, user_id: &str, friend_id: &str) -> Result<(), AppError> {
+    user_repository::remove_friend(db, user_id, friend_id).await
+}
+
+/// Get the user's friend list with detailed information
+pub async fn get_friend_list(db: &Database, user_id: &str) -> Result<Vec<FriendDto>, AppError> {
+    let friends = user_repository::get_friend_list_details(db, user_id).await?;
+
+    // Convert to FriendDto objects
+    let friend_dtos = friends
+        .into_iter()
+        .map(|friend| FriendDto {
+            id: friend.id.to_hex(),
+            username: friend.username,
+            display_name: friend.display_name,
+            avatar_url: friend.avatar_url,
+            covenant_name: friend.covenant_name,
+            platform: friend.platform,
+            region: friend.region,
+        })
+        .collect();
+
+    Ok(friend_dtos)
 }

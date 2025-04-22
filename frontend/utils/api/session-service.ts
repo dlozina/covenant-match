@@ -1,11 +1,13 @@
 import { httpClient } from './http-client';
-import { 
+import {
   Session,
   MinimalSession,
   JoinedPlayer,
   CreateSessionParams,
   JoinSessionParams,
-  UserSessionResult
+  UserSessionResult,
+  SessionFilterOptions,
+  SessionResponse
 } from './types';
 import { ApiError } from './errors';
 
@@ -243,6 +245,28 @@ export class SessionService {
         // Not logged in, so no active session
         return null;
       }
+      throw error;
+    }
+  }
+
+  /**
+   * Get sessions created by friends
+   * @param options Optional filter parameters 
+   * @returns List of sessions
+   */
+  static async getFriendSessions(options: SessionFilterOptions = {}): Promise<SessionResponse[]> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (options.status) queryParams.append('status', options.status);
+      if (options.limit) queryParams.append('limit', options.limit.toString());
+      if (options.offset) queryParams.append('offset', options.offset.toString());
+      if (options.isPrivate !== undefined) queryParams.append('isPrivate', options.isPrivate.toString());
+      if (options.region) queryParams.append('region', options.region);
+      if (options.platform) queryParams.append('platform', options.platform);
+
+      const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      return await httpClient.get<SessionResponse[]>(`/api/v1/sessions/friends${query}`, true);
+    } catch (error) {
       throw error;
     }
   }

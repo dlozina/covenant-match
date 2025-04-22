@@ -1,7 +1,9 @@
 use crate::models::session::{CreateSessionDto, JoinSessionDto, SubmitResultDto, UpdateSessionDto};
 use crate::services::session_service;
 use crate::utils::jwt;
-use actix_web::{get, patch, post, web, HttpMessage, HttpRequest, HttpResponse, Responder};
+use actix_web::{
+    get, patch, post, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError,
+};
 use mongodb::Database;
 
 /// Get all sessions with optional status filter
@@ -709,12 +711,90 @@ async fn reset_session_flags(
     }
 }
 
+/// Get sessions created by friends
+#[utoipa::path(
+    get,
+    path = "/api/v1/sessions/friends",
+    params(
+        ("status" = Option<String>, Query, description = "Filter sessions by status (e.g., 'Open', 'InProgress', 'Completed')"),
+        ("limit" = Option<u64>, Query, description = "Limit number of results (default: 10)"),
+        ("offset" = Option<u64>, Query, description = "Offset for pagination (default: 0)"),
+        ("isPrivate" = Option<bool>, Query, description = "Filter sessions by private status (default: false)"),
+        ("region" = Option<String>, Query, description = "Filter sessions by player region"),
+        ("platform" = Option<String>, Query, description = "Filter sessions by player platform")
+    ),
+    responses(
+        (status = 200, description = "List of sessions created by friends retrieved successfully", body = Vec<SessionResponseDto>),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "sessions"
+)]
+#[get("/api/v1/sessions/friends")]
+async fn get_friends_sessions(
+    db: web::Data<Database>,
+    req: HttpRequest,
+    query: web::Query<std::collections::HashMap<String, String>>,
+) -> impl Responder {
+    // Extract claims from request extensions
+    let claims = {
+        let extensions = req.extensions();
+        match extensions.get::<jwt::Claims>() {
+            Some(claims) => claims.clone(),
+            None => {
+                return HttpResponse::Unauthorized().json(serde_json::json!({
+                    "status": "error",
+                    "message": "Authentication required"
+                }));
+            }
+        }
+    };
+
+    // Extract query parameters
+    let status = query.get("status").map(|s| s.to_string());
+    let limit = query
+        .get("limit")
+        .and_then(|l| l.parse::<u64>().ok())
+        .unwrap_or(10);
+    let offset = query
+        .get("offset")
+        .and_then(|o| o.parse::<u64>().ok())
+        .unwrap_or(0);
+    let is_private = query.get("isPrivate").and_then(|p| p.parse::<bool>().ok());
+    let region = query.get("region").cloned();
+    let platform = query.get("platform").cloned();
+
+    match session_service::get_friends_sessions(
+        &db,
+        &claims.sub,
+        status,
+        Some(limit),
+        Some(offset),
+        is_private,
+        region,
+        platform,
+    )
+    .await
+    {
+        Ok(sessions) => HttpResponse::Ok().json(sessions),
+        Err(e) => {
+            log::error!("Error getting friends' sessions: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
+/// Get sessions created by friends
 pub fn config(cfg: &mut web::ServiceConfig) {
     // Register paths from most specific to most general
     // Global endpoints first
     cfg.service(get_public_sessions)
         // Then specific action endpoints
         .service(get_user_active_session) // /api/v1/sessions/active must be before {id} routes
+        .service(get_friends_sessions) // /api/v1/sessions/friends must be before {id} routes
         .service(get_sessions)
         .service(create_session)
         // Then ID-based endpoints
