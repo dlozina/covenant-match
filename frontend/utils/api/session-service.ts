@@ -2,7 +2,7 @@ import { httpClient } from './http-client';
 import {
   Session,
   MinimalSession,
-  JoinedPlayer,
+  //JoinedPlayer,
   CreateSessionParams,
   JoinSessionParams,
   UserSessionResult,
@@ -266,6 +266,50 @@ export class SessionService {
 
       const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
       return await httpClient.get<SessionResponse[]>(`/api/v1/sessions/friends${query}`, true);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get sessions for authenticated users
+   * @param options Optional filter parameters 
+   * @returns List of full session objects
+   */
+  static async getSessions(options: SessionFilterOptions = {}): Promise<Session[]> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (options.status) queryParams.append('status', options.status);
+      if (options.limit) queryParams.append('limit', options.limit.toString());
+      if (options.offset) queryParams.append('offset', options.offset.toString());
+      if (options.isPrivate !== undefined) queryParams.append('isPrivate', options.isPrivate.toString());
+      if (options.region) queryParams.append('region', options.region);
+      if (options.platform) queryParams.append('platform', options.platform);
+
+      const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      return await httpClient.get<Session[]>(`/api/v1/sessions${query}`, true);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get sessions for unauthenticated users (public view with limited data)
+   * @param options Optional filter parameters 
+   * @returns List of minimal session objects
+   */
+  static async getPublicSessions(options: SessionFilterOptions = {}): Promise<MinimalSession[]> {
+    try {
+      const queryParams = new URLSearchParams();
+      if (options.status) queryParams.append('status', options.status);
+      if (options.limit) queryParams.append('limit', options.limit.toString());
+      if (options.offset) queryParams.append('offset', options.offset.toString());
+      if (options.isPrivate !== undefined) queryParams.append('isPrivate', options.isPrivate.toString());
+      if (options.region) queryParams.append('region', options.region);
+      if (options.platform) queryParams.append('platform', options.platform);
+
+      const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      return await httpClient.get<MinimalSession[]>(`/api/v1/sessions/public${query}`, false);
     } catch (error) {
       throw error;
     }

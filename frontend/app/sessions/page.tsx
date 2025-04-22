@@ -36,6 +36,8 @@ import {
   fetchSessions
 } from "@/utils/api";
 
+import { SessionService } from "@/utils/api/session-service";
+
 type StatusFilter = "All" | "Open" | "InProgress" | "Completed";
 type FriendFilter = "All" | "Friends";
 
@@ -77,54 +79,63 @@ export default function SessionsPage() {
 
     try {
       console.log("Fetching sessions with status:", statusFilter, 
-                 "region:", userRegion, "platform:", userPlatform);
+                 "region:", userRegion, "platform:", userPlatform,
+                 "friendFilter:", friendFilter);
       
-      const result = await fetchSessions(
-        isLoggedIn, 
-        currentPage, 
-        limit, 
-        statusFilter,
-        userRegion,
-        userPlatform
-      );
-      
-      if (result.sessions) {
-        setSessions(result.sessions);
-        setFilteredSessions(result.sessions);
-        setTotalPages(result.sessions.length === limit ? currentPage + 1 : currentPage);
-      } else if (result.minimalSessions) {
-        setMinimalSessions(result.minimalSessions);
-        setTotalPages(result.minimalSessions.length === limit ? currentPage + 1 : currentPage);
+      // Use the appropriate fetch function based on the friend filter
+      if (isLoggedIn && friendFilter === "Friends") {
+        // Fetch sessions created by friends
+        const offset = (currentPage - 1) * limit;
+        const status = statusFilter === 'All' ? undefined : statusFilter;
+        
+        const sessions = await SessionService.getFriendSessions({
+          status,
+          limit,
+          offset,
+          region: userRegion,
+          platform: userPlatform
+        });
+        
+        setSessions(sessions);
+        setFilteredSessions(sessions);
+        setTotalPages(sessions.length === limit ? currentPage + 1 : currentPage);
+      } else {
+        // Fetch all sessions
+        const result = await fetchSessions(
+          isLoggedIn, 
+          currentPage, 
+          limit, 
+          statusFilter,
+          userRegion,
+          userPlatform
+        );
+        
+        if (result.sessions) {
+          setSessions(result.sessions);
+          setFilteredSessions(result.sessions);
+          setTotalPages(result.sessions.length === limit ? currentPage + 1 : currentPage);
+        } else if (result.minimalSessions) {
+          setMinimalSessions(result.minimalSessions);
+          setTotalPages(result.minimalSessions.length === limit ? currentPage + 1 : currentPage);
+        }
       }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "Failed to load sessions");
     } finally {
       setIsLoading(false);
     }
-  }, [isLoggedIn, currentPage, limit, statusFilter, userRegion, userPlatform, isUserLoading, shouldFetch]);
+  }, [isLoggedIn, currentPage, limit, statusFilter, userRegion, userPlatform, isUserLoading, shouldFetch, friendFilter]);
   
-  // Apply friend filter - separate from data fetching
-  const applyFilters = useCallback(() => {
-    // Only for friend filtering, not status filtering
-    if (friendFilter === "Friends") {
-      // Placeholder for friend filtering logic
-      // This will be implemented later
-    }
-  }, [friendFilter]);
-
-  // Apply friend filtering whenever that filter or session data changes
-  useEffect(() => {
-    if (sessions.length > 0) {
-      const filtered = [...sessions];
-      // Friend filtering would go here
-      setFilteredSessions(filtered);
-    }
-  }, [sessions, friendFilter, applyFilters]);
+  // We no longer need a separate applyFilters function since we're fetching from API directly
+  const handleFriendFilterChange = (value: FriendFilter) => {
+    setFriendFilter(value);
+    setCurrentPage(1); // Reset to first page when filter changes
+  };
 
   // Single main effect for fetching sessions
   useEffect(() => {
     fetchSessionsData();
-  }, [currentPage, statusFilter, shouldFetch, fetchSessionsData]);
+  }, [currentPage, statusFilter, friendFilter, shouldFetch, fetchSessionsData]);
   
   // Handler for refresh button
   const handleRefresh = () => {
@@ -258,12 +269,11 @@ export default function SessionsPage() {
                     id="friend-filter"
                     className="w-full p-2 rounded-md border bg-background"
                     value={friendFilter}
-                    onChange={(e) => setFriendFilter(e.target.value as FriendFilter)}
+                    onChange={(e) => handleFriendFilterChange(e.target.value as FriendFilter)}
                   >
                     <option value="All">All Players</option>
                     <option value="Friends">Friends Only</option>
                   </select>
-                  <p className="text-xs text-muted-foreground mt-1">Friend filtering coming soon!</p>
                 </div>
                 
                 {/* Mobile View - Use styled Select component */}
@@ -271,7 +281,7 @@ export default function SessionsPage() {
                   <label htmlFor="mobile-friend-filter" className="block text-sm font-medium mb-1">Players</label>
                   <Select
                     value={friendFilter}
-                    onValueChange={(value) => setFriendFilter(value as FriendFilter)}
+                    onValueChange={(value) => handleFriendFilterChange(value as FriendFilter)}
                   >
                     <SelectTrigger id="mobile-friend-filter" className="h-10 w-full">
                       <SelectValue placeholder="Select players" />
@@ -281,7 +291,6 @@ export default function SessionsPage() {
                       <SelectItem value="Friends">Friends Only</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground mt-1">Friend filtering coming soon!</p>
                 </div>
               </div>
             )}
