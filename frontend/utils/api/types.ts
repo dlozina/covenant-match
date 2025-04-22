@@ -28,6 +28,7 @@ export interface MinimalSession {
   hostName: string;
   status: "Open" | "InProgress" | "Completed";
   createdAt: string;
+  nightLord?: string;
 }
 
 export interface SessionDetails {

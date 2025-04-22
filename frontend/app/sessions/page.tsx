@@ -33,10 +33,12 @@ import {
 import {
   Session, 
   MinimalSession, 
-  fetchSessions
+  fetchSessions,
+  NightLord
 } from "@/utils/api";
 
 import { SessionService } from "@/utils/api/session-service";
+import { fetchNightLords } from "@/utils/api";
 
 type StatusFilter = "All" | "Open" | "InProgress" | "Completed";
 type FriendFilter = "All" | "Friends";
@@ -53,12 +55,32 @@ export default function SessionsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("Open");
   const [friendFilter, setFriendFilter] = useState<FriendFilter>("All");
+  const [nightLordFilter, setNightLordFilter] = useState<string>("All");
+  const [nightLords, setNightLords] = useState<NightLord[]>([]);
+  const [isLoadingNightLords, setIsLoadingNightLords] = useState(false);
   const [shouldFetch, setShouldFetch] = useState(false); // Single flag to control fetching
   const limit = 10;
   
   // Get user region and platform data for API calls
   const userRegion = userData?.autoRegion ? userData.cmRegion : userData?.region;
   const userPlatform = userData?.platform;
+
+  // Fetch Night Lords on component mount
+  useEffect(() => {
+    const loadNightLords = async () => {
+      try {
+        setIsLoadingNightLords(true);
+        const lords = await fetchNightLords();
+        setNightLords(lords);
+      } catch (error) {
+        console.error("Error fetching Night Lords:", error);
+      } finally {
+        setIsLoadingNightLords(false);
+      }
+    };
+    
+    loadNightLords();
+  }, []);
 
   // Wait initially before first fetch to ensure userData is loaded
   useEffect(() => {
@@ -80,7 +102,8 @@ export default function SessionsPage() {
     try {
       console.log("Fetching sessions with status:", statusFilter, 
                  "region:", userRegion, "platform:", userPlatform,
-                 "friendFilter:", friendFilter);
+                 "friendFilter:", friendFilter,
+                 "nightLordFilter:", nightLordFilter);
       
       // Use the appropriate fetch function based on the friend filter
       if (isLoggedIn && friendFilter === "Friends") {
@@ -97,7 +120,16 @@ export default function SessionsPage() {
         });
         
         setSessions(sessions);
-        setFilteredSessions(sessions);
+        
+        // Apply Night Lord filter if it's set
+        if (nightLordFilter !== 'All') {
+          setFilteredSessions(sessions.filter(session => 
+            session.nightLord.toLowerCase() === nightLordFilter.toLowerCase()
+          ));
+        } else {
+          setFilteredSessions(sessions);
+        }
+        
         setTotalPages(sessions.length === limit ? currentPage + 1 : currentPage);
       } else {
         // Fetch all sessions
@@ -112,7 +144,16 @@ export default function SessionsPage() {
         
         if (result.sessions) {
           setSessions(result.sessions);
-          setFilteredSessions(result.sessions);
+          
+          // Apply Night Lord filter if it's set
+          if (nightLordFilter !== 'All') {
+            setFilteredSessions(result.sessions.filter(session => 
+              session.nightLord.toLowerCase() === nightLordFilter.toLowerCase()
+            ));
+          } else {
+            setFilteredSessions(result.sessions);
+          }
+          
           setTotalPages(result.sessions.length === limit ? currentPage + 1 : currentPage);
         } else if (result.minimalSessions) {
           setMinimalSessions(result.minimalSessions);
@@ -124,7 +165,7 @@ export default function SessionsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoggedIn, currentPage, limit, statusFilter, userRegion, userPlatform, isUserLoading, shouldFetch, friendFilter]);
+  }, [isLoggedIn, currentPage, limit, statusFilter, userRegion, userPlatform, isUserLoading, shouldFetch, friendFilter, nightLordFilter]);
   
   // We no longer need a separate applyFilters function since we're fetching from API directly
   const handleFriendFilterChange = (value: FriendFilter) => {
@@ -137,6 +178,17 @@ export default function SessionsPage() {
     fetchSessionsData();
   }, [currentPage, statusFilter, friendFilter, shouldFetch, fetchSessionsData]);
   
+  // Additional effect to handle client-side filtering for nightLord
+  useEffect(() => {
+    if (sessions.length > 0 && nightLordFilter !== 'All') {
+      setFilteredSessions(sessions.filter(session => 
+        session.nightLord.toLowerCase() === nightLordFilter.toLowerCase()
+      ));
+    } else if (sessions.length > 0) {
+      setFilteredSessions(sessions);
+    }
+  }, [nightLordFilter, sessions]);
+  
   // Handler for refresh button
   const handleRefresh = () => {
     if (!isLoading) {
@@ -148,6 +200,23 @@ export default function SessionsPage() {
   const handleStatusFilterChange = (value: StatusFilter) => {
     setStatusFilter(value);
     setCurrentPage(1); // Reset to first page when filter changes
+  };
+
+  // Night Lord filter change handler
+  const handleNightLordFilterChange = (value: string) => {
+    setNightLordFilter(value);
+    setCurrentPage(1); // Reset to first page when filter changes
+
+    // Apply filter locally if we have session data
+    if (sessions.length > 0) {
+      if (value === "All") {
+        setFilteredSessions(sessions);
+      } else {
+        setFilteredSessions(sessions.filter(session => 
+          session.nightLord.toLowerCase() === value.toLowerCase()
+        ));
+      }
+    }
   };
 
   async function handleJoinSession(sessionId: string) {
@@ -260,6 +329,46 @@ export default function SessionsPage() {
                 </Select>
               </div>
             </div>
+            
+            <div className="w-full">
+              {/* Desktop View - Keep original select */}
+              <div className="hidden md:block">
+                <label htmlFor="nightlord-filter" className="block text-sm font-medium mb-1">Night Lord</label>
+                <select 
+                  id="nightlord-filter"
+                  className="w-full p-2 rounded-md border bg-background"
+                  value={nightLordFilter}
+                  onChange={(e) => handleNightLordFilterChange(e.target.value)}
+                  disabled={isLoadingNightLords}
+                >
+                  <option value="All">All Night Lords</option>
+                  {nightLords.map(lord => (
+                    <option key={lord.id} value={lord.name}>{lord.name}</option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* Mobile View - Use styled Select component */}
+              <div className="block md:hidden">
+                <label htmlFor="mobile-nightlord-filter" className="block text-sm font-medium mb-1">Night Lord</label>
+                <Select
+                  value={nightLordFilter}
+                  onValueChange={(value) => handleNightLordFilterChange(value)}
+                  disabled={isLoadingNightLords}
+                >
+                  <SelectTrigger id="mobile-nightlord-filter" className="h-10 w-full">
+                    <SelectValue placeholder="Select Night Lord" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All Night Lords</SelectItem>
+                    {nightLords.map(lord => (
+                      <SelectItem key={lord.id} value={lord.name}>{lord.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
             {isLoggedIn && (
               <div className="w-full">
                 {/* Desktop View - Keep original select */}
@@ -326,8 +435,9 @@ export default function SessionsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[300px]">Session Name</TableHead>
+                    <TableHead className="w-[250px]">Session Name</TableHead>
                     <TableHead>Host</TableHead>
+                    <TableHead>Night Lord</TableHead>
                     <TableHead>Status</TableHead>
                     {isLoggedIn && <TableHead className="text-right">Action</TableHead>}
                   </TableRow>
@@ -341,6 +451,7 @@ export default function SessionsPage() {
                       <TableRow key={session.id}>
                         <TableCell className="font-medium">{session.name}</TableCell>
                         <TableCell>{getHostName(session)}</TableCell>
+                        <TableCell>{session.nightLord}</TableCell>
                         <TableCell>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(session.status)}`}>
                             {session.status}
@@ -369,6 +480,7 @@ export default function SessionsPage() {
                       <TableRow key={session.id}>
                         <TableCell className="font-medium">{session.name}</TableCell>
                         <TableCell>{session.hostName}</TableCell>
+                        <TableCell>{(session as { nightLord?: string }).nightLord || '-'}</TableCell>
                         <TableCell>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(session.status)}`}>
                             {session.status}
@@ -397,6 +509,7 @@ export default function SessionsPage() {
                     </div>
                     <div className="text-sm text-muted-foreground mb-3">
                       <p>Host: {getHostName(session)}</p>
+                      <p className="mt-1">Night Lord: {session.nightLord}</p>
                     </div>
                     <div className="mt-3">
                       {session.status === 'Open' ? (
@@ -430,6 +543,7 @@ export default function SessionsPage() {
                     </div>
                     <div className="text-sm text-muted-foreground mb-3">
                       <p>Host: {session.hostName}</p>
+                      <p className="mt-1">Night Lord: {(session as { nightLord?: string }).nightLord || '-'}</p>
                     </div>
                     {!isLoggedIn && (
                       <div className="mt-3 text-center">
