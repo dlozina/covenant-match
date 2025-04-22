@@ -15,8 +15,6 @@ use chrono::Utc;
 use mongodb::bson::oid::ObjectId;
 use mongodb::Database;
 use serde_json::json;
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::LazyLock;
 use std::sync::Mutex;
 
@@ -206,11 +204,15 @@ pub async fn create_session(
         id: ObjectId::new(),
         name: session_data.name,
         host_id: user_id.to_string(),
+        region: session_data.region.clone(),
+        platform: session_data.platform,
         password: session_data.game_password,
         is_private: session_data.is_private,
         status: SessionStatus::Open,
         joined_players: vec![PlayerInfo {
             user_id: user.id.to_hex(),
+            region: session_data.region,
+            platform: user.platform,
             username: user.display_name.unwrap_or(user.username),
             nightfarer: session_data.nightfarer,
             covenant_name: user.covenant_name,
@@ -224,6 +226,8 @@ pub async fn create_session(
         started_at: None,
         completed_at: None,
         stats_updated: false,
+        new_session_created: false,
+        new_session_created_id: None,
     };
 
     // Save the session to the database
@@ -274,12 +278,14 @@ pub async fn get_sessions(
     limit: Option<u64>,
     offset: Option<u64>,
     is_private: Option<bool>,
+    region: Option<String>,
+    platform: Option<String>,
 ) -> Result<Vec<SessionResponseDto>, AppError> {
     let status_filter = match status {
         Some(s) => match s.to_lowercase().as_str() {
             "open" => Some(SessionStatus::Open),
             "full" => Some(SessionStatus::Full),
-            "in_progress" => Some(SessionStatus::InProgress),
+            "in_progress" | "inprogress" => Some(SessionStatus::InProgress),
             "completed" => Some(SessionStatus::Completed),
             "cancelled" => Some(SessionStatus::Cancelled),
             _ => None,
@@ -287,13 +293,21 @@ pub async fn get_sessions(
         None => None,
     };
 
-    let sessions =
-        session_repository::find_sessions(db, status_filter, limit, offset, is_private).await?;
+    let sessions = session_repository::find_sessions(
+        db,
+        status_filter,
+        limit,
+        offset,
+        is_private,
+        region,
+        platform,
+    )
+    .await?;
 
     // Convert to response DTOs (exclude passwords for listing)
     Ok(sessions
         .into_iter()
-        .map(|s| SessionResponseDto::from(s))
+        .map(SessionResponseDto::from)
         .collect())
 }
 
@@ -303,12 +317,14 @@ pub async fn get_minimal_sessions(
     status: Option<String>,
     limit: Option<u64>,
     offset: Option<u64>,
+    region: Option<String>,
+    platform: Option<String>,
 ) -> Result<Vec<MinimalSessionDto>, AppError> {
     let status_filter = match status {
         Some(s) => match s.to_lowercase().as_str() {
             "open" => Some(SessionStatus::Open),
             "full" => Some(SessionStatus::Full),
-            "in_progress" => Some(SessionStatus::InProgress),
+            "in_progress" | "inprogress" => Some(SessionStatus::InProgress),
             "completed" => Some(SessionStatus::Completed),
             "cancelled" => Some(SessionStatus::Cancelled),
             _ => None,
@@ -319,8 +335,16 @@ pub async fn get_minimal_sessions(
     // Always filter out private sessions for this public endpoint
     let is_private = Some(false);
 
-    let sessions =
-        session_repository::find_sessions(db, status_filter, limit, offset, is_private).await?;
+    let sessions = session_repository::find_sessions(
+        db,
+        status_filter,
+        limit,
+        offset,
+        is_private,
+        region,
+        platform,
+    )
+    .await?;
 
     // Convert to minimal DTOs with just the necessary info
     Ok(sessions
@@ -418,6 +442,8 @@ pub async fn join_session(
     let now = mongodb::bson::DateTime::now();
     session.joined_players.push(PlayerInfo {
         user_id: join_data.user_id.clone(),
+        region: join_data.region.clone(),
+        platform: join_data.platform.clone(),
         username: join_data.username.clone(),
         nightfarer: join_data.nightfarer.clone(),
         covenant_name: join_data.covenant_name.clone(),
@@ -555,13 +581,10 @@ pub async fn leave_session(db: &Database, session_id: &str, user_id: &str) -> Re
         .ok_or(AppError::SessionNotFound)?;
 
     // Check if the session has already started - can't leave once started
-    if session.status == SessionStatus::InProgress
-        || session.status == SessionStatus::Completed
-        || session.status == SessionStatus::Cancelled
-    {
+    // We can leave if a session is completed or cancelled
+    if session.status == SessionStatus::InProgress {
         return Err(AppError::BadRequest(
-            "Cannot leave a session that has already started, completed, or been cancelled"
-                .to_string(),
+            "Cannot leave a session that has already started.".to_string(),
         ));
     }
 
@@ -895,7 +918,7 @@ pub async fn complete_session(
     db: &Database,
     session_id: &str,
     user_id: &str,
-    duration: Option<i64>,
+    _duration: Option<i64>,
 ) -> Result<SessionResponseDto, AppError> {
     // Get the session
     let mut session = session_repository::find_by_id(db, session_id)
@@ -949,7 +972,7 @@ pub async fn recreate_session(
     make_private: bool,
 ) -> Result<SessionResponseDto, AppError> {
     // Get the original session
-    let original_session = session_repository::find_by_id(db, session_id)
+    let mut original_session = session_repository::find_by_id(db, session_id)
         .await?
         .ok_or(AppError::SessionNotFound)?;
 
@@ -992,16 +1015,23 @@ pub async fn recreate_session(
         format!("{} (Replay)", original_session.name)
     };
 
+    // Create a new session id
+    let new_session_id = ObjectId::new();
+
     // Create a new session with the same name and settings
     let new_session = GameSession {
-        id: ObjectId::new(),
+        id: new_session_id,
         name: new_name,
         host_id: user_id.to_string(),
+        region: original_session.region.clone(),
+        platform: original_session.platform.clone(),
         password: original_session.password.clone(),
         is_private: make_private, // Always make recreated sessions private so they don't show in the sessions list
         status: SessionStatus::Open,
         joined_players: vec![PlayerInfo {
             user_id: user_id.to_string(),
+            region: original_session.region.clone(),
+            platform: original_session.platform.clone(),
             username: host_user.display_name.unwrap_or(host_user.username),
             nightfarer: host_nightfarer,
             covenant_name: host_user.covenant_name.clone(),
@@ -1015,10 +1045,21 @@ pub async fn recreate_session(
         started_at: None,
         completed_at: None,
         stats_updated: false,
+        new_session_created: false,
+        new_session_created_id: None,
     };
 
     // Save the new session to the database
     session_repository::create_session(db, &new_session).await?;
+
+    // Update the original session to point to the new session
+    // This allows participants to find the new session from the old one
+    original_session.new_session_created = true;
+    original_session.new_session_created_id = Some(new_session_id);
+    original_session.updated_at = now;
+
+    // Save the updated original session
+    session_repository::update_session(db, &original_session).await?;
 
     // Create response DTO
     let response = SessionResponseDto::from(new_session.clone());
@@ -1149,6 +1190,78 @@ pub async fn get_covenant_stats(db: &Database) -> Result<CovenantStatsResponse, 
     Ok(CovenantStatsResponse { covenant_stats })
 }
 
+/// Reset the session flags for new session creation
+/// This is used to reset the flags once enough players have joined
+pub async fn reset_session_flags(
+    db: &Database,
+    session_id: &str,
+    user_id: &str,
+) -> Result<(), AppError> {
+    // Get the session
+    let mut session = session_repository::find_by_id(db, session_id)
+        .await?
+        .ok_or(AppError::SessionNotFound)?;
+
+    // Check if user is a participant in the session
+    let is_participant = session.joined_players.iter().any(|p| p.user_id == user_id);
+
+    if !is_participant {
+        return Err(AppError::Forbidden(
+            "Only session participants can reset flags".to_string(),
+        ));
+    }
+
+    // Log current state of flags
+    log::info!(
+        "Current state of flags for session {}: new_session_created={}, new_session_created_id={:?}",
+        session_id,
+        session.new_session_created,
+        session.new_session_created_id
+    );
+
+    // Check if the session has the flags set
+    if !session.new_session_created {
+        log::info!(
+            "No flags to reset for session {}, skipping update",
+            session_id
+        );
+        // No flags to reset
+        return Ok(());
+    }
+
+    log::info!(
+        "Resetting new session flags for session {} - joined players: {}",
+        session_id,
+        session.joined_players.len()
+    );
+
+    // Reset the flags
+    session.new_session_created = false;
+    session.new_session_created_id = None;
+
+    // Update timestamp
+    session.updated_at = mongodb::bson::DateTime::now();
+
+    // Update the session in the database
+    match session_repository::update_session(db, &session).await {
+        Ok(_) => {
+            log::info!(
+                "Successfully reset new session flags for session {}",
+                session_id
+            );
+            Ok(())
+        }
+        Err(e) => {
+            log::error!(
+                "Failed to reset new session flags for session {}: {:?}",
+                session_id,
+                e
+            );
+            Err(e)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1168,7 +1281,7 @@ mod tests {
     // Test version of submit_result that uses our mock db
     fn submit_result_test(
         db: &MockDb,
-        session_id: &str,
+        _session_id: &str,
         result_data: SubmitResultDto,
     ) -> Result<(), AppError> {
         // Get user ID from result data
@@ -1287,6 +1400,8 @@ mod tests {
             username: "Player 1".to_string(),
             nightfarer: "Mage".to_string(),
             covenant_name: "Covenant 1".to_string(),
+            region: "Europe".to_string(),
+            platform: "Playstation".to_string(),
             joined_at: now,
         };
 
@@ -1295,6 +1410,8 @@ mod tests {
             username: "Player 2".to_string(),
             nightfarer: "Warrior".to_string(),
             covenant_name: "Covenant 2".to_string(),
+            region: "Europe".to_string(),
+            platform: "Playstation".to_string(),
             joined_at: now,
         };
 
@@ -1303,6 +1420,8 @@ mod tests {
             username: "Player 3".to_string(),
             nightfarer: "Rogue".to_string(),
             covenant_name: "Covenant 3".to_string(),
+            region: "Europe".to_string(),
+            platform: "Playstation".to_string(),
             joined_at: now,
         };
 
@@ -1311,6 +1430,8 @@ mod tests {
             id: ObjectId::parse_str(&session_id).unwrap(),
             name: "Test Session".to_string(),
             host_id: "player1".to_string(),
+            region: "Europe".to_string(),
+            platform: "Playstation".to_string(),
             password: "test".to_string(),
             is_private: false,
             status: SessionStatus::InProgress,
@@ -1323,6 +1444,8 @@ mod tests {
             started_at: Some(now),
             completed_at: None,
             stats_updated: false,
+            new_session_created: false,
+            new_session_created_id: None,
         };
 
         // Create mock db
@@ -1413,6 +1536,8 @@ mod tests {
             username: "Player 1".to_string(),
             nightfarer: "Mage".to_string(),
             covenant_name: "Covenant 1".to_string(),
+            region: "Europe".to_string(),
+            platform: "Playstation".to_string(),
             joined_at: now,
         };
 
@@ -1421,6 +1546,8 @@ mod tests {
             username: "Player 2".to_string(),
             nightfarer: "Warrior".to_string(),
             covenant_name: "Covenant 2".to_string(),
+            region: "Europe".to_string(),
+            platform: "Playstation".to_string(),
             joined_at: now,
         };
 
@@ -1429,6 +1556,8 @@ mod tests {
             username: "Player 3".to_string(),
             nightfarer: "Rogue".to_string(),
             covenant_name: "Covenant 3".to_string(),
+            region: "Europe".to_string(),
+            platform: "Playstation".to_string(),
             joined_at: now,
         };
 
@@ -1437,6 +1566,8 @@ mod tests {
             id: ObjectId::parse_str(&session_id).unwrap(),
             name: "Test Session".to_string(),
             host_id: "player1".to_string(),
+            region: "Europe".to_string(),
+            platform: "Playstation".to_string(),
             password: "test".to_string(),
             is_private: false,
             status: SessionStatus::Completed, // Already completed
@@ -1464,6 +1595,8 @@ mod tests {
             started_at: Some(now),
             completed_at: Some(now),
             stats_updated: true, // Set to true to indicate stats have already been updated
+            new_session_created: false,
+            new_session_created_id: None,
         };
 
         // Create mock db with an empty stats_updated vector

@@ -1,7 +1,6 @@
 use actix::prelude::*;
 use actix_web::{get, web, HttpMessage, HttpRequest, HttpResponse, Responder};
-use actix_web_actors::ws;
-use log::{error, info};
+use log::info;
 use utoipa::IntoParams;
 
 use crate::ws::server::ws_route;
@@ -61,13 +60,14 @@ pub async fn ws_session_route(
 )]
 #[get("/api/v1/ws/status")]
 pub async fn ws_status(
-    session_manager: web::Data<Addr<SessionManager>>,
     req: HttpRequest,
 ) -> impl Responder {
     // Get the user role from the request extensions
     let user_role = {
         let extensions = req.extensions();
-        let claims = extensions.get::<crate::utils::jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<crate::utils::jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.role.clone()
     };
 

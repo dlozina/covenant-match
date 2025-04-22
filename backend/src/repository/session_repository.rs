@@ -34,6 +34,8 @@ pub async fn find_sessions(
     limit: Option<u64>,
     offset: Option<u64>,
     is_private: Option<bool>,
+    region: Option<String>,
+    platform: Option<String>,
 ) -> Result<Vec<GameSession>, AppError> {
     let mut filter = match status {
         Some(status) => doc! { "status": to_bson(&status)? },
@@ -42,6 +44,16 @@ pub async fn find_sessions(
 
     if let Some(is_private) = is_private {
         filter = doc! { "$and": [filter, doc! { "is_private": is_private }] };
+    }
+
+    // Add region filter if provided
+    if let Some(region_val) = region {
+        filter = doc! { "$and": [filter, doc! { "joined_players.region": region_val }] };
+    }
+
+    // Add platform filter if provided
+    if let Some(platform_val) = platform {
+        filter = doc! { "$and": [filter, doc! { "platform": platform_val }] };
     }
 
     // Get all sessions matching the filter
@@ -86,6 +98,8 @@ pub async fn update_session(db: &Database, session: &GameSession) -> Result<(), 
             "completed_at": to_bson(&session.completed_at)?,
             "stats_updated": session.stats_updated,
             "is_private": session.is_private,
+            "new_session_created": session.new_session_created,
+            "new_session_created_id": to_bson(&session.new_session_created_id)?,
         }
     };
 
@@ -195,11 +209,21 @@ pub async fn find_active_sessions_for_user(
 pub async fn count_sessions_by_status(
     db: &Database,
     status: Option<String>,
+    is_private: Option<bool>,
 ) -> Result<u64, AppError> {
-    let filter = match status {
+    let mut filter = match status {
         Some(status_str) => doc! { "status": status_str },
         None => doc! {},
     };
+
+    if let Some(is_private_val) = is_private {
+        filter = doc! {
+            "$and": [
+                filter,
+                { "is_private": is_private_val }
+            ]
+        };
+    }
 
     let count = get_collection(db).count_documents(filter).await?;
     Ok(count)

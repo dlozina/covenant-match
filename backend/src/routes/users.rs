@@ -1,7 +1,7 @@
 use crate::models::error::AppError;
 use crate::models::user::{CreateUserDto, GetUsersQuery, LoginUserDto, UpdateUserProfileDto};
 use crate::services::{auth_service, user_service};
-use crate::utils::jwt;
+use crate::utils::{geo_location, ip_address, jwt};
 use actix_web::{
     delete, get, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError,
 };
@@ -41,9 +41,17 @@ async fn create_user(
         None
     };
 
+    // Get the client region
+    let client_region = geo_location::get_client_region(&req);
+
     // Pass the requesting user's role (if any) to determine if they can create an admin
-    match user_service::create_user(&db, user_data.into_inner(), requesting_user_role.as_deref())
-        .await
+    match user_service::create_user(
+        &db,
+        user_data.into_inner(),
+        requesting_user_role.as_deref(),
+        client_region,
+    )
+    .await
     {
         Ok(user) => HttpResponse::Created().json(user),
         Err(e) => {
@@ -75,11 +83,18 @@ async fn login(
     let login_data = credentials.into_inner();
 
     // Get the client IP address
-    let ip_address = req
-        .connection_info()
-        .peer_addr()
-        .unwrap_or("unknown")
-        .to_string();
+    let ip_address = ip_address::get_client_ip(&req);
+
+    // Get the client region
+    let client_region = geo_location::get_client_region(&req);
+
+    // If necessary, update the user's region in db
+    match user_service::update_user_region(&db, &login_data.username, client_region).await {
+        Ok(()) => (),
+        Err(e) => {
+            log::error!("Error updating user region: {:?}", e);
+        }
+    }
 
     // Verify CAPTCHA if required based on previous login attempts
     if let Err(e) = auth_service::verify_captcha_if_required(
@@ -170,7 +185,9 @@ async fn get_current_user(db: web::Data<Database>, req: HttpRequest) -> impl Res
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
@@ -212,12 +229,19 @@ async fn update_profile(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
+    // Get the client region
+    let client_region = geo_location::get_client_region(&req);
+
     // Update the user profile
-    match user_service::update_user_profile(&db, &user_id, update_data.into_inner()).await {
+    match user_service::update_user_profile(&db, &user_id, update_data.into_inner(), client_region)
+        .await
+    {
         Ok(user) => HttpResponse::Ok().json(user),
         Err(e) => {
             log::error!("Error updating user profile: {:?}", e);
@@ -247,13 +271,15 @@ async fn delete_user(db: web::Data<Database>, req: HttpRequest) -> impl Responde
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
     // Delete the user
     match user_service::delete_user(&db, &user_id).await {
-        Ok(_) => HttpResponse::NoContent().finish(),
+        Ok(()) => HttpResponse::NoContent().finish(),
         Err(e) => {
             log::error!("Error deleting user: {:?}", e);
             e.error_response()
@@ -289,7 +315,9 @@ async fn create_admin_user(
     // Extract user_id before any await points
     let claims = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.clone()
     };
 
@@ -305,7 +333,10 @@ async fn create_admin_user(
     let mut admin_user_data = user_data.into_inner();
     admin_user_data.role = Some("admin".to_string());
 
-    match user_service::create_user(&db, admin_user_data, Some("admin")).await {
+    // Get the client region
+    let client_region = geo_location::get_client_region(&req);
+
+    match user_service::create_user(&db, admin_user_data, Some("admin"), client_region).await {
         Ok(user) => HttpResponse::Created().json(user),
         Err(e) => {
             log::error!("Error creating admin user: {:?}", e);
@@ -343,7 +374,9 @@ async fn get_all_users(
     // Get claims from request extensions (set by middleware)
     let claims = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.clone()
     };
 
@@ -360,7 +393,12 @@ async fn get_all_users(
         .await
     {
         Ok((users, total, page)) => {
-            let total_pages = (total as f64 / query.limit as f64).ceil() as u64;
+            // Calculate total pages using the built-in div_ceil method
+            let total_pages = if query.limit > 0 {
+                total.div_ceil(query.limit)
+            } else {
+                0
+            };
 
             HttpResponse::Ok().json(serde_json::json!({
                 "status": "success",
@@ -442,11 +480,17 @@ async fn update_user_admin(
     db: web::Data<Database>,
     path: web::Path<String>,
     update_data: web::Json<UpdateUserProfileDto>,
+    req: HttpRequest,
 ) -> impl Responder {
     // Middleware already checks for admin role
     let user_id = path.into_inner();
 
-    match user_service::update_user_profile(&db, &user_id, update_data.into_inner()).await {
+    // Get the client region
+    let client_region = geo_location::get_client_region(&req);
+
+    match user_service::update_user_profile(&db, &user_id, update_data.into_inner(), client_region)
+        .await
+    {
         Ok(user) => HttpResponse::Ok().json(user),
         Err(e) => {
             log::error!("Error updating user: {:?}", e);
@@ -480,7 +524,7 @@ async fn delete_user_admin(db: web::Data<Database>, path: web::Path<String>) -> 
     let user_id = path.into_inner();
 
     match user_service::delete_user(&db, &user_id).await {
-        Ok(_) => HttpResponse::NoContent().finish(),
+        Ok(()) => HttpResponse::NoContent().finish(),
         Err(e) => {
             log::error!("Error deleting user: {:?}", e);
             e.error_response()
@@ -523,7 +567,8 @@ async fn refresh_token(req: HttpRequest) -> impl Responder {
 
     // Check if the token is already expired
     let now = chrono::Utc::now().timestamp();
-    if claims.exp < now as usize {
+    let exp_i64 = i64::try_from(claims.exp).unwrap_or(i64::MAX);
+    if exp_i64 < now {
         return HttpResponse::Unauthorized().json(serde_json::json!({
             "status": "error",
             "message": "Token has expired"
@@ -531,14 +576,11 @@ async fn refresh_token(req: HttpRequest) -> impl Responder {
     }
 
     // Parse the user ID from the token
-    let user_id = match mongodb::bson::oid::ObjectId::parse_str(&claims.sub) {
-        Ok(id) => id,
-        Err(_) => {
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "status": "error",
-                "message": "Invalid user ID format in token"
-            }));
-        }
+    let Ok(user_id) = mongodb::bson::oid::ObjectId::parse_str(&claims.sub) else {
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "status": "error",
+            "message": "Invalid user ID format in token"
+        }));
     };
 
     // Generate a new token with the same user ID and role
@@ -630,16 +672,20 @@ async fn decode_token(token_data: web::Json<JwtInfoDto>, req: HttpRequest) -> im
     match jwt::decode_token(token) {
         Ok(claims) => {
             // Get current time for validity check
-            let now = chrono::Utc::now().timestamp() as usize;
-            let is_valid = claims.exp > now;
+            let now = chrono::Utc::now().timestamp();
+            let exp_i64 = i64::try_from(claims.exp).unwrap_or(i64::MAX);
+            let is_valid = exp_i64 > now;
 
             // Calculate time to expiry
-            let seconds_to_expiry = if is_valid { claims.exp - now } else { 0 };
+            let seconds_to_expiry = if is_valid {
+                usize::try_from((exp_i64 - now).max(0)).unwrap_or(0)
+            } else {
+                0
+            };
 
             // Format expiry time
-            let expires_at = chrono::DateTime::<chrono::Utc>::from_timestamp(claims.exp as i64, 0)
-                .map(|dt| dt.to_rfc3339())
-                .unwrap_or_else(|| "Invalid timestamp".to_string());
+            let expires_at = chrono::DateTime::<chrono::Utc>::from_timestamp(exp_i64, 0)
+                .map_or_else(|| "Invalid timestamp".to_string(), |dt| dt.to_rfc3339());
 
             // Format time to expiry in a human-readable format
             let time_to_expiry = if is_valid {
@@ -649,13 +695,13 @@ async fn decode_token(token_data: web::Json<JwtInfoDto>, req: HttpRequest) -> im
                 let seconds = seconds_to_expiry % 60;
 
                 if days > 0 {
-                    format!("{}d {}h {}m {}s", days, hours, minutes, seconds)
+                    format!("{days}d {hours}h {minutes}m {seconds}s")
                 } else if hours > 0 {
-                    format!("{}h {}m {}s", hours, minutes, seconds)
+                    format!("{hours}h {minutes}m {seconds}s")
                 } else if minutes > 0 {
-                    format!("{}m {}s", minutes, seconds)
+                    format!("{minutes}m {seconds}s")
                 } else {
-                    format!("{}s", seconds)
+                    format!("{seconds}s")
                 }
             } else {
                 "Expired".to_string()

@@ -62,7 +62,7 @@ fn is_path_excluded(path: &str, method: &Method) -> bool {
     // Check against defined exclusion patterns from config
     config.auth.exclude_patterns.iter().any(|pattern| {
         let method_matches = match pattern.get_method() {
-            Some(excluded) => method == &excluded,
+            Some(excluded) => method == excluded,
             None => true, // If no method specified in config, match any method
         };
 
@@ -72,12 +72,11 @@ fn is_path_excluded(path: &str, method: &Method) -> bool {
 
         if pattern.is_regex {
             // Use regex matching for patterns marked as regex
-            match Regex::new(&pattern.path) {
-                Ok(regex) => regex.is_match(path),
-                Err(_) => {
-                    log::error!("Invalid regex pattern: {}", pattern.path);
-                    false
-                }
+            if let Ok(regex) = Regex::new(&pattern.path) {
+                regex.is_match(path)
+            } else {
+                log::error!("Invalid regex pattern: {}", pattern.path);
+                false
             }
         } else {
             // Use simple path matching
@@ -108,7 +107,7 @@ where
         if is_path_excluded(&path, &method) {
             log::info!("Path excluded from authentication: {}", path);
             let fut = self.service.call(req);
-            return Box::pin(async move { fut.await });
+            return Box::pin(fut);
         }
 
         let require_role = self.require_role.clone();
@@ -162,7 +161,7 @@ where
 
         Box::pin(async move {
             match auth_result {
-                Ok(_) => fut.await,
+                Ok(()) => fut.await,
                 Err(e) => {
                     // Convert AppError to actix_web::Error
                     let error_response = match e {

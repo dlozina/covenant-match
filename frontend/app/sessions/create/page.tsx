@@ -12,6 +12,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import { useAuth } from "@/lib/auth-context";
 import {
   Form,
   FormControl,
@@ -68,6 +69,7 @@ function CreateSessionContent() {
   const [nightLords, setNightLords] = useState<NightLord[]>([]);
   const [nightfarers, setNightfarers] = useState<Nightfarer[]>([]);
   const [isLoadingCharacters, setIsLoadingCharacters] = useState<boolean>(true);
+  const { userData } = useAuth();
   
   // Character counter states
   const [sessionNameLength, setSessionNameLength] = useState(0);
@@ -188,13 +190,29 @@ function CreateSessionContent() {
     setIsLoading(true);
     
     try {
+      // Get region based on user settings
+      const userRegion = userData?.autoRegion ? userData.cmRegion : userData?.region;
+      
+      if (!userRegion) {
+        throw new Error("User region information is missing");
+      }
+      
+      // Get platform from user data
+      const userPlatform = userData?.platform;
+      
+      if (!userPlatform) {
+        throw new Error("User platform information is missing");
+      }
+      
       // Sanitize inputs before submission
       const sessionData: CreateSessionParams = {
         gamePassword: data.password.trim(),
         name: data.sessionName.trim(),
         nightLord: selectedLord,
         nightfarer: selectedFarer,
-        isPrivate: false
+        isPrivate: false,
+        region: userRegion,
+        platform: userPlatform
       };
       
       const responseData = await createSession(sessionData);

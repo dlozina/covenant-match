@@ -172,6 +172,28 @@ function JoinSessionContent() {
       });
       return;
     }
+
+    // Get region based on user settings
+    const userRegion = userData.autoRegion ? userData.cmRegion : userData.region;
+    
+    if (!userRegion) {
+      setNotification({
+        type: 'error',
+        message: "User region information is missing"
+      });
+      return;
+    }
+    
+    // Get platform from user data
+    const userPlatform = userData.platform;
+    
+    if (!userPlatform) {
+      setNotification({
+        type: 'error',
+        message: "User platform information is missing"
+      });
+      return;
+    }
     
     setIsLoading(true);
     
@@ -181,7 +203,9 @@ function JoinSessionContent() {
         selectedFarer,
         userId,
         userData.username,
-        userData.covenantName || 'Unknown'
+        userData.covenantName || 'Unknown',
+        userRegion,
+        userPlatform
       );
       
       router.push(`/sessions/run?id=${sessionId}`);

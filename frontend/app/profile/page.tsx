@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { toast } from "sonner"
 import { MainLayout } from "@/components/layout"
 import { Button } from "@/components/ui/button"
 import {
@@ -50,7 +49,6 @@ function ProfileContent() {
 
   const handleLogout = () => {
     logout();
-    toast.success("Logged out successfully");
     router.push('/');
   };
 
@@ -117,6 +115,10 @@ function ProfileContent() {
                       <div>
                         <h3 className="text-sm md:text-base font-medium">Auto Region Detection</h3>
                         <p className="text-sm md:text-base text-muted-foreground break-words">{userData.autoRegion ? "Enabled" : "Disabled"}</p>
+                      </div>
+                      <div>
+                        <h3 className="text-sm md:text-base font-medium">Detected Covenant-Match Region</h3>
+                        <p className="text-sm md:text-base text-muted-foreground break-words">{userData.cmRegion || "Unknown"}</p>
                       </div>
                     </div>
                   </div>

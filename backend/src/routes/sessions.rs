@@ -12,7 +12,9 @@ use mongodb::Database;
         ("status" = Option<String>, Query, description = "Filter sessions by status (e.g., 'Open', 'InProgress', 'Completed')"),
         ("limit" = Option<u64>, Query, description = "Limit number of results (default: 10)"),
         ("offset" = Option<u64>, Query, description = "Offset for pagination (default: 0)"),
-        ("isPrivate" = Option<bool>, Query, description = "Filter sessions by private status (default: false)")
+        ("isPrivate" = Option<bool>, Query, description = "Filter sessions by private status (default: false)"),
+        ("region" = Option<String>, Query, description = "Filter sessions by player region"),
+        ("platform" = Option<String>, Query, description = "Filter sessions by player platform")
     ),
     responses(
         (status = 200, description = "List of sessions retrieved successfully", body = Vec<SessionResponseDto>),
@@ -29,8 +31,12 @@ async fn get_sessions(
     let limit = query.get("limit").and_then(|v| v.parse::<u64>().ok());
     let offset = query.get("offset").and_then(|v| v.parse::<u64>().ok());
     let is_private = query.get("isPrivate").and_then(|v| v.parse::<bool>().ok());
+    let region = query.get("region").cloned();
+    let platform = query.get("platform").cloned();
 
-    match session_service::get_sessions(&db, status, limit, offset, is_private).await {
+    match session_service::get_sessions(&db, status, limit, offset, is_private, region, platform)
+        .await
+    {
         Ok(sessions) => HttpResponse::Ok().json(sessions),
         Err(e) => {
             log::error!("Error fetching sessions: {:?}", e);
@@ -67,7 +73,9 @@ async fn create_session(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
@@ -111,7 +119,9 @@ async fn get_session(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
@@ -204,7 +214,9 @@ async fn start_session(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
@@ -250,12 +262,14 @@ async fn cancel_session(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
     match session_service::cancel_session(&db, &id, &user_id).await {
-        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+        Ok(()) => HttpResponse::Ok().json(serde_json::json!({
             "status": "success",
             "message": "Session cancelled successfully"
         })),
@@ -269,7 +283,7 @@ async fn cancel_session(
     }
 }
 
-/// Leave a session (joined player only, before session starts)
+/// Leave a session (joined player only, before session starts, after it's completed or cancelled)
 #[utoipa::path(
     post,
     path = "/api/v1/sessions/{id}/leave",
@@ -299,12 +313,14 @@ async fn leave_session(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
     match session_service::leave_session(&db, &id, &user_id).await {
-        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+        Ok(()) => HttpResponse::Ok().json(serde_json::json!({
             "status": "success",
             "message": "Left session successfully"
         })),
@@ -350,12 +366,14 @@ async fn complete_session(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
     // Extract duration from request body if provided
-    let duration = body.and_then(|b| b.get("duration").and_then(|d| d.as_i64()));
+    let duration = body.and_then(|b| b.get("duration").and_then(serde_json::Value::as_i64));
 
     match session_service::complete_session(&db, &id, &user_id, duration).await {
         Ok(session) => HttpResponse::Ok().json(session),
@@ -400,7 +418,9 @@ async fn recreate_session(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
@@ -449,7 +469,9 @@ async fn update_session(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
@@ -497,7 +519,7 @@ async fn submit_result(
     let result_data = result_data.into_inner();
 
     match session_service::submit_result(&db, &id, result_data).await {
-        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+        Ok(()) => HttpResponse::Ok().json(serde_json::json!({
             "status": "success",
             "message": "Result submitted successfully"
         })),
@@ -541,7 +563,9 @@ async fn get_results(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
@@ -564,7 +588,9 @@ async fn get_results(
     params(
         ("status" = Option<String>, Query, description = "Filter sessions by status (e.g., 'Open', 'InProgress', 'Completed')"),
         ("limit" = Option<u64>, Query, description = "Limit number of results (default: 10)"),
-        ("offset" = Option<u64>, Query, description = "Offset for pagination (default: 0)")
+        ("offset" = Option<u64>, Query, description = "Offset for pagination (default: 0)"),
+        ("region" = Option<String>, Query, description = "Filter sessions by player region"),
+        ("platform" = Option<String>, Query, description = "Filter sessions by player platform")
     ),
     responses(
         (status = 200, description = "List of minimal session information retrieved successfully", body = Vec<MinimalSessionDto>),
@@ -580,8 +606,11 @@ async fn get_public_sessions(
     let status = query.get("status").cloned();
     let limit = query.get("limit").and_then(|v| v.parse::<u64>().ok());
     let offset = query.get("offset").and_then(|v| v.parse::<u64>().ok());
+    let region = query.get("region").cloned();
+    let platform = query.get("platform").cloned();
 
-    match session_service::get_minimal_sessions(&db, status, limit, offset).await {
+    match session_service::get_minimal_sessions(&db, status, limit, offset, region, platform).await
+    {
         Ok(sessions) => HttpResponse::Ok().json(sessions),
         Err(e) => {
             log::error!("Error fetching public sessions: {:?}", e);
@@ -612,7 +641,9 @@ async fn get_user_active_session(db: web::Data<Database>, req: HttpRequest) -> i
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
@@ -621,6 +652,56 @@ async fn get_user_active_session(db: web::Data<Database>, req: HttpRequest) -> i
         Err(e) => {
             log::error!("Error checking active session: {:?}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": "error",
+                "message": e.to_string()
+            }))
+        }
+    }
+}
+
+/// Reset the new session flags (once enough players have joined)
+#[utoipa::path(
+    post,
+    path = "/api/v1/sessions/{id}/reset-flags",
+    params(
+        ("id" = String, Path, description = "Session ID to reset flags for")
+    ),
+    responses(
+        (status = 200, description = "Session flags reset successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Session not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "sessions"
+)]
+#[post("/api/v1/sessions/{id}/reset-flags")]
+async fn reset_session_flags(
+    db: web::Data<Database>,
+    path: web::Path<String>,
+    req: HttpRequest,
+) -> impl Responder {
+    let id = path.into_inner();
+
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
+        claims.sub.clone()
+    };
+
+    match session_service::reset_session_flags(&db, &id, &user_id).await {
+        Ok(()) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "message": "Session flags reset successfully"
+        })),
+        Err(e) => {
+            log::error!("Error resetting session flags: {:?}", e);
+            HttpResponse::BadRequest().json(serde_json::json!({
                 "status": "error",
                 "message": e.to_string()
             }))
@@ -646,5 +727,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         .service(recreate_session)
         .service(update_session)
         .service(submit_result)
-        .service(get_results);
+        .service(get_results)
+        .service(reset_session_flags);
 }

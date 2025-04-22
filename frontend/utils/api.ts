@@ -392,13 +392,32 @@ export const fetchSessions = async (
   isLoggedIn: boolean,
   currentPage: number,
   limit: number,
-  statusFilter: string
+  statusFilter: string,
+  region?: string,
+  platform?: string
 ): Promise<{ sessions?: Session[], minimalSessions?: MinimalSession[] }> => {
   try {
+    // For logged-in users, ensure we have region data before proceeding
+    // This prevents showing sessions from other regions during refresh
+    if (isLoggedIn && !region) {
+      console.warn("No region specified for logged-in user when fetching sessions");
+      // Return empty data to prevent showing sessions from other regions
+      return { sessions: [] };
+    }
+
     const offset = (currentPage - 1) * limit;
+    // Format status parameter to match backend expectations (lowercase with underscores)
+    const formattedStatus = statusFilter === 'InProgress' ? 'in_progress' : statusFilter.toLowerCase();
     // Add status parameter to only fetch sessions with the current status filter
-    const statusParam = statusFilter !== 'All' ? `&status=${statusFilter}` : '';
+    const statusParam = statusFilter !== 'All' ? `&status=${formattedStatus}` : '';
     const token = getToken();
+    
+    // Add region and platform parameters if provided
+    const regionParam = region ? `&region=${encodeURIComponent(region)}` : '';
+    const platformParam = platform ? `&platform=${encodeURIComponent(platform)}` : '';
+    
+    // Log API request parameters for debugging
+    console.log(`Fetching sessions with params - status: ${formattedStatus}, region: ${region}, platform: ${platform}`);
     
     // Different endpoints based on authentication status
     if (isLoggedIn && token) {
@@ -406,7 +425,7 @@ export const fetchSessions = async (
       // Always set isPrivate=false to ensure we never show private sessions
       const isPrivateParam = '&isPrivate=false';
       
-      const response = await fetch(`${API_URL}/api/v1/sessions?limit=${limit}&offset=${offset}${statusParam}${isPrivateParam}`, {
+      const response = await fetch(`${API_URL}/api/v1/sessions?limit=${limit}&offset=${offset}${statusParam}${isPrivateParam}${regionParam}${platformParam}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -545,7 +564,9 @@ export const joinSession = async (
   nightfarer: string,
   userId: string,
   username: string,
-  covenantName: string
+  covenantName: string,
+  region: string,
+  platform: string
 ): Promise<void> => {
   try {
     const token = getToken();
@@ -560,7 +581,9 @@ export const joinSession = async (
         nightfarer,
         userId,
         username,
-        covenantName
+        covenantName,
+        region,
+        platform
       }),
     });
     
@@ -625,6 +648,8 @@ export interface CreateSessionParams {
   nightLord: string;
   nightfarer: string;
   isPrivate: boolean;
+  region: string;
+  platform: string;
 }
 
 // Function to create a session

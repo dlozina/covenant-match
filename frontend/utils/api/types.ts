@@ -141,6 +141,7 @@ export interface CreateSessionParams {
   nightLord: string;
   nightfarer: string;
   isPrivate: boolean;
+  region: string;
 }
 
 export interface JoinSessionParams {
@@ -148,6 +149,7 @@ export interface JoinSessionParams {
   userId: string;
   username: string;
   covenantName: string;
+  region: string;
 }
 
 // Statistics types

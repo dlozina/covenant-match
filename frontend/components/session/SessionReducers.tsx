@@ -9,7 +9,7 @@ export interface SessionState {
   export type SessionAction = 
     | { type: 'START_SESSION' }
     | { type: 'UPDATE_ELAPSED'; payload: number }
-    | { type: 'FINISH_SESSION' }
+    | { type: 'FINISH_SESSION'; payload?: number }
     | { type: 'RESTORE_SESSION'; payload: Partial<SessionState> }
     | { type: 'RESET_SESSION' };
   
@@ -72,7 +72,7 @@ export interface SessionState {
         return {
           ...state,
           isSessionFinished: true,
-          finalDuration: state.elapsedSeconds
+          finalDuration: action.payload !== undefined ? action.payload : state.elapsedSeconds
         };
       case 'RESTORE_SESSION':
         return {

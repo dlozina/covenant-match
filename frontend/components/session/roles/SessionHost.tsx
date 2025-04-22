@@ -35,7 +35,8 @@ export function SessionHost() {
     startSession,
     resetSession,
     handleFinishSession,
-    updatePlayerReportedStatus
+    updatePlayerReportedStatus,
+    lastHeartbeat
   } = useSessionContext();
   
   // Get auth context - moved before conditional return
@@ -262,13 +263,6 @@ export function SessionHost() {
   
   return (
     <>
-      {/* Notification component */}
-      <Notification 
-        notification={notification} 
-        onDismiss={clearNotification}
-        className="mb-4"
-      />
-    
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column for Desktop / Main Content for Mobile */}
@@ -302,6 +296,7 @@ export function SessionHost() {
                 sessionState={sessionState}
                 formatTime={formatTime}
                 sessionData={sessionData}
+                lastHeartbeat={lastHeartbeat}
               />
             )}
           </div>
@@ -340,10 +335,18 @@ export function SessionHost() {
               sessionState={sessionState}
               formatTime={formatTime}
               sessionData={sessionData}
+              lastHeartbeat={lastHeartbeat}
             />
           )}
         </div>
       </div>
+
+      {/* Notification component */}
+      <Notification 
+        notification={notification} 
+        onDismiss={clearNotification}
+        className="mb-4"
+      />
 
       {/* Dialogs */}
       <FinishSessionDialog 

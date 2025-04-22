@@ -11,6 +11,8 @@ pub struct PlayerInfo {
     pub username: String,
     pub nightfarer: String,
     pub covenant_name: String,
+    pub region: String,
+    pub platform: String,
     #[serde(alias = "joined_at")]
     pub joined_at: DateTime,
 }
@@ -73,6 +75,8 @@ pub struct GameSession {
     pub id: ObjectId,
     pub name: String,
     pub host_id: String,
+    pub region: String,
+    pub platform: String,
     pub password: String,
     pub is_private: bool,
     pub night_lord: String,
@@ -84,14 +88,17 @@ pub struct GameSession {
     pub updated_at: DateTime,
     pub started_at: Option<DateTime>,
     pub completed_at: Option<DateTime>,
-    #[serde(default)] // This makes it optional for backwards compatibility
     pub stats_updated: bool,
+    pub new_session_created: bool,
+    pub new_session_created_id: Option<ObjectId>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateSessionDto {
     pub name: String,
+    pub region: String,
+    pub platform: String,
     pub game_password: String,
     pub nightfarer: String,
     pub night_lord: String,
@@ -112,6 +119,8 @@ pub struct JoinSessionDto {
     pub username: String,
     pub nightfarer: String,
     pub covenant_name: String,
+    pub region: String,
+    pub platform: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
@@ -129,6 +138,8 @@ pub struct SessionResponseDto {
     pub id: String,
     pub name: String,
     pub host_id: String,
+    pub region: String,
+    pub platform: String,
     pub status: SessionStatus,
     pub night_lord: String,
     pub joined_players: Vec<PlayerInfo>,
@@ -140,6 +151,9 @@ pub struct SessionResponseDto {
     pub password: String,
     pub is_private: bool,
     pub stats_updated: bool,
+    pub new_session_created: bool,
+    #[schema(value_type = String)]
+    pub new_session_created_id: Option<ObjectId>,
 }
 
 impl From<GameSession> for SessionResponseDto {
@@ -148,6 +162,8 @@ impl From<GameSession> for SessionResponseDto {
             id: session.id.to_hex(),
             name: session.name,
             host_id: session.host_id,
+            region: session.region,
+            platform: session.platform,
             status: session.status,
             night_lord: session.night_lord,
             joined_players: session.joined_players,
@@ -159,6 +175,8 @@ impl From<GameSession> for SessionResponseDto {
             password: session.password,
             is_private: session.is_private,
             stats_updated: session.stats_updated,
+            new_session_created: session.new_session_created,
+            new_session_created_id: session.new_session_created_id,
         }
     }
 }
@@ -166,7 +184,7 @@ impl From<GameSession> for SessionResponseDto {
 /// Combined review DTO for submitting results, ratings, and feedback in one request
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct SessionReviewDto {
-    pub result: Option<String>,   // win, loss, etc.
+    pub result: Option<String>,   // win, loss, d/c.
     pub rating: Option<i32>,      // 1-5 stars
     pub feedback: Option<String>, // Optional text feedback
 }

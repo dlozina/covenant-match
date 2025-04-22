@@ -11,20 +11,28 @@ export function useSessionTimer(
   useEffect(() => {
     if (!isActive) return;
     
-    let animationFrameId: number;
+    // Make sure we have a valid start time
+    if (!startTimeRef.current) {
+      return;
+    }
     
-    const tick = () => {
+    // Use setInterval for more consistent timing
+    const intervalId = setInterval(() => {
       const now = Date.now();
-      const elapsed = Math.floor((now - (startTimeRef.current || now)) / 1000);
+      const startTime = startTimeRef.current;
       
+      // Safety check
+      if (!startTime) {
+        console.error('startTimeRef became null during timer execution');
+        return;
+      }
+      
+      const elapsed = Math.floor((now - startTime) / 1000);
       onTick(elapsed);
-      animationFrameId = requestAnimationFrame(tick);
-    };
-    
-    animationFrameId = requestAnimationFrame(tick);
+    }, 1000); // Update every second
     
     return () => {
-      cancelAnimationFrame(animationFrameId);
+      clearInterval(intervalId);
     };
   }, [isActive, onTick, startTimeRef]);
 }

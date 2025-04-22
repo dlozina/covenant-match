@@ -46,13 +46,17 @@ export class SessionService {
    * @param currentPage Current page number (1-indexed)
    * @param limit Number of items per page
    * @param statusFilter Filter by status
+   * @param region Filter by player region
+   * @param platform Filter by player platform
    * @returns List of sessions
    */
   async fetchSessions(
     isLoggedIn: boolean,
     currentPage: number = 1,
     limit: number = 10,
-    statusFilter: string = 'All'
+    statusFilter: string = 'All',
+    region?: string,
+    platform?: string
   ): Promise<{ sessions?: Session[], minimalSessions?: MinimalSession[] }> {
     try {
       let url = `/api/v1/sessions?page=${currentPage}&limit=${limit}`;
@@ -60,6 +64,15 @@ export class SessionService {
       // Add status filter if it's not "All"
       if (statusFilter !== 'All') {
         url += `&status=${statusFilter}`;
+      }
+      
+      // Add region and platform filters if provided
+      if (region) {
+        url += `&region=${encodeURIComponent(region)}`;
+      }
+      
+      if (platform) {
+        url += `&platform=${encodeURIComponent(platform)}`;
       }
       
       if (isLoggedIn) {
@@ -116,20 +129,23 @@ export class SessionService {
    * @param userId User ID
    * @param username Username
    * @param covenantName Covenant name
+   * @param region User region
    */
   async joinSession(
     sessionId: string,
     nightfarer: string,
     userId: string,
     username: string,
-    covenantName: string
+    covenantName: string,
+    region: string
   ): Promise<void> {
     try {
       const joinData: JoinSessionParams = {
         nightfarer,
         userId,
         username,
-        covenantName
+        covenantName,
+        region
       };
       
       await this.client.post<void>(

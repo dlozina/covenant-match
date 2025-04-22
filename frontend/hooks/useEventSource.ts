@@ -1,5 +1,4 @@
 import { useEffect, useCallback, useRef } from 'react';
-import { toast } from 'sonner';
 import { EventSourcePolyfill } from 'event-source-polyfill';
 
 // Define types for event messages
@@ -125,7 +124,6 @@ class EventSourceService {
     if (!token) {
       console.error('No valid authentication token found');
       this.connectionStatus = 'error';
-      toast.error('Authentication error - please refresh the page or log in again');
       return;
     }
     
@@ -245,7 +243,6 @@ class EventSourceService {
             }, delay);
           } else if (this.reconnectAttempts >= this.maxReconnectAttempts) {
             console.log('Maximum reconnection attempts reached');
-            toast.error('Could not establish a stable connection. Please refresh the page.');
           }
         } else {
           console.log('EventSource error but connection not closed, status:', readyState);
@@ -358,7 +355,6 @@ class EventSourceService {
     } catch (error) {
       console.error('Error creating EventSource:', error);
       this.connectionStatus = 'error';
-      toast.error('Failed to connect to real-time updates');
     }
   }
   

@@ -41,7 +41,7 @@ type FriendFilter = "All" | "Friends";
 
 export default function SessionsPage() {
   const router = useRouter();
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, userData, isLoading: isUserLoading } = useAuth();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [minimalSessions, setMinimalSessions] = useState<MinimalSession[]>([]);
   const [filteredSessions, setFilteredSessions] = useState<Session[]>([]);
@@ -51,24 +51,49 @@ export default function SessionsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("Open");
   const [friendFilter, setFriendFilter] = useState<FriendFilter>("All");
+  const [shouldFetch, setShouldFetch] = useState(false); // Single flag to control fetching
   const limit = 10;
+  
+  // Get user region and platform data for API calls
+  const userRegion = userData?.autoRegion ? userData.cmRegion : userData?.region;
+  const userPlatform = userData?.platform;
 
-  // Define fetchSessionsData before using it in useEffect
+  // Wait initially before first fetch to ensure userData is loaded
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShouldFetch(true);
+    }, 100); // 100ms delay to ensure userData is loaded
+    
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Fetch sessions data when needed
   const fetchSessionsData = useCallback(async () => {
+    if (!shouldFetch) return;
+    if (isLoggedIn && isUserLoading) return; // Wait for user data if logged in
+    
     setIsLoading(true);
     setError(null);
 
     try {
-      const result = await fetchSessions(isLoggedIn, currentPage, limit, statusFilter);
+      console.log("Fetching sessions with status:", statusFilter, 
+                 "region:", userRegion, "platform:", userPlatform);
+      
+      const result = await fetchSessions(
+        isLoggedIn, 
+        currentPage, 
+        limit, 
+        statusFilter,
+        userRegion,
+        userPlatform
+      );
       
       if (result.sessions) {
         setSessions(result.sessions);
         setFilteredSessions(result.sessions);
-        // For now, we'll just assume there are more pages if we get a full page of results
         setTotalPages(result.sessions.length === limit ? currentPage + 1 : currentPage);
       } else if (result.minimalSessions) {
         setMinimalSessions(result.minimalSessions);
-        // For now, we'll just assume there are more pages if we get a full page of results
         setTotalPages(result.minimalSessions.length === limit ? currentPage + 1 : currentPage);
       }
     } catch (error: unknown) {
@@ -76,36 +101,43 @@ export default function SessionsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoggedIn, currentPage, limit, statusFilter]);
+  }, [isLoggedIn, currentPage, limit, statusFilter, userRegion, userPlatform, isUserLoading, shouldFetch]);
   
-  // Define applyFilters before using it in useEffect
+  // Apply friend filter - separate from data fetching
   const applyFilters = useCallback(() => {
-    const result = [...sessions];
-    
-    // Status filtering is now handled at the API level
-    
-    // Apply friend filter (placeholder for future implementation)
+    // Only for friend filtering, not status filtering
     if (friendFilter === "Friends") {
+      // Placeholder for friend filtering logic
       // This will be implemented later
-      // For now, we'll just show a toast message
     }
-    
-    setFilteredSessions(result);
-    
-    // Update pagination based on filtered results
-    setTotalPages(Math.max(1, Math.ceil(result.length / limit)));
-    if (currentPage > Math.ceil(result.length / limit) && result.length > 0) {
-      setCurrentPage(1);
-    }
-  }, [sessions, friendFilter, currentPage, limit]);
+  }, [friendFilter]);
 
+  // Apply friend filtering whenever that filter or session data changes
+  useEffect(() => {
+    if (sessions.length > 0) {
+      const filtered = [...sessions];
+      // Friend filtering would go here
+      setFilteredSessions(filtered);
+    }
+  }, [sessions, friendFilter, applyFilters]);
+
+  // Single main effect for fetching sessions
   useEffect(() => {
     fetchSessionsData();
-  }, [currentPage, statusFilter, fetchSessionsData]);
+  }, [currentPage, statusFilter, shouldFetch, fetchSessionsData]);
+  
+  // Handler for refresh button
+  const handleRefresh = () => {
+    if (!isLoading) {
+      fetchSessionsData(); // Direct call, no state updates that would trigger useEffects
+    }
+  };
 
-  useEffect(() => {
-    applyFilters();
-  }, [sessions, friendFilter, applyFilters]);
+  // Status filter change handler
+  const handleStatusFilterChange = (value: StatusFilter) => {
+    setStatusFilter(value);
+    setCurrentPage(1); // Reset to first page when filter changes
+  };
 
   async function handleJoinSession(sessionId: string) {
     // Require authentication to join a session
@@ -162,9 +194,19 @@ export default function SessionsPage() {
           <div>
             <h2 className="text-lg md:text-xl font-semibold">Looking for a session?</h2>
           </div>
-          <Button className="w-full sm:w-auto" asChild>
-            <Link href={isLoggedIn ? "/sessions/create" : "/login?redirect=/sessions/create"}>Create Session</Link>
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              className="w-full sm:w-auto order-2 sm:order-1"
+              onClick={handleRefresh}
+              disabled={isLoading}
+            >
+              {isLoading ? "Refreshing..." : "Refresh Sessions"}
+            </Button>
+            <Button className="w-full sm:w-auto order-1 sm:order-2" asChild>
+              <Link href={isLoggedIn ? "/sessions/create" : "/login?redirect=/sessions/create"}>Create Session</Link>
+            </Button>
+          </div>
         </div>
         
         {/* Filter Section */}
@@ -179,7 +221,7 @@ export default function SessionsPage() {
                   id="status-filter"
                   className="w-full p-2 rounded-md border bg-background"
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                  onChange={(e) => handleStatusFilterChange(e.target.value as StatusFilter)}
                 >
                   <option value="All">All Statuses</option>
                   <option value="Open">Open</option>
@@ -193,7 +235,7 @@ export default function SessionsPage() {
                 <label htmlFor="mobile-status-filter" className="block text-sm font-medium mb-1">Status</label>
                 <Select
                   value={statusFilter}
-                  onValueChange={(value) => setStatusFilter(value as StatusFilter)}
+                  onValueChange={(value) => handleStatusFilterChange(value as StatusFilter)}
                 >
                   <SelectTrigger id="mobile-status-filter" className="h-10 w-full">
                     <SelectValue placeholder="Select status" />
@@ -245,6 +287,15 @@ export default function SessionsPage() {
             )}
           </div>
         </div>
+        
+        {isUserLoading && isLoggedIn && (
+          <div className="flex justify-center items-center my-6 py-8">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-700 mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading user data...</p>
+            </div>
+          </div>
+        )}
         
         {isLoading ? (
           <div className="flex justify-center py-8">

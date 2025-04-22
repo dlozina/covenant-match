@@ -78,7 +78,9 @@ async fn get_current_user_statistics(db: web::Data<Database>, req: HttpRequest) 
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
@@ -126,7 +128,9 @@ async fn get_current_user_session_history(
     // Extract user_id before any await points
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
@@ -224,7 +228,7 @@ async fn get_night_lord_statistics(
 
             // Calculate win rate
             let win_rate = if total_played > 0 {
-                (total_wins as f64 / total_played as f64) * 100.0
+                (f64::from(total_wins) / f64::from(total_played)) * 100.0
             } else {
                 0.0
             };
@@ -289,7 +293,7 @@ async fn get_user_statistics(
         let extensions = req.extensions();
         match extensions.get::<jwt::Claims>() {
             Some(claims) => claims.sub.clone(),
-            None => "".to_string(), // Should never happen due to middleware
+            None => String::new(), // Should never happen due to middleware
         }
     };
 
@@ -396,7 +400,7 @@ async fn get_all_night_lord_statistics(db: web::Data<Database>) -> impl Responde
             // Calculate win rates for each Night Lord
             for entry in night_lord_stats.values_mut() {
                 if entry.played > 0 {
-                    entry.win_rate = (entry.wins as f64 / entry.played as f64) * 100.0;
+                    entry.win_rate = (f64::from(entry.wins) / f64::from(entry.played)) * 100.0;
                 }
             }
 
@@ -447,7 +451,9 @@ async fn get_session_details(
     // Get claims from request extensions (set by middleware)
     let user_id = {
         let extensions = req.extensions();
-        let claims = extensions.get::<jwt::Claims>().unwrap();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
 
@@ -508,7 +514,8 @@ pub struct PlayerDetail {
     get,
     path = "/api/v1/statistics/sessions-stats",
     params(
-        ("status" = Option<String>, Query, description = "Filter sessions by status (e.g., 'Open', 'InProgress', 'Completed')")
+        ("status" = Option<String>, Query, description = "Filter sessions by status (e.g., 'Open', 'InProgress', 'Completed')"),
+        ("is_private" = Option<bool>, Query, description = "Filter sessions by private status")
     ),
     responses(
         (status = 200, description = "Sessions count retrieved successfully", body = SessionsStatsResponse),
@@ -523,7 +530,13 @@ async fn get_sessions_stats(
 ) -> impl Responder {
     let status = query.get("status").cloned();
 
-    match session_repository::count_sessions_by_status(&db, status).await {
+    // Parse is_private from query if provided, default to false if not provided
+    let is_private = query
+        .get("is_private")
+        .map(|val| matches!(val.to_lowercase().as_str(), "true"))
+        .or(Some(false)); // Default to false when not provided
+
+    match session_repository::count_sessions_by_status(&db, status, is_private).await {
         Ok(count) => HttpResponse::Ok().json(json!({
             "status": "success",
             "data": {
@@ -566,7 +579,7 @@ async fn get_covenant_stats(db: web::Data<Database>) -> impl Responder {
             log::error!("Error fetching covenant statistics: {:?}", e);
 
             // Return a more informative error message
-            let error_message = format!("Failed to retrieve covenant statistics: {}", e);
+            let error_message = format!("Failed to retrieve covenant statistics: {e}");
 
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "status": "error",

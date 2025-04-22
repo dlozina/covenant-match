@@ -1,3 +1,4 @@
+pub mod chat;
 pub mod game_data;
 pub mod health;
 pub mod sessions;
@@ -5,3 +6,4 @@ pub mod sse;
 pub mod statistics;
 pub mod users;
 pub mod ws;
+pub mod user_data;

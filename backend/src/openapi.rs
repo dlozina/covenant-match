@@ -1,7 +1,9 @@
+use crate::models::chat::ChatMessage;
 use crate::models::game_data::{
     Covenant, CovenantResponse, GameDataResponse, NightLord, NightLordResponse, Nightfarer,
     NightfarerResponse, Platform, PlatformResponse, Region, RegionResponse,
 };
+use crate::models::geo_location::{CoordinatesDto, GeoLocationDataDto};
 use crate::models::session::{
     CovenantStats, CovenantStatsResponse, CreateSessionDto, GameResult, JoinSessionDto,
     MinimalSessionDto, PlayerInfo, RateSessionDto, ResultsResponseDto, SessionResponseDto,
@@ -12,11 +14,15 @@ use crate::models::user::{
     AuthResponse, CreateUserDto, GetUsersQuery, LoginUserDto, PaginationInfo, RefreshTokenResponse,
     UpdateUserDto, UpdateUserProfileDto, User, UserResponse, UsersListData, UsersListResponse,
 };
+use crate::models::user_data::UserDataResponseDto;
 use crate::routes::statistics::NightLordStatsResponse;
 use crate::routes::users::{JwtInfoDto, TokenInfoResponse};
 use crate::sse::messages::{ServerMessage, SessionInfo, SseSessionStatus};
 
-use crate::routes::{game_data::*, health::*, sessions::*, sse::*, statistics::*, users::*, ws::*};
+use crate::routes::{
+    chat::*, game_data::*, health::*, sessions::*, sse::*, statistics::*, user_data::*, users::*,
+    ws::*,
+};
 
 // Import SSE models
 use crate::config::get_config;
@@ -54,6 +60,9 @@ use utoipa::{
         get_user_by_id_admin,
         update_user_admin,
         delete_user_admin,
+        // User data routes
+        get_current_user_data,
+        test_cloudflare_headers,
         // Session routes
         get_sessions,
         create_session,
@@ -69,6 +78,7 @@ use utoipa::{
         get_results,
         get_public_sessions,
         get_user_active_session,
+        reset_session_flags,
         // Game data routes
         get_game_data,
         get_platforms,
@@ -76,6 +86,8 @@ use utoipa::{
         get_covenants,
         get_nightfarers,
         get_night_lords,
+        // Chat routes
+        get_chat_history,
         // SSE routes
         events_route,
         events_status,
@@ -110,6 +122,10 @@ use utoipa::{
             PaginationInfo,
             JwtInfoDto,
             TokenInfoResponse,
+            // User data models
+            UserDataResponseDto,
+            GeoLocationDataDto,
+            CoordinatesDto,
             // Session models
             CreateSessionDto,
             JoinSessionDto,
@@ -138,6 +154,8 @@ use utoipa::{
             CovenantResponse,
             NightfarerResponse,
             NightLordResponse,
+            // Chat models
+            ChatMessage,
             // SSE models
             ServerMessage,
             SessionInfo,
@@ -161,9 +179,11 @@ use utoipa::{
         (name = "health", description = "Health check endpoints"),
         (name = "users", description = "User management endpoints"),
         (name = "admin", description = "Admin-only endpoints"),
+        (name = "users-data", description = "User data endpoints with geolocation information"),
         (name = "sessions", description = "Session management endpoints"),
         (name = "game-data", description = "Game data endpoints"),
         (name = "statistics", description = "Statistics endpoints"),
+        (name = "chat", description = "Chat messaging endpoints"),
         (name = "realtime", description = "Real-time communication endpoints")
     ),
     modifiers(&SecurityAddon),

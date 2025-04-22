@@ -20,11 +20,11 @@ pub struct Claims {
 /// Generate a JWT for a user
 ///
 /// # Arguments
-/// * `user_id` - The MongoDB ObjectId of the user
+/// * `user_id` - The `MongoDB` `ObjectId` of the user
 /// * `role` - The role of the user ("admin" or "user")
 ///
 /// # Returns
-/// A Result containing either the encoded JWT or an AppError
+/// A Result containing either the encoded JWT or an `AppError`
 ///
 /// # Duration format
 /// The token expiration is controlled by the `jwt.expires_in` setting in config,
@@ -41,23 +41,20 @@ pub fn generate_token(user_id: &ObjectId, role: &str) -> Result<String, AppError
     let expires_in = config.jwt_expires_in();
 
     // Calculate expiration time based on the configured duration
-    let expiration = match parse_duration_to_seconds(expires_in) {
-        Some(seconds) => {
-            let now = Utc::now().timestamp();
-            (now + seconds) as usize
-        }
-        None => {
-            // Default to 12 hours if parsing fails
-            log::warn!(
-                "Invalid duration format in config: '{}'. Using default of 12h",
-                expires_in
-            );
-            let now = Utc::now().timestamp();
-            (now + 12 * 3600) as usize
-        }
+    let expiration = if let Some(seconds) = parse_duration_to_seconds(expires_in) {
+        let now = Utc::now().timestamp();
+        (now + seconds).max(0) as usize
+    } else {
+        // Default to 12 hours if parsing fails
+        log::warn!(
+            "Invalid duration format in config: '{}'. Using default of 12h",
+            expires_in
+        );
+        let now = Utc::now().timestamp();
+        (now + 12 * 3600).max(0) as usize
     };
 
-    let issued_at = Utc::now().timestamp() as usize;
+    let issued_at = Utc::now().timestamp().max(0) as usize;
 
     let claims = Claims {
         sub: user_id.to_hex(),
@@ -72,7 +69,7 @@ pub fn generate_token(user_id: &ObjectId, role: &str) -> Result<String, AppError
         &claims,
         &EncodingKey::from_secret(jwt_secret.as_bytes()),
     )
-    .map_err(|e| AppError::InternalError(format!("Token generation error: {}", e)))
+    .map_err(|e| AppError::InternalError(format!("Token generation error: {e}")))
 }
 
 // Validate a JWT and extract the claims
@@ -114,9 +111,9 @@ pub fn decode_token(token: &str) -> Result<Claims, AppError> {
     )
     .map(|token_data| token_data.claims)
     .map_err(|e| match e.kind() {
-        jsonwebtoken::errors::ErrorKind::InvalidToken => AppError::InvalidToken,
-        jsonwebtoken::errors::ErrorKind::InvalidSignature => AppError::InvalidToken,
-        _ => AppError::InternalError(format!("Token decoding error: {}", e)),
+        jsonwebtoken::errors::ErrorKind::InvalidToken
+        | jsonwebtoken::errors::ErrorKind::InvalidSignature => AppError::InvalidToken,
+        _ => AppError::InternalError(format!("Token decoding error: {e}")),
     })
 }
 
@@ -138,9 +135,8 @@ fn parse_duration_to_seconds(duration_str: &str) -> Option<i64> {
 
     let (value_str, unit) = duration_str.split_at(len - 1);
 
-    let value = match value_str.parse::<i64>() {
-        Ok(v) => v,
-        Err(_) => return None,
+    let Ok(value) = value_str.parse::<i64>() else {
+        return None;
     };
 
     match unit {

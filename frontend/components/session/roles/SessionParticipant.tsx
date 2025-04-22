@@ -1,6 +1,7 @@
 import { useCallback, useReducer, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import Link from "next/link";
 import { 
   PlayerSection,
   SessionControlButtons,
@@ -31,7 +32,8 @@ export function SessionParticipant() {
     isHost,
     formatTime,
     resetSession,
-    updatePlayerReportedStatus
+    updatePlayerReportedStatus,
+    lastHeartbeat
   } = useSessionContext();
   
   // Get auth context - moved before conditional return
@@ -58,13 +60,15 @@ export function SessionParticipant() {
   
   // State for new session
   const [newSessionId, setNewSessionId] = useState<string | null>(null);
+  // Track if we've already shown notification for new session
+  const [hasShownNewSessionNotification, setHasShownNewSessionNotification] = useState<boolean>(false);
   
   // Function to handle notifications
-  const showNotification = useCallback((message: string, type: 'error' | 'success' | 'warning') => {
+  const showNotification = useCallback((message: string | JSX.Element, type: 'error' | 'success' | 'warning', persist: boolean = false) => {
     setNotification({ message, type });
     
-    // Auto-clear success notifications after 5 seconds
-    if (type === 'success') {
+    // Auto-clear success notifications after 5 seconds, unless persist is true
+    if (type === 'success' && !persist) {
       setTimeout(() => {
         setNotification(null);
       }, 5000);
@@ -87,6 +91,9 @@ export function SessionParticipant() {
     
     // Store in sessionStorage for recreation page
     sessionStorage.setItem('autoJoinSessionId', newSessionId);
+    
+    // Clear the pending session ID from localStorage
+    localStorage.removeItem('pendingNewSessionId');
     
     // Navigate to recreate
     router.push(`/sessions/recreate?id=${sessionData?.id}`);
@@ -188,6 +195,65 @@ export function SessionParticipant() {
     }
   }, [sessionData, router, showNotification]);
   
+  // Effect to detect when host has created a new session based on server data
+  useEffect(() => {
+    if (
+      sessionData?.newSessionCreated && 
+      sessionData.newSessionCreatedId && 
+      !hasShownNewSessionNotification
+    ) {
+      // Save the new session ID
+      setNewSessionId(sessionData.newSessionCreatedId);
+      
+      // Show notification with link to join the new session
+      // Make notification type success but also persist longer for users waking from sleep
+      setNotification({
+        type: 'success',
+        message: (
+          <div>
+            The host has created a new session. <Link href={`/sessions/recreate?id=${sessionData.id}`} className="underline font-bold">Click here</Link> to join the new session.
+          </div>
+        )
+      });
+      
+      // Mark that we've shown the notification
+      setHasShownNewSessionNotification(true);
+      
+      // Also store the ID in case the user refreshes
+      localStorage.setItem('pendingNewSessionId', sessionData.newSessionCreatedId);
+      
+      // NOTE: We've removed the auto-redirect logic from here since it's handled in SessionContext.tsx
+      // through the WebSocket/SSE newSession event. This avoids redundant redirection code.
+    }
+  }, [sessionData, hasShownNewSessionNotification]);
+  
+  // Additional effect to check for redirects that might have failed due to sleep mode
+  useEffect(() => {
+    // Check if newSessionCreated flag is true but we're still on this page
+    // This indicates the automatic redirect might have failed
+    if (
+      sessionData?.newSessionCreated && 
+      sessionData.newSessionCreatedId
+    ) {
+      // Check if we're already on the new session page
+      if (
+        window.location.href.includes(sessionData.newSessionCreatedId) ||
+        window.location.href.includes(`/sessions/run?id=${sessionData.newSessionCreatedId}`)
+      ) {
+        // We're already on the new session page, clear the localStorage
+        localStorage.removeItem('pendingNewSessionId');
+      } else {
+        // We're not on the new session page, show the notification
+        const message = (
+          <div className="font-medium">
+            A new session is available. <Link href={`/sessions/recreate?id=${sessionData.id}`} className="underline font-bold">Click here</Link> to join the new session.
+          </div>
+        );
+        showNotification(message, 'success', true);
+      }
+    }
+  }, [sessionData, showNotification]);
+  
   // Effect to update newSessionId when it changes in localStorage
   useEffect(() => {
     // Check if we have a pending new session ID
@@ -272,13 +338,6 @@ export function SessionParticipant() {
   
   return (
     <>
-      {/* Notification component */}
-      <Notification 
-        notification={notification} 
-        onDismiss={clearNotification}
-        className="mb-4"
-      />
-    
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column for Desktop / Main Content for Mobile */}
@@ -312,6 +371,7 @@ export function SessionParticipant() {
                 sessionState={sessionState}
                 formatTime={formatTime}
                 sessionData={sessionData}
+                lastHeartbeat={lastHeartbeat}
               />
             )}
           </div>
@@ -332,6 +392,8 @@ export function SessionParticipant() {
           />
         </div>
 
+        
+
         {/* Right Column for Desktop Only */}
         <div className="hidden lg:flex lg:col-span-1 flex-col h-full">
           {/* Report Your Result Section - Only shown after session is finished */}
@@ -350,10 +412,18 @@ export function SessionParticipant() {
               sessionState={sessionState}
               formatTime={formatTime}
               sessionData={sessionData}
+              lastHeartbeat={lastHeartbeat}
             />
           )}
         </div>
       </div>
+
+      {/* Notification component */}
+      <Notification 
+        notification={notification} 
+        onDismiss={clearNotification}
+        className="mb-4"
+      />
 
       {/* Dialogs */}
       <WarningDialog 

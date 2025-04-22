@@ -11,7 +11,7 @@ mod utils;
 mod ws;
 
 use crate::config::get_config;
-use crate::routes::{health, statistics, users};
+use crate::routes::{chat, health, statistics, users};
 use actix::Actor;
 use actix_cors::Cors;
 use actix_web::web::Data;
@@ -21,7 +21,7 @@ use log::{info, warn};
 use middleware::auth::Auth;
 use mongodb::{options::ClientOptions, Client};
 use routes::{game_data, sessions};
-use services::{auth_service, session_service, user_service};
+use services::{auth_service, chat_service, session_service, user_service};
 use sse::heartbeat::HeartbeatActor;
 use sse::partition::{SessionRouter, DEFAULT_PARTITION_COUNT};
 use sse::session_pruner::SessionPrunerActor;
@@ -33,7 +33,7 @@ use utoipa_swagger_ui::SwaggerUi;
 use ws::session::SessionManager as WsSessionManager;
 
 /// Starts a background task to periodically clean up old login attempts
-async fn start_login_attempts_cleanup(db: mongodb::Database) {
+fn start_login_attempts_cleanup(db: mongodb::Database) {
     let db = Arc::new(Mutex::new(db));
 
     task::spawn(async move {
@@ -56,6 +56,33 @@ async fn start_login_attempts_cleanup(db: mongodb::Database) {
 
             // Release the lock
             drop(db_lock);
+        }
+    });
+}
+
+/// Starts a background task to periodically clean up inactive chat sessions
+fn start_chat_cleanup(chat_service: Arc<chat_service::ChatService>) {
+    task::spawn(async move {
+        let config = get_config();
+        let cleanup_interval_minutes = config.chat_cleanup_interval_minutes();
+        let inactive_minutes = config.chat_inactive_minutes();
+
+        loop {
+            // Sleep first to avoid cleanup immediately on startup
+            tokio::time::sleep(Duration::from_secs(cleanup_interval_minutes * 60)).await;
+
+            info!("Running scheduled cleanup of inactive chat sessions");
+
+            match chat_service
+                .cleanup_inactive_sessions(inactive_minutes)
+                .await
+            {
+                Ok(_) => info!(
+                    "Cleaned up inactive chat sessions (older than {} minutes)",
+                    inactive_minutes
+                ),
+                Err(e) => warn!("Failed to clean up inactive chat sessions: {:?}", e),
+            }
         }
     });
 }
@@ -109,7 +136,7 @@ async fn main() -> std::io::Result<()> {
     let db = client.database("covenant-match");
 
     // Start the periodic cleanup of old login attempts
-    start_login_attempts_cleanup(db.clone()).await;
+    start_login_attempts_cleanup(db.clone());
     info!("Started periodic cleanup task for login attempts");
 
     // Initialize database with error handling
@@ -136,7 +163,7 @@ async fn main() -> std::io::Result<()> {
 
     // Check if we should use WebSockets or SSE
     let use_websockets = get_config().use_websockets();
-    let inactive_timeout = get_config().session_inactive_timeout() as i64;
+    let inactive_timeout = i64::try_from(get_config().session_inactive_timeout()).unwrap_or(86400); // Default to 24 hours if conversion fails
 
     info!(
         "Realtime configuration: use_websockets = {}, inactive_timeout = {} seconds",
@@ -144,7 +171,9 @@ async fn main() -> std::io::Result<()> {
     );
 
     // Initialize either WebSockets or SSE based on configuration
-    let sse_router = if !use_websockets {
+    let sse_router = if use_websockets {
+        None
+    } else {
         // Initialize SSE (Server-Sent Events)
         info!("Initializing SSE for real-time communications");
         let router = SessionRouter::new(DEFAULT_PARTITION_COUNT, None).start();
@@ -164,22 +193,32 @@ async fn main() -> std::io::Result<()> {
         session_service::set_sse_router(router.clone());
 
         Some(router)
-    } else {
-        None
     };
 
     // Initialize WebSocket session manager if needed
     let ws_session_manager = if use_websockets {
         info!("Initializing WebSockets for real-time communications");
-        let session_manager = WsSessionManager::default().start();
+
+        // Initialize chat service
+        let chat_service = Arc::new(chat_service::ChatService::new(&db));
+        info!("Chat service initialized");
+
+        // Create session manager with chat service
+        let session_manager = WsSessionManager::new(Some(chat_service.clone())).start();
 
         // Register the WebSocket session manager with the session service
         session_service::set_session_manager(session_manager.clone());
 
-        Some(session_manager)
+        Some((session_manager, chat_service))
     } else {
         None
     };
+
+    // Start the periodic cleanup of inactive chat sessions
+    if let Some((_, chat_service)) = &ws_session_manager {
+        start_chat_cleanup(chat_service.clone());
+        info!("Started periodic cleanup task for inactive chat sessions");
+    }
 
     info!(
         "Starting HTTP server on {}:{}",
@@ -208,6 +247,8 @@ async fn main() -> std::io::Result<()> {
             .configure(sessions::config)
             .configure(game_data::config)
             .configure(statistics::config)
+            .configure(chat::config)
+            .configure(routes::user_data::config)
             // Add Swagger UI with the OpenAPI schema from our new module
             .service(
                 SwaggerUi::new("/api/docs/{_:.*}")
@@ -221,9 +262,10 @@ async fn main() -> std::io::Result<()> {
                 .configure(routes::sse::config);
         }
 
-        if let Some(manager) = &ws_session_manager {
+        if let Some((manager, chat_service)) = &ws_session_manager {
             app = app
                 .app_data(Data::new(manager.clone()))
+                .app_data(Data::new(chat_service.clone()))
                 .configure(routes::ws::config);
         }
 

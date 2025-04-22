@@ -1,6 +1,9 @@
 pub mod auth;
+pub mod chat;
 pub mod error;
 pub mod game_data;
 pub mod session;
 pub mod statistics;
 pub mod user;
+pub mod geo_location;
+pub mod user_data;

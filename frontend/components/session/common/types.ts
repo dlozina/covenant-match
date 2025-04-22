@@ -21,4 +21,6 @@ export interface SessionData {
   completedAt: string | null;
   password: string | null;
   _version?: number;
+  newSessionCreated?: boolean;
+  newSessionCreatedId?: string;
 } 

@@ -5,7 +5,7 @@ use std::env;
 #[derive(Deserialize)]
 struct RecaptchaResponse {
     pub success: bool,
-    pub score: Option<f32>, // Only available for v3
+    pub _score: Option<f32>, // Only available for v3
     #[serde(rename = "error-codes")]
     pub error_codes: Option<Vec<String>>,
 }
@@ -29,11 +29,12 @@ pub async fn verify_recaptcha(token: &str) -> Result<bool, AppError> {
         .form(&params)
         .send()
         .await
-        .map_err(|e| AppError::InternalError(format!("Failed to verify reCAPTCHA: {}", e)))?;
+        .map_err(|e| AppError::InternalError(format!("Failed to verify reCAPTCHA: {e}")))?;
 
-    let response: RecaptchaResponse = res.json().await.map_err(|e| {
-        AppError::InternalError(format!("Failed to parse reCAPTCHA response: {}", e))
-    })?;
+    let response: RecaptchaResponse = res
+        .json()
+        .await
+        .map_err(|e| AppError::InternalError(format!("Failed to parse reCAPTCHA response: {e}")))?;
 
     if !response.success {
         let errors = response.error_codes.unwrap_or_default().join(", ");
@@ -43,9 +44,9 @@ pub async fn verify_recaptcha(token: &str) -> Result<bool, AppError> {
             return Err(AppError::CaptchaVerificationFailed(
                 "Verification failed".to_string(),
             ));
-        } else {
-            return Err(AppError::CaptchaVerificationFailed(errors));
         }
+
+        return Err(AppError::CaptchaVerificationFailed(errors));
     }
 
     Ok(true)

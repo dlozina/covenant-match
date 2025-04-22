@@ -20,7 +20,7 @@ pub struct WsSession {
     client_id: String,
     /// Session id this client is connected to
     session_id: String,
-    /// Client must send ping at least once per 10 seconds (CLIENT_TIMEOUT),
+    /// Client must send ping at least once per 10 seconds (`CLIENT_TIMEOUT`),
     /// otherwise we drop connection.
     hb: Instant,
     /// Session manager actor address
@@ -31,7 +31,7 @@ impl Actor for WsSession {
     type Context = ws::WebsocketContext<Self>;
 
     /// Method is called on actor start.
-    /// We register ws session with SessionManager
+    /// We register ws session with `SessionManager`
     fn started(&mut self, ctx: &mut Self::Context) {
         // Start heartbeat process
         self.hb(ctx);
@@ -43,11 +43,12 @@ impl Actor for WsSession {
                 client_id: self.client_id.clone(),
                 addr: addr.recipient(),
                 session_id: self.session_id.clone(),
+                user_id: Some(self.client_id.clone()),
             })
             .into_actor(self)
             .then(|res, _, ctx| {
                 match res {
-                    Ok(_) => debug!("Connected to session manager"),
+                    Ok(()) => debug!("Connected to session manager"),
                     Err(e) => {
                         error!("Failed to connect to session manager: {:?}", e);
                         ctx.stop();
@@ -68,7 +69,7 @@ impl Actor for WsSession {
     }
 }
 
-/// Handler for ws::Message
+/// Handler for `ws::Message`
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         match msg {
@@ -85,8 +86,6 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 // Try to parse the message
                 match serde_json::from_str::<ClientMessage>(&text) {
                     Ok(client_msg) => {
-                        debug!("Parsed client message: {:?}", client_msg);
-
                         // Handle different message types
                         match client_msg.message_type.as_str() {
                             "ping" => {
@@ -95,27 +94,60 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                     message_type: "pong".to_string(),
                                     data: json!({"timestamp": chrono::Utc::now().timestamp()}),
                                 };
-                                ctx.text(serde_json::to_string(&response).unwrap());
+                                ctx.text(
+                                    serde_json::to_string(&response)
+                                        .expect("Failed to serialize pong response"),
+                                );
                             }
                             "chat" => {
                                 // Forward chat message to all clients in the session
                                 if let Some(message) = client_msg.data.get("message") {
                                     if let Some(message_str) = message.as_str() {
-                                        // Create a message with sender information
+                                        // Extract client_id if provided
+                                        let client_id_value = client_msg
+                                            .data
+                                            .get("clientId")
+                                            .and_then(|v| v.as_str())
+                                            .map(ToString::to_string);
+
+                                        // Extract username if provided
+                                        let username = client_msg
+                                            .data
+                                            .get("username")
+                                            .and_then(|v| v.as_str())
+                                            .map(ToString::to_string);
+
+                                        // Create message data with sender information
+                                        let mut message_data = json!({
+                                            "userId": self.client_id,
+                                            "message": message_str,
+                                            "timestamp": chrono::Utc::now().timestamp()
+                                        });
+
+                                        // Add client_id to the message data if available
+                                        if let Some(client_id) = client_id_value {
+                                            message_data
+                                                .as_object_mut()
+                                                .expect(
+                                                    "Failed to mutate message_data for client_id",
+                                                )
+                                                .insert("clientId".to_string(), json!(client_id));
+                                        }
+
+                                        // Add username to the message data if available
+                                        if let Some(username) = username {
+                                            message_data
+                                                .as_object_mut()
+                                                .expect(
+                                                    "Failed to mutate message_data for username",
+                                                )
+                                                .insert("username".to_string(), json!(username));
+                                        }
+
                                         let server_msg = ServerMessage {
                                             message_type: "chat".to_string(),
-                                            data: json!({
-                                                "userId": self.client_id,
-                                                "message": message_str,
-                                                "timestamp": chrono::Utc::now().timestamp()
-                                            }),
+                                            data: message_data,
                                         };
-
-                                        // Log the chat message for debugging
-                                        debug!(
-                                            "Broadcasting chat message from {}: {}",
-                                            self.client_id, message_str
-                                        );
 
                                         // Broadcast to all clients in this session
                                         self.session_manager.do_send(Broadcast {
@@ -161,7 +193,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
     }
 }
 
-/// Handler for ServerMessage
+/// Handler for `ServerMessage`
 impl Handler<ServerMessage> for WsSession {
     type Result = ();
 
@@ -175,8 +207,8 @@ impl Handler<ServerMessage> for WsSession {
 }
 
 impl WsSession {
-    /// Helper method that sends ping to client every 5 seconds (HEARTBEAT_INTERVAL).
-    /// Also checks if client has responded within 10 seconds (CLIENT_TIMEOUT).
+    /// Helper method that sends ping to client every 5 seconds (`HEARTBEAT_INTERVAL`).
+    /// Also checks if client has responded within 10 seconds (`CLIENT_TIMEOUT`).
     fn hb(&self, ctx: &mut ws::WebsocketContext<Self>) {
         ctx.run_interval(HEARTBEAT_INTERVAL, |act, ctx| {
             // Check client heartbeat

@@ -18,7 +18,9 @@ use actix_web::{get, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 pub async fn health_check_v1(req: HttpRequest) -> impl Responder {
     // Claims are available from request extensions (set by middleware)
     let claims = req.extensions();
-    let claims = claims.get::<jwt::Claims>().unwrap();
+    let claims = claims
+        .get::<jwt::Claims>()
+        .expect("JWT claims not found in request extensions");
 
     // Authentication successful, return health check response
     HttpResponse::Ok().json(serde_json::json!({
@@ -46,7 +48,9 @@ pub async fn health_check_v1(req: HttpRequest) -> impl Responder {
 pub async fn health_check_v2(req: HttpRequest) -> impl Responder {
     // Claims are available from request extensions (set by middleware)
     let claims = req.extensions();
-    let claims = claims.get::<jwt::Claims>().unwrap();
+    let claims = claims
+        .get::<jwt::Claims>()
+        .expect("JWT claims not found in request extensions");
 
     // Authentication successful, return health check response
     HttpResponse::Ok().json(serde_json::json!({

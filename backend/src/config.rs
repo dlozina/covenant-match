@@ -55,12 +55,19 @@ pub struct RealtimeConfig {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct ChatConfig {
+    pub cleanup_interval_minutes: u64,
+    pub inactive_minutes: i64,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct Config {
     pub environment: String,
     pub database: DatabaseConfig,
     pub jwt: JwtConfig,
     pub server: ServerConfig,
     pub realtime: RealtimeConfig,
+    pub chat: ChatConfig,
     pub auth: AuthConfig,
 }
 
@@ -205,6 +212,10 @@ impl Config {
                 use_websockets: true,
                 session_inactive_timeout: 86400,
             },
+            chat: ChatConfig {
+                cleanup_interval_minutes: 60,
+                inactive_minutes: 60,
+            },
             auth: auth_config,
         }
     }
@@ -240,6 +251,14 @@ impl Config {
 
     pub fn session_inactive_timeout(&self) -> u64 {
         self.realtime.session_inactive_timeout
+    }
+
+    pub fn chat_cleanup_interval_minutes(&self) -> u64 {
+        self.chat.cleanup_interval_minutes
+    }
+
+    pub fn chat_inactive_minutes(&self) -> i64 {
+        self.chat.inactive_minutes
     }
 }
 
