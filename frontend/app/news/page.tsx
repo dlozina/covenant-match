@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { MainLayout } from "@/components/layout";
 import { Footer } from "@/components/layout/Footer";
 import Link from "next/link";
@@ -8,20 +8,7 @@ import { Calendar, ChevronLeft, ChevronRight, Newspaper, Search } from "lucide-r
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NewsItem, fetchAllNews } from "@/utils/api";
-
-// Custom component for safely displaying images
-const SafeImage = ({ src, alt }: { src: string, alt: string }) => {
-  // Make sure we use the absolute URL
-  const imageSrc = src.startsWith('/uploads/') ? src : src;
-  
-  return (
-    <img
-      src={imageSrc}
-      alt={alt}
-      className="absolute inset-0 w-full h-full object-cover"
-    />
-  );
-};
+import { SecureImage } from "@/components/ui/secure-image";
 
 export default function NewsPage() {
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -29,13 +16,37 @@ export default function NewsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const itemsPerPage = 10;
+
+  // Debounce search query changes
+  useEffect(() => {
+    // Clear any existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Set a new timeout - 500ms debounce
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+      // Reset to first page when search changes
+      setCurrentPage(1);
+    }, 1000); // 1 second debounce
+
+    // Cleanup function
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery]);
 
   useEffect(() => {
     const loadNews = async () => {
       setIsLoading(true);
       try {
-        const result = await fetchAllNews(currentPage, itemsPerPage, searchQuery);
+        const result = await fetchAllNews(currentPage, itemsPerPage, debouncedQuery);
         setNews(result.news);
         setTotalPages(result.totalPages);
       } catch (error) {
@@ -46,11 +57,11 @@ export default function NewsPage() {
     };
 
     loadNews();
-  }, [currentPage, searchQuery]);
+  }, [currentPage, debouncedQuery]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setCurrentPage(1); // Reset to first page when searching
+    // Not needed anymore since we debounce, but kept for form submission
   };
 
   const formatDate = (dateString: string | { $date: { $numberLong: string } }) => {
@@ -124,9 +135,16 @@ export default function NewsPage() {
                 <div className="bg-card/50 border border-purple-900/20 rounded-lg overflow-hidden h-full transition-all hover:border-purple-600/50 hover:bg-card/70">
                   {item.image_url ? (
                     <div className="h-48 overflow-hidden relative">
-                      <SafeImage 
+                      <SecureImage 
                         src={item.image_url}
                         alt={item.title}
+                        fill
+                        className="object-cover"
+                        fallback={
+                          <div className="h-full w-full flex items-center justify-center bg-gradient-to-br from-purple-900/20 to-indigo-900/20">
+                            <Newspaper className="h-16 w-16 text-purple-500/30" />
+                          </div>
+                        }
                       />
                     </div>
                   ) : (

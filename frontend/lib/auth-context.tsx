@@ -420,7 +420,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           throw new Error(errorData.message || `API request failed: ${response.status}`);
         } catch (parseError) {
           // If parsing fails, use generic error
-          throw new Error(`API request failed: ${response.status}`);
+          throw new Error(`API request failed: ${response.status} with error ${parseError}`);
         }
       }
 

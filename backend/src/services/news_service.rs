@@ -48,22 +48,37 @@ pub async fn get_all_news(
     db: &Database,
     page: u64,
     limit: u64,
+    search: Option<String>,
 ) -> Result<(Vec<NewsResponse>, u64, u64), AppError> {
     // Ensure page and limit are valid
     let page = if page < 1 { 1 } else { page };
     let limit = if limit < 1 { 10 } else { limit };
 
-    // Get total count for pagination metadata
-    let total = news_repository::count_news(db).await?;
+    // Get total count for pagination metadata and news posts based on search
+    if let Some(search_term) = search {
+        // Use search function in repository
+        let (news_posts, total) =
+            news_repository::find_news_with_search(db, page, limit, search_term).await?;
 
-    // Get paginated news posts
-    let news_posts = news_repository::find_news_paginated(db, page, limit).await?;
+        // Convert to response DTOs
+        let news_responses: Vec<NewsResponse> =
+            news_posts.into_iter().map(NewsResponse::from).collect();
 
-    // Convert to response DTOs
-    let news_responses: Vec<NewsResponse> =
-        news_posts.into_iter().map(NewsResponse::from).collect();
+        Ok((news_responses, total, page))
+    } else {
+        // Original behavior without search
+        // Get total count for pagination metadata
+        let total = news_repository::count_news(db).await?;
 
-    Ok((news_responses, total, page))
+        // Get paginated news posts
+        let news_posts = news_repository::find_news_paginated(db, page, limit).await?;
+
+        // Convert to response DTOs
+        let news_responses: Vec<NewsResponse> =
+            news_posts.into_iter().map(NewsResponse::from).collect();
+
+        Ok((news_responses, total, page))
+    }
 }
 
 pub async fn update_news(

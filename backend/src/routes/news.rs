@@ -19,7 +19,8 @@ use uuid::Uuid;
     path = "/api/v1/news",
     params(
         ("limit" = Option<u64>, Query, description = "Limit the number of results (default: 10)"),
-        ("page" = Option<u64>, Query, description = "Page number (default: 1)")
+        ("page" = Option<u64>, Query, description = "Page number (default: 1)"),
+        ("search" = Option<String>, Query, description = "Search term to filter news")
     ),
     responses(
         (status = 200, description = "News posts retrieved successfully", body = NewsListResponse),
@@ -32,7 +33,13 @@ async fn get_all_news(
     db: web::Data<Database>,
     query: web::Query<crate::models::common::PaginationQuery>,
 ) -> impl Responder {
-    match news_service::get_all_news(&db, query.page.unwrap_or(1), query.limit.unwrap_or(10)).await
+    match news_service::get_all_news(
+        &db,
+        query.page.unwrap_or(1),
+        query.limit.unwrap_or(10),
+        query.search.clone(),
+    )
+    .await
     {
         Ok((news, total, page)) => {
             // Calculate total pages
@@ -89,7 +96,7 @@ async fn get_recent_news(
 
     // Just use the existing get_all_news service that's already working
     // Always use page 1 and apply the requested limit
-    match news_service::get_all_news(&db, 1, limit).await {
+    match news_service::get_all_news(&db, 1, limit, None).await {
         Ok((news, total, page)) => {
             // Calculate total pages (same as in get_all_news)
             let total_pages = if limit > 0 {
@@ -504,7 +511,6 @@ async fn delete_news(db: web::Data<Database>, path: web::Path<String>) -> impl R
         }
     }
 }
-
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     log::info!("Configuring news routes");

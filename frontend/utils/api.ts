@@ -926,6 +926,7 @@ export async function fetchAllNews(page: number = 1, limit: number = 10, search?
     let url = `${API_URL}/api/v1/news?page=${page}&limit=${limit}`;
     if (search) {
       url += `&search=${encodeURIComponent(search)}`;
+      console.log(`Searching news with term: "${search}"`);
     }
     
     const response = await fetch(url, {

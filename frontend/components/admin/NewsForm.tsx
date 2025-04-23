@@ -10,17 +10,15 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import { 
   ImageIcon,
-  Upload,
   X,
   Loader2,
   Save,
   ArrowLeft
 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { NewsItem } from "@/utils/api";
-import { useAuth } from "@/lib/auth-context";
 import { NotificationType } from "@/components/ui/notification";
+import { SecureImage } from "@/components/ui/secure-image";
 
 // Props for the NewsForm component
 interface NewsFormProps {
@@ -40,7 +38,6 @@ export function NewsForm({ initialData, onSubmit, isSubmitting, onNotification }
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const router = useRouter();
-  const { fetchWithAuth } = useAuth();
   
   // Initialize image preview if there's an existing image
   useEffect(() => {
@@ -49,11 +46,11 @@ export function NewsForm({ initialData, onSubmit, isSubmitting, onNotification }
     }
   }, [initialData]);
   
-  // Custom function to determine if we should use the Image component or a regular img tag
+  // Custom function to determine if we should use the Image component or SecureImage
   const renderImagePreview = () => {
     if (!imagePreview) return null;
     
-    // For blob URLs (newly uploaded images) use nextjs Image
+    // For blob URLs (newly uploaded images) use standard Next.js Image
     if (imagePreview.startsWith('blob:')) {
       return (
         <Image
@@ -65,12 +62,13 @@ export function NewsForm({ initialData, onSubmit, isSubmitting, onNotification }
       );
     }
     
-    // For API/server URLs, use regular img tag to avoid hostname issues
+    // For API/server URLs, use SecureImage for proper handling
     return (
-      <img
+      <SecureImage
         src={imagePreview}
         alt="News preview"
-        className="absolute inset-0 w-full h-full object-cover"
+        fill
+        className="object-cover"
       />
     );
   };

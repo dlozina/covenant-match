@@ -6,6 +6,7 @@ use mongodb::{
     bson::{doc, oid::ObjectId, Document},
     Collection, Database,
 };
+use regex;
 
 const COLLECTION_NAME: &str = "news";
 
@@ -242,4 +243,71 @@ pub async fn find_all_news(db: &Database) -> Result<Vec<News>, AppError> {
             Err(AppError::DatabaseError(e))
         }
     }
+}
+
+// Function to find news with search term
+pub async fn find_news_with_search(
+    db: &Database,
+    page: u64,
+    limit: u64,
+    search: String,
+) -> Result<(Vec<News>, u64), AppError> {
+    let collection = get_collection(db);
+    log::info!(
+        "Searching news with term: '{}', page: {}, limit: {}",
+        search,
+        page,
+        limit
+    );
+
+    // Calculate skip value for pagination
+    let skip = (page - 1) * limit;
+
+    // Create a search filter using regex for case-insensitive search
+    // This searches in title, content, and summary fields
+    let search_regex = format!(".*{}.*", regex::escape(&search));
+    let filter = doc! {
+        "$or": [
+            { "title": { "$regex": &search_regex, "$options": "i" } },
+            { "content": { "$regex": &search_regex, "$options": "i" } },
+            { "summary": { "$regex": &search_regex, "$options": "i" } }
+        ]
+    };
+
+    // Get all matching documents first (for accurate counting)
+    let mut cursor = collection.find(filter.clone()).await.map_err(|e| {
+        error!("Database error searching news: {:?}", e);
+        AppError::DatabaseError(e)
+    })?;
+
+    // Collect all matching results
+    let mut news = Vec::new();
+    while let Some(result) = cursor.next().await {
+        match result {
+            Ok(item) => {
+                log::debug!("Found matching news item: {:?}", item.id);
+                news.push(item);
+            }
+            Err(e) => {
+                error!("Error getting news item: {:?}", e);
+                return Err(AppError::DatabaseError(e));
+            }
+        }
+    }
+
+    log::info!("Found {} news items matching search", news.len());
+
+    // Sort manually by created_at descending
+    news.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+    // Get total count for pagination
+    let total = news.len() as u64;
+
+    // Apply pagination manually
+    let start = std::cmp::min(skip as usize, news.len());
+    let end = std::cmp::min(start + limit as usize, news.len());
+
+    log::info!("Returning news items from index {} to {}", start, end);
+
+    Ok((news[start..end].to_vec(), total))
 }

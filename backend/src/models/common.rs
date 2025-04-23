@@ -5,6 +5,7 @@ use utoipa::ToSchema;
 pub struct PaginationQuery {
     pub page: Option<u64>,
     pub limit: Option<u64>,
+    pub search: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

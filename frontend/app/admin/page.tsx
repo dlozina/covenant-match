@@ -6,7 +6,6 @@ import {
   Newspaper, 
   Server, 
   Clock, 
-  Database, 
   ShieldCheck, 
   ActivitySquare
 } from "lucide-react";
