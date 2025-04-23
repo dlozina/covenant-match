@@ -879,11 +879,20 @@ export async function fetchRecentNews(limit: number = 5): Promise<NewsItem[]> {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to fetch news');
+      const errorData = await response.json();
+      console.error('Error from news API:', errorData);
+      throw new Error(errorData.message || 'Failed to fetch news');
     }
 
     const data = await response.json();
-    return data.data.news;
+    console.log('Recent news API response:', data);
+    
+    if (data.status === 'success' && data.data && Array.isArray(data.data.news)) {
+      return data.data.news;
+    } else {
+      console.error('Unexpected API response format:', data);
+      return [];
+    }
   } catch (error) {
     console.error('Error fetching recent news:', error);
     return [];

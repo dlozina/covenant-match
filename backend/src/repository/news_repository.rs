@@ -1,6 +1,6 @@
 use crate::models::error::AppError;
 use crate::models::news::{News, NewsResponse};
-use futures::{StreamExt, TryStreamExt};
+use futures::StreamExt;
 use log::error;
 use mongodb::{
     bson::{doc, oid::ObjectId, Document},
@@ -152,43 +152,94 @@ pub async fn delete_news(db: &Database, news_id: &str) -> Result<bool, AppError>
 
 pub async fn find_recent_news(db: &Database, limit: u64) -> Result<Vec<News>, AppError> {
     let collection = get_collection(db);
+    log::info!("find_recent_news repository called with limit: {}", limit);
 
-    // Filter for published news only (for public view)
+    // Filter for published news only
     let filter = doc! { "published": true };
-    log::info!("Fetching recent news with limit: {}, published only", limit);
+    log::info!("Using filter for published news only");
 
-    // Find all published news
-    let mut cursor = collection.find(filter).await.map_err(|e| {
-        error!("Database error fetching recent news: {:?}", e);
-        AppError::DatabaseError(e)
-    })?;
+    // Execute the find query
+    let mut cursor = match collection.find(filter).await {
+        Ok(cursor) => {
+            log::info!("MongoDB find query executed successfully");
+            cursor
+        }
+        Err(e) => {
+            log::error!("MongoDB find query failed: {:?}", e);
+            return Err(AppError::DatabaseError(e));
+        }
+    };
 
-    // Collect results up to limit
+    // Collect all items
     let mut news = Vec::new();
-    let mut count = 0;
 
     while let Some(result) = cursor.next().await {
-        if count >= limit {
-            break;
-        }
-
         match result {
             Ok(item) => {
-                log::debug!("Found recent news item: {:?}", item.id);
+                // Log before pushing to avoid using the moved value
+                let item_id = item.id.to_hex();
+                log::info!(
+                    "Added news item to results: id={}, title={}",
+                    item_id,
+                    item.title
+                );
                 news.push(item);
-                count += 1;
             }
             Err(e) => {
-                error!("Error getting recent news item: {:?}", e);
+                log::error!("Error getting news item: {:?}", e);
                 return Err(AppError::DatabaseError(e));
             }
         }
     }
 
+    log::info!("Found total of {} news items", news.len());
+
     // Sort by created_at (descending) after fetching
     news.sort_by(|a, b| b.created_at.cmp(&a.created_at));
 
-    log::info!("Returning {} recent news items", news.len());
+    // Apply limit
+    if news.len() > limit as usize {
+        news.truncate(limit as usize);
+    }
+
+    log::info!("Returning {} news items after limit applied", news.len());
 
     Ok(news)
+}
+
+// Add a new function that doesn't attempt any ID validation
+pub async fn find_all_news(db: &Database) -> Result<Vec<News>, AppError> {
+    let collection = get_collection(db);
+
+    // Get all news items
+    log::info!("find_all_news: querying all news");
+
+    let filter = doc! { "published": true };
+
+    match collection.find(filter).await {
+        Ok(cursor) => {
+            let mut news = Vec::new();
+            let mut stream = cursor;
+
+            while let Some(doc) = stream.next().await {
+                match doc {
+                    Ok(news_item) => news.push(news_item),
+                    Err(e) => {
+                        log::error!("Error getting news item: {:?}", e);
+                        return Err(AppError::DatabaseError(e));
+                    }
+                }
+            }
+
+            // Sort by date descending
+            news.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+            log::info!("Found {} news items", news.len());
+            Ok(news)
+        }
+        Err(e) => {
+            log::error!("MongoDB find query failed: {:?}", e);
+            Err(AppError::DatabaseError(e))
+        }
+    }
 }

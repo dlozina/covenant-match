@@ -7,8 +7,21 @@ import { Footer } from "@/components/layout/Footer";
 import { fetchNewsById, NewsItem } from "@/utils/api";
 import { Calendar, User, ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
+
+// Custom component for safely displaying images
+const SafeImage = ({ src, alt }: { src: string, alt: string }) => {
+  // Make sure we use the absolute URL
+  const imageSrc = src.startsWith('/uploads/') ? src : src;
+  
+  return (
+    <img
+      src={imageSrc}
+      alt={alt}
+      className="w-full h-full object-cover"
+    />
+  );
+};
 
 export default function NewsDetailPage() {
   const params = useParams();
@@ -43,8 +56,20 @@ export default function NewsDetailPage() {
     fetchNews();
   }, [newsId]);
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+  const formatDate = (dateInput: string | { $date: { $numberLong: string } }) => {
+    // Handle MongoDB date object format
+    if (typeof dateInput === 'object' && dateInput.$date) {
+      const timestamp = parseInt(dateInput.$date.$numberLong);
+      const date = new Date(timestamp);
+      return new Intl.DateTimeFormat('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }).format(date);
+    }
+    
+    // Handle string format
+    const date = new Date(dateInput as string);
     return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
       month: 'long',
@@ -83,13 +108,9 @@ export default function NewsDetailPage() {
           <article className="bg-card/50 border border-purple-900/20 rounded-lg overflow-hidden backdrop-blur-sm">
             {newsItem.image_url && (
               <div className="w-full h-64 overflow-hidden relative">
-                <Image 
+                <SafeImage 
                   src={newsItem.image_url} 
                   alt={newsItem.title} 
-                  fill
-                  priority
-                  sizes="(max-width: 1200px) 100vw, 1200px"
-                  className="object-cover"
                 />
               </div>
             )}

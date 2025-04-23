@@ -120,15 +120,42 @@ pub async fn delete_news(db: &Database, news_id: &str) -> Result<(), AppError> {
 }
 
 pub async fn get_recent_news(db: &Database, limit: u64) -> Result<Vec<NewsResponse>, AppError> {
-    // Get recent news posts
-    let news_posts = news_repository::find_recent_news(db, limit).await?;
+    log::info!("get_recent_news service called with limit: {}", limit);
 
-    // Convert to response DTOs
-    let news_responses: Vec<NewsResponse> = news_posts
+    // Ensure limit is reasonable
+    let limit = limit.min(20); // Cap at 20 to prevent huge queries
+
+    // Use the new function that doesn't require ID validation
+    log::info!("Using find_all_news instead of find_recent_news");
+
+    // Directly call find_all_news which has no ID validation
+    let all_news = match news_repository::find_all_news(db).await {
+        Ok(posts) => {
+            log::info!("Successfully retrieved {} news posts", posts.len());
+            posts
+        }
+        Err(e) => {
+            log::error!("Error in find_all_news: {:?}", e);
+            // Return an empty vector instead of propagating the error
+            return Ok(Vec::new());
+        }
+    };
+
+    // Convert to response DTOs, only use published news, and limit the number
+    let news_responses: Vec<NewsResponse> = all_news
         .into_iter()
-        .filter(|news| news.published) // Only return published news
-        .map(NewsResponse::from)
+        .filter(|news| news.published)
+        .map(|news| {
+            log::info!(
+                "Including news item: id={}, title={}",
+                news.id.to_hex(),
+                news.title
+            );
+            NewsResponse::from(news)
+        })
+        .take(limit as usize) // Apply the limit
         .collect();
 
+    log::info!("Returning {} news responses", news_responses.len());
     Ok(news_responses)
 }

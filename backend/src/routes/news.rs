@@ -62,6 +62,64 @@ async fn get_all_news(
     }
 }
 
+/// Get recent news posts for homepage
+#[utoipa::path(
+    get,
+    path = "/api/v1/news/recent",
+    params(
+        ("limit" = Option<u64>, Query, description = "Limit the number of results (default: 5)")
+    ),
+    responses(
+        (status = 200, description = "Recent news posts retrieved successfully", body = NewsListResponse),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "news"
+)]
+#[get("/api/v1/news/recent")]
+async fn get_recent_news(
+    db: web::Data<Database>,
+    query: web::Query<crate::models::common::LimitQuery>,
+) -> impl Responder {
+    log::info!(
+        "Received request for recent news with limit: {:?}",
+        query.limit
+    );
+
+    let limit = query.limit.unwrap_or(5).min(20);
+
+    // Just use the existing get_all_news service that's already working
+    // Always use page 1 and apply the requested limit
+    match news_service::get_all_news(&db, 1, limit).await {
+        Ok((news, total, page)) => {
+            // Calculate total pages (same as in get_all_news)
+            let total_pages = if limit > 0 {
+                (total + limit - 1) / limit
+            } else {
+                0
+            };
+
+            // Return exactly the same structure as get_all_news
+            log::info!("Successfully retrieved {} recent news items", news.len());
+            HttpResponse::Ok().json(serde_json::json!({
+                "status": "success",
+                "data": {
+                    "news": news,
+                    "pagination": {
+                        "total": total,
+                        "page": page,
+                        "limit": limit,
+                        "total_pages": total_pages
+                    }
+                }
+            }))
+        }
+        Err(e) => {
+            log::error!("Error fetching recent news: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
 /// Get a specific news post by ID
 #[utoipa::path(
     get,
@@ -447,44 +505,13 @@ async fn delete_news(db: web::Data<Database>, path: web::Path<String>) -> impl R
     }
 }
 
-/// Get recent news posts for homepage
-#[utoipa::path(
-    get,
-    path = "/api/v1/news/recent",
-    params(
-        ("limit" = Option<u64>, Query, description = "Limit the number of results (default: 5)")
-    ),
-    responses(
-        (status = 200, description = "Recent news posts retrieved successfully", body = NewsListResponse),
-        (status = 500, description = "Internal server error")
-    ),
-    tag = "news"
-)]
-#[get("/api/v1/news/recent")]
-async fn get_recent_news(
-    db: web::Data<Database>,
-    query: web::Query<crate::models::common::LimitQuery>,
-) -> impl Responder {
-    match news_service::get_recent_news(&db, query.limit.unwrap_or(5)).await {
-        Ok(news) => HttpResponse::Ok().json(serde_json::json!({
-            "status": "success",
-            "data": {
-                "news": news
-            }
-        })),
-        Err(e) => {
-            log::error!("Error fetching recent news: {:?}", e);
-            e.error_response()
-        }
-    }
-}
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     log::info!("Configuring news routes");
     cfg.service(get_all_news);
+    cfg.service(get_recent_news);
     cfg.service(get_news_by_id);
     cfg.service(create_news);
     cfg.service(update_news);
     cfg.service(delete_news);
-    cfg.service(get_recent_news);
 }

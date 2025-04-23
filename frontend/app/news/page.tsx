@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout";
 import { Footer } from "@/components/layout/Footer";
 import Link from "next/link";
-import Image from "next/image";
 import { Calendar, ChevronLeft, ChevronRight, Newspaper, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -120,7 +119,7 @@ export default function NewsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {news.map((item, index) => (
+            {news.map((item) => (
               <Link href={`/news/${item.id}`} key={item.id}>
                 <div className="bg-card/50 border border-purple-900/20 rounded-lg overflow-hidden h-full transition-all hover:border-purple-600/50 hover:bg-card/70">
                   {item.image_url ? (

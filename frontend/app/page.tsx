@@ -91,10 +91,19 @@ export default function Home() {
     const getNews = async () => {
       try {
         setIsLoadingNews(true);
+        console.log('Fetching recent news...');
         const newsData = await fetchRecentNews(2); // Only show top 2 news items on homepage
-        setNews(newsData);
+        console.log('News data received:', newsData);
+        
+        if (Array.isArray(newsData)) {
+          setNews(newsData);
+        } else {
+          console.error('News data is not an array:', newsData);
+          setNews([]);
+        }
       } catch (error) {
         console.error("Failed to fetch news:", error);
+        setNews([]);
       } finally {
         setIsLoadingNews(false);
       }
@@ -190,7 +199,7 @@ export default function Home() {
         <div className="space-y-4">
           {isLoadingNews ? (
             <div className="py-2 text-sm text-muted-foreground">Loading news...</div>
-          ) : news.length > 0 ? (
+          ) : Array.isArray(news) && news.length > 0 ? (
             news.map((item, i) => (
               <div key={i} className="border-b border-purple-900/20 pb-3">
                 <h4 className="font-medium">{item.title}</h4>
