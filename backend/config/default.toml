@@ -47,4 +47,5 @@ exclude_patterns = [
     # { path = "/api/v1/sse/.*", method = "GET", is_regex = true },
     # { path = "/api/public/.*", method = "GET", is_regex = true },
     # { path = "/favicon.ico", method = "GET", is_regex = false },
+    { path = "/uploads/.*", method = "GET", is_regex = true },
 ] 

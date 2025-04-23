@@ -47,48 +47,48 @@ pub async fn find_news_paginated(
     limit: u64,
 ) -> Result<Vec<News>, AppError> {
     let collection = get_collection(db);
+    log::info!("Fetching news with page: {}, limit: {}", page, limit);
 
     // Calculate skip value for pagination
     let skip = (page - 1) * limit;
 
-    // Create a filter document
+    // Create a filter document - no filter means return all news including drafts
     let filter = doc! {};
 
-    // Use find with options
+    // Use the find method without options
     let mut cursor = collection.find(filter).await.map_err(|e| {
         error!("Database error fetching paginated news: {:?}", e);
         AppError::DatabaseError(e)
     })?;
 
-    // Apply sorting and pagination manually
-    // Skip documents
-    for _ in 0..skip {
-        if cursor.advance().await.map_err(AppError::DatabaseError)? {
-            continue;
-        } else {
-            break;
-        }
-    }
-
-    // Collect results with limit
+    // Collect all results first
     let mut news = Vec::new();
-    let mut count = 0;
 
     while let Some(result) = cursor.next().await {
-        if count >= limit {
-            break;
-        }
-
         match result {
             Ok(item) => {
+                log::debug!("Found news item: {:?}", item.id);
                 news.push(item);
-                count += 1;
             }
-            Err(e) => return Err(AppError::DatabaseError(e)),
+            Err(e) => {
+                error!("Error getting news item: {:?}", e);
+                return Err(AppError::DatabaseError(e));
+            }
         }
     }
 
-    Ok(news)
+    log::info!("Total news items found: {}", news.len());
+
+    // Sort manually by created_at descending
+    news.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+    // Apply pagination manually
+    let start = std::cmp::min(skip as usize, news.len());
+    let end = std::cmp::min(start + limit as usize, news.len());
+
+    log::info!("Returning news items from index {} to {}", start, end);
+
+    Ok(news[start..end].to_vec())
 }
 
 pub async fn count_news(db: &Database) -> Result<u64, AppError> {
@@ -152,9 +152,12 @@ pub async fn delete_news(db: &Database, news_id: &str) -> Result<bool, AppError>
 
 pub async fn find_recent_news(db: &Database, limit: u64) -> Result<Vec<News>, AppError> {
     let collection = get_collection(db);
-    let filter = doc! {};
 
-    // Find all news
+    // Filter for published news only (for public view)
+    let filter = doc! { "published": true };
+    log::info!("Fetching recent news with limit: {}, published only", limit);
+
+    // Find all published news
     let mut cursor = collection.find(filter).await.map_err(|e| {
         error!("Database error fetching recent news: {:?}", e);
         AppError::DatabaseError(e)
@@ -171,15 +174,21 @@ pub async fn find_recent_news(db: &Database, limit: u64) -> Result<Vec<News>, Ap
 
         match result {
             Ok(item) => {
+                log::debug!("Found recent news item: {:?}", item.id);
                 news.push(item);
                 count += 1;
             }
-            Err(e) => return Err(AppError::DatabaseError(e)),
+            Err(e) => {
+                error!("Error getting recent news item: {:?}", e);
+                return Err(AppError::DatabaseError(e));
+            }
         }
     }
 
     // Sort by created_at (descending) after fetching
     news.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+    log::info!("Returning {} recent news items", news.len());
 
     Ok(news)
 }

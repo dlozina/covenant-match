@@ -164,10 +164,13 @@ export interface NewsItem {
   summary: string;
   content: string;
   image_url?: string;
+  author_id?: string;
   author_username: string;
+  updated_by_id?: string;
+  updated_by_username?: string;
   published: boolean;
-  created_at: string;
-  updated_at: string;
+  created_at: string | { $date: { $numberLong: string } };
+  updated_at: string | { $date: { $numberLong: string } };
   time_ago?: string;
 }
 

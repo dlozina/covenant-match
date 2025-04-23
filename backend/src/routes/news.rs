@@ -1,11 +1,17 @@
-use crate::models::error::AppError;
 use crate::models::news::{CreateNewsDto, NewsResponse, UpdateNewsDto};
 use crate::services::news_service;
 use crate::services::user_service;
+use crate::utils::jwt;
+use actix_multipart::Multipart;
 use actix_web::{
-    delete, get, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError,
+    delete, get, http::header::ContentType, post, put, web, HttpMessage, HttpRequest, HttpResponse,
+    Responder, ResponseError,
 };
+use futures_util::{StreamExt, TryStreamExt};
 use mongodb::Database;
+use std::path::Path;
+use tokio::io::AsyncWriteExt;
+use uuid::Uuid;
 
 /// Get all news posts
 #[utoipa::path(
@@ -103,32 +109,241 @@ async fn get_news_by_id(db: web::Data<Database>, path: web::Path<String>) -> imp
 #[post("/api/v1/admin/news")]
 async fn create_news(
     db: web::Data<Database>,
-    news_data: web::Json<CreateNewsDto>,
+    mut payload: Multipart,
+    json: Option<web::Json<CreateNewsDto>>,
     req: HttpRequest,
 ) -> impl Responder {
-    // Extract user_id from request extensions for author tracking
-    let extensions = req.extensions();
-    let claims = extensions
-        .get::<crate::utils::jwt::Claims>()
-        .expect("JWT claims not found in request extensions");
-    let user_id = claims.sub.clone();
+    // Log content type
+    log::info!("Content-Type: {:?}", req.headers().get("content-type"));
 
-    // Since username isn't in Claims, fetch it from the database
-    match user_service::get_user_by_id(&db, &user_id).await {
-        Ok(user) => {
-            let username = user.username.clone();
-            match news_service::create_news(&db, news_data.into_inner(), &user_id, &username).await
-            {
-                Ok(news) => HttpResponse::Created().json(news),
+    // Get claims from request extensions (set by middleware)
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
+        claims.sub.clone()
+    };
+
+    // Check if we're receiving JSON
+    if let Some(json_data) = json {
+        // Process JSON data
+        log::info!("Processing JSON data");
+
+        match user_service::get_user_by_id(&db, &user_id).await {
+            Ok(user) => {
+                let username = user.username.clone();
+                match news_service::create_news(&db, json_data.into_inner(), &user_id, &username)
+                    .await
+                {
+                    Ok(news) => HttpResponse::Created().json(news),
+                    Err(e) => {
+                        log::error!("Error creating news post from JSON: {:?}", e);
+                        e.error_response()
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!("Error fetching user: {:?}", e);
+                e.error_response()
+            }
+        }
+    } else {
+        // Multipart handling path
+        log::info!("Processing multipart form data");
+
+        // Extract all the fields from the form
+        let mut title = None;
+        let mut content = None;
+        let mut summary = None;
+        let mut published = None;
+        let mut image_url = None;
+
+        // Create uploads directory if it doesn't exist
+        let uploads_dir = Path::new("uploads");
+        if !uploads_dir.exists() {
+            match tokio::fs::create_dir_all(uploads_dir).await {
+                Ok(_) => log::info!("Created uploads directory"),
                 Err(e) => {
-                    log::error!("Error creating news post: {:?}", e);
-                    e.error_response()
+                    log::error!("Failed to create uploads directory: {:?}", e);
+                    return HttpResponse::InternalServerError().json(serde_json::json!({
+                        "status": "error",
+                        "message": "Failed to create uploads directory"
+                    }));
                 }
             }
         }
-        Err(e) => {
-            log::error!("Error fetching user: {:?}", e);
-            e.error_response()
+
+        // Process each field in the multipart form
+        while let Ok(Some(mut field)) = payload.try_next().await {
+            if let Some(content_disposition) = field.content_disposition() {
+                let name = content_disposition.get_name().unwrap_or_default();
+                log::info!("Processing field: {}", name);
+
+                match name {
+                    "title" => {
+                        let mut data = Vec::new();
+                        while let Some(chunk) = field.next().await {
+                            data.extend_from_slice(&chunk.unwrap_or_default());
+                        }
+                        let field_value = String::from_utf8_lossy(&data).to_string();
+                        log::info!("Title: {}", field_value);
+                        title = Some(field_value);
+                    }
+                    "content" => {
+                        let mut data = Vec::new();
+                        while let Some(chunk) = field.next().await {
+                            data.extend_from_slice(&chunk.unwrap_or_default());
+                        }
+                        let field_value = String::from_utf8_lossy(&data).to_string();
+                        log::info!("Content length: {}", field_value.len());
+                        content = Some(field_value);
+                    }
+                    "summary" => {
+                        let mut data = Vec::new();
+                        while let Some(chunk) = field.next().await {
+                            data.extend_from_slice(&chunk.unwrap_or_default());
+                        }
+                        let field_value = String::from_utf8_lossy(&data).to_string();
+                        log::info!("Summary length: {}", field_value.len());
+                        summary = Some(field_value);
+                    }
+                    "published" => {
+                        let mut data = Vec::new();
+                        while let Some(chunk) = field.next().await {
+                            data.extend_from_slice(&chunk.unwrap_or_default());
+                        }
+                        let published_str = String::from_utf8_lossy(&data).to_string();
+                        log::info!("Published: {}", published_str);
+                        published = Some(published_str.to_lowercase() == "true");
+                    }
+                    "image" => {
+                        log::info!("Processing image upload");
+                        if let Some(filename) = content_disposition.get_filename() {
+                            log::info!("Original filename: {}", filename);
+                            let unique_filename = format!("{}-{}", Uuid::new_v4(), filename);
+                            log::info!("Saving as: {}", unique_filename);
+                            let filepath = uploads_dir.join(&unique_filename);
+
+                            // Open file for writing
+                            match tokio::fs::File::create(&filepath).await {
+                                Ok(mut file) => {
+                                    let mut total_bytes = 0;
+
+                                    // Write each chunk to the file
+                                    let mut write_error = false;
+                                    while let Some(chunk) = field.next().await {
+                                        match chunk {
+                                            Ok(data) => {
+                                                total_bytes += data.len();
+                                                match file.write_all(&data).await {
+                                                    Ok(_) => {}
+                                                    Err(e) => {
+                                                        log::error!(
+                                                            "Error writing to file: {:?}",
+                                                            e
+                                                        );
+                                                        write_error = true;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            Err(e) => {
+                                                log::error!(
+                                                    "Error getting multipart chunk: {:?}",
+                                                    e
+                                                );
+                                                write_error = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+
+                                    if !write_error {
+                                        log::info!("Image saved, size: {} bytes", total_bytes);
+                                        // Set the image URL to the relative path
+                                        image_url = Some(format!("/uploads/{}", unique_filename));
+                                    }
+                                }
+                                Err(e) => {
+                                    log::error!("Failed to create file: {:?}", e);
+                                    // Skip this field
+                                    while let Some(_) = field.next().await {}
+                                }
+                            }
+                        } else {
+                            log::warn!("Image field found but no filename provided");
+                            // Skip this field
+                            while let Some(_) = field.next().await {}
+                        }
+                    }
+                    _ => {
+                        // Skip unknown fields
+                        log::info!("Skipping unknown field: {}", name);
+                        while let Some(_) = field.next().await {}
+                    }
+                }
+            } else {
+                log::warn!("Field without content disposition");
+                while let Some(_) = field.next().await {}
+            }
+        }
+
+        log::info!(
+            "Form processing complete. Title: {:?}, Content: {:?}, Summary: {:?}",
+            title.as_ref().map(|_| "present"),
+            content.as_ref().map(|_| "present"),
+            summary.as_ref().map(|_| "present")
+        );
+
+        // Validate required fields
+        if title.is_none() {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "status": "error",
+                "message": "Title is required"
+            }));
+        }
+
+        if content.is_none() {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "status": "error",
+                "message": "Content is required"
+            }));
+        }
+
+        if summary.is_none() {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "status": "error",
+                "message": "Summary is required"
+            }));
+        }
+
+        // Create the DTO
+        let news_data = CreateNewsDto {
+            title: title.unwrap(),
+            content: content.unwrap(),
+            summary: summary.unwrap(),
+            image_url,
+            published,
+        };
+
+        // Since username isn't in Claims, fetch it from the database
+        match user_service::get_user_by_id(&db, &user_id).await {
+            Ok(user) => {
+                let username = user.username.clone();
+                match news_service::create_news(&db, news_data, &user_id, &username).await {
+                    Ok(news) => HttpResponse::Created().json(news),
+                    Err(e) => {
+                        log::error!("Error creating news post: {:?}", e);
+                        e.error_response()
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!("Error fetching user: {:?}", e);
+                e.error_response()
+            }
         }
     }
 }
@@ -163,12 +378,15 @@ async fn update_news(
 ) -> impl Responder {
     let news_id = path.into_inner();
 
-    // Extract user_id from request extensions for updated_by tracking
-    let extensions = req.extensions();
-    let claims = extensions
-        .get::<crate::utils::jwt::Claims>()
-        .expect("JWT claims not found in request extensions");
-    let user_id = claims.sub.clone();
+    // Get claims from request extensions (set by middleware)
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
+        claims.sub.clone()
+    };
 
     // Since username isn't in Claims, fetch it from the database
     match user_service::get_user_by_id(&db, &user_id).await {

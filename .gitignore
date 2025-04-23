@@ -54,3 +54,6 @@ dev-secrets/
 # Nginx
 nginx/.htpasswd
 .htpasswd
+
+# Uploads
+uploads/

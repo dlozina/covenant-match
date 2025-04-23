@@ -354,11 +354,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
     const fullUrl = url.startsWith('http') ? url : `${apiBaseUrl}${url}`;
 
-    // Prepare headers with fresh token
+    // Create a new headers object
+    const customHeaders: HeadersInit = {
+      'Authorization': `Bearer ${token}`
+    };
+    
+    // Only set Content-Type if not FormData and if not already set
+    const optionsHeaders = options.headers as Record<string, string> || {};
+    if (!(options.body instanceof FormData) && !optionsHeaders['Content-Type']) {
+      customHeaders['Content-Type'] = 'application/json';
+    }
+    
+    // Merge with any headers from options
     const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      ...(options.headers || {})
+      ...customHeaders,
+      ...optionsHeaders
     };
 
     try {
@@ -387,7 +397,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           });
 
           if (retryResponse.ok) {
-            return await retryResponse.json();
+            // Check if response is JSON
+            const contentType = retryResponse.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              return await retryResponse.json();
+            } else {
+              return await retryResponse.text() as unknown as T;
+            }
           }
         }
 
@@ -398,11 +414,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Handle successful response
       if (!response.ok) {
-        throw new Error(`API request failed: ${response.status}`);
+        // Try to get error details
+        try {
+          const errorData = await response.json();
+          throw new Error(errorData.message || `API request failed: ${response.status}`);
+        } catch (parseError) {
+          // If parsing fails, use generic error
+          throw new Error(`API request failed: ${response.status}`);
+        }
       }
 
-      const data = await response.json();
-      return data;
+      // Check if response is JSON
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        return await response.json();
+      } else {
+        return await response.text() as unknown as T;
+      }
     } catch (error) {
       console.error('API request error:', error);
       throw error;

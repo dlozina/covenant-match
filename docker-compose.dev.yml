@@ -33,6 +33,7 @@ services:
     volumes:
       - ./backend:/app
       - ./dev-secrets:/dev-secrets
+      - ./uploads:/app/uploads
     environment:
       - RUST_LOG=debug
       - PORT=8080

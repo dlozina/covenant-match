@@ -10,6 +10,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NewsItem, fetchAllNews } from "@/utils/api";
 
+// Custom component for safely displaying images
+const SafeImage = ({ src, alt }: { src: string, alt: string }) => {
+  // Make sure we use the absolute URL
+  const imageSrc = src.startsWith('/uploads/') ? src : src;
+  
+  return (
+    <img
+      src={imageSrc}
+      alt={alt}
+      className="absolute inset-0 w-full h-full object-cover"
+    />
+  );
+};
+
 export default function NewsPage() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -40,13 +54,30 @@ export default function NewsPage() {
     setCurrentPage(1); // Reset to first page when searching
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    }).format(date);
+  const formatDate = (dateString: string | { $date: { $numberLong: string } }) => {
+    try {
+      if (typeof dateString === 'object' && dateString.$date && dateString.$date.$numberLong) {
+        const timestamp = parseInt(dateString.$date.$numberLong);
+        if (!isNaN(timestamp)) {
+          return new Intl.DateTimeFormat('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          }).format(new Date(timestamp));
+        }
+      }
+      
+      // Handle string dates
+      const date = new Date(typeof dateString === 'string' ? dateString : Date.now());
+      return new Intl.DateTimeFormat('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }).format(date);
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return "Unknown date";
+    }
   };
 
   // Create a footer to pass to the layout
@@ -94,13 +125,9 @@ export default function NewsPage() {
                 <div className="bg-card/50 border border-purple-900/20 rounded-lg overflow-hidden h-full transition-all hover:border-purple-600/50 hover:bg-card/70">
                   {item.image_url ? (
                     <div className="h-48 overflow-hidden relative">
-                      <Image
+                      <SafeImage 
                         src={item.image_url}
                         alt={item.title}
-                        fill
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        className="object-cover"
-                        priority={index < 2}
                       />
                     </div>
                   ) : (

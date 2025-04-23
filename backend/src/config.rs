@@ -179,6 +179,11 @@ impl Config {
                     method: Some("GET".to_string()),
                     is_regex: false,
                 },
+                ExcludePattern {
+                    path: "/uploads/.*".to_string(),
+                    method: Some("GET".to_string()),
+                    is_regex: true,
+                },
             ],
         };
 

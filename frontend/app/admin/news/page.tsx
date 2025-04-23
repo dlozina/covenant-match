@@ -2,19 +2,10 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { 
-  PlusCircle, 
-  Search, 
-  Edit, 
-  Trash, 
-  Eye, 
-  EyeOff,
-  ChevronLeft,
-  ChevronRight
-} from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { Notification, NotificationType } from "@/components/ui/notification";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -23,237 +14,246 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
-import { NewsItem } from "@/utils/api";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { formatDistanceToNow } from "date-fns";
+import { PlusIcon, Pencil, Trash2 } from "lucide-react";
 
-export default function AdminNewsPage() {
+interface NewsItem {
+  id: string;
+  title: string;
+  summary: string;
+  content: string;
+  image_url?: string;
+  author_id: string;
+  author_username: string;
+  updated_by_id: string;
+  updated_by_username: string;
+  published: boolean;
+  created_at: {
+    $date: {
+      $numberLong: string;
+    }
+  };
+  updated_at: {
+    $date: {
+      $numberLong: string;
+    }
+  };
+  time_ago?: string;
+}
+
+// Define MongoDB date object type
+interface MongoDBDate {
+  $date: {
+    $numberLong: string;
+  };
+}
+
+// Helper function to safely format MongoDB date objects
+const formatDate = (dateObj: MongoDBDate | string): string => {
+  try {
+    if (typeof dateObj === 'object' && dateObj.$date && dateObj.$date.$numberLong) {
+      const timestamp = parseInt(dateObj.$date.$numberLong);
+      if (!isNaN(timestamp)) {
+        return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
+      }
+    }
+    return "Unknown date";
+  } catch (e) {
+    console.error("Error formatting date:", e);
+    return "Unknown date";
+  }
+};
+
+export default function NewsListPage() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [notification, setNotification] = useState<NotificationType | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  
+  const { fetchWithAuth } = useAuth();
+
+  const fetchNews = async () => {
+    setIsLoading(true);
+    try {
+      interface NewsResponse {
+        status: string;
+        data: {
+          news: NewsItem[];
+          pagination?: {
+            total: number;
+            page: number;
+            total_pages: number;
+          };
+        };
+      }
+      
+      const data = await fetchWithAuth<NewsResponse>("/api/v1/news");
+      
+      // Check if data has the expected structure
+      if (data && data.status === "success" && data.data && data.data.news) {
+        setNews(data.data.news);
+      } else {
+        console.error("Unexpected response format:", data);
+        throw new Error("Unexpected response format");
+      }
+    } catch (error) {
+      console.error("Error fetching news:", error);
+      setNotification({
+        type: "error",
+        message: "Failed to load news items"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Mock API call - replace with actual API call when ready
-    const fetchNews = async () => {
-      setIsLoading(true);
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock data
-      const mockNews: NewsItem[] = [
-        {
-          id: "1",
-          title: "New Character Added to Nightreign",
-          summary: "The Dark Knight is now available in Nightreign with unique abilities.",
-          content: "<p>The Dark Knight brings a new style of gameplay...</p>",
-          author_username: "NightReignDev",
-          published: true,
-          created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          updated_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          time_ago: "2 days ago"
-        },
-        {
-          id: "2",
-          title: "Matchmaking Improved",
-          summary: "Session joining is now faster than ever with our latest update.",
-          content: "<p>We've completely rewritten our matchmaking algorithm...</p>",
-          author_username: "CovenantTeam",
-          published: true,
-          created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          updated_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          time_ago: "5 days ago"
-        },
-        {
-          id: "3",
-          title: "Weekly Community Tournament Results",
-          summary: "Check out the results from last weekend's community tournament.",
-          content: "<p>Congratulations to our winners and thank you to everyone...</p>",
-          author_username: "TournamentAdmin",
-          published: true,
-          created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-          updated_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-          time_ago: "7 days ago"
-        },
-        {
-          id: "4",
-          title: "Upcoming Maintenance [DRAFT]",
-          summary: "Server maintenance scheduled for next week.",
-          content: "<p>We will be performing server maintenance next Tuesday...</p>",
-          author_username: "SystemAdmin",
-          published: false,
-          created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-          updated_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-          time_ago: "1 day ago"
-        }
-      ];
-      
-      // Filter by status if needed
-      const filteredNews = statusFilter === "all" 
-        ? mockNews 
-        : mockNews.filter(item => 
-            statusFilter === "published" ? item.published : !item.published
-          );
-      
-      // Filter by search query if needed
-      const searchedNews = searchQuery 
-        ? filteredNews.filter(item => 
-            item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            item.summary.toLowerCase().includes(searchQuery.toLowerCase())
-          )
-        : filteredNews;
-      
-      setNews(searchedNews);
-      setTotalPages(Math.ceil(searchedNews.length / 10)); // Assuming 10 items per page
-      setIsLoading(false);
-    };
-    
     fetchNews();
-  }, [searchQuery, statusFilter, currentPage]);
+  }, [fetchWithAuth]);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Search is handled in useEffect
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    
+    try {
+      await fetchWithAuth(`/api/v1/admin/news/${deleteId}`, {
+        method: "DELETE",
+      });
+      
+      setNotification({
+        type: "success",
+        message: "News deleted successfully"
+      });
+      
+      // Refresh the news list
+      fetchNews();
+    } catch (error) {
+      console.error("Error deleting news:", error);
+      setNotification({
+        type: "error",
+        message: "Failed to delete news"
+      });
+    } finally {
+      setDeleteId(null);
+    }
   };
 
-  const handleStatusChange = (value: string) => {
-    setStatusFilter(value);
-    setCurrentPage(1); // Reset to first page when changing filters
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    }).format(date);
-  };
+  if (isLoading) {
+    return (
+      <div className="container py-10">
+        <div className="flex justify-between items-center mb-6">
+          <Skeleton className="h-10 w-1/3" />
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <div className="border rounded-md">
+          <div className="p-4">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div key={index} className="flex items-center justify-between py-2">
+                <Skeleton className="h-6 w-2/3" />
+                <div className="flex space-x-2">
+                  <Skeleton className="h-8 w-8" />
+                  <Skeleton className="h-8 w-8" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div>
+    <div className="container py-10">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">News Management</h1>
-        <Link href="/admin/news/create">
+        <h1 className="text-3xl font-bold tracking-tight">News Management</h1>
+        <Link href="/admin/news/create" passHref>
           <Button>
-            <PlusCircle className="h-4 w-4 mr-2" />
-            Create News
+            <PlusIcon className="h-4 w-4 mr-2" />
+            Add News
           </Button>
         </Link>
       </div>
-      
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <form onSubmit={handleSearch} className="w-full sm:w-auto">
-              <div className="flex gap-2">
-                <Input
-                  type="text"
-                  placeholder="Search news..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full"
-                />
-                <Button type="submit">
-                  <Search className="h-4 w-4" />
-                </Button>
-              </div>
-            </form>
-            
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground mr-1">Status:</span>
-              <Select
-                value={statusFilter}
-                onValueChange={handleStatusChange}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="published">Published</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {isLoading ? (
-        <div className="flex justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-purple-500"></div>
+
+      {notification && (
+        <div className="mb-6">
+          <Notification 
+            notification={notification} 
+            onDismiss={() => setNotification(null)}
+          />
         </div>
-      ) : news.length === 0 ? (
-        <div className="text-center py-20">
-          <p className="text-lg text-muted-foreground">No news articles found</p>
+      )}
+
+      {news.length === 0 && !isLoading ? (
+        <div className="text-center py-10 border rounded-md">
+          <p className="text-muted-foreground">No news posts found</p>
+          <Link href="/admin/news/create" passHref>
+            <Button variant="link">Create your first news post</Button>
+          </Link>
         </div>
       ) : (
-        <div className="bg-card rounded-md border">
+        <div className="border rounded-md">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[50px]">ID</TableHead>
                 <TableHead>Title</TableHead>
-                <TableHead className="hidden md:table-cell">Author</TableHead>
-                <TableHead className="hidden md:table-cell">Created</TableHead>
-                <TableHead className="w-[100px]">Status</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead>Updated</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {news.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell className="font-mono text-xs">{item.id.substring(0, 5)}...</TableCell>
-                  <TableCell className="font-medium">
-                    <div className="max-w-sm">
-                      <div className="truncate">{item.title}</div>
-                      <div className="text-xs text-muted-foreground truncate">{item.summary}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">{item.author_username}</TableCell>
-                  <TableCell className="hidden md:table-cell">{formatDate(item.created_at)}</TableCell>
+                  <TableCell className="font-medium">{item.title}</TableCell>
                   <TableCell>
-                    <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
-                      item.published 
-                        ? "bg-green-500/10 text-green-500" 
-                        : "bg-amber-500/10 text-amber-500"
-                    }`}>
+                    <div className="flex items-center">
                       {item.published ? (
-                        <>
-                          <Eye className="h-3 w-3 mr-1" />
+                        <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                          <i className="inline-block h-2 w-2 rounded-full bg-green-500 mr-1" />
                           Published
-                        </>
+                        </span>
                       ) : (
-                        <>
-                          <EyeOff className="h-3 w-3 mr-1" />
+                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
+                          <i className="inline-block h-2 w-2 rounded-full bg-gray-500 mr-1" />
                           Draft
-                        </>
+                        </span>
                       )}
                     </div>
                   </TableCell>
+                  <TableCell>
+                    {item.time_ago || formatDate(item.created_at)}
+                  </TableCell>
+                  <TableCell>
+                    {formatDate(item.updated_at)}
+                  </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Link href={`/admin/news/edit/${item.id}`}>
-                        <Button variant="ghost" size="icon">
-                          <Edit className="h-4 w-4" />
+                    <div className="flex justify-end space-x-2">
+                      <Link href={`/admin/news/preview/${item.id}`} passHref>
+                        <Button variant="outline" size="icon" title="Preview">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                         </Button>
                       </Link>
-                      <Link href={`/news/${item.id}`} target="_blank">
-                        <Button variant="ghost" size="icon">
-                          <Eye className="h-4 w-4" />
+                      <Link href={`/admin/news/edit/${item.id}`} passHref>
+                        <Button variant="outline" size="icon">
+                          <Pencil className="h-4 w-4" />
                         </Button>
                       </Link>
-                      <Button variant="ghost" size="icon" className="text-red-500">
-                        <Trash className="h-4 w-4" />
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        onClick={() => setDeleteId(item.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
                     </div>
                   </TableCell>
@@ -261,36 +261,25 @@ export default function AdminNewsPage() {
               ))}
             </TableBody>
           </Table>
-          
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center py-4">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                
-                <span className="text-muted-foreground px-4">
-                  Page {currentPage} of {totalPages}
-                </span>
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
         </div>
       )}
+
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the news post.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 } 

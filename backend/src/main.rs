@@ -14,6 +14,7 @@ use crate::config::get_config;
 use crate::routes::{admin, chat, health, news, statistics, users};
 use actix::Actor;
 use actix_cors::Cors;
+use actix_files;
 use actix_web::web::Data;
 use actix_web::{middleware::Logger, App, HttpServer};
 use dotenv::dotenv;
@@ -255,7 +256,9 @@ async fn main() -> std::io::Result<()> {
             .service(
                 SwaggerUi::new("/api/docs/{_:.*}")
                     .url("/api-docs/openapi.json", openapi::get_openapi()),
-            );
+            )
+            // Serve static files from the uploads directory
+            .service(actix_files::Files::new("/uploads", "uploads"));
 
         // Conditionally add SSE or WebSocket routes based on config
         if let Some(router) = &sse_router {
