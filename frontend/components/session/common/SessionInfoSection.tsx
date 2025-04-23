@@ -281,7 +281,7 @@ const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({
         clearInterval(intervalId);
       }
     };
-  }, [sessionState.isSessionStarted, formatTime]);
+  }, [sessionState.isSessionStarted, formatTime, sessionState.isSessionFinished, sessionState.finalDuration]);
 
   // Handle heartbeats for sync
   useEffect(() => {
@@ -318,7 +318,7 @@ const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({
         }
       }
     }
-  }, [lastHeartbeat, sessionData]);
+  }, [lastHeartbeat, sessionData, sessionData?.id, sessionData?.startedAt, formatTime, saveTimerState]);
 
   // Handle visibility changes
   useEffect(() => {
@@ -371,13 +371,14 @@ const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [formatTime, sessionData]);
+  }, [formatTime, sessionData, sessionData?.startedAt, loadTimerState, saveTimerState]);
 
   // Clean up on unmount
   useEffect(() => {
     return () => {
-      if (timerRef.current.intervalId) {
-        clearInterval(timerRef.current.intervalId);
+      const currentIntervalId = timerRef.current.intervalId;
+      if (currentIntervalId) {
+        clearInterval(currentIntervalId);
         timerRef.current.intervalId = null;
       }
     };

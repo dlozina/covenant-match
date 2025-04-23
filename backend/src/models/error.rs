@@ -2,6 +2,7 @@ use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError};
 use mongodb::bson;
 use serde_json::json;
+use std::fmt::{Display, Formatter};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -88,6 +89,13 @@ pub enum AppError {
 
     #[error("Invalid input: {0}")]
     InvalidInput(String),
+
+    // Add these new errors
+    #[error("News post not found")]
+    NewsNotFound,
+
+    #[error("System info error: {0}")]
+    SystemInfoError(String),
 }
 
 impl ResponseError for AppError {
@@ -139,6 +147,9 @@ impl ResponseError for AppError {
             AppError::FriendLimitReached => StatusCode::CONFLICT,
 
             AppError::InvalidInput(_) => StatusCode::BAD_REQUEST,
+
+            AppError::NewsNotFound => StatusCode::NOT_FOUND,
+            AppError::SystemInfoError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

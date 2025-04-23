@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import Image from "next/image";
 import { MainLayout } from "@/components/layout";
 import { Sword, Shield, Timer, Users, Trophy, Skull, ScrollText, Compass, Award } from "lucide-react";
 // Use for test if css config is not working
@@ -13,9 +14,11 @@ import { useEffect, useState } from "react";
 import { 
   LeaderboardEntry, 
   CovenantStats,
+  NewsItem,
   fetchLeaderboard, 
   fetchSessionsCount,
-  fetchCovenantStats 
+  fetchCovenantStats,
+  fetchRecentNews 
 } from "@/utils/api";
 
 export default function Home() {
@@ -26,6 +29,8 @@ export default function Home() {
   const [isLoadingActiveSessions, setIsLoadingActiveSessions] = useState(true);
   const [topCovenants, setTopCovenants] = useState<CovenantStats[]>([]);
   const [isLoadingCovenants, setIsLoadingCovenants] = useState(true);
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [isLoadingNews, setIsLoadingNews] = useState(true);
 
   useEffect(() => {
     const getLeaderboard = async () => {
@@ -83,9 +88,22 @@ export default function Home() {
       }
     };
 
+    const getNews = async () => {
+      try {
+        setIsLoadingNews(true);
+        const newsData = await fetchRecentNews(2); // Only show top 2 news items on homepage
+        setNews(newsData);
+      } catch (error) {
+        console.error("Failed to fetch news:", error);
+      } finally {
+        setIsLoadingNews(false);
+      }
+    };
+
     getLeaderboard();
     getActiveSessions();
     getTopCovenants();
+    getNews();
   }, []);
 
   // Add custom sidebars with improved styling
@@ -170,15 +188,28 @@ export default function Home() {
           <span>News & Updates</span>
         </h3>
         <div className="space-y-4">
-          <div className="border-b border-purple-900/20 pb-3">
-            <h4 className="font-medium">New Character Added</h4>
-            <p className="text-sm text-muted-foreground">The Dark Knight is now available in Nightreign.</p>
-            <p className="text-xs text-purple-400 mt-1">2 days ago</p>
-          </div>
-          <div className="border-b border-purple-900/20 pb-3">
-            <h4 className="font-medium">Matchmaking Improved</h4>
-            <p className="text-sm text-muted-foreground">Session joining is now faster than ever.</p>
-            <p className="text-xs text-purple-400 mt-1">5 days ago</p>
+          {isLoadingNews ? (
+            <div className="py-2 text-sm text-muted-foreground">Loading news...</div>
+          ) : news.length > 0 ? (
+            news.map((item, i) => (
+              <div key={i} className="border-b border-purple-900/20 pb-3">
+                <h4 className="font-medium">{item.title}</h4>
+                <p className="text-sm text-muted-foreground">{item.summary}</p>
+                <div className="flex justify-between items-center mt-1">
+                  <p className="text-xs text-purple-400">{item.time_ago || "Recently"}</p>
+                  <Link href={`/news/${item.id}`} className="text-xs text-blue-400 hover:underline">
+                    Read more
+                  </Link>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="py-2 text-sm text-muted-foreground">No news available</div>
+          )}
+          <div className="pt-2 text-center">
+            <Link href="/news" className="text-sm text-blue-400 hover:underline">
+              View all news
+            </Link>
           </div>
         </div>
       </div>
@@ -199,7 +230,16 @@ export default function Home() {
       {/* Hero Section */}
       <div className="relative rounded-lg overflow-hidden mb-8 lg:mb-12">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900/80 to-indigo-900/80 z-10"></div>
-        <div className="absolute inset-0 bg-[url('/nightreign-bg.jpeg')] bg-cover bg-center opacity-100"></div>
+        <div className="absolute inset-0">
+          <Image
+            src="/nightreign-bg.jpeg"
+            alt="Nightreign Background"
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover"
+          />
+        </div>
         <div className="relative z-20 px-4 py-12 lg:px-6 lg:py-24 max-w-4xl mx-auto text-center">
           <h1 className="text-3xl lg:text-5xl lg:text-6xl font-bold mb-4 lg:mb-6 bg-clip-text text-transparent bg-gradient-to-r from-purple-300 to-indigo-200">
             Welcome to Covenant Match

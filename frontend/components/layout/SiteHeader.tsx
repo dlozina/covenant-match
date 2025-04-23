@@ -6,8 +6,8 @@ import { Menu, UserPlus, Sword, Users, LayoutDashboard, User, LogOut, LogIn } fr
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-// Add theme toggle back in
-// import { ThemeToggle } from "@/components/theme/theme-toggle";
+// Disabled change theme toggle for now
+//import { ThemeToggle } from "@/components/theme/theme-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,

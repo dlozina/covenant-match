@@ -7,3 +7,5 @@ pub mod statistics;
 pub mod users;
 pub mod ws;
 pub mod user_data;
+pub mod news;
+pub mod admin;

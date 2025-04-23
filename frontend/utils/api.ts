@@ -157,6 +157,20 @@ export interface CovenantStatsResponse {
   covenantStats: CovenantStats[];
 }
 
+// News Types
+export interface NewsItem {
+  id: string;
+  title: string;
+  summary: string;
+  content: string;
+  image_url?: string;
+  author_username: string;
+  published: boolean;
+  created_at: string;
+  updated_at: string;
+  time_ago?: string;
+}
+
 // Function to fetch leaderboard data
 export const fetchLeaderboard = async (): Promise<LeaderboardEntry[]> => {
   try {
@@ -849,4 +863,79 @@ export const fetchGameData = async (): Promise<GameData> => {
     console.error('Failed to fetch game data:', error);
     throw error;
   }
-}; 
+};
+
+// Function to fetch recent news for homepage
+export async function fetchRecentNews(limit: number = 5): Promise<NewsItem[]> {
+  try {
+    const response = await fetch(`${API_URL}/api/v1/news/recent?limit=${limit}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch news');
+    }
+
+    const data = await response.json();
+    return data.data.news;
+  } catch (error) {
+    console.error('Error fetching recent news:', error);
+    return [];
+  }
+}
+
+// Function to fetch a single news item by ID
+export async function fetchNewsById(id: string): Promise<NewsItem | null> {
+  try {
+    const response = await fetch(`${API_URL}/api/v1/news/${id}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch news');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching news item:', error);
+    return null;
+  }
+}
+
+// Function to fetch paginated news list with search
+export async function fetchAllNews(page: number = 1, limit: number = 10, search?: string): Promise<{ news: NewsItem[], total: number, page: number, totalPages: number }> {
+  try {
+    let url = `${API_URL}/api/v1/news?page=${page}&limit=${limit}`;
+    if (search) {
+      url += `&search=${encodeURIComponent(search)}`;
+    }
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch news');
+    }
+
+    const data = await response.json();
+    return {
+      news: data.data.news,
+      total: data.data.pagination.total,
+      page: data.data.pagination.page,
+      totalPages: data.data.pagination.total_pages
+    };
+  } catch (error) {
+    console.error('Error fetching news list:', error);
+    return { news: [], total: 0, page: 1, totalPages: 0 };
+  }
+} 

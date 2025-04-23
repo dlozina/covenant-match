@@ -1,0 +1,104 @@
+"use client";
+
+import { useEffect } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { 
+  Newspaper, 
+  Users, 
+  LayoutDashboard, 
+  Settings, 
+  LogOut,
+  Database,
+  MessageSquare,
+  Shield
+} from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { isLoggedIn, isLoading, user, logout } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    // Redirect non-admin users or not logged in users
+    if (!isLoading && (!isLoggedIn || user?.role !== "admin")) {
+      router.push("/");
+    }
+  }, [isLoading, isLoggedIn, user, router]);
+
+  // Show loading state while checking auth
+  if (isLoading || !isLoggedIn || user?.role !== "admin") {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-purple-500"></div>
+        <span className="ml-2">Loading...</span>
+      </div>
+    );
+  }
+
+  // Admin navigation items
+  const navItems = [
+    { href: "/admin", icon: <LayoutDashboard size={18} />, label: "Dashboard" },
+    { href: "/admin/users", icon: <Users size={18} />, label: "Users" },
+    { href: "/admin/news", icon: <Newspaper size={18} />, label: "News" },
+    { href: "/admin/sessions", icon: <Database size={18} />, label: "Sessions" },
+    { href: "/admin/chat", icon: <MessageSquare size={18} />, label: "Chat Logs" },
+    { href: "/admin/settings", icon: <Settings size={18} />, label: "Settings" },
+  ];
+
+  return (
+    <div className="flex min-h-screen bg-background">
+      {/* Sidebar */}
+      <aside className="w-64 border-r border-purple-900/20 bg-card/50 backdrop-blur-sm">
+        <div className="p-4 border-b border-purple-900/20">
+          <div className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-purple-500" />
+            <span className="font-bold text-xl">Admin Panel</span>
+          </div>
+        </div>
+        
+        <nav className="p-4 space-y-1">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href || 
+              (item.href !== "/admin" && pathname.startsWith(item.href));
+            
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-3 px-3 py-2 rounded-md w-full transition-colors ${
+                  isActive ? 
+                    "bg-purple-600/20 text-purple-200" : 
+                    "hover:bg-purple-900/10 text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+          
+          <button
+            onClick={() => logout()}
+            className="flex items-center gap-3 px-3 py-2 rounded-md w-full hover:bg-red-900/10 text-muted-foreground hover:text-red-400 mt-4 transition-colors"
+          >
+            <LogOut size={18} />
+            <span>Log Out</span>
+          </button>
+        </nav>
+      </aside>
+      
+      {/* Main content */}
+      <main className="flex-1 overflow-auto">
+        <div className="container p-6">
+          {children}
+        </div>
+      </main>
+    </div>
+  );
+} 

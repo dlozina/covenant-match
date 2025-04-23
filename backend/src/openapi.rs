@@ -1,9 +1,14 @@
+use crate::models::admin::{
+    AdminDashboardStats, DashboardStatsResponse, MemoryUsage, SystemInfo, SystemStatusResponse,
+};
 use crate::models::chat::ChatMessage;
+use crate::models::common::{LimitQuery, PaginationQuery};
 use crate::models::game_data::{
     Covenant, CovenantResponse, GameDataResponse, NightLord, NightLordResponse, Nightfarer,
     NightfarerResponse, Platform, PlatformResponse, Region, RegionResponse,
 };
 use crate::models::geo_location::{CoordinatesDto, GeoLocationDataDto};
+use crate::models::news::{CreateNewsDto, NewsListResponse, NewsResponse, UpdateNewsDto};
 use crate::models::session::{
     CovenantStats, CovenantStatsResponse, CreateSessionDto, GameResult, JoinSessionDto,
     MinimalSessionDto, PlayerInfo, RateSessionDto, ResultsResponseDto, SessionResponseDto,
@@ -21,8 +26,8 @@ use crate::routes::users::{JwtInfoDto, TokenInfoResponse};
 use crate::sse::messages::{ServerMessage, SessionInfo, SseSessionStatus};
 
 use crate::routes::{
-    chat::*, game_data::*, health::*, sessions::*, sse::*, statistics::*, user_data::*, users::*,
-    ws::*,
+    admin::*, chat::*, game_data::*, health::*, news::*, sessions::*, sse::*, statistics::*,
+    user_data::*, users::*, ws::*,
 };
 
 // Import SSE models
@@ -110,6 +115,16 @@ use utoipa::{
         get_session_details,
         get_sessions_stats,
         get_covenant_stats,
+        // News routes
+        get_all_news,
+        get_news_by_id,
+        create_news,
+        update_news,
+        delete_news,
+        get_recent_news,
+        // Admin routes
+        get_dashboard_stats,
+        get_system_info,
     ),
     components(
         schemas(
@@ -184,6 +199,20 @@ use utoipa::{
             PlayerDetail,
             SessionsStatsResponse,
             SessionsStatsData,
+            // News models
+            NewsResponse,
+            NewsListResponse,
+            CreateNewsDto,
+            UpdateNewsDto,
+            // Admin models
+            AdminDashboardStats,
+            SystemInfo,
+            MemoryUsage,
+            SystemStatusResponse,
+            DashboardStatsResponse,
+            // Common models
+            PaginationQuery,
+            LimitQuery,
         ),
     ),
     tags(
@@ -195,7 +224,8 @@ use utoipa::{
         (name = "game-data", description = "Game data endpoints"),
         (name = "statistics", description = "Statistics endpoints"),
         (name = "chat", description = "Chat messaging endpoints"),
-        (name = "realtime", description = "Real-time communication endpoints")
+        (name = "realtime", description = "Real-time communication endpoints"),
+        (name = "news", description = "News management endpoints"),
     ),
     modifiers(&SecurityAddon),
 )]

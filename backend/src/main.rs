@@ -11,7 +11,7 @@ mod utils;
 mod ws;
 
 use crate::config::get_config;
-use crate::routes::{chat, health, statistics, users};
+use crate::routes::{admin, chat, health, news, statistics, users};
 use actix::Actor;
 use actix_cors::Cors;
 use actix_web::web::Data;
@@ -226,7 +226,7 @@ async fn main() -> std::io::Result<()> {
         get_config().server_port()
     );
 
-    HttpServer::new(move || {
+    let app = HttpServer::new(move || {
         // Configure CORS
         let cors = Cors::default()
             .allow_any_origin() // For development - restrict in production
@@ -249,6 +249,8 @@ async fn main() -> std::io::Result<()> {
             .configure(statistics::config)
             .configure(chat::config)
             .configure(routes::user_data::config)
+            .configure(admin::config)
+            .configure(news::config)
             // Add Swagger UI with the OpenAPI schema from our new module
             .service(
                 SwaggerUi::new("/api/docs/{_:.*}")
@@ -270,13 +272,14 @@ async fn main() -> std::io::Result<()> {
         }
 
         app
-    })
-    .workers(get_config().workers())
-    .bind(format!(
-        "{}:{}",
-        get_config().server_host(),
-        get_config().server_port()
-    ))?
-    .run()
-    .await
+    });
+
+    app.workers(get_config().workers())
+        .bind(format!(
+            "{}:{}",
+            get_config().server_host(),
+            get_config().server_port()
+        ))?
+        .run()
+        .await
 }
