@@ -20,19 +20,28 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isLoggedIn, isLoading, user, logout } = useAuth();
+  const { isLoggedIn, isLoading, userData, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
+    // Debug logging
+    console.log('Admin Layout - Auth state:', { 
+      isLoading, 
+      isLoggedIn, 
+      userRole: userData?.role,
+      isAdmin: userData?.role === 'admin'
+    });
+    
     // Redirect non-admin users or not logged in users
-    if (!isLoading && (!isLoggedIn || user?.role !== "admin")) {
+    if (!isLoading && (!isLoggedIn || userData?.role !== "admin")) {
+      console.log('Redirecting from admin panel - Not authorized');
       router.push("/");
     }
-  }, [isLoading, isLoggedIn, user, router]);
+  }, [isLoading, isLoggedIn, userData, router]);
 
   // Show loading state while checking auth
-  if (isLoading || !isLoggedIn || user?.role !== "admin") {
+  if (isLoading || !isLoggedIn || userData?.role !== "admin") {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-purple-500"></div>

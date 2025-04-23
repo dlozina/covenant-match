@@ -21,6 +21,7 @@ type UserData = {
   preferredSessionName?: string;
   preferredSessionPassword?: string;
   preferredNightfarer?: string;
+  role?: string;
   // Add other user properties as needed
 };
 
@@ -70,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }).join(''));
 
       const payload = JSON.parse(jsonPayload);
+      console.log("JWT payload:", payload); // Log the JWT payload to debug
       return payload.exp * 1000; // Convert to milliseconds
     } catch (error) {
       console.error("Error parsing JWT token", error);
@@ -112,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         preferredSessionName: data.preferredSessionName,
         preferredSessionPassword: data.preferredSessionPassword,
         preferredNightfarer: data.preferredNightfarer,
+        role: data.role,
       };
     } catch (error) {
       console.error("Error fetching user data:", error);

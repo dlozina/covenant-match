@@ -95,6 +95,7 @@ export interface UserProfile {
   preferredNightfarer?: string;
   createdAt: string;
   updatedAt: string;
+  role?: string;
 }
 
 // Game data types

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, UserPlus, Sword, Users, LayoutDashboard, User, LogOut, LogIn } from "lucide-react";
+import { Menu, UserPlus, Sword, Users, LayoutDashboard, User, LogOut, LogIn, Shield } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,8 @@ export function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const { isLoggedIn, userData, logout, isLoading } = useAuth();
+  
+  const isAdmin = userData?.role === "admin";
 
   const handleLogout = () => {
     logout();
@@ -41,6 +43,14 @@ export function SiteHeader() {
         label: "Dashboard",
         icon: <LayoutDashboard className="h-4 w-4 mr-2" />,
         active: pathname === "/dashboard",
+      }
+    ] : []),
+    ...(isAdmin ? [
+      {
+        href: "/admin",
+        label: "Admin Panel",
+        icon: <Shield className="h-4 w-4 mr-2" />,
+        active: pathname.startsWith("/admin"),
       }
     ] : []),
   ];
@@ -116,6 +126,14 @@ export function SiteHeader() {
                         Edit Profile
                       </Link>
                     </DropdownMenuItem>
+                    {isAdmin && (
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin" className="w-full flex items-center">
+                          <Shield className="h-4 w-4 mr-2" />
+                          Admin Panel
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <div className="px-2 py-1.5 text-xs text-muted-foreground">
                       <div className="flex items-center justify-between mb-1">

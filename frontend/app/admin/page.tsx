@@ -11,6 +11,7 @@ import {
   ActivitySquare
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/lib/auth-context";
 
 // Mock admin dashboard data
 // This would be replaced with API calls to the backend
@@ -42,8 +43,12 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { userData } = useAuth();
 
   useEffect(() => {
+    // Debug log
+    console.log("Admin Dashboard - User Data:", userData);
+    
     // Mock API call - replace with actual API calls when ready
     const fetchDashboardData = async () => {
       setIsLoading(true);
