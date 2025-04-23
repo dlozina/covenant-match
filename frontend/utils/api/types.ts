@@ -28,6 +28,7 @@ export interface MinimalSession {
   hostName: string;
   status: "Open" | "InProgress" | "Completed";
   createdAt: string;
+  nightLord?: string;
 }
 
 export interface SessionDetails {
@@ -246,4 +247,38 @@ export interface UserSessionResult {
   result: string;
   score: number;
   submittedAt: string;
-} 
+}
+
+/**
+ * Friend data from the API
+ */
+export interface Friend {
+  id: string;
+  username: string;
+  displayName?: string;
+  avatarUrl?: string;
+  covenantName: string;
+  platform: string;
+  region: string;
+}
+
+/**
+ * Friend list response from the API
+ */
+export interface FriendList {
+  friends: Friend[];
+  total: number;
+}
+
+// Filtering options
+export interface SessionFilterOptions {
+  status?: string;
+  limit?: number;
+  offset?: number;
+  isPrivate?: boolean;
+  region?: string;
+  platform?: string;
+}
+
+// Use existing Session type as SessionResponse
+export type SessionResponse = Session; 

@@ -228,3 +228,73 @@ pub async fn count_sessions_by_status(
     let count = get_collection(db).count_documents(filter).await?;
     Ok(count)
 }
+
+/// Find sessions created by friends
+pub async fn find_friends_sessions(
+    db: &Database,
+    friend_ids: &[ObjectId],
+    status: Option<SessionStatus>,
+    limit: Option<u64>,
+    offset: Option<u64>,
+    is_private: Option<bool>,
+    region: Option<String>,
+    platform: Option<String>,
+) -> Result<Vec<GameSession>, AppError> {
+    // Create the base filter
+    let mut filter = match status {
+        Some(status) => doc! { "status": to_bson(&status)? },
+        None => doc! {},
+    };
+
+    // Add friend filter - session host must be in the friend list
+    let friend_ids_hex: Vec<String> = friend_ids.iter().map(|id| id.to_hex()).collect();
+
+    // Add this to the filter
+    filter = doc! {
+        "$and": [
+            filter,
+            { "host_id": { "$in": friend_ids_hex } }
+        ]
+    };
+
+    // Add private filter if provided
+    if let Some(is_private) = is_private {
+        filter = doc! { "$and": [filter, doc! { "is_private": is_private }] };
+    }
+
+    // Add region filter if provided
+    if let Some(region_val) = region {
+        filter = doc! { "$and": [filter, doc! { "region": region_val }] };
+    }
+
+    // Add platform filter if provided
+    if let Some(platform_val) = platform {
+        filter = doc! { "$and": [filter, doc! { "platform": platform_val }] };
+    }
+
+    // Get all sessions matching the filter
+    let cursor = get_collection(db).find(filter).await?;
+    let mut sessions: Vec<GameSession> = cursor.try_collect().await?;
+
+    // Sort by most recent first
+    sessions.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+    // Apply offset (skip) and limit if provided
+    if let Some(offset_val) = offset {
+        let offset_idx = offset_val as usize;
+        if offset_idx < sessions.len() {
+            sessions = sessions.into_iter().skip(offset_idx).collect();
+        } else {
+            sessions.clear();
+        }
+    }
+
+    if let Some(limit_val) = limit {
+        let limit_size = limit_val as usize;
+        if sessions.len() > limit_size {
+            sessions.truncate(limit_size);
+        }
+    }
+
+    Ok(sessions)
+}

@@ -9,6 +9,68 @@ fn get_collection(db: &Database) -> Collection<UserStatistics> {
     db.collection::<UserStatistics>("statistics")
 }
 
+// Helper function to create new user statistics
+fn create_new_statistics(user_id: &str, username: &str) -> UserStatistics {
+    UserStatistics {
+        id: uuid::Uuid::new_v4().to_string(),
+        user_id: user_id.to_string(),
+        username: username.to_string(),
+        total_games: 0,
+        wins: 0,
+        losses: 0,
+        disconnects: 0,
+        win_rate: 0.0,
+        nightfarer_stats: HashMap::new(),
+        night_lord_stats: HashMap::new(),
+        covenant_stats: HashMap::new(),
+        achievements: vec![],
+        reputation_score: 0.0,
+    }
+}
+
+// Helper function to update overall statistics
+fn update_overall_stats(stats: &mut UserStatistics, result: GameResult) {
+    stats.total_games += 1;
+
+    match result {
+        GameResult::Win => stats.wins += 1,
+        GameResult::Loss => stats.losses += 1,
+        GameResult::Disconnect => stats.disconnects += 1,
+    }
+
+    // Calculate win rate
+    if stats.total_games > 0 {
+        stats.win_rate =
+            ((stats.wins as f64 / stats.total_games as f64) * 100.0 * 100.0).round() / 100.0;
+    }
+}
+
+// Helper function to update specific stats for a character/night lord/covenant
+fn update_specific_stats(stats_map: &mut HashMap<String, Stats>, name: &str, result: GameResult) {
+    let specific_stats = stats_map.entry(name.to_string()).or_insert_with(|| Stats {
+        played: 0,
+        wins: 0,
+        losses: 0,
+        disconnects: 0,
+        win_rate: 0.0,
+    });
+
+    specific_stats.played += 1;
+
+    match result {
+        GameResult::Win => specific_stats.wins += 1,
+        GameResult::Loss => specific_stats.losses += 1,
+        GameResult::Disconnect => specific_stats.disconnects += 1,
+    }
+
+    // Calculate win rate
+    if specific_stats.played > 0 {
+        specific_stats.win_rate =
+            ((specific_stats.wins as f64 / specific_stats.played as f64) * 100.0 * 100.0).round()
+                / 100.0;
+    }
+}
+
 pub async fn find_by_user_id(
     db: &Database,
     user_id: &str,
@@ -32,29 +94,12 @@ pub async fn update_player_stats(
     nightfarer: &str,
     night_lord: &str,
     covenant_name: &str,
-    result: &GameResult,
+    result: GameResult,
 ) -> Result<(), AppError> {
     // Get existing stats or create new ones
     let mut stats = match find_by_user_id(db, user_id).await? {
         Some(s) => s,
-        None => {
-            // Create new stats record for user
-            UserStatistics {
-                id: uuid::Uuid::new_v4().to_string(),
-                user_id: user_id.to_string(),
-                username: username.to_string(),
-                total_games: 0,
-                wins: 0,
-                losses: 0,
-                disconnects: 0,
-                win_rate: 0.0,
-                nightfarer_stats: HashMap::new(),
-                night_lord_stats: HashMap::new(),
-                covenant_stats: HashMap::new(),
-                achievements: vec![],
-                reputation_score: 0.0,
-            }
-        }
+        None => create_new_statistics(user_id, username),
     };
 
     // Update changed username -> Display Name
@@ -63,101 +108,12 @@ pub async fn update_player_stats(
     }
 
     // Update overall stats
-    stats.total_games += 1;
+    update_overall_stats(&mut stats, result);
 
-    match result {
-        GameResult::Win => stats.wins += 1,
-        GameResult::Loss => stats.losses += 1,
-        GameResult::Disconnect => stats.disconnects += 1,
-    }
-
-    // Calculate win rate
-    if stats.total_games > 0 {
-        stats.win_rate =
-            ((stats.wins as f64 / stats.total_games as f64) * 100.0 * 100.0).round() / 100.0;
-    }
-
-    // Update nightfarer stats
-    let character_stats = stats
-        .nightfarer_stats
-        .entry(nightfarer.to_string())
-        .or_insert_with(|| Stats {
-            played: 0,
-            wins: 0,
-            losses: 0,
-            disconnects: 0,
-            win_rate: 0.0,
-        });
-
-    character_stats.played += 1;
-
-    match result {
-        GameResult::Win => character_stats.wins += 1,
-        GameResult::Loss => character_stats.losses += 1,
-        GameResult::Disconnect => character_stats.disconnects += 1,
-    }
-
-    // Calculate character win rate
-    if character_stats.played > 0 {
-        character_stats.win_rate =
-            ((character_stats.wins as f64 / character_stats.played as f64) * 100.0 * 100.0).round()
-                / 100.0;
-    }
-
-    // Update night lord stats
-    let night_lord_stats = stats
-        .night_lord_stats
-        .entry(night_lord.to_string())
-        .or_insert_with(|| Stats {
-            played: 0,
-            wins: 0,
-            losses: 0,
-            disconnects: 0,
-            win_rate: 0.0,
-        });
-
-    night_lord_stats.played += 1;
-
-    match result {
-        GameResult::Win => night_lord_stats.wins += 1,
-        GameResult::Loss => night_lord_stats.losses += 1,
-        GameResult::Disconnect => night_lord_stats.disconnects += 1,
-    }
-
-    // Calculate night lord win rate
-    if night_lord_stats.played > 0 {
-        night_lord_stats.win_rate =
-            ((night_lord_stats.wins as f64 / night_lord_stats.played as f64) * 100.0 * 100.0)
-                .round()
-                / 100.0;
-    }
-
-    // Update covenant stats
-    let covenant_stats = stats
-        .covenant_stats
-        .entry(covenant_name.to_string())
-        .or_insert_with(|| Stats {
-            played: 0,
-            wins: 0,
-            losses: 0,
-            disconnects: 0,
-            win_rate: 0.0,
-        });
-
-    covenant_stats.played += 1;
-
-    match result {
-        GameResult::Win => covenant_stats.wins += 1,
-        GameResult::Loss => covenant_stats.losses += 1,
-        GameResult::Disconnect => covenant_stats.disconnects += 1,
-    }
-
-    // Calculate covenant win rate
-    if covenant_stats.played > 0 {
-        covenant_stats.win_rate =
-            ((covenant_stats.wins as f64 / covenant_stats.played as f64) * 100.0 * 100.0).round()
-                / 100.0;
-    }
+    // Update stats for specific types
+    update_specific_stats(&mut stats.nightfarer_stats, nightfarer, result);
+    update_specific_stats(&mut stats.night_lord_stats, night_lord, result);
+    update_specific_stats(&mut stats.covenant_stats, covenant_name, result);
 
     // Update or insert the stats document
     get_collection(db)

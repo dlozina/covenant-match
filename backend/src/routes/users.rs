@@ -1,5 +1,8 @@
 use crate::models::error::AppError;
-use crate::models::user::{CreateUserDto, GetUsersQuery, LoginUserDto, UpdateUserProfileDto};
+use crate::models::user::{
+    AddFriendDto, CreateUserDto, FriendListResponse, GetUsersQuery, LoginUserDto, RemoveFriendDto,
+    UpdateUserProfileDto,
+};
 use crate::services::{auth_service, user_service};
 use crate::utils::{geo_location, ip_address, jwt};
 use actix_web::{
@@ -730,6 +733,145 @@ async fn decode_token(token_data: web::Json<JwtInfoDto>, req: HttpRequest) -> im
     }
 }
 
+/// Get user's friend list
+#[utoipa::path(
+    get,
+    path = "/api/v1/friends",
+    responses(
+        (status = 200, description = "Friend list retrieved successfully", body = FriendListResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "users"
+)]
+#[get("/api/v1/friends")]
+async fn get_friend_list(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
+    // Get claims from request extensions (set by middleware)
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
+        claims.sub.clone()
+    };
+
+    // Get the friend list
+    match user_service::get_friend_list(&db, &user_id).await {
+        Ok(friends) => {
+            // Create response
+            let response = FriendListResponse {
+                friends: friends.clone(),
+                total: friends.len(),
+            };
+            HttpResponse::Ok().json(response)
+        }
+        Err(e) => {
+            log::error!("Error fetching friend list: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
+/// Add a friend to the user's friend list
+#[utoipa::path(
+    post,
+    path = "/api/v1/friends",
+    request_body = AddFriendDto,
+    responses(
+        (status = 201, description = "Friend added successfully"),
+        (status = 400, description = "Invalid input"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "User not found"),
+        (status = 409, description = "Friend limit reached"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "users"
+)]
+#[post("/api/v1/friends")]
+async fn add_friend(
+    db: web::Data<Database>,
+    req: HttpRequest,
+    friend_data: web::Json<AddFriendDto>,
+) -> impl Responder {
+    // Get claims from request extensions (set by middleware)
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
+        claims.sub.clone()
+    };
+
+    // Add friend
+    match user_service::add_friend(&db, &user_id, &friend_data.friend_id).await {
+        Ok(_) => HttpResponse::Created().json(serde_json::json!({
+            "status": "success",
+            "message": "Friend added to your list"
+        })),
+        Err(e) => {
+            log::error!("Error adding friend: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
+/// Remove a friend from the user's friend list
+#[utoipa::path(
+    delete,
+    path = "/api/v1/friends/{friend_id}",
+    params(
+        ("friend_id" = String, Path, description = "ID of the friend to remove")
+    ),
+    responses(
+        (status = 200, description = "Friend removed successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "User not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "users"
+)]
+#[delete("/api/v1/friends/{friend_id}")]
+async fn remove_friend(
+    db: web::Data<Database>,
+    req: HttpRequest,
+    path: web::Path<String>,
+) -> impl Responder {
+    // Get claims from request extensions (set by middleware)
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
+        claims.sub.clone()
+    };
+
+    let friend_id = path.into_inner();
+
+    // Remove friend
+    match user_service::remove_friend(&db, &user_id, &friend_id).await {
+        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "message": "Friend removed from your list"
+        })),
+        Err(e) => {
+            log::error!("Error removing friend: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     log::info!("Configuring user routes");
     cfg.service(create_user);
@@ -744,4 +886,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(delete_user_admin);
     cfg.service(refresh_token);
     cfg.service(decode_token);
+    cfg.service(get_friend_list);
+    cfg.service(add_friend);
+    cfg.service(remove_friend);
 }

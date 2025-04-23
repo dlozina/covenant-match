@@ -28,6 +28,8 @@ pub struct User {
     pub preferred_session_name: Option<String>,
     pub preferred_session_password: Option<String>,
     pub preferred_nightfarer: Option<String>,
+    #[serde(default)]
+    pub friend_list: Vec<ObjectId>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate, ToSchema)]
@@ -75,6 +77,8 @@ pub struct UserResponse {
     pub preferred_session_name: Option<String>,
     pub preferred_session_password: Option<String>,
     pub preferred_nightfarer: Option<String>,
+    #[serde(default)]
+    pub friend_list: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
@@ -133,6 +137,7 @@ impl From<User> for UserResponse {
             preferred_session_name: user.preferred_session_name,
             preferred_session_password: user.preferred_session_password,
             preferred_nightfarer: user.preferred_nightfarer,
+            friend_list: user.friend_list.iter().map(|id| id.to_hex()).collect(),
         }
     }
 }
@@ -213,4 +218,36 @@ pub struct RefreshTokenResponse {
     pub status: String,
     /// The new JWT token
     pub token: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AddFriendDto {
+    pub friend_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoveFriendDto {
+    pub friend_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FriendDto {
+    pub id: String,
+    pub username: String,
+    pub display_name: Option<String>,
+    pub avatar_url: Option<String>,
+    pub covenant_name: String,
+    pub platform: String,
+    pub region: String,
+}
+
+/// Response for friend list
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FriendListResponse {
+    pub friends: Vec<FriendDto>,
+    pub total: usize,
 }

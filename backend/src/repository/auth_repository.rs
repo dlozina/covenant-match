@@ -54,6 +54,7 @@ pub async fn count_recent_failed_attempts(
         AppError::DatabaseError(e)
     })?;
 
+    #[allow(clippy::cast_possible_truncation)]
     Ok(count as usize)
 }
 
@@ -115,7 +116,7 @@ pub async fn get_recent_attempts(db: &Database, limit: i64) -> Result<Vec<LoginA
     attempts.sort_by(|a, b| b.created_at.cmp(&a.created_at));
 
     // Limit the results
-    if attempts.len() > limit as usize {
+    if attempts.len() > limit as usize { 
         attempts.truncate(limit as usize);
     }
 

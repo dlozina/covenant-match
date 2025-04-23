@@ -1,6 +1,6 @@
 use crate::models::error::AppError;
 use crate::models::user::User;
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use log::error;
 use mongodb::{
     bson::{doc, oid::ObjectId, Document},
@@ -240,4 +240,118 @@ pub async fn count_users_by_role(db: &Database, role: Option<&str>) -> Result<u6
         .count_documents(filter)
         .await
         .map_err(AppError::DatabaseError)
+}
+
+/// Add a friend to a user's friend list
+pub async fn add_friend(db: &Database, user_id: &str, friend_id: &str) -> Result<(), AppError> {
+    let collection = db.collection::<User>(COLLECTION_NAME);
+
+    // Convert string IDs to ObjectId
+    let user_object_id = ObjectId::parse_str(user_id).map_err(|_| AppError::InvalidId)?;
+    let friend_object_id = ObjectId::parse_str(friend_id).map_err(|_| AppError::InvalidId)?;
+
+    // Check if the friend_id is valid (exists in the database)
+    let friend_filter = doc! { "_id": friend_object_id.clone() };
+    let friend_exists = collection.find_one(friend_filter).await.map_err(|e| {
+        error!("Database error checking friend existence: {:?}", e);
+        AppError::DatabaseError(e)
+    })?;
+
+    if friend_exists.is_none() {
+        return Err(AppError::UserNotFound);
+    }
+
+    // Check if the friend is already in the list
+    let user_filter = doc! {
+        "_id": user_object_id.clone(),
+        "friend_list": { "$in": [friend_object_id.clone()] }
+    };
+
+    let already_added = collection.find_one(user_filter).await.map_err(|e| {
+        error!("Database error checking if friend already added: {:?}", e);
+        AppError::DatabaseError(e)
+    })?;
+
+    if already_added.is_some() {
+        // Friend is already in the list
+        return Ok(());
+    }
+
+    // Count existing friends to enforce limit
+    let user = find_user_by_id(db, user_id)
+        .await?
+        .ok_or(AppError::UserNotFound)?;
+    if user.friend_list.len() >= 20 {
+        return Err(AppError::FriendLimitReached);
+    }
+
+    // Add friend to list
+    let filter = doc! { "_id": user_object_id };
+    let update = doc! {
+        "$addToSet": { "friend_list": friend_object_id },
+        "$set": { "updated_at": mongodb::bson::DateTime::now() }
+    };
+
+    collection.update_one(filter, update).await.map_err(|e| {
+        error!("Database error adding friend: {:?}", e);
+        AppError::DatabaseError(e)
+    })?;
+
+    Ok(())
+}
+
+/// Remove a friend from a user's friend list
+pub async fn remove_friend(db: &Database, user_id: &str, friend_id: &str) -> Result<(), AppError> {
+    let collection = db.collection::<User>(COLLECTION_NAME);
+
+    // Convert string IDs to ObjectId
+    let user_object_id = ObjectId::parse_str(user_id).map_err(|_| AppError::InvalidId)?;
+    let friend_object_id = ObjectId::parse_str(friend_id).map_err(|_| AppError::InvalidId)?;
+
+    // Remove friend from list
+    let filter = doc! { "_id": user_object_id };
+    let update = doc! {
+        "$pull": { "friend_list": friend_object_id },
+        "$set": { "updated_at": mongodb::bson::DateTime::now() }
+    };
+
+    let result = collection.update_one(filter, update).await.map_err(|e| {
+        error!("Database error removing friend: {:?}", e);
+        AppError::DatabaseError(e)
+    })?;
+
+    if result.matched_count == 0 {
+        return Err(AppError::UserNotFound);
+    }
+
+    Ok(())
+}
+
+/// Get a user's friend list with details
+pub async fn get_friend_list_details(db: &Database, user_id: &str) -> Result<Vec<User>, AppError> {
+    let collection = db.collection::<User>(COLLECTION_NAME);
+
+    // Get the user first to access their friend list
+    let user = find_user_by_id(db, user_id)
+        .await?
+        .ok_or(AppError::UserNotFound)?;
+
+    if user.friend_list.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // Find all friends by their IDs
+    let filter = doc! { "_id": { "$in": &user.friend_list } };
+    let cursor = collection.find(filter).await.map_err(|e| {
+        error!("Database error finding friends: {:?}", e);
+        AppError::DatabaseError(e)
+    })?;
+
+    // Use try_collect to transform cursor into Vec<User>
+    let friends_list = cursor.try_collect().await.map_err(|e| {
+        error!("Error collecting friend results: {:?}", e);
+        AppError::DatabaseError(e)
+    })?;
+
+    Ok(friends_list)
 }

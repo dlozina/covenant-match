@@ -40,13 +40,17 @@ pub fn set_sse_router(addr: Addr<SessionRouter>) {
 
 /// Get the global SSE router address
 pub fn get_sse_router() -> Option<Addr<SessionRouter>> {
-    let router = SSE_ROUTER.lock().unwrap();
+    let router = SSE_ROUTER
+        .lock()
+        .expect("Failed to acquire SSE router lock");
     router.clone()
 }
 
 // Function to get the WebSocket session manager
 pub fn get_session_manager() -> Option<Addr<WsSessionManager>> {
-    let manager = WS_SESSION_MANAGER.lock().unwrap();
+    let manager = WS_SESSION_MANAGER
+        .lock()
+        .expect("Failed to acquire WebSocket session manager lock");
     manager.clone()
 }
 
@@ -118,63 +122,58 @@ fn broadcast_to_sse(
     exclude_client_id: Option<String>,
     timestamp: i64,
 ) {
-    match get_sse_router() {
-        Some(router) => {
-            log::debug!("Broadcasting to SSE clients");
-            let message = SseServerMessage {
-                message_type: event_type.to_string(),
-                data: data.clone(),
-                timestamp,
-            };
+    if let Some(router) = get_sse_router() {
+        log::debug!("Broadcasting to SSE clients");
+        let message = SseServerMessage {
+            message_type: event_type.to_string(),
+            data: data.clone(),
+            timestamp,
+        };
 
-            let broadcast = BroadcastMessage {
-                session_id: session_id.to_string(),
-                message,
-                exclude_client: exclude_client_id,
-            };
+        let broadcast = BroadcastMessage {
+            session_id: session_id.to_string(),
+            message,
+            exclude_client: exclude_client_id,
+        };
 
-            // Use do_send which doesn't wait for a response
-            router.do_send(broadcast);
-        }
-        None => {
-            log::error!(
-                "SSE router not available for broadcasting - get_sse_router() returned None"
-            );
+        // Use do_send which doesn't wait for a response
+        router.do_send(broadcast);
+    } else {
+        log::error!("SSE router not available for broadcasting - get_sse_router() returned None");
 
-            // Attempt to recover by creating a new router
-            log::info!("Attempting to recover by creating a new router");
+        // Attempt to recover by creating a new router
+        log::info!("Attempting to recover by creating a new router");
 
-            // Get configuration for inactive timeout
-            let inactive_timeout = crate::config::get_config().session_inactive_timeout() as i64;
+        // Get configuration for inactive timeout
+        let inactive_timeout = crate::config::get_config().session_inactive_timeout() as i64;
 
-            // Create a new router
-            let new_router =
-                SessionRouter::new(crate::sse::partition::DEFAULT_PARTITION_COUNT, None).start();
+        // Create a new router
+        let new_router =
+            SessionRouter::new(crate::sse::partition::DEFAULT_PARTITION_COUNT, None).start();
 
-            // Set the new router
-            set_sse_router(new_router.clone());
+        // Set the new router
+        set_sse_router(new_router.clone());
 
-            // Start the session pruner with configurable inactivity timeout
-            let _session_pruner = SessionPrunerActor::new(
-                new_router.clone(),
-                3600,             // Run every hour
-                inactive_timeout, // Prune sessions inactive based on config
-            )
-            .start();
+        // Start the session pruner with configurable inactivity timeout
+        let _session_pruner = SessionPrunerActor::new(
+            new_router.clone(),
+            3600,             // Run every hour
+            inactive_timeout, // Prune sessions inactive based on config
+        )
+        .start();
 
-            // Try broadcasting again with the new router
-            let message = SseServerMessage {
-                message_type: event_type.to_string(),
-                data: data.clone(),
-                timestamp,
-            };
+        // Try broadcasting again with the new router
+        let message = SseServerMessage {
+            message_type: event_type.to_string(),
+            data: data.clone(),
+            timestamp,
+        };
 
-            new_router.do_send(BroadcastMessage {
-                session_id: session_id.to_string(),
-                message,
-                exclude_client: exclude_client_id,
-            });
-        }
+        new_router.do_send(BroadcastMessage {
+            session_id: session_id.to_string(),
+            message,
+            exclude_client: exclude_client_id,
+        });
     }
 }
 
@@ -268,7 +267,10 @@ pub async fn check_user_active_session(
     }
 
     // Return the first active session (users should only have one active session)
-    let session = active_sessions.into_iter().next().unwrap();
+    let session = active_sessions
+        .into_iter()
+        .next()
+        .expect("Active sessions was checked to be non-empty");
     Ok(Some(SessionResponseDto::from(session)))
 }
 
@@ -305,10 +307,7 @@ pub async fn get_sessions(
     .await?;
 
     // Convert to response DTOs (exclude passwords for listing)
-    Ok(sessions
-        .into_iter()
-        .map(SessionResponseDto::from)
-        .collect())
+    Ok(sessions.into_iter().map(SessionResponseDto::from).collect())
 }
 
 /// Get minimal public session information for non-authenticated users
@@ -602,13 +601,10 @@ pub async fn leave_session(db: &Database, session_id: &str, user_id: &str) -> Re
         .position(|p| p.user_id == user_id);
 
     // Check if the player is actually in the session
-    let player_index = match player_index {
-        Some(index) => index,
-        None => {
-            return Err(AppError::BadRequest(
-                "User is not in this session".to_string(),
-            ))
-        }
+    let Some(player_index) = player_index else {
+        return Err(AppError::BadRequest(
+            "User is not in this session".to_string(),
+        ));
     };
 
     // Get player data for notification before removing
@@ -644,25 +640,23 @@ pub async fn leave_session(db: &Database, session_id: &str, user_id: &str) -> Re
     Ok(())
 }
 
-pub async fn submit_result(
+/// Validate session and user for result submission
+async fn validate_result_submission(
     db: &Database,
     session_id: &str,
-    result_data: SubmitResultDto,
-) -> Result<(), AppError> {
+    user_id: &str,
+) -> Result<GameSession, AppError> {
     // Get the session
-    let mut session = session_repository::find_by_id(db, session_id)
+    let session = session_repository::find_by_id(db, session_id)
         .await?
         .ok_or(AppError::SessionNotFound)?;
 
-    // Check if session is in progress
+    // Check if session is in completed state
     if session.status != SessionStatus::Completed {
         return Err(AppError::BadRequest(
             "Results can only be submitted for completed sessions".to_string(),
         ));
     }
-
-    // Get user ID from result data
-    let user_id = result_data.user_id.clone();
 
     // Check if user is part of the session
     if !session.joined_players.iter().any(|p| p.user_id == user_id) {
@@ -678,13 +672,22 @@ pub async fn submit_result(
         ));
     }
 
+    Ok(session)
+}
+
+/// Add result to session and determine if there's a consensus
+fn process_result(
+    session: &mut GameSession,
+    user_id: String,
+    result_data: &SubmitResultDto,
+) -> Option<GameResult> {
     // Add the result
     let now = mongodb::bson::DateTime::now();
     session.results.push(SessionResult {
         user_id: user_id.clone(),
         result: result_data.result,
         rating: result_data.rating,
-        feedback: result_data.feedback,
+        feedback: result_data.feedback.clone(),
         submitted_at: now,
     });
 
@@ -708,7 +711,7 @@ pub async fn submit_result(
         .count();
 
     // Determine if there's a consensus (majority agreement)
-    let consensus_result = if win_count > 1 {
+    if win_count > 1 {
         Some(GameResult::Win)
     } else if loss_count > 1 {
         Some(GameResult::Loss)
@@ -716,63 +719,90 @@ pub async fn submit_result(
         Some(GameResult::Disconnect)
     } else {
         None
-    };
+    }
+}
 
-    // If we have a consensus result (at least 2 players agree), and we have at least 2 results
-    // we'll apply the consensus result to all players' statistics
-    if let Some(result) = consensus_result {
-        // Mark session as completed
-        session.status = SessionStatus::Completed;
+/// Handle consensus result by updating player statistics
+async fn handle_consensus(
+    db: &Database,
+    session: &mut GameSession,
+    session_id: &str,
+    consensus_result: GameResult,
+) -> Result<(), AppError> {
+    // Mark session as completed
+    session.status = SessionStatus::Completed;
 
-        if session.completed_at.is_none() {
-            session.completed_at = Some(now);
-        }
+    let now = mongodb::bson::DateTime::now();
+    if session.completed_at.is_none() {
+        session.completed_at = Some(now);
+    }
 
-        // Get the list of players who have already submitted results
-        let players_who_submitted: Vec<String> =
-            session.results.iter().map(|r| r.user_id.clone()).collect();
+    // Get the list of players who have already submitted results
+    let players_who_submitted: Vec<String> =
+        session.results.iter().map(|r| r.user_id.clone()).collect();
 
+    log::info!(
+        "Consensus reached in session {}: {:?}. Players who submitted: {:?}, stats already updated: {}",
+        session_id,
+        consensus_result,
+        players_who_submitted,
+        session.stats_updated
+    );
+
+    // Check if stats have already been updated using the explicit flag
+    if session.stats_updated {
+        log::info!("Skipping stats update as they have already been updated");
+    } else {
         log::info!(
-            "Consensus reached in session {}: {:?}. Players who submitted: {:?}, stats already updated: {}",
-            session_id,
-            result,
-            players_who_submitted,
-            session.stats_updated
+            "Updating stats for all players with consensus result: {:?}",
+            consensus_result
         );
 
-        // Check if stats have already been updated using the explicit flag
-        if !session.stats_updated {
+        // Update statistics for ALL players using the consensus result
+        for player in &session.joined_players {
+            // Update statistics for this player with the consensus result
+            statistics_repository::update_player_stats(
+                db,
+                &player.user_id,
+                &player.username,
+                &player.nightfarer,
+                &session.night_lord,
+                &player.covenant_name,
+                consensus_result,
+            )
+            .await?;
+
             log::info!(
-                "Updating stats for all players with consensus result: {:?}",
-                result
+                "Updated stats for player {} with result {:?}",
+                player.user_id,
+                consensus_result
             );
-
-            // Update statistics for ALL players using the consensus result
-            for player in &session.joined_players {
-                // Update statistics for this player with the consensus result
-                statistics_repository::update_player_stats(
-                    db,
-                    &player.user_id,
-                    &player.username,
-                    &player.nightfarer,
-                    &session.night_lord,
-                    &player.covenant_name,
-                    &result,
-                )
-                .await?;
-
-                log::info!(
-                    "Updated stats for player {} with result {:?}",
-                    player.user_id,
-                    result
-                );
-            }
-
-            // Set the flag to indicate stats have been updated
-            session.stats_updated = true;
-        } else {
-            log::info!("Skipping stats update as they have already been updated");
         }
+
+        // Set the flag to indicate stats have been updated
+        session.stats_updated = true;
+    }
+
+    Ok(())
+}
+
+pub async fn submit_result(
+    db: &Database,
+    session_id: &str,
+    result_data: SubmitResultDto,
+) -> Result<(), AppError> {
+    // Get user ID from result data
+    let user_id = result_data.user_id.clone();
+
+    // Validate session and user
+    let mut session = validate_result_submission(db, session_id, &user_id).await?;
+
+    // Process the result submission and check for consensus
+    let consensus_result = process_result(&mut session, user_id.clone(), &result_data);
+
+    // If we have a consensus result (at least 2 players agree), update player statistics
+    if let Some(result) = consensus_result {
+        handle_consensus(db, &mut session, session_id, result).await?;
     }
 
     // Update the session in the database
@@ -853,6 +883,7 @@ pub async fn get_session_results(
     Ok(response)
 }
 
+#[allow(dead_code)]
 pub async fn rate_session(
     db: &Database,
     session_id: &str,
@@ -1260,6 +1291,57 @@ pub async fn reset_session_flags(
             Err(e)
         }
     }
+}
+
+/// Get sessions created by friends of the specified user
+pub async fn get_friends_sessions(
+    db: &Database,
+    user_id: &str,
+    status: Option<String>,
+    limit: Option<u64>,
+    offset: Option<u64>,
+    is_private: Option<bool>,
+    region: Option<String>,
+    platform: Option<String>,
+) -> Result<Vec<SessionResponseDto>, AppError> {
+    // First, get the user to find their friend list
+    let user = user_repository::find_user_by_id(db, user_id)
+        .await?
+        .ok_or(AppError::UserNotFound)?;
+
+    // If the user has no friends, return an empty list
+    if user.friend_list.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // Convert status string to enum if provided
+    let status_filter = match status {
+        Some(s) => match s.to_lowercase().as_str() {
+            "open" => Some(SessionStatus::Open),
+            "full" => Some(SessionStatus::Full),
+            "in_progress" | "inprogress" => Some(SessionStatus::InProgress),
+            "completed" => Some(SessionStatus::Completed),
+            "cancelled" => Some(SessionStatus::Cancelled),
+            _ => None,
+        },
+        None => None,
+    };
+
+    // Find sessions created by friends
+    let sessions = session_repository::find_friends_sessions(
+        db,
+        &user.friend_list,
+        status_filter,
+        limit,
+        offset,
+        is_private,
+        region,
+        platform,
+    )
+    .await?;
+
+    // Convert to response DTOs
+    Ok(sessions.into_iter().map(SessionResponseDto::from).collect())
 }
 
 #[cfg(test)]
