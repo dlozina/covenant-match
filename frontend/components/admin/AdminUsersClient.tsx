@@ -89,12 +89,15 @@ const formatDate = (dateObj: string | { $date: { $numberLong: string } }): strin
 const adminUserSchema = z.object({
   username: z.string().min(4, "Username must be at least 4 characters"),
   email: z.string().email("Must be a valid email address"),
-  display_name: z.string().min(2, "Display name must be at least 2 characters"),
+  displayName: z.string().min(2, "Display name must be at least 2 characters"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirm_password: z.string().min(8, "Confirm password must be at least 8 characters"),
   region: z.string().optional(),
   platform: z.string().optional(),
+  covenantName: z.string().min(1, "Covenant name is required"),
   active: z.boolean().default(true),
+  autoRegion: z.boolean().default(true),
+  role: z.enum(["admin", "user"]).default("admin"),
 }).refine(data => data.password === data.confirm_password, {
   message: "Passwords do not match",
   path: ["confirm_password"],
@@ -129,6 +132,10 @@ export function AdminUsersClient() {
   const PLATFORMS = useMemo(() => 
     gameData?.platforms?.map(p => p.name) || ["PlayStation", "Xbox", "PC"],
   [gameData]);
+  
+  const COVENANTS = useMemo(() => 
+    gameData?.covenants?.map(c => c.name) || ["Warriors of Sunlight", "Way of White", "Princess Guard", "Way of the Blue", "Heirs of the Sun", "Spears of the Church", "Blades of the Darkmoon", "Watchdogs of Farron"],
+  [gameData]);
 
   // Initialize form for admin user creation
   const form = useForm<z.infer<typeof adminUserSchema>>({
@@ -136,12 +143,15 @@ export function AdminUsersClient() {
     defaultValues: {
       username: "",
       email: "",
-      display_name: "",
+      displayName: "",
       password: "",
       confirm_password: "",
       region: "",
       platform: "",
+      covenantName: "",
       active: true,
+      autoRegion: true,
+      role: "admin",
     },
   });
 
@@ -180,7 +190,7 @@ export function AdminUsersClient() {
           const filteredUsers = response.data.users.filter(user => 
             user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
             user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            user.display_name.toLowerCase().includes(searchQuery.toLowerCase())
+            user.displayName.toLowerCase().includes(searchQuery.toLowerCase())
           );
           
           setUsers(filteredUsers);
@@ -269,34 +279,37 @@ export function AdminUsersClient() {
     }
   };
 
-  const onSubmitCreateAdmin = async (values: z.infer<typeof adminUserSchema>) => {
+  const onSubmitCreateUser = async (values: z.infer<typeof adminUserSchema>) => {
     setIsSubmitting(true);
     try {
       await UserService.createAdminUser({
         username: values.username,
         email: values.email,
-        display_name: values.display_name,
+        displayName: values.displayName,
         password: values.password,
         region: values.region,
         platform: values.platform,
+        covenantName: values.covenantName,
         active: values.active,
+        autoRegion: values.autoRegion,
+        role: values.role,
       });
       
       setNotification({
         type: "success",
-        message: "Admin user created successfully"
+        message: `${values.role === 'admin' ? 'Admin' : 'Regular'} user created successfully`
       });
       form.reset();
       
       // Switch to users tab and refresh the list
       setActiveTab("users-list");
-      loadUsers(1, pagination.limit, "admin");
-      setCurrentRole("admin");
+      loadUsers(1, pagination.limit, values.role);
+      setCurrentRole(values.role);
     } catch (error) {
-      console.error("Error creating admin user:", error);
+      console.error("Error creating user:", error);
       setNotification({
         type: "error",
-        message: error instanceof Error ? error.message : "Failed to create admin user"
+        message: error instanceof Error ? error.message : "Failed to create user"
       });
     } finally {
       setIsSubmitting(false);
@@ -439,7 +452,7 @@ export function AdminUsersClient() {
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">{user.username}</TableCell>
                     <TableCell>{user.email}</TableCell>
-                    <TableCell>{user.display_name}</TableCell>
+                    <TableCell>{user.displayName}</TableCell>
                     <TableCell>
                       <span className={`px-2 py-1 rounded-md text-xs ${
                         user.role === "admin" 
@@ -449,7 +462,9 @@ export function AdminUsersClient() {
                         {user.role}
                       </span>
                     </TableCell>
-                    <TableCell>{formatDate(user.created_at)}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      {formatDate(user.createdAt)}
+                    </TableCell>
                     <TableCell>{user.region || "-"}</TableCell>
                     <TableCell className="text-right space-x-2">
                       <Button variant="ghost" size="icon" onClick={() => router.push(`/admin/users/edit/${user.id}`)}>
@@ -531,12 +546,12 @@ export function AdminUsersClient() {
     );
   };
 
-  const renderCreateAdminForm = () => {
+  const renderCreateUserForm = () => {
     if (isLoadingGameData) {
       return (
         <Card>
           <CardHeader>
-            <CardTitle>Create Admin User</CardTitle>
+            <CardTitle>Create User</CardTitle>
             <CardDescription>Loading form data...</CardDescription>
           </CardHeader>
           <CardContent>
@@ -551,12 +566,12 @@ export function AdminUsersClient() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Create Admin User</CardTitle>
-          <CardDescription>Create a new administrator with full access to the admin panel</CardDescription>
+          <CardTitle>Create User</CardTitle>
+          <CardDescription>Create a new user account with admin or regular permissions</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmitCreateAdmin)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmitCreateUser)} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -565,7 +580,7 @@ export function AdminUsersClient() {
                     <FormItem>
                       <FormLabel>Username</FormLabel>
                       <FormControl>
-                        <Input placeholder="admin_username" {...field} />
+                        <Input placeholder="username" {...field} />
                       </FormControl>
                       <FormDescription>
                         Username for login (min. 4 characters)
@@ -582,10 +597,10 @@ export function AdminUsersClient() {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input placeholder="admin@example.com" type="email" {...field} />
+                        <Input placeholder="user@example.com" type="email" {...field} />
                       </FormControl>
                       <FormDescription>
-                        Email address for the admin user
+                        Email address for the user
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -593,22 +608,55 @@ export function AdminUsersClient() {
                 />
               </div>
 
-              <FormField
-                control={form.control}
-                name="display_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Display Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Admin User" {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      Public display name for the admin user
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="covenantName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Covenant Name</FormLabel>
+                      <FormControl>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select covenant" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {COVENANTS.map(covenant => (
+                              <SelectItem key={covenant} value={covenant}>{covenant}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormDescription>
+                        User&apos;s covenant allegiance name
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="displayName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Display Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Display Name" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Public display name for the user
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
@@ -706,6 +754,58 @@ export function AdminUsersClient() {
                 />
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="role"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>User Role</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select role" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="admin">Administrator</SelectItem>
+                          <SelectItem value="user">Regular User</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Admin users have full access to the admin panel
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="autoRegion"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                      <div className="space-y-0.5">
+                        <FormLabel>Auto Region Detection</FormLabel>
+                        <FormDescription>
+                          Automatically detect and update user&apos;s region
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
               <FormField
                 control={form.control}
                 name="active"
@@ -729,7 +829,7 @@ export function AdminUsersClient() {
               />
 
               <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? "Creating..." : "Create Admin User"}
+                {isSubmitting ? "Creating..." : `Create ${form.getValues().role === 'admin' ? 'Admin' : 'Regular'} User`}
               </Button>
             </form>
           </Form>
@@ -760,9 +860,9 @@ export function AdminUsersClient() {
             <Users className="h-4 w-4 mr-2" />
             <span>Users List</span>
           </TabsTrigger>
-          <TabsTrigger value="create-admin" className="flex items-center">
+          <TabsTrigger value="create-user" className="flex items-center">
             <UserPlus className="h-4 w-4 mr-2" />
-            <span>Create Admin</span>
+            <span>Create User</span>
           </TabsTrigger>
         </TabsList>
         
@@ -770,8 +870,8 @@ export function AdminUsersClient() {
           {renderUserList()}
         </TabsContent>
         
-        <TabsContent value="create-admin" className="mt-6">
-          {renderCreateAdminForm()}
+        <TabsContent value="create-user" className="mt-6">
+          {renderCreateUserForm()}
         </TabsContent>
       </Tabs>
 

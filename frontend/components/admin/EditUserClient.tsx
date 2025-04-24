@@ -2,46 +2,32 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
 import { Notification, NotificationType } from "@/components/ui/notification";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Save, User } from "lucide-react";
+import { ArrowLeft, User, Ban, UserX, Key, AlertTriangle } from "lucide-react";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
 import { Switch } from "@/components/ui/switch";
 import { 
   AdminUser, 
-  UpdateUserParams,
   UserService
 } from "@/utils/api/user-service";
-
-// User Edit form schema
-const userEditSchema = z.object({
-  email: z.string().email("Must be a valid email address"),
-  display_name: z.string().min(2, "Display name must be at least 2 characters"),
-  active: z.boolean().default(true),
-});
-
-type UserEditFormValues = z.infer<typeof userEditSchema>;
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 interface EditUserClientProps {
   userId: string;
@@ -54,16 +40,7 @@ export function EditUserClient({ userId }: EditUserClientProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [user, setUser] = useState<AdminUser | null>(null);
   const [notification, setNotification] = useState<NotificationType | null>(null);
-  
-  // Initialize form
-  const form = useForm<UserEditFormValues>({
-    resolver: zodResolver(userEditSchema),
-    defaultValues: {
-      email: "",
-      display_name: "",
-      active: true,
-    },
-  });
+  const [activeTab, setActiveTab] = useState("profile");
   
   // Fetch user data
   const fetchUser = async () => {
@@ -71,13 +48,6 @@ export function EditUserClient({ userId }: EditUserClientProps) {
     try {
       const userData = await UserService.getAdminUserById(userId);
       setUser(userData);
-      
-      // Set form values
-      form.reset({
-        email: userData.email,
-        display_name: userData.display_name,
-        active: userData.active,
-      });
     } catch (error) {
       console.error("Error fetching user:", error);
       setNotification({
@@ -92,28 +62,38 @@ export function EditUserClient({ userId }: EditUserClientProps) {
   useEffect(() => {
     fetchUser();
   }, [userId]);
-  
-  const onSubmit = async (values: UserEditFormValues) => {
+
+  const handleUpdateStatus = async (active: boolean) => {
+    if (!user) return;
+    
     setIsSubmitting(true);
     try {
-      const updatedUser = await UserService.updateUser(userId, values);
+      const updatedUser = await UserService.updateUser(userId, { active });
       
       setNotification({
         type: "success",
-        message: "User updated successfully"
+        message: active ? "Account activated successfully" : "Account disabled successfully"
       });
       
       // Update local state with new user data
       setUser(updatedUser);
     } catch (error) {
-      console.error("Error updating user:", error);
+      console.error("Error updating user status:", error);
       setNotification({
         type: "error",
-        message: error instanceof Error ? error.message : "Failed to update user"
+        message: error instanceof Error ? error.message : "Failed to update user status"
       });
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleResetPassword = () => {
+    router.push(`/admin/users/reset-password/${userId}`);
+  };
+
+  const handleDeleteUser = () => {
+    router.push(`/admin/users?delete=${userId}`);
   };
   
   if (isLoading) {
@@ -166,7 +146,7 @@ export function EditUserClient({ userId }: EditUserClientProps) {
           <Button variant="outline" size="icon" onClick={() => router.push("/admin/users")}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h2 className="text-3xl font-bold tracking-tight">Edit User</h2>
+          <h2 className="text-3xl font-bold tracking-tight">User Details</h2>
         </div>
         <p className="text-sm text-muted-foreground">
           ID: {userId}
@@ -180,114 +160,151 @@ export function EditUserClient({ userId }: EditUserClientProps) {
         />
       )}
       
-      <Card>
+      <Card className="overflow-hidden">
         <CardHeader>
-          <CardTitle>User Details</CardTitle>
+          <CardTitle className="text-xl">{user.displayName}</CardTitle>
           <CardDescription>
-            Update {user.username}&apos;s profile information
+            @{user.username}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid gap-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <FormLabel>Username</FormLabel>
-                    <Input value={user.username} disabled className="bg-muted/50" />
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Username cannot be changed
-                    </p>
+          <Tabs defaultValue="profile" value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="profile">Basic Information</TabsTrigger>
+              <TabsTrigger value="game">Game Information</TabsTrigger>
+              <TabsTrigger value="settings">Account Settings</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="profile" className="space-y-6 pt-4">
+              {/* Basics Section */}
+              <div className="space-y-4">
+                <div className="grid gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Username</Label>
+                      <Input value={user.username} readOnly className="bg-muted/50 mt-2" />
+                    </div>
+                    <div>
+                      <Label>Role</Label>
+                      <Input value={user.role} readOnly className="bg-muted/50 mt-2" />
+                    </div>
                   </div>
                   
-                  <div>
-                    <FormLabel>Role</FormLabel>
-                    <Input value={user.role} disabled className="bg-muted/50" />
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Role is managed via specific admin actions
-                    </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Display Name</Label>
+                      <Input value={user.displayName} readOnly className="bg-muted/50 mt-2" />
+                    </div>
+                    <div>
+                      <Label>Email</Label>
+                      <Input value={user.email} readOnly className="bg-muted/50 mt-2" />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Created</Label>
+                      <Input 
+                        value={typeof user.createdAt === 'string' 
+                          ? new Date(user.createdAt).toLocaleString() 
+                          : new Date(parseInt(user.createdAt.$date.$numberLong)).toLocaleString()} 
+                        readOnly 
+                        className="bg-muted/50 mt-2" 
+                      />
+                    </div>
+                    <div>
+                      <Label>Last Updated</Label>
+                      <Input 
+                        value={typeof user.updatedAt === 'string' 
+                          ? new Date(user.updatedAt).toLocaleString() 
+                          : new Date(parseInt(user.updatedAt.$date.$numberLong)).toLocaleString()} 
+                        readOnly 
+                        className="bg-muted/50 mt-2" 
+                      />
+                    </div>
                   </div>
                 </div>
-                
-                <FormField
-                  control={form.control}
-                  name="display_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Display Name</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        This is the user&apos;s public display name
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input type="email" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        The user&apos;s email address for notifications and account recovery
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="active"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">
-                          Account Status
-                        </FormLabel>
-                        <FormDescription>
-                          {field.value ? 
-                            "Account is active and user can login" : 
-                            "Account is disabled and user cannot login"}
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="game" className="space-y-6 pt-4">
+              {/* Game Settings Section */}
+              <div className="space-y-4">
+                <div className="grid gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Region</Label>
+                      <Input value={user.region || "Not set"} readOnly className="bg-muted/50 mt-2" />
+                    </div>
+                    <div>
+                      <Label>Platform</Label>
+                      <Input value={user.platform || "Not set"} readOnly className="bg-muted/50 mt-2" />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Auto Region Detection</Label>
+                      <Input value={user.autoRegion ? "Enabled" : "Disabled"} readOnly className="bg-muted/50 mt-2" />
+                    </div>
+                    <div>
+                      <Label>Detected Covenant-Match Region</Label>
+                      <Input value={user.cmRegion || "Unknown"} readOnly className="bg-muted/50 mt-2" />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Covenant Name</Label>
+                      <Input value={user.covenantName || "Not set"} readOnly className="bg-muted/50 mt-2" />
+                    </div>
+                    <div>
+                      <Label>Cloudflare Region</Label>
+                      <Input value={user.cfRegion || "Unknown"} readOnly className="bg-muted/50 mt-2" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="settings" className="space-y-6 pt-4">
+              {/* User Settings & Preferences */}
+              <div className="space-y-4">
+                <div className="grid gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Preferred Session Name</Label>
+                      <Input value={user.preferredSessionName || "Not set"} readOnly className="bg-muted/50 mt-2" />
+                    </div>
+                    <div>
+                      <Label>Preferred Session Password</Label>
+                      <Input value={user.preferredSessionPassword || "Not set"} readOnly className="bg-muted/50 mt-2" />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Preferred Nightfarer</Label>
+                      <Input value={user.preferredNightfarer || "Not set"} readOnly className="bg-muted/50 mt-2" />
+                    </div>
+                    <div>
+                      <Label>Account Status</Label>
+                      <div className="flex items-center space-x-2 mt-2">
+                        <Switch 
+                          checked={user.active}
+                          onCheckedChange={(checked) => handleUpdateStatus(checked)}
+                          disabled={isSubmitting}
                         />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                        <span className={user.active ? "text-green-600" : "text-red-600"}>
+                          {user.active ? "Active" : "Disabled"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              
-              <div className="flex justify-end gap-4">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => router.push("/admin/users")}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  type="submit" 
-                  disabled={isSubmitting || !form.formState.isDirty}
-                  className="gap-2"
-                >
-                  <Save className="h-4 w-4" />
-                  {isSubmitting ? "Saving..." : "Save Changes"}
-                </Button>
-              </div>
-            </form>
-          </Form>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
       
@@ -295,22 +312,34 @@ export function EditUserClient({ userId }: EditUserClientProps) {
         <CardHeader className="text-destructive">
           <CardTitle>Danger Zone</CardTitle>
           <CardDescription>
-            Additional actions that require caution
+            Administrative actions that require caution
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row gap-4">
             <Button 
-              variant="destructive" 
-              onClick={() => router.push(`/admin/users/reset-password/${userId}`)}
+              variant="outline"
+              className="gap-2"
+              onClick={handleResetPassword}
             >
+              <Key className="h-4 w-4" />
               Reset Password
             </Button>
             <Button 
               variant="outline" 
-              className="border-destructive text-destructive hover:bg-destructive/10"
-              onClick={() => router.push(`/admin/users?delete=${userId}`)}
+              className={`gap-2 ${user.active ? "" : "border-destructive text-destructive hover:bg-destructive/10"}`}
+              onClick={() => handleUpdateStatus(!user.active)}
+              disabled={isSubmitting}
             >
+              <Ban className="h-4 w-4" />
+              {user.active ? "Disable Account" : "Enable Account"}
+            </Button>
+            <Button 
+              variant="destructive" 
+              className="gap-2"
+              onClick={handleDeleteUser}
+            >
+              <UserX className="h-4 w-4" />
               Delete User
             </Button>
           </div>

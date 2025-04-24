@@ -1,11 +1,11 @@
 import { EditUserClient } from "@/components/admin/EditUserClient";
 
-interface EditUserPageProps {
+interface UserDetailsPageProps {
   params: {
     id: string;
   };
 }
 
-export default async function EditUserPage({ params }: EditUserPageProps) {
+export default async function UserDetailsPage({ params }: UserDetailsPageProps) {
   return <EditUserClient userId={params.id} />;
 } 

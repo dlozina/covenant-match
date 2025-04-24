@@ -190,12 +190,20 @@ export interface AdminUser {
   id: string;
   username: string;
   email: string;
-  display_name: string;
+  displayName: string;
   role: string;
-  created_at: string | { $date: { $numberLong: string } };
-  updated_at: string | { $date: { $numberLong: string } };
-  profile_image?: string;
+  createdAt: string | { $date: { $numberLong: string } };
+  updatedAt: string | { $date: { $numberLong: string } };
+  profileImage?: string;
   region?: string;
+  platform?: string;
+  autoRegion?: boolean;
+  covenantName?: string;
+  cmRegion?: string;
+  cfRegion?: string;
+  preferredSessionName?: string;
+  preferredSessionPassword?: string;
+  preferredNightfarer?: string;
   active: boolean;
 }
 
@@ -217,15 +225,18 @@ export interface GetUsersResponse {
 export interface CreateAdminUserParams {
   username: string;
   email: string;
-  display_name: string;
+  displayName: string;
   password: string;
   region?: string;
   platform?: string;
+  covenantName: string;
   active?: boolean;
+  autoRegion?: boolean;
+  role?: string;
 }
 
 export interface UpdateUserParams {
   email?: string;
-  display_name?: string;
+  displayName?: string;
   active?: boolean;
 } 
