@@ -6,14 +6,13 @@ import { Notification, NotificationType } from "@/components/ui/notification";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, User, Ban, UserX, Key, AlertTriangle } from "lucide-react";
+import { ArrowLeft, User, Ban, UserX, Key} from "lucide-react";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { 
@@ -27,7 +26,6 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
 
 interface EditUserClientProps {
   userId: string;
