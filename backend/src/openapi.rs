@@ -8,7 +8,10 @@ use crate::models::game_data::{
     NightfarerResponse, Platform, PlatformResponse, Region, RegionResponse,
 };
 use crate::models::geo_location::{CoordinatesDto, GeoLocationDataDto};
-use crate::models::news::{CreateNewsDto, NewsListResponse, NewsResponse, UpdateNewsDto};
+use crate::models::news::{
+    Announcement, CreateNewsDto, NewsListResponse, NewsResponse, UpdateAnnouncementDto,
+    UpdateNewsDto,
+};
 use crate::models::session::{
     CovenantStats, CovenantStatsResponse, CreateSessionDto, GameResult, JoinSessionDto,
     MinimalSessionDto, PlayerInfo, RateSessionDto, ResultsResponseDto, SessionResponseDto,
@@ -70,6 +73,8 @@ use utoipa::{
         get_user_by_id_admin,
         update_user_admin,
         delete_user_admin,
+        get_admin_news,
+        get_admin_news_by_id,
         // User data routes
         get_current_user_data,
         test_cloudflare_headers,
@@ -122,6 +127,9 @@ use utoipa::{
         update_news,
         delete_news,
         get_recent_news,
+        // Announcement routes
+        get_current_announcement,
+        update_announcement,
         // Admin routes
         get_dashboard_stats,
         get_system_info,
@@ -204,6 +212,9 @@ use utoipa::{
             NewsListResponse,
             CreateNewsDto,
             UpdateNewsDto,
+            // Announcement models
+            Announcement,
+            UpdateAnnouncementDto,
             // Admin models
             AdminDashboardStats,
             SystemInfo,
@@ -225,7 +236,7 @@ use utoipa::{
         (name = "statistics", description = "Statistics endpoints"),
         (name = "chat", description = "Chat messaging endpoints"),
         (name = "realtime", description = "Real-time communication endpoints"),
-        (name = "news", description = "News management endpoints"),
+        (name = "news", description = "News and announcements management endpoints"),
     ),
     modifiers(&SecurityAddon),
 )]

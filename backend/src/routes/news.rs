@@ -1,4 +1,6 @@
-use crate::models::news::{CreateNewsDto, NewsResponse, UpdateNewsDto};
+use crate::models::news::{
+    AnnouncementResponse, CreateNewsDto, NewsResponse, UpdateAnnouncementDto, UpdateNewsDto,
+};
 use crate::services::news_service;
 use crate::services::user_service;
 use crate::utils::jwt;
@@ -33,11 +35,13 @@ async fn get_all_news(
     db: web::Data<Database>,
     query: web::Query<crate::models::common::PaginationQuery>,
 ) -> impl Responder {
+    // Public endpoint always uses non-admin mode (false) to only fetch published news
     match news_service::get_all_news(
         &db,
         query.page.unwrap_or(1),
         query.limit.unwrap_or(10),
         query.search.clone(),
+        false, // Always non-admin mode (only published news)
     )
     .await
     {
@@ -96,7 +100,7 @@ async fn get_recent_news(
 
     // Just use the existing get_all_news service that's already working
     // Always use page 1 and apply the requested limit
-    match news_service::get_all_news(&db, 1, limit, None).await {
+    match news_service::get_all_news(&db, 1, limit, None, false).await {
         Ok((news, total, page)) => {
             // Calculate total pages (same as in get_all_news)
             let total_pages = if limit > 0 {
@@ -527,6 +531,179 @@ async fn delete_news(db: web::Data<Database>, path: web::Path<String>) -> impl R
     }
 }
 
+/// Get all news posts for admin (including drafts)
+#[utoipa::path(
+    get,
+    path = "/api/v1/admin/news",
+    params(
+        ("limit" = Option<u64>, Query, description = "Limit the number of results (default: 10)"),
+        ("page" = Option<u64>, Query, description = "Page number (default: 1)"),
+        ("search" = Option<String>, Query, description = "Search term to filter news")
+    ),
+    responses(
+        (status = 200, description = "News posts retrieved successfully", body = NewsListResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - requires admin role"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "admin"
+)]
+#[get("/api/v1/admin/news")]
+async fn get_admin_news(
+    db: web::Data<Database>,
+    query: web::Query<crate::models::common::PaginationQuery>,
+    _req: HttpRequest,
+) -> impl Responder {
+    // This endpoint always uses admin mode (true) to fetch all news including drafts
+    match news_service::get_all_news(
+        &db,
+        query.page.unwrap_or(1),
+        query.limit.unwrap_or(10),
+        query.search.clone(),
+        true, // Always use admin mode
+    )
+    .await
+    {
+        Ok((news, total, page)) => {
+            // Calculate total pages
+            let total_pages = if query.limit.unwrap_or(10) > 0 {
+                (total + query.limit.unwrap_or(10) - 1) / query.limit.unwrap_or(10)
+            } else {
+                0
+            };
+
+            HttpResponse::Ok().json(serde_json::json!({
+                "status": "success",
+                "data": {
+                    "news": news,
+                    "pagination": {
+                        "total": total,
+                        "page": page,
+                        "limit": query.limit.unwrap_or(10),
+                        "total_pages": total_pages
+                    }
+                }
+            }))
+        }
+        Err(e) => {
+            log::error!("Error fetching admin news: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
+/// Get a specific news post by ID for admin (always in admin mode)
+#[utoipa::path(
+    get,
+    path = "/api/v1/admin/news/{news_id}",
+    params(
+        ("news_id" = String, Path, description = "News post ID")
+    ),
+    responses(
+        (status = 200, description = "News post retrieved successfully", body = NewsResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - requires admin role"),
+        (status = 404, description = "News post not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "admin"
+)]
+#[get("/api/v1/admin/news/{news_id}")]
+async fn get_admin_news_by_id(
+    db: web::Data<Database>,
+    path: web::Path<String>,
+    _req: HttpRequest,
+) -> impl Responder {
+    let news_id = path.into_inner();
+
+    // Admin endpoint - always use admin mode (true) to fetch all news including drafts
+    match news_service::get_news_by_id(&db, &news_id, true).await {
+        Ok(news) => HttpResponse::Ok().json(news),
+        Err(e) => {
+            log::error!("Error fetching news for admin: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
+/// Update announcement (admin only)
+#[utoipa::path(
+    put,
+    path = "/api/v1/admin/announcements",
+    request_body = UpdateAnnouncementDto,
+    responses(
+        (status = 200, description = "Announcement updated successfully", body = AnnouncementResponse),
+        (status = 400, description = "Invalid input"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - requires admin role"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "admin"
+)]
+#[put("/api/v1/admin/announcements")]
+async fn update_announcement(
+    db: web::Data<Database>,
+    data: web::Json<crate::models::news::UpdateAnnouncementDto>,
+    req: HttpRequest,
+) -> impl Responder {
+    // Get claims from request extensions (set by middleware)
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
+        claims.sub.clone()
+    };
+
+    match news_service::update_announcement(&db, data.into_inner(), &user_id).await {
+        Ok(announcement) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "data": {
+                "announcement": announcement
+            }
+        })),
+        Err(e) => {
+            log::error!("Error updating announcement: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
+/// Get current announcement
+#[utoipa::path(
+    get,
+    path = "/api/v1/announcements/current",
+    responses(
+        (status = 200, description = "Current announcement retrieved successfully", body = AnnouncementResponse),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "news"
+)]
+#[get("/api/v1/announcements/current")]
+async fn get_current_announcement(db: web::Data<Database>) -> impl Responder {
+    match news_service::get_current_announcement(&db).await {
+        Ok(announcement) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "data": {
+                "announcement": announcement
+            }
+        })),
+        Err(e) => {
+            log::error!("Error fetching current announcement: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     log::info!("Configuring news routes");
     cfg.service(get_all_news);
@@ -535,4 +712,8 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(create_news);
     cfg.service(update_news);
     cfg.service(delete_news);
+    cfg.service(get_admin_news);
+    cfg.service(get_admin_news_by_id);
+    cfg.service(update_announcement);
+    cfg.service(get_current_announcement);
 }

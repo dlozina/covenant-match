@@ -22,11 +22,11 @@ pub async fn get_dashboard_stats(db: &Database) -> Result<AdminDashboardStats, A
     let completed_sessions = 80;
 
     // Get news counts
-    let news_count = news_repository::count_news(db).await?;
+    let news_count = news_repository::count_news(db, true).await?;
 
     // Count published news (temporarily using same value as news_count)
     // In the future, we could add a filter for published news
-    let published_news_count = news_count;
+    let published_news_count = news_repository::count_news(db, false).await?;
 
     Ok(AdminDashboardStats {
         users_count,

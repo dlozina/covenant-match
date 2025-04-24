@@ -94,6 +94,9 @@ pub enum AppError {
     #[error("News post not found")]
     NewsNotFound,
 
+    #[error("Announcement not found")]
+    AnnouncementNotFound,
+
     #[error("System info error: {0}")]
     SystemInfoError(String),
 }
@@ -120,6 +123,8 @@ impl ResponseError for AppError {
 
             AppError::UserNotFound => StatusCode::NOT_FOUND,
             AppError::SessionNotFound => StatusCode::NOT_FOUND,
+            AppError::NewsNotFound => StatusCode::NOT_FOUND,
+            AppError::AnnouncementNotFound => StatusCode::NOT_FOUND,
 
             AppError::UserAlreadyExists => StatusCode::CONFLICT,
             AppError::UserAlreadyInSession => StatusCode::CONFLICT,
@@ -148,7 +153,6 @@ impl ResponseError for AppError {
 
             AppError::InvalidInput(_) => StatusCode::BAD_REQUEST,
 
-            AppError::NewsNotFound => StatusCode::NOT_FOUND,
             AppError::SystemInfoError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }

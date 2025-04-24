@@ -44,15 +44,7 @@ export function SiteHeader() {
         icon: <LayoutDashboard className="h-4 w-4 mr-2" />,
         active: pathname === "/dashboard",
       }
-    ] : []),
-    ...(isAdmin ? [
-      {
-        href: "/admin",
-        label: "Admin Panel",
-        icon: <Shield className="h-4 w-4 mr-2" />,
-        active: pathname.startsWith("/admin"),
-      }
-    ] : []),
+    ] : [])
   ];
 
   return (

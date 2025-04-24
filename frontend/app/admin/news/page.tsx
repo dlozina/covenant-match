@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Notification, NotificationType } from "@/components/ui/notification";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { NewsItem, fetchAdminNews, Announcement, updateAnnouncement, fetchAnnouncement } from "@/utils/api";
 import {
   Table,
   TableBody,
@@ -25,31 +26,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { formatDistanceToNow } from "date-fns";
-import { PlusIcon, Pencil, Trash2 } from "lucide-react";
-
-interface NewsItem {
-  id: string;
-  title: string;
-  summary: string;
-  content: string;
-  image_url?: string;
-  author_id: string;
-  author_username: string;
-  updated_by_id: string;
-  updated_by_username: string;
-  published: boolean;
-  created_at: {
-    $date: {
-      $numberLong: string;
-    }
-  };
-  updated_at: {
-    $date: {
-      $numberLong: string;
-    }
-  };
-  time_ago?: string;
-}
+import { PlusIcon, Pencil, Trash2, AlertCircle, Bell } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Define MongoDB date object type
 interface MongoDBDate {
@@ -80,31 +61,27 @@ export default function NewsListPage() {
   const [notification, setNotification] = useState<NotificationType | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   
+  // Announcement state
+  const [announcement, setAnnouncement] = useState<Announcement>({
+    active: false,
+    content: "New version of Covenant Match coming soon!",
+    updated_at: new Date().toISOString()
+  });
+  const [isAnnouncementLoading, setIsAnnouncementLoading] = useState(true);
+  const [isSavingAnnouncement, setIsSavingAnnouncement] = useState(false);
+  
   const { fetchWithAuth } = useAuth();
 
   const fetchNews = async () => {
     setIsLoading(true);
     try {
-      interface NewsResponse {
-        status: string;
-        data: {
-          news: NewsItem[];
-          pagination?: {
-            total: number;
-            page: number;
-            total_pages: number;
-          };
-        };
-      }
+      // Use the fetchAdminNews function which uses the admin-specific endpoint
+      const newsItems = await fetchAdminNews();
       
-      const data = await fetchWithAuth<NewsResponse>("/api/v1/news");
-      
-      // Check if data has the expected structure
-      if (data && data.status === "success" && data.data && data.data.news) {
-        setNews(data.data.news);
+      if (newsItems && newsItems.length >= 0) {
+        setNews(newsItems);
       } else {
-        console.error("Unexpected response format:", data);
-        throw new Error("Unexpected response format");
+        throw new Error("Failed to fetch news items");
       }
     } catch (error) {
       console.error("Error fetching news:", error);
@@ -117,9 +94,59 @@ export default function NewsListPage() {
     }
   };
 
+  const fetchAnnouncementData = async () => {
+    setIsAnnouncementLoading(true);
+    try {
+      const data = await fetchAnnouncement();
+      if (data) {
+        setAnnouncement(data);
+      }
+    } catch (error) {
+      console.error("Error fetching announcement:", error);
+      setNotification({
+        type: "error",
+        message: "Failed to load announcement settings"
+      });
+    } finally {
+      setIsAnnouncementLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchNews();
+    fetchAnnouncementData();
   }, [fetchWithAuth]);
+
+  const handleAnnouncementChange = (field: keyof Announcement, value: boolean | string) => {
+    setAnnouncement(prev => ({
+      ...prev,
+      [field]: value,
+      updated_at: new Date().toISOString()
+    }));
+  };
+
+  const saveAnnouncement = async () => {
+    setIsSavingAnnouncement(true);
+    try {
+      const success = await updateAnnouncement(announcement);
+      if (success) {
+        setNotification({
+          type: "success",
+          message: "Announcement settings updated successfully"
+        });
+      } else {
+        throw new Error("Failed to update announcement");
+      }
+    } catch (error) {
+      console.error("Error saving announcement:", error);
+      setNotification({
+        type: "error",
+        message: "Failed to update announcement settings"
+      });
+    } finally {
+      setIsSavingAnnouncement(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -191,6 +218,85 @@ export default function NewsListPage() {
           />
         </div>
       )}
+
+      {/* Announcement Management Card */}
+      <Card className="mb-6 border-purple-900/20">
+        <CardHeader className="bg-gradient-to-r from-purple-900/10 to-indigo-900/10">
+          <div className="flex items-center gap-2">
+            <Bell className="h-5 w-5 text-purple-400" />
+            <CardTitle>Site Announcement</CardTitle>
+          </div>
+          <CardDescription>
+            Configure the site-wide announcement displayed on the homepage
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-6">
+          {isAnnouncementLoading ? (
+            <div className="space-y-4">
+              <Skeleton className="h-8 w-20" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-10 w-28 ml-auto" />
+            </div>
+          ) : (
+            <div className="space-y-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Switch 
+                    id="announcement-active" 
+                    checked={announcement.active}
+                    onCheckedChange={(checked) => handleAnnouncementChange('active', checked)}
+                  />
+                  <Label htmlFor="announcement-active">
+                    {announcement.active ? "Announcement Enabled" : "Announcement Disabled"}
+                  </Label>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Last updated: {typeof announcement.updated_at === 'string' 
+                    ? new Date(announcement.updated_at).toLocaleString()
+                    : new Date(parseInt(announcement.updated_at.$date.$numberLong)).toLocaleString()}
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="announcement-content">Announcement Content</Label>
+                <Textarea 
+                  id="announcement-content"
+                  value={announcement.content}
+                  onChange={(e) => handleAnnouncementChange('content', e.target.value)}
+                  placeholder="Enter the announcement text here..."
+                  className="resize-none"
+                  rows={3}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Keep the announcement brief and clear. Avoid using HTML or special formatting.
+                </p>
+              </div>
+
+              {/* Preview */}
+              <div className="border rounded-md p-3 bg-slate-50 dark:bg-slate-900">
+                <div className="text-sm font-medium mb-1">Preview:</div>
+                <div className="bg-gradient-to-r from-purple-900 to-indigo-900 text-white p-3 rounded-md shadow-sm border border-purple-700">
+                  <div className="flex items-center space-x-2">
+                    <AlertCircle className="h-4 w-4 text-purple-300" />
+                    <span className="font-semibold">Announcement:</span>
+                    <span>{announcement.content}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  onClick={saveAnnouncement}
+                  disabled={isSavingAnnouncement}
+                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+                >
+                  {isSavingAnnouncement ? "Saving..." : "Save Announcement Settings"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {news.length === 0 && !isLoading ? (
         <div className="text-center py-10 border rounded-md">

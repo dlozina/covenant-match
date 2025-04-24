@@ -2,12 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
 import { Notification, NotificationType } from "@/components/ui/notification";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Calendar, ArrowLeft, Pencil, ExternalLink, Newspaper } from "lucide-react";
-import { NewsItem } from "@/utils/api";
+import { NewsItem, fetchAdminNewsById } from "@/utils/api";
 import Link from "next/link";
 import { SecureImage } from "@/components/ui/secure-image";
 
@@ -21,7 +20,6 @@ export function NewsPreviewClient({ id }: NewsPreviewClientProps) {
   const [notification, setNotification] = useState<NotificationType | null>(null);
   
   const router = useRouter();
-  const { fetchWithAuth } = useAuth();
 
   // Format date for display
   const formatDate = (dateString: string | { $date: { $numberLong: string } }) => {
@@ -54,7 +52,11 @@ export function NewsPreviewClient({ id }: NewsPreviewClientProps) {
   useEffect(() => {
     const fetchNews = async () => {
       try {
-        const data = await fetchWithAuth<NewsItem>(`/api/v1/news/${id}`);
+        // Use the admin-specific API endpoint to fetch the news, which handles drafts too
+        const data = await fetchAdminNewsById(id);
+        if (!data) {
+          throw new Error("Failed to fetch news item");
+        }
         setNews(data);
       } catch (error) {
         console.error("Error fetching news:", error);
@@ -68,7 +70,7 @@ export function NewsPreviewClient({ id }: NewsPreviewClientProps) {
     };
 
     fetchNews();
-  }, [id, fetchWithAuth]);
+  }, [id]);
 
   if (isLoading) {
     return (

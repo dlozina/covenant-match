@@ -6,7 +6,7 @@ import { NewsForm } from "@/components/admin/NewsForm";
 import { useAuth } from "@/lib/auth-context";
 import { Notification, NotificationType } from "@/components/ui/notification";
 import { Skeleton } from "@/components/ui/skeleton";
-import { NewsItem } from "@/utils/api";
+import { NewsItem, fetchAdminNewsById } from "@/utils/api";
 
 interface EditNewsClientProps {
   id: string;
@@ -25,7 +25,11 @@ export function EditNewsClient({ id }: EditNewsClientProps) {
   useEffect(() => {
     const fetchNews = async () => {
       try {
-        const data = await fetchWithAuth<NewsItem>(`/api/v1/news/${id}`);
+        // Use the admin-specific API endpoint to fetch the news, which handles drafts too
+        const data = await fetchAdminNewsById(id);
+        if (!data) {
+          throw new Error("Failed to fetch news item");
+        }
         setNews(data);
       } catch (error) {
         console.error("Error fetching news:", error);
@@ -39,7 +43,7 @@ export function EditNewsClient({ id }: EditNewsClientProps) {
     };
 
     fetchNews();
-  }, [id, fetchWithAuth]);
+  }, [id]);
 
   const handleSubmit = async (formData: FormData) => {
     setIsSubmitting(true);

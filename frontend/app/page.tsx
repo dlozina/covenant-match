@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
 import { MainLayout } from "@/components/layout";
-import { Sword, Shield, Timer, Users, Trophy, Skull, ScrollText, Compass, Award } from "lucide-react";
+import { Sword, Shield, Timer, Users, Trophy, Skull, ScrollText, Compass, Award, AlertCircle } from "lucide-react";
 // Use for test if css config is not working
 // import { TestStyled } from "@/components/ui/test-styled";
 // import { BasicTest } from "@/components/ui/basic-test";
@@ -15,10 +15,12 @@ import {
   LeaderboardEntry, 
   CovenantStats,
   NewsItem,
+  Announcement,
   fetchLeaderboard, 
   fetchSessionsCount,
   fetchCovenantStats,
-  fetchRecentNews 
+  fetchRecentNews,
+  fetchAnnouncement 
 } from "@/utils/api";
 
 export default function Home() {
@@ -31,6 +33,8 @@ export default function Home() {
   const [isLoadingCovenants, setIsLoadingCovenants] = useState(true);
   const [news, setNews] = useState<NewsItem[]>([]);
   const [isLoadingNews, setIsLoadingNews] = useState(true);
+  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
+  const [isLoadingAnnouncement, setIsLoadingAnnouncement] = useState(true);
 
   useEffect(() => {
     const getLeaderboard = async () => {
@@ -92,7 +96,7 @@ export default function Home() {
       try {
         setIsLoadingNews(true);
         console.log('Fetching recent news...');
-        const newsData = await fetchRecentNews(2); // Only show top 2 news items on homepage
+        const newsData = await fetchRecentNews(6); // Only show top 6 news items on homepage
         console.log('News data received:', newsData);
         
         if (Array.isArray(newsData)) {
@@ -109,10 +113,24 @@ export default function Home() {
       }
     };
 
+    const getAnnouncement = async () => {
+      try {
+        setIsLoadingAnnouncement(true);
+        const data = await fetchAnnouncement();
+        setAnnouncement(data);
+      } catch (error) {
+        console.error("Failed to fetch announcement:", error);
+        setAnnouncement(null);
+      } finally {
+        setIsLoadingAnnouncement(false);
+      }
+    };
+
     getLeaderboard();
     getActiveSessions();
     getTopCovenants();
     getNews();
+    getAnnouncement();
   }, []);
 
   // Add custom sidebars with improved styling
@@ -236,6 +254,24 @@ export default function Home() {
       rightSidebar={rightSidebar}
       footer={footer}
     >
+      {/* Urgent News Ribbon - Only shown if active */}
+      {!isLoadingAnnouncement && announcement && announcement.active && (
+        <div className="relative my-4 lg:my-6 overflow-hidden">
+          <div className="bg-gradient-to-r from-purple-900 to-indigo-900 text-white py-3 px-4 rounded-md shadow-lg border border-purple-700">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="h-5 w-5 text-purple-300" />
+                <span className="font-semibold">Announcement:</span>
+                <span>{announcement.content}</span>
+              </div>
+              <Link href="/news" className="text-xs bg-purple-800 hover:bg-purple-700 px-2 py-1 rounded-sm transition-colors">
+                Learn More
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Hero Section */}
       <div className="relative rounded-lg overflow-hidden mb-8 lg:mb-12">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900/80 to-indigo-900/80 z-10"></div>

@@ -1,5 +1,8 @@
 use crate::models::error::AppError;
-use crate::models::news::{CreateNewsDto, News, NewsResponse, UpdateNewsDto};
+use crate::models::news::{
+    Announcement, AnnouncementResponse, CreateNewsDto, News, NewsResponse, UpdateAnnouncementDto,
+    UpdateNewsDto,
+};
 use crate::repository::news_repository;
 use mongodb::bson::{doc, oid::ObjectId};
 use mongodb::Database;
@@ -53,36 +56,22 @@ pub async fn get_all_news(
     page: u64,
     limit: u64,
     search: Option<String>,
+    admin_mode: bool,
 ) -> Result<(Vec<NewsResponse>, u64, u64), AppError> {
-    // Ensure page and limit are valid
-    let page = if page < 1 { 1 } else { page };
-    let limit = if limit < 1 { 10 } else { limit };
-
-    // Get total count for pagination metadata and news posts based on search
-    if let Some(search_term) = search {
-        // Use search function in repository
-        let (news_posts, total) =
-            news_repository::find_news_with_search(db, page, limit, search_term).await?;
-
-        // Convert to response DTOs
-        let news_responses: Vec<NewsResponse> =
-            news_posts.into_iter().map(NewsResponse::from).collect();
-
-        Ok((news_responses, total, page))
+    let (news, total) = if let Some(search_term) = search {
+        // Use search function if search term is provided
+        news_repository::find_news_with_search(db, page, limit, search_term, admin_mode).await?
     } else {
-        // Original behavior without search
-        // Get total count for pagination metadata
-        let total = news_repository::count_news(db).await?;
+        // Use regular function if no search term
+        let news = news_repository::find_news_paginated(db, page, limit, admin_mode).await?;
+        let total = news_repository::count_news(db, admin_mode).await?;
+        (news, total)
+    };
 
-        // Get paginated news posts
-        let news_posts = news_repository::find_news_paginated(db, page, limit).await?;
+    // Convert all news to response DTOs
+    let news_responses: Vec<NewsResponse> = news.into_iter().map(|n| n.into()).collect();
 
-        // Convert to response DTOs
-        let news_responses: Vec<NewsResponse> =
-            news_posts.into_iter().map(NewsResponse::from).collect();
-
-        Ok((news_responses, total, page))
-    }
+    Ok((news_responses, total, page))
 }
 
 pub async fn update_news(
@@ -177,4 +166,62 @@ pub async fn get_recent_news(db: &Database, limit: u64) -> Result<Vec<NewsRespon
 
     log::info!("Returning {} news responses", news_responses.len());
     Ok(news_responses)
+}
+
+pub async fn get_current_announcement(db: &Database) -> Result<AnnouncementResponse, AppError> {
+    // Try to get the current announcement
+    let announcement_result = news_repository::find_current_announcement(db).await?;
+
+    // If an announcement exists, return it
+    if let Some(announcement) = announcement_result {
+        return Ok(announcement.to_response());
+    }
+
+    // If no announcement exists, create a default one
+    log::info!("No announcement found, creating a default one");
+
+    // Define default announcement data
+    let default_announcement = doc! {
+        "active": false,
+        "content": "Welcome to Covenant Match!",
+        "updated_by_id": "system",
+        "updated_by_username": "System",
+        "updated_at": mongodb::bson::DateTime::now()
+    };
+
+    // Create and return the default announcement
+    match news_repository::update_announcement(db, default_announcement).await? {
+        Some(announcement) => Ok(announcement.to_response()),
+        None => Err(AppError::AnnouncementNotFound), // This should not happen given our implementation
+    }
+}
+
+pub async fn update_announcement(
+    db: &Database,
+    update_data: UpdateAnnouncementDto,
+    updater_id: &str,
+) -> Result<AnnouncementResponse, AppError> {
+    // Get the current timestamp
+    let now = mongodb::bson::DateTime::now();
+
+    // Get user information
+    let user = crate::repository::user_repository::find_user_by_id(db, updater_id)
+        .await?
+        .ok_or(AppError::UserNotFound)?;
+
+    // Create update document - ignore the updatedAt field from the DTO
+    let update_doc = doc! {
+        "active": update_data.active,
+        "content": update_data.content,
+        "updated_by_id": updater_id.to_string(),
+        "updated_by_username": user.username,
+        "updated_at": now
+    };
+
+    // Update the announcement
+    let updated_announcement = news_repository::update_announcement(db, update_doc)
+        .await?
+        .ok_or(AppError::AnnouncementNotFound)?;
+
+    Ok(updated_announcement.to_response())
 }

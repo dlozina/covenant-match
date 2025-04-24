@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { MainLayout } from "@/components/layout";
 import { Footer } from "@/components/layout/Footer";
 import Link from "next/link";
-import { Calendar, ChevronLeft, ChevronRight, Newspaper, Search } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Newspaper } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NewsItem, fetchAllNews } from "@/utils/api";
@@ -59,11 +59,6 @@ export default function NewsPage() {
     loadNews();
   }, [currentPage, debouncedQuery]);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Not needed anymore since we debounce, but kept for form submission
-  };
-
   const formatDate = (dateString: string | { $date: { $numberLong: string } }) => {
     try {
       if (typeof dateString === 'object' && dateString.$date && dateString.$date.$numberLong) {
@@ -104,19 +99,15 @@ export default function NewsPage() {
         </h1>
 
         {/* Search bar */}
-        <form onSubmit={handleSearch} className="mb-6 sm:mb-8">
+        <form className="mb-6 sm:mb-8">
           <div className="flex gap-2">
             <Input
               type="text"
               placeholder="Search news..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-card/50 border-purple-900/20"
+              className="bg-card/50 border-purple-900/20 w-full"
             />
-            <Button type="submit">
-              <Search className="h-4 w-4 mr-2" />
-              Search
-            </Button>
           </div>
         </form>
 

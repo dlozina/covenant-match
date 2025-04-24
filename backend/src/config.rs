@@ -184,6 +184,46 @@ impl Config {
                     method: Some("GET".to_string()),
                     is_regex: true,
                 },
+                ExcludePattern {
+                    path: "/api/v1/announcements/current".to_string(),
+                    method: Some("GET".to_string()),
+                    is_regex: false,
+                },
+                ExcludePattern {
+                    path: "/api/v1/news/recent".to_string(),
+                    method: Some("GET".to_string()),
+                    is_regex: false,
+                },
+                ExcludePattern {
+                    path: "/api/v1/news".to_string(),
+                    method: Some("GET".to_string()),
+                    is_regex: false,
+                },
+                ExcludePattern {
+                    path: "/api/v1/news/.*".to_string(),
+                    method: Some("GET".to_string()),
+                    is_regex: true,
+                },
+                ExcludePattern {
+                    path: "/api/v1/statistics/leaderboard".to_string(),
+                    method: Some("GET".to_string()),
+                    is_regex: false,
+                },
+                ExcludePattern {
+                    path: "/api/v1/statistics/covenants".to_string(),
+                    method: Some("GET".to_string()),
+                    is_regex: false,
+                },
+                ExcludePattern {
+                    path: "/api/v1/statistics/sessions-stats".to_string(),
+                    method: Some("GET".to_string()),
+                    is_regex: false,
+                },
+                ExcludePattern {
+                    path: "/api/v1/public/sessions".to_string(),
+                    method: Some("GET".to_string()),
+                    is_regex: false,
+                },
             ],
         };
 

@@ -1,5 +1,5 @@
 use crate::models::error::AppError;
-use crate::models::news::{News, NewsResponse};
+use crate::models::news::{Announcement, News, NewsResponse};
 use futures::StreamExt;
 use log::error;
 use mongodb::{
@@ -9,9 +9,14 @@ use mongodb::{
 use regex;
 
 const COLLECTION_NAME: &str = "news";
+const ANNOUNCEMENT_COLLECTION: &str = "announcements";
 
 fn get_collection(db: &Database) -> Collection<News> {
     db.collection::<News>(COLLECTION_NAME)
+}
+
+fn get_announcement_collection(db: &Database) -> Collection<Announcement> {
+    db.collection::<Announcement>(ANNOUNCEMENT_COLLECTION)
 }
 
 pub async fn create_news(db: &Database, news: &News) -> Result<(), AppError> {
@@ -56,15 +61,26 @@ pub async fn find_news_paginated(
     db: &Database,
     page: u64,
     limit: u64,
+    admin_mode: bool,
 ) -> Result<Vec<News>, AppError> {
     let collection = get_collection(db);
-    log::info!("Fetching news with page: {}, limit: {}", page, limit);
+    log::info!(
+        "Fetching news with page: {}, limit: {}, admin_mode: {}",
+        page,
+        limit,
+        admin_mode
+    );
 
     // Calculate skip value for pagination
     let skip = (page - 1) * limit;
 
-    // Create a filter document - only return published news
-    let filter = doc! { "published": true };
+    // Create a filter document based on admin mode
+    // If admin_mode is true, fetch all news; otherwise, only show published news
+    let filter = if admin_mode {
+        doc! {} // Empty filter to get all news
+    } else {
+        doc! { "published": true }
+    };
 
     // Use the find method without options
     let mut cursor = collection.find(filter).await.map_err(|e| {
@@ -102,9 +118,15 @@ pub async fn find_news_paginated(
     Ok(news[start..end].to_vec())
 }
 
-pub async fn count_news(db: &Database) -> Result<u64, AppError> {
+pub async fn count_news(db: &Database, admin_mode: bool) -> Result<u64, AppError> {
     let collection = get_collection(db);
-    let filter = doc! { "published": true };
+
+    // Create a filter document based on admin mode
+    let filter = if admin_mode {
+        doc! {} // Empty filter to count all news
+    } else {
+        doc! { "published": true }
+    };
 
     collection.count_documents(filter).await.map_err(|e| {
         error!("Database error counting news: {:?}", e);
@@ -261,13 +283,15 @@ pub async fn find_news_with_search(
     page: u64,
     limit: u64,
     search: String,
+    admin_mode: bool,
 ) -> Result<(Vec<News>, u64), AppError> {
     let collection = get_collection(db);
     log::info!(
-        "Searching news with term: '{}', page: {}, limit: {}",
+        "Searching news with term: '{}', page: {}, limit: {}, admin_mode: {}",
         search,
         page,
-        limit
+        limit,
+        admin_mode
     );
 
     // Calculate skip value for pagination
@@ -276,9 +300,18 @@ pub async fn find_news_with_search(
     // Create a search filter using regex for case-insensitive search
     // This searches in title, content, and summary fields
     let search_regex = format!(".*{}.*", regex::escape(&search));
+
+    // Base filter that varies based on admin_mode
+    let base_filter = if admin_mode {
+        doc! {} // Empty filter to match all documents
+    } else {
+        doc! { "published": true } // Only match published documents
+    };
+
+    // Combined filter with search
     let filter = doc! {
         "$and": [
-            { "published": true },
+            base_filter,
             { "$or": [
                 { "title": { "$regex": &search_regex, "$options": "i" } },
                 { "content": { "$regex": &search_regex, "$options": "i" } },
@@ -323,4 +356,73 @@ pub async fn find_news_with_search(
     log::info!("Returning news items from index {} to {}", start, end);
 
     Ok((news[start..end].to_vec(), total))
+}
+
+// Announcement repository functions
+pub async fn find_current_announcement(db: &Database) -> Result<Option<Announcement>, AppError> {
+    let collection = get_announcement_collection(db);
+
+    // We only ever have one announcement document, so we get the first one
+    collection.find_one(doc! {}).await.map_err(|e| {
+        error!("Database error finding announcement: {:?}", e);
+        AppError::DatabaseError(e)
+    })
+}
+
+pub async fn update_announcement(
+    db: &Database,
+    update_doc: Document,
+) -> Result<Option<Announcement>, AppError> {
+    let collection = get_announcement_collection(db);
+
+    // Check if any announcement exists
+    let exists = collection.count_documents(doc! {}).await.map_err(|e| {
+        error!("Database error checking for existing announcement: {:?}", e);
+        AppError::DatabaseError(e)
+    })? > 0;
+
+    if exists {
+        // Update the existing announcement (we only ever have one)
+        collection
+            .update_one(doc! {}, doc! { "$set": update_doc })
+            .await
+            .map_err(|e| {
+                error!("Database error updating announcement: {:?}", e);
+                AppError::DatabaseError(e)
+            })?;
+    } else {
+        // Create a new announcement
+        let now = mongodb::bson::DateTime::now();
+        let new_id = ObjectId::new();
+
+        // Create a properly structured Announcement object
+        let announcement = Announcement {
+            id: new_id,
+            active: update_doc.get_bool("active").unwrap_or(false),
+            content: update_doc
+                .get_str("content")
+                .unwrap_or("New announcement")
+                .to_string(),
+            updated_by_id: update_doc
+                .get_str("updated_by_id")
+                .unwrap_or("system")
+                .to_string(),
+            updated_by_username: update_doc
+                .get_str("updated_by_username")
+                .unwrap_or("system")
+                .to_string(),
+            updated_at: now,
+        };
+
+        collection.insert_one(&announcement).await.map_err(|e| {
+            error!("Database error creating announcement: {:?}", e);
+            AppError::DatabaseError(e)
+        })?;
+    }
+
+    // Fetch and return the updated/created announcement
+    collection.find_one(doc! {}).await.map_err(|e| {
+        error!("Database error fetching announcement: {:?}", e);
+        AppError::DatabaseError(e)
+    })
 }

@@ -157,6 +157,13 @@ export interface CovenantStatsResponse {
   covenantStats: CovenantStats[];
 }
 
+// Announcement type for site-wide notifications
+export interface Announcement {
+  active: boolean;
+  content: string;
+  updated_at: string | { $date: { $numberLong: string } };
+}
+
 // News Types
 export interface NewsItem {
   id: string;
@@ -920,6 +927,34 @@ export async function fetchNewsById(id: string): Promise<NewsItem | null> {
   }
 }
 
+// Function to fetch a single news item by ID for admin (includes drafts)
+export async function fetchAdminNewsById(id: string): Promise<NewsItem | null> {
+  try {
+    // Get the authentication token
+    const token = getToken();
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+    
+    const response = await fetch(`${API_URL}/api/v1/admin/news/${id}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch news item');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching admin news item:', error);
+    return null;
+  }
+}
+
 // Function to fetch paginated news list with search
 export async function fetchAllNews(page: number = 1, limit: number = 10, search?: string): Promise<{ news: NewsItem[], total: number, page: number, totalPages: number }> {
   try {
@@ -950,5 +985,106 @@ export async function fetchAllNews(page: number = 1, limit: number = 10, search?
   } catch (error) {
     console.error('Error fetching news list:', error);
     return { news: [], total: 0, page: 1, totalPages: 0 };
+  }
+}
+
+// Function to fetch news for admin dashboard (includes drafts)
+export async function fetchAdminNews(): Promise<NewsItem[]> {
+  try {
+    // Get the authentication token
+    const token = getToken();
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+    
+    const response = await fetch(`${API_URL}/api/v1/admin/news`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch admin news');
+    }
+
+    const data = await response.json();
+    if (data.status === 'success' && data.data && Array.isArray(data.data.news)) {
+      return data.data.news;
+    } else {
+      console.error('Unexpected API response format:', data);
+      return [];
+    }
+  } catch (error) {
+    console.error('Error fetching admin news:', error);
+    return [];
+  }
+}
+
+// Function to fetch the current announcement
+export async function fetchAnnouncement(): Promise<Announcement | null> {
+  try {
+    const response = await fetch(`${API_URL}/api/v1/announcements/current`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    if (data.status === 'success' && data.data) {
+      return data.data.announcement;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error fetching announcement:', error);
+    return null;
+  }
+}
+
+// Function to update the announcement (admin only)
+export async function updateAnnouncement(announcement: Announcement): Promise<boolean> {
+  try {
+    // Get the authentication token
+    const token = getToken();
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+    
+    // Ensure we're sending a properly formatted date string
+    let updatedAt = announcement.updated_at;
+    
+    // If updated_at is a MongoDB date object, convert it to a string
+    if (typeof updatedAt === 'object' && updatedAt !== null && '$date' in updatedAt) {
+      // Don't send the MongoDB object format at all - backend handles timestamps
+      updatedAt = new Date().toISOString();
+    }
+    
+    const response = await fetch(`${API_URL}/api/v1/admin/announcements`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        active: announcement.active,
+        content: announcement.content
+        // Don't send updated_at at all - let the backend handle it
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update announcement');
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error updating announcement:', error);
+    return false;
   }
 } 
