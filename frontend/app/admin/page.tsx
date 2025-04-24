@@ -97,16 +97,16 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-8">Admin Dashboard</h1>
+      <h1 className="text-2xl md:text-3xl font-bold mb-4 md:mb-8">Admin Dashboard</h1>
       
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 md:p-4">
             <CardTitle className="text-sm font-medium">Total Users</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 md:p-4 pt-0 md:pt-0">
             <div className="text-2xl font-bold">{stats?.usersCount}</div>
             <p className="text-xs text-muted-foreground">
               {stats?.activeUsersCount} active users
@@ -115,11 +115,11 @@ export default function AdminDashboard() {
         </Card>
         
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 md:p-4">
             <CardTitle className="text-sm font-medium">Active Sessions</CardTitle>
             <ActivitySquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 md:p-4 pt-0 md:pt-0">
             <div className="text-2xl font-bold">{stats?.activeSessions}</div>
             <p className="text-xs text-muted-foreground">
               {stats?.totalSessions} total sessions
@@ -128,11 +128,11 @@ export default function AdminDashboard() {
         </Card>
         
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 md:p-4">
             <CardTitle className="text-sm font-medium">News Articles</CardTitle>
             <Newspaper className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 md:p-4 pt-0 md:pt-0">
             <div className="text-2xl font-bold">{stats?.newsCount}</div>
             <p className="text-xs text-muted-foreground">
               {stats?.publishedNewsCount} published
@@ -141,11 +141,11 @@ export default function AdminDashboard() {
         </Card>
         
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 md:p-4">
             <CardTitle className="text-sm font-medium">Completed Sessions</CardTitle>
             <ShieldCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 md:p-4 pt-0 md:pt-0">
             <div className="text-2xl font-bold">{stats?.completedSessions}</div>
             <p className="text-xs text-muted-foreground">
               {((stats?.completedSessions || 0) / (stats?.totalSessions || 1) * 100).toFixed(0)}% completion rate
@@ -155,13 +155,13 @@ export default function AdminDashboard() {
       </div>
       
       {/* System Information */}
-      <h2 className="text-xl font-semibold mb-4">System Information</h2>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4">System Information</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-medium">Server Status</CardTitle>
+          <CardHeader className="p-3 md:p-4">
+            <CardTitle className="text-base md:text-lg font-medium">Server Status</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 md:space-y-4 p-3 md:p-4 pt-0 md:pt-0">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Version:</span>
               <span>{systemInfo?.version}</span>
@@ -193,14 +193,14 @@ export default function AdminDashboard() {
         </Card>
         
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg font-medium">Memory Usage</CardTitle>
+          <CardHeader className="p-3 md:p-4">
+            <CardTitle className="text-base md:text-lg font-medium">Memory Usage</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
+          <CardContent className="p-3 md:p-4 pt-0 md:pt-0">
+            <div className="space-y-3 md:space-y-4">
               <div className="flex items-center justify-between">
                 <Server className="h-4 w-4 text-muted-foreground" />
-                <span className="flex-1 ml-2 text-muted-foreground">
+                <span className="flex-1 ml-2 text-muted-foreground text-xs md:text-sm">
                   {systemInfo?.memoryUsage.usedMb} MB used of {systemInfo?.memoryUsage.totalMb} MB total
                 </span>
                 <span className="font-medium">
@@ -215,14 +215,14 @@ export default function AdminDashboard() {
                 />
               </div>
               
-              <div className="grid grid-cols-2 gap-4 pt-2">
+              <div className="grid grid-cols-2 gap-2 md:gap-4 pt-2">
                 <div className="bg-card/50 p-2 rounded-md border border-border">
                   <div className="text-xs text-muted-foreground mb-1">Used Memory</div>
-                  <div className="text-lg font-medium">{systemInfo?.memoryUsage.usedMb} MB</div>
+                  <div className="text-base md:text-lg font-medium">{systemInfo?.memoryUsage.usedMb} MB</div>
                 </div>
                 <div className="bg-card/50 p-2 rounded-md border border-border">
                   <div className="text-xs text-muted-foreground mb-1">Free Memory</div>
-                  <div className="text-lg font-medium">{systemInfo?.memoryUsage.freeMb} MB</div>
+                  <div className="text-base md:text-lg font-medium">{systemInfo?.memoryUsage.freeMb} MB</div>
                 </div>
               </div>
             </div>

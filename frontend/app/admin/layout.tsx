@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { 
@@ -11,7 +11,9 @@ import {
   LogOut,
   Database,
   MessageSquare,
-  Shield
+  Shield,
+  Menu,
+  X
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
@@ -23,6 +25,24 @@ export default function AdminLayout({
   const { isLoggedIn, isLoading, userData, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Control sidebar visibility based on screen size
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setSidebarOpen(false);
+      } else {
+        setSidebarOpen(true);
+      }
+    };
+
+    // Set initial state
+    handleResize();
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     // Debug logging
@@ -61,9 +81,19 @@ export default function AdminLayout({
   ];
 
   return (
-    <div className="flex min-h-screen bg-background">
-      {/* Sidebar */}
-      <aside className="w-64 border-r border-purple-900/20 bg-card/50 backdrop-blur-sm">
+    <div className="flex min-h-screen bg-background relative">
+      {/* Mobile menu button */}
+      <button 
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-md bg-purple-500/10 text-purple-500"
+      >
+        {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
+
+      {/* Sidebar - with responsive behavior */}
+      <aside className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} 
+        fixed md:relative w-64 border-r border-purple-900/20 bg-card/95 backdrop-blur-sm 
+        min-h-screen z-40 transition-transform duration-300 ease-in-out md:translate-x-0`}>
         <div className="p-4 border-b border-purple-900/20">
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-purple-500" />
@@ -85,6 +115,11 @@ export default function AdminLayout({
                     "bg-purple-600/20 text-purple-200" : 
                     "hover:bg-purple-900/10 text-muted-foreground hover:text-foreground"
                 }`}
+                onClick={() => {
+                  if (window.innerWidth < 768) {
+                    setSidebarOpen(false);
+                  }
+                }}
               >
                 {item.icon}
                 <span>{item.label}</span>
@@ -102,9 +137,17 @@ export default function AdminLayout({
         </nav>
       </aside>
       
+      {/* Overlay for mobile when sidebar is open */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-30 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      
       {/* Main content */}
       <main className="flex-1 overflow-auto">
-        <div className="container p-6">
+        <div className="container p-3 sm:p-4 md:p-6">
           {children}
         </div>
       </main>

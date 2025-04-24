@@ -199,79 +199,64 @@ export default function NewsListPage() {
   }
 
   return (
-    <div className="container py-10">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">News Management</h1>
-        <Link href="/admin/news/create" passHref>
-          <Button>
-            <PlusIcon className="h-4 w-4 mr-2" />
-            Add News
-          </Button>
-        </Link>
-      </div>
-
+    <div className="space-y-6">
       {notification && (
-        <div className="mb-6">
-          <Notification 
-            notification={notification} 
-            onDismiss={() => setNotification(null)}
-          />
-        </div>
+        <Notification
+          notification={notification}
+          onDismiss={() => setNotification(null)}
+        />
       )}
 
-      {/* Announcement Management Card */}
-      <Card className="mb-6 border-purple-900/20">
-        <CardHeader className="bg-gradient-to-r from-purple-900/10 to-indigo-900/10">
-          <div className="flex items-center gap-2">
-            <Bell className="h-5 w-5 text-purple-400" />
-            <CardTitle>Site Announcement</CardTitle>
+      {/* Announcement Settings Section - made more responsive */}
+      <Card className="mb-6">
+        <CardHeader className="p-4 md:p-6">
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+            <div>
+              <CardTitle>Site Announcement</CardTitle>
+              <CardDescription className="mt-1">
+                Set a global announcement that will appear at the top of all pages
+              </CardDescription>
+            </div>
+            <Button
+              onClick={saveAnnouncement}
+              disabled={isSavingAnnouncement}
+              className="w-full sm:w-auto"
+            >
+              {isSavingAnnouncement ? "Saving..." : "Save Changes"}
+            </Button>
           </div>
-          <CardDescription>
-            Configure the site-wide announcement displayed on the homepage
-          </CardDescription>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="p-4 md:p-6 pt-0">
           {isAnnouncementLoading ? (
-            <div className="space-y-4">
-              <Skeleton className="h-8 w-20" />
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-10 w-28 ml-auto" />
+            <div className="space-y-2">
+              <Skeleton className="h-6 w-24" />
+              <Skeleton className="h-32 w-full" />
             </div>
           ) : (
-            <div className="space-y-5">
-              <div className="flex items-center justify-between">
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                 <div className="flex items-center space-x-2">
-                  <Switch 
-                    id="announcement-active" 
+                  <Switch
+                    id="announcement-active"
                     checked={announcement.active}
-                    onCheckedChange={(checked) => handleAnnouncementChange('active', checked)}
+                    onCheckedChange={(value) => handleAnnouncementChange("active", value)}
                   />
-                  <Label htmlFor="announcement-active">
-                    {announcement.active ? "Announcement Enabled" : "Announcement Disabled"}
-                  </Label>
+                  <Label htmlFor="announcement-active">Enable announcement</Label>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  Last updated: {typeof announcement.updated_at === 'string' 
+                <div className="flex items-center text-sm text-muted-foreground">
+                  <Bell className="h-4 w-4 mr-1" />
+                  <span>Last updated: {typeof announcement.updated_at === 'string' 
                     ? new Date(announcement.updated_at).toLocaleString()
-                    : new Date(parseInt(announcement.updated_at.$date.$numberLong)).toLocaleString()}
+                    : new Date(parseInt(announcement.updated_at.$date.$numberLong)).toLocaleString()}</span>
                 </div>
               </div>
+              <Textarea
+                value={announcement.content}
+                onChange={(e) => handleAnnouncementChange("content", e.target.value)}
+                placeholder="Enter announcement text"
+                className="min-h-[100px]"
+              />
               
-              <div className="space-y-2">
-                <Label htmlFor="announcement-content">Announcement Content</Label>
-                <Textarea 
-                  id="announcement-content"
-                  value={announcement.content}
-                  onChange={(e) => handleAnnouncementChange('content', e.target.value)}
-                  placeholder="Enter the announcement text here..."
-                  className="resize-none"
-                  rows={3}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Keep the announcement brief and clear. Avoid using HTML or special formatting.
-                </p>
-              </div>
-
               {/* Preview */}
               <div className="border rounded-md p-3 bg-slate-50 dark:bg-slate-900">
                 <div className="text-sm font-medium mb-1">Preview:</div>
@@ -283,104 +268,117 @@ export default function NewsListPage() {
                   </div>
                 </div>
               </div>
-
-              <div className="flex justify-end">
-                <Button
-                  onClick={saveAnnouncement}
-                  disabled={isSavingAnnouncement}
-                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
-                >
-                  {isSavingAnnouncement ? "Saving..." : "Save Announcement Settings"}
-                </Button>
-              </div>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {news.length === 0 && !isLoading ? (
-        <div className="text-center py-10 border rounded-md">
-          <p className="text-muted-foreground">No news posts found</p>
-          <Link href="/admin/news/create" passHref>
-            <Button variant="link">Create your first news post</Button>
-          </Link>
-        </div>
-      ) : (
-        <div className="border rounded-md">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Updated</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {news.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.title}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center">
-                      {item.published ? (
-                        <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-                          <i className="inline-block h-2 w-2 rounded-full bg-green-500 mr-1" />
-                          Published
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
-                          <i className="inline-block h-2 w-2 rounded-full bg-gray-500 mr-1" />
-                          Draft
-                        </span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {item.time_ago || formatDate(item.created_at)}
-                  </TableCell>
-                  <TableCell>
-                    {formatDate(item.updated_at)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end space-x-2">
-                      <Link href={`/admin/news/preview/${item.id}`} passHref>
-                        <Button variant="outline" size="icon" title="Preview">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                        </Button>
-                      </Link>
-                      <Link href={`/admin/news/edit/${item.id}`} passHref>
-                        <Button variant="outline" size="icon">
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
-                        onClick={() => setDeleteId(item.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
+      {/* News Management Section */}
+      <div className="flex flex-col sm:flex-row items-center justify-between mb-4 gap-4">
+        <h1 className="text-2xl font-bold">News Articles</h1>
+        <Link href="/admin/news/create">
+          <Button className="flex items-center w-full sm:w-auto">
+            <PlusIcon className="h-4 w-4 mr-2" />
+            Add New Article
+          </Button>
+        </Link>
+      </div>
 
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-        <AlertDialogContent>
+      {/* News Table with responsive design */}
+      <div className="border rounded-md overflow-hidden">
+        {news.length === 0 ? (
+          <div className="p-6 text-center">
+            <p className="text-muted-foreground">No news articles found</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Click &quot;Add New Article&quot; to create your first article
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[40%]">Title</TableHead>
+                  <TableHead className="hidden md:table-cell">Status</TableHead>
+                  <TableHead className="hidden md:table-cell">Date</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {news.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-medium">
+                      <div>
+                        {item.title}
+                        <div className="md:hidden text-xs text-muted-foreground mt-1">
+                          <div className="flex items-center">
+                            <span className={`inline-block w-2 h-2 rounded-full mr-1 ${
+                              item.published ? 'bg-green-500' : 'bg-amber-500'
+                            }`}></span>
+                            {item.published ? 'Published' : 'Draft'}
+                          </div>
+                          <div className="mt-1">{formatDate(item.created_at)}</div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        item.published 
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' 
+                          : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full mr-1 ${
+                          item.published ? 'bg-green-400' : 'bg-amber-400'
+                        }`}></span>
+                        {item.published ? 'Published' : 'Draft'}
+                      </span>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {formatDate(item.created_at)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end space-x-2">
+                        <Link href={`/admin/news/edit/${item.id}`}>
+                          <Button variant="outline" size="icon">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="text-red-500 hover:text-red-600"
+                          onClick={() => setDeleteId(item.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={Boolean(deleteId)} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center">
+              <AlertCircle className="h-5 w-5 mr-2 text-red-500" />
+              Confirm Deletion
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the news post.
+              Are you sure you want to delete this news article? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+          <AlertDialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2">
+            <AlertDialogCancel className="mt-2 sm:mt-0">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-500 hover:bg-red-600 text-white"
+              onClick={handleDelete}
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
