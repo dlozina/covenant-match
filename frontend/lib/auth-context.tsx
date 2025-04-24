@@ -35,6 +35,7 @@ type AuthContextType = {
   refreshUserData: () => Promise<void>;
   refreshToken: () => Promise<boolean>;
   fetchWithAuth: <T = unknown>(url: string, options?: RequestInit) => Promise<T>;
+  getAuthHeaders: () => Promise<HeadersInit>;
 };
 
 // Create the auth context with default values
@@ -46,7 +47,8 @@ const AuthContext = createContext<AuthContextType>({
   logout: () => {},
   refreshUserData: async () => {},
   refreshToken: async () => false,
-  fetchWithAuth: async <T = unknown>(): Promise<T> => { throw new Error('Not implemented'); }
+  fetchWithAuth: async <T = unknown>(): Promise<T> => { throw new Error('Not implemented'); },
+  getAuthHeaders: async (): Promise<HeadersInit> => { throw new Error('Not implemented'); }
 });
 
 // Custom hook to use the auth context
@@ -437,6 +439,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [refreshToken, logout]);
 
+  // Add getAuthHeaders implementation inside AuthProvider
+  const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
+    // Get token from storage
+    let token = localStorage.getItem('token');
+    if (!token) {
+      // Not logged in
+      throw new Error('Not authenticated');
+    }
+
+    // Check if token is expired or will expire soon (within 5 minutes)
+    const expiry = getTokenExpiry(token);
+    const now = Date.now();
+    const FIVE_MINUTES = 5 * 60 * 1000;
+    
+    if (expiry - now < FIVE_MINUTES) {
+      // Token is expiring soon, refresh it
+      const refreshSuccess = await refreshToken();
+      if (!refreshSuccess) {
+        // If refresh failed and token is expired, logout
+        if (now >= expiry) {
+          logout();
+          throw new Error('Session expired');
+        }
+      } else {
+        // Get the new token after refresh
+        token = localStorage.getItem('token') || '';
+      }
+    }
+
+    // Create headers with Authorization
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+  }, [refreshToken, logout]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -447,7 +485,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         refreshUserData,
         refreshToken,
-        fetchWithAuth
+        fetchWithAuth,
+        getAuthHeaders
       }}
     >
       {children}

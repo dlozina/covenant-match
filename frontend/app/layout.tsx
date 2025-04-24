@@ -1,10 +1,16 @@
-import { Metadata } from "next";
+import { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { SiteHeader } from "@/components/layout";
 import { ThemeProvider, Providers } from "@/app/providers";
 
 const inter = Inter({ subsets: ["latin"] });
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+};
 
 export const metadata: Metadata = {
   title: "CovenantMatch - Nightreign Matchmaking",
@@ -13,7 +19,6 @@ export const metadata: Metadata = {
   keywords: "Nightreign, Elden Ring, gaming, matchmaking, teammates, covenant match, team finder, game sessions",
   authors: [{ name: "Covenant Match Team" }],
   robots: "index, follow",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
   appleWebApp: {
     title: "Covenant-Match"
   },

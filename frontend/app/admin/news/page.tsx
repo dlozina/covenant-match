@@ -65,7 +65,7 @@ export default function NewsListPage() {
   const [announcement, setAnnouncement] = useState<Announcement>({
     active: false,
     content: "New version of Covenant Match coming soon!",
-    updated_at: new Date().toISOString()
+    updatedAt: new Date().toISOString()
   });
   const [isAnnouncementLoading, setIsAnnouncementLoading] = useState(true);
   const [isSavingAnnouncement, setIsSavingAnnouncement] = useState(false);
@@ -245,9 +245,9 @@ export default function NewsListPage() {
                 </div>
                 <div className="flex items-center text-sm text-muted-foreground">
                   <Bell className="h-4 w-4 mr-1" />
-                  <span>Last updated: {typeof announcement.updated_at === 'string' 
-                    ? new Date(announcement.updated_at).toLocaleString()
-                    : new Date(parseInt(announcement.updated_at.$date.$numberLong)).toLocaleString()}</span>
+                  <span>Last updated: {typeof announcement.updatedAt === 'string' 
+                    ? new Date(announcement.updatedAt).toLocaleString()
+                    : new Date(parseInt(announcement.updatedAt.$date.$numberLong)).toLocaleString()}</span>
                 </div>
               </div>
               <Textarea

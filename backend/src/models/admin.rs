@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct AdminDashboardStats {
     pub users_count: u64,
     pub active_users_count: u64,
@@ -13,6 +14,7 @@ pub struct AdminDashboardStats {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct SystemInfo {
     pub version: String,
     pub environment: String,
@@ -23,6 +25,7 @@ pub struct SystemInfo {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct MemoryUsage {
     pub total_mb: u64,
     pub used_mb: u64,

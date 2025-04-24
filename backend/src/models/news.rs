@@ -1,4 +1,3 @@
-use chrono::DateTime;
 use mongodb::bson::{self, oid::ObjectId};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -150,6 +149,7 @@ impl Announcement {
 
 // Response struct for API
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct AnnouncementResponse {
     pub id: String,
     pub active: bool,

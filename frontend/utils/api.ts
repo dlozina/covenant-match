@@ -161,7 +161,7 @@ export interface CovenantStatsResponse {
 export interface Announcement {
   active: boolean;
   content: string;
-  updated_at: string | { $date: { $numberLong: string } };
+  updatedAt: string | { $date: { $numberLong: string } };
 }
 
 // News Types
@@ -1057,7 +1057,7 @@ export async function updateAnnouncement(announcement: Announcement): Promise<bo
     }
     
     // Ensure we're sending a properly formatted date string
-    let updatedAt = announcement.updated_at;
+    let updatedAt = announcement.updatedAt;
     
     // If updated_at is a MongoDB date object, convert it to a string
     if (typeof updatedAt === 'object' && updatedAt !== null && '$date' in updatedAt) {

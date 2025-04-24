@@ -14,18 +14,26 @@ pub async fn get_dashboard_stats(db: &Database) -> Result<AdminDashboardStats, A
     // For now, using the same value as total users
     let active_users_count = users_count;
 
-    // Get session counts
-    // We need to count sessions manually since the count_sessions function doesn't exist
-    // For total sessions, we'll just use a dummy value for now
-    let total_sessions = 100;
-    let active_sessions = 15;
-    let completed_sessions = 80;
+    // Get session counts using repository function
+    let total_sessions = session_repository::count_sessions_by_status(db, None, None).await?;
+
+    // Count active sessions (Open + InProgress)
+    let open_sessions =
+        session_repository::count_sessions_by_status(db, Some("Open".to_string()), None).await?;
+    let in_progress_sessions =
+        session_repository::count_sessions_by_status(db, Some("InProgress".to_string()), None)
+            .await?;
+    let active_sessions = open_sessions + in_progress_sessions;
+
+    // Count completed sessions
+    let completed_sessions =
+        session_repository::count_sessions_by_status(db, Some("Completed".to_string()), None)
+            .await?;
 
     // Get news counts
     let news_count = news_repository::count_news(db, true).await?;
 
-    // Count published news (temporarily using same value as news_count)
-    // In the future, we could add a filter for published news
+    // Count published news
     let published_news_count = news_repository::count_news(db, false).await?;
 
     Ok(AdminDashboardStats {

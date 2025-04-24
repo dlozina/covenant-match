@@ -10,7 +10,7 @@ use crate::models::game_data::{
 use crate::models::geo_location::{CoordinatesDto, GeoLocationDataDto};
 use crate::models::news::{
     Announcement, CreateNewsDto, NewsListResponse, NewsResponse, UpdateAnnouncementDto,
-    UpdateNewsDto,
+    UpdateNewsDto, NewsListData, AnnouncementResponse,
 };
 use crate::models::session::{
     CovenantStats, CovenantStatsResponse, CreateSessionDto, GameResult, JoinSessionDto,
@@ -212,9 +212,11 @@ use utoipa::{
             NewsListResponse,
             CreateNewsDto,
             UpdateNewsDto,
+            NewsListData,
             // Announcement models
             Announcement,
             UpdateAnnouncementDto,
+            AnnouncementResponse,
             // Admin models
             AdminDashboardStats,
             SystemInfo,
