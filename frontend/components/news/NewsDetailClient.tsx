@@ -70,21 +70,21 @@ export function NewsDetailClient({ id }: NewsDetailClientProps) {
 
   return (
     <MainLayout footer={footer}>
-      <div className="container max-w-3xl py-8">
+      <div className="py-4 sm:py-6 md:py-8">
         <Link href="/news">
-          <Button variant="ghost" className="mb-6 pl-0">
+          <Button variant="ghost" className="mb-4 md:mb-6 pl-0">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to News
           </Button>
         </Link>
 
         {isLoading ? (
-          <div className="flex flex-col items-center py-20">
+          <div className="flex flex-col items-center py-12 md:py-20">
             <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-purple-500"></div>
             <p className="mt-4 text-muted-foreground">Loading article...</p>
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center py-20">
+          <div className="flex flex-col items-center py-12 md:py-20">
             <div className="text-lg text-red-500 font-medium">{error}</div>
             <Link href="/news">
               <Button className="mt-4">View all news</Button>
@@ -93,13 +93,13 @@ export function NewsDetailClient({ id }: NewsDetailClientProps) {
         ) : newsItem ? (
           <article className="bg-card/50 border border-purple-900/20 rounded-lg overflow-hidden backdrop-blur-sm">
             {newsItem.image_url && (
-              <div className="w-full h-64 overflow-hidden relative">
+              <div className="w-full h-48 sm:h-56 md:h-64 overflow-hidden relative">
                 <SecureImage 
                   src={newsItem.image_url} 
                   alt={newsItem.title} 
                   fill
                   priority
-                  sizes="(max-width: 1200px) 100vw, 1200px"
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1000px"
                   className="object-cover"
                   fallback={
                     <div className="w-full h-full flex items-center justify-center bg-slate-800/50">
@@ -110,10 +110,10 @@ export function NewsDetailClient({ id }: NewsDetailClientProps) {
               </div>
             )}
 
-            <div className="p-6">
-              <h1 className="text-3xl font-bold mb-4">{newsItem.title}</h1>
+            <div className="p-4 sm:p-5 md:p-6">
+              <h1 className="text-2xl sm:text-3xl font-bold mb-3 sm:mb-4">{newsItem.title}</h1>
               
-              <div className="flex items-center text-sm text-muted-foreground mb-6">
+              <div className="flex flex-wrap items-center text-sm text-muted-foreground mb-4 sm:mb-6">
                 <div className="flex items-center">
                   <User className="mr-1 h-4 w-4" />
                   <span>{newsItem.author_username}</span>
@@ -126,7 +126,7 @@ export function NewsDetailClient({ id }: NewsDetailClientProps) {
               </div>
 
               <div className="prose prose-invert max-w-none">
-                <div className="text-lg font-medium text-muted-foreground mb-6">
+                <div className="text-base sm:text-lg font-medium text-muted-foreground mb-4 sm:mb-6">
                   {newsItem.summary}
                 </div>
                 <div dangerouslySetInnerHTML={{ __html: newsItem.content }}></div>
@@ -134,7 +134,7 @@ export function NewsDetailClient({ id }: NewsDetailClientProps) {
             </div>
           </article>
         ) : (
-          <div className="flex flex-col items-center py-20">
+          <div className="flex flex-col items-center py-12 md:py-20">
             <div className="text-lg font-medium">News article not found</div>
             <Link href="/news">
               <Button className="mt-4">View all news</Button>

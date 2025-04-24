@@ -23,7 +23,11 @@ pub async fn create_news(db: &Database, news: &News) -> Result<(), AppError> {
     Ok(())
 }
 
-pub async fn find_news_by_id(db: &Database, id: &str) -> Result<Option<News>, AppError> {
+pub async fn find_news_by_id(
+    db: &Database,
+    id: &str,
+    admin_mode: bool,
+) -> Result<Option<News>, AppError> {
     let collection = get_collection(db);
 
     // Check if the ID looks like a valid ObjectId (24 hex chars)
@@ -34,7 +38,13 @@ pub async fn find_news_by_id(db: &Database, id: &str) -> Result<Option<News>, Ap
     // Convert string ID to ObjectId
     let object_id = ObjectId::parse_str(id).map_err(|_| AppError::InvalidId)?;
 
-    let filter = doc! { "_id": object_id };
+    // Create the base filter with ID
+    let mut filter = doc! { "_id": object_id };
+
+    // If not in admin mode, only show published news
+    if !admin_mode {
+        filter.insert("published", true);
+    }
 
     collection.find_one(filter).await.map_err(|e| {
         error!("Database error finding news by id: {:?}", e);
@@ -53,8 +63,8 @@ pub async fn find_news_paginated(
     // Calculate skip value for pagination
     let skip = (page - 1) * limit;
 
-    // Create a filter document - no filter means return all news including drafts
-    let filter = doc! {};
+    // Create a filter document - only return published news
+    let filter = doc! { "published": true };
 
     // Use the find method without options
     let mut cursor = collection.find(filter).await.map_err(|e| {
@@ -94,7 +104,7 @@ pub async fn find_news_paginated(
 
 pub async fn count_news(db: &Database) -> Result<u64, AppError> {
     let collection = get_collection(db);
-    let filter = doc! {};
+    let filter = doc! { "published": true };
 
     collection.count_documents(filter).await.map_err(|e| {
         error!("Database error counting news: {:?}", e);
@@ -267,10 +277,13 @@ pub async fn find_news_with_search(
     // This searches in title, content, and summary fields
     let search_regex = format!(".*{}.*", regex::escape(&search));
     let filter = doc! {
-        "$or": [
-            { "title": { "$regex": &search_regex, "$options": "i" } },
-            { "content": { "$regex": &search_regex, "$options": "i" } },
-            { "summary": { "$regex": &search_regex, "$options": "i" } }
+        "$and": [
+            { "published": true },
+            { "$or": [
+                { "title": { "$regex": &search_regex, "$options": "i" } },
+                { "content": { "$regex": &search_regex, "$options": "i" } },
+                { "summary": { "$regex": &search_regex, "$options": "i" } }
+            ]}
         ]
     };
 

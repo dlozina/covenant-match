@@ -142,10 +142,25 @@ async fn get_recent_news(
     tag = "news"
 )]
 #[get("/api/v1/news/{news_id}")]
-async fn get_news_by_id(db: web::Data<Database>, path: web::Path<String>) -> impl Responder {
+async fn get_news_by_id(
+    db: web::Data<Database>,
+    path: web::Path<String>,
+    req: HttpRequest,
+) -> impl Responder {
     let news_id = path.into_inner();
 
-    match news_service::get_news_by_id(&db, &news_id).await {
+    // Default to non-admin mode (only published news)
+    let mut admin_mode = false;
+
+    // Check if user is authenticated and has admin role
+    if let Some(claims) = req.extensions().get::<jwt::Claims>() {
+        // Check if user has admin role
+        if claims.role == "admin" {
+            admin_mode = true;
+        }
+    }
+
+    match news_service::get_news_by_id(&db, &news_id, admin_mode).await {
         Ok(news) => HttpResponse::Ok().json(news),
         Err(e) => {
             log::error!("Error fetching news: {:?}", e);

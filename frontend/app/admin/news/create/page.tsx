@@ -4,18 +4,25 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { NewsForm } from "@/components/admin/NewsForm";
 import { Notification, NotificationType } from "@/components/ui/notification";
+import { useAuth } from "@/lib/auth-context";
 
 export default function CreateNewsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notification, setNotification] = useState<NotificationType | null>(null);
   const router = useRouter();
+  const { fetchWithAuth } = useAuth();
 
-
-  const handleSubmit = async () => {
+  const handleSubmit = async (formData: FormData) => {
     setIsSubmitting(true);
     
     try {
-      // Success - we already have the JSON response from fetchWithAuth
+      // Send the form data to the API
+      await fetchWithAuth('/api/v1/admin/news', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      // Success
       setNotification({
         type: "success",
         message: "News created successfully"

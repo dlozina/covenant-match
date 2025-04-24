@@ -148,10 +148,54 @@ export function NewsForm({ initialData, onSubmit, isSubmitting, onNotification }
       return;
     }
     
-    // Create preview URL
-    const previewUrl = URL.createObjectURL(file);
-    setImagePreview(previewUrl);
-    setImageFile(file);
+    // Create a temporary URL for the image
+    const objectUrl = URL.createObjectURL(file);
+    
+    // Load the image to check its dimensions
+    const img = document.createElement('img');
+    img.onload = () => {
+      // The news component typically displays images at 16:9 ratio
+      // We'll check if the image is reasonably close to that
+      const width = img.width;
+      const height = img.height;
+      
+      // Check minimum dimensions to ensure quality
+      if (width < 600 || height < 400) {
+        onNotification({
+          type: "error",
+          message: "Image is too small. Minimum dimensions: 600x400 pixels"
+        });
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
+      
+      // Check aspect ratio
+      const aspectRatio = width / height;
+      const targetRatio = 16 / 9; // Ideal aspect ratio
+      const ratioTolerance = 0.25; // Allow some flexibility
+      
+      if (Math.abs(aspectRatio - targetRatio) > ratioTolerance) {
+        onNotification({
+          type: "warning",
+          message: "Image aspect ratio is not optimal (16:9 recommended). The image may appear cropped."
+        });
+        // We still allow it but with a warning
+      }
+      
+      // Image passed checks, set the preview
+      setImagePreview(objectUrl);
+      setImageFile(file);
+    };
+    
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      onNotification({
+        type: "error",
+        message: "Failed to load image. Please try another file."
+      });
+    };
+    
+    img.src = objectUrl;
   };
   
   // Clear selected image
@@ -274,6 +318,9 @@ export function NewsForm({ initialData, onSubmit, isSubmitting, onNotification }
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     PNG, JPG or WebP up to 2MB
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Recommended size: 1200x675 pixels (16:9 ratio)
                   </p>
                 </div>
               )}

@@ -34,9 +34,13 @@ pub async fn create_news(
     Ok(news.into())
 }
 
-pub async fn get_news_by_id(db: &Database, news_id: &str) -> Result<NewsResponse, AppError> {
-    // Find the news post by ID
-    let news = news_repository::find_news_by_id(db, news_id)
+pub async fn get_news_by_id(
+    db: &Database,
+    news_id: &str,
+    admin_mode: bool,
+) -> Result<NewsResponse, AppError> {
+    // Find the news post by ID, with admin mode flag
+    let news = news_repository::find_news_by_id(db, news_id, admin_mode)
         .await?
         .ok_or(AppError::NewsNotFound)?;
 
