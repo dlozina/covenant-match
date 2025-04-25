@@ -2,7 +2,7 @@ use crate::models::admin::{
     AdminDashboardStats, AdminSessionResponse, AdminSessionsResponse, SystemInfo,
 };
 use crate::models::error::AppError;
-use crate::services::{admin_service, chat_service, session_service};
+use crate::services::{admin_service, chat_service, session_service, user_service};
 use crate::utils::jwt;
 use actix_web::{
     delete, get, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError,
@@ -191,8 +191,30 @@ pub struct ChatMessage {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatMessageResponseDto {
+    sender_id: String,
+    sender_name: String,
+    message: String,
+    timestamp: i64,
+    session_id: String,
+    // Additional user information
+    user: Option<UserInfoDto>,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UserInfoDto {
+    username: Option<String>,
+    display_name: Option<String>,
+    email: Option<String>,
+    role: Option<String>,
+    avatar_url: Option<String>,
+}
+
+#[derive(Serialize)]
 pub struct AdminChatResponse {
-    messages: Vec<ChatMessage>,
+    messages: Vec<ChatMessageResponseDto>,
     total: usize,
 }
 
@@ -250,15 +272,54 @@ async fn get_admin_chat_history(
         .await
     {
         Ok(result) => {
-            let response_messages: Vec<ChatMessage> = result
+            // Collect unique sender IDs
+            let sender_ids: Vec<String> = result
+                .messages
+                .iter()
+                .map(|msg| msg.sender_id.clone())
+                .collect::<std::collections::HashSet<String>>()
+                .into_iter()
+                .collect();
+
+            // Get user information for all senders
+            let mut user_info_map = std::collections::HashMap::new();
+
+            for sender_id in sender_ids {
+                match user_service::get_user_by_id(&db, &sender_id).await {
+                    Ok(user) => {
+                        user_info_map.insert(
+                            sender_id,
+                            UserInfoDto {
+                                username: Some(user.username),
+                                display_name: user.display_name,
+                                email: Some(user.email),
+                                role: Some(user.role),
+                                avatar_url: user.avatar_url,
+                            },
+                        );
+                    }
+                    Err(e) => {
+                        debug!("Could not find user info for ID {}: {:?}", sender_id, e);
+                        // Continue with other users even if one fails
+                    }
+                }
+            }
+
+            // Map messages to response DTOs with user info
+            let response_messages: Vec<ChatMessageResponseDto> = result
                 .messages
                 .into_iter()
-                .map(|msg| ChatMessage {
-                    sender_id: msg.sender_id,
-                    sender_name: msg.sender_name,
-                    message: msg.content,
-                    timestamp: msg.timestamp.timestamp_millis(),
-                    session_id: msg.session_id,
+                .map(|msg| {
+                    let user = user_info_map.get(&msg.sender_id).cloned();
+
+                    ChatMessageResponseDto {
+                        sender_id: msg.sender_id.clone(),
+                        sender_name: msg.sender_name,
+                        message: msg.content,
+                        timestamp: msg.timestamp.timestamp_millis(),
+                        session_id: msg.session_id,
+                        user,
+                    }
                 })
                 .collect();
 

@@ -57,7 +57,6 @@ import { Calendar } from "@/components/ui/calendar";
 import { format, startOfDay, endOfDay } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { UserService } from "@/utils/api/user-service";
 import {
   Tooltip,
   TooltipContent,
@@ -72,17 +71,18 @@ interface ChatMessage {
   message: string;
   timestamp: number;
   sessionId: string;
+  user?: {
+    username?: string;
+    displayName?: string;
+    email?: string;
+    role?: string;
+    avatarUrl?: string;
+  };
 }
 
 interface ChatResponse {
   messages: ChatMessage[];
   total: number;
-}
-
-interface UserInfo {
-  id: string;
-  name: string;
-  email?: string;
 }
 
 export default function AdminChatPage() {
@@ -105,7 +105,6 @@ export default function AdminChatPage() {
     messageId?: string;
     dateRange?: {from: string, to: string};
   } | null>(null);
-  const [userCache, setUserCache] = useState<Record<string, UserInfo>>({});
   
   const { getAuthHeaders } = useAuth();
 
@@ -296,65 +295,6 @@ export default function AdminChatPage() {
   
   // Calculate pagination
   const totalPages = Math.ceil(pagination.total / pagination.limit);
-  
-  // This function will fetch user info by ID from the backend
-  const getUserInfo = async (userId: string): Promise<UserInfo | null> => {
-    // Return from cache if we already fetched this user
-    if (userCache[userId]) {
-      return userCache[userId];
-    }
-    
-    try {
-      const user = await UserService.getAdminUserById(userId);
-      
-      // Create user info from the response
-      const userInfo: UserInfo = {
-        id: userId,
-        name: user.displayName || user.username || userId.substring(0, 8) + '...',
-        email: user.email
-      };
-      
-      // Update cache
-      setUserCache(prev => ({
-        ...prev,
-        [userId]: userInfo
-      }));
-      
-      return userInfo;
-    } catch (error) {
-      console.error(`Failed to fetch user info for ${userId}:`, error);
-      
-      // Cache negative result to avoid repeated failed requests
-      const fallbackInfo: UserInfo = {
-        id: userId,
-        name: userId.substring(0, 8) + '...' // Shortened ID for display
-      };
-      
-      setUserCache(prev => ({
-        ...prev,
-        [userId]: fallbackInfo
-      }));
-      
-      return fallbackInfo;
-    }
-  };
-  
-  // Load user info for all senders in the current set of messages
-  useEffect(() => {
-    const loadUserInfo = async () => {
-      const userIds = [...new Set(messages.map(msg => msg.senderId))];
-      
-      for (const userId of userIds) {
-        if (!userCache[userId]) {
-          await getUserInfo(userId);
-        }
-      }
-    };
-    
-    if (messages.length > 0) {
-      loadUserInfo();
-    }
-  }, [messages]);
   
   return (
     <div className="container mx-auto py-6">
@@ -586,19 +526,25 @@ export default function AdminChatPage() {
                             <div className="flex items-center gap-1 cursor-help">
                               <User className="h-4 w-4 opacity-70" />
                               <span>
-                                {userCache[message.senderId]?.name && 
-                                 userCache[message.senderId]?.name !== message.senderId.substring(0, 8) + '...' 
-                                  ? userCache[message.senderId]?.name 
-                                  : message.senderName}
+                                {message.user?.displayName || message.senderName || "Unknown User"}
                               </span>
+                              {message.senderName && message.user?.displayName && message.senderName !== message.user.displayName && (
+                                <Badge variant="outline" className="ml-1 text-xs">
+                                  {message.senderName}
+                                </Badge>
+                              )}
                             </div>
                           </TooltipTrigger>
                           <TooltipContent side="right">
                             <div className="space-y-1">
                               <p className="text-xs font-semibold">User Information</p>
                               <p className="text-xs">ID: {message.senderId}</p>
-                              {userCache[message.senderId]?.email && (
-                                <p className="text-xs">Email: {userCache[message.senderId]?.email}</p>
+                              <p className="text-xs">Sender Name: {message.senderName}</p>
+                              {message.user?.email && (
+                                <p className="text-xs">Email: {message.user.email}</p>
+                              )}
+                              {message.user?.role && (
+                                <p className="text-xs">Role: {message.user.role}</p>
                               )}
                             </div>
                           </TooltipContent>
