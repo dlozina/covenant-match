@@ -227,8 +227,21 @@ export default function AdminChatPage() {
     setDeleteDialogOpen(true);
   };
   
-  const confirmDeleteMessage = (messageId: string) => {
-    setDeleteTarget({ messageId });
+  const confirmDeleteMessage = (message: ChatMessage) => {
+    // Instead of using the composite ID, use the session ID and date range
+    // to delete the specific message by timestamp
+    const messageTimestamp = new Date(message.timestamp);
+    const startTime = new Date(messageTimestamp.getTime() - 1000); // 1 second before
+    const endTime = new Date(messageTimestamp.getTime() + 1000);   // 1 second after
+    
+    setDeleteTarget({ 
+      session: message.sessionId,
+      dateRange: { 
+        from: formatDateForApi(startTime)!, 
+        to: formatDateForApi(endTime)! 
+      } 
+    });
+    
     setDeleteDialogOpen(true);
   };
   
@@ -505,7 +518,7 @@ export default function AdminChatPage() {
                           <Button 
                             variant="ghost" 
                             size="icon"
-                            onClick={() => confirmDeleteMessage(`${message.senderId}-${message.timestamp}`)}
+                            onClick={() => confirmDeleteMessage(message)}
                           >
                             <Trash className="h-4 w-4 text-red-500" />
                           </Button>

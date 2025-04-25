@@ -11,7 +11,7 @@ mod utils;
 mod ws;
 
 use crate::config::get_config;
-use crate::routes::{admin, chat, health, news, statistics, users};
+use crate::routes::{admin, health, news, statistics, users};
 use actix::Actor;
 use actix_cors::Cors;
 use actix_files;
@@ -248,7 +248,6 @@ async fn main() -> std::io::Result<()> {
             .configure(sessions::config)
             .configure(game_data::config)
             .configure(statistics::config)
-            .configure(chat::config)
             .configure(routes::user_data::config)
             .configure(admin::config)
             .configure(news::config)

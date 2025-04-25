@@ -355,6 +355,7 @@ async fn delete_admin_chat_messages(
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct DeleteMessagesParams {
     session_id: Option<String>,
     message_id: Option<String>,
