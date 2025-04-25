@@ -1,6 +1,7 @@
 use crate::models::chat::ChatMessage;
 use crate::models::error::AppError;
 use crate::repository::chat_repository;
+use chrono::{DateTime, Utc};
 use log::{debug, info};
 use mongodb::Database;
 use std::sync::Arc;
@@ -8,6 +9,12 @@ use std::sync::Arc;
 /// Service for managing chat functionality
 pub struct ChatService {
     db: Arc<Database>,
+}
+
+/// Result of admin chat history query, including messages and total count
+pub struct AdminChatHistoryResult {
+    pub messages: Vec<ChatMessage>,
+    pub total: usize,
 }
 
 impl ChatService {
@@ -26,6 +33,88 @@ impl ChatService {
     ) -> Result<Vec<ChatMessage>, AppError> {
         debug!("Getting chat history for session: {}", session_id);
         chat_repository::get_chat_history(&self.db, session_id, limit).await
+    }
+
+    /// Get chat history for admin with filtering options
+    pub async fn get_admin_chat_history(
+        &self,
+        session_id: Option<&str>,
+        limit: i64,
+        from_date: Option<&str>,
+        to_date: Option<&str>,
+    ) -> Result<AdminChatHistoryResult, AppError> {
+        debug!("Admin getting chat history with filters");
+
+        // Parse dates if provided
+        let from_datetime = if let Some(date_str) = from_date {
+            Some(
+                DateTime::parse_from_rfc3339(date_str)
+                    .map_err(|e| AppError::BadRequest(format!("Invalid from_date format: {}", e)))?
+                    .with_timezone(&Utc),
+            )
+        } else {
+            None
+        };
+
+        let to_datetime = if let Some(date_str) = to_date {
+            Some(
+                DateTime::parse_from_rfc3339(date_str)
+                    .map_err(|e| AppError::BadRequest(format!("Invalid to_date format: {}", e)))?
+                    .with_timezone(&Utc),
+            )
+        } else {
+            None
+        };
+
+        chat_repository::get_admin_chat_history(
+            &self.db,
+            session_id,
+            limit,
+            from_datetime,
+            to_datetime,
+        )
+        .await
+    }
+
+    /// Delete chat messages for admin (by session ID, message ID, or date range)
+    pub async fn delete_admin_messages(
+        &self,
+        session_id: Option<&str>,
+        message_id: Option<&str>,
+        from_date: Option<&str>,
+        to_date: Option<&str>,
+    ) -> Result<u64, AppError> {
+        debug!("Admin deleting chat messages with filters");
+
+        // Parse dates if provided
+        let from_datetime = if let Some(date_str) = from_date {
+            Some(
+                DateTime::parse_from_rfc3339(date_str)
+                    .map_err(|e| AppError::BadRequest(format!("Invalid from_date format: {}", e)))?
+                    .with_timezone(&Utc),
+            )
+        } else {
+            None
+        };
+
+        let to_datetime = if let Some(date_str) = to_date {
+            Some(
+                DateTime::parse_from_rfc3339(date_str)
+                    .map_err(|e| AppError::BadRequest(format!("Invalid to_date format: {}", e)))?
+                    .with_timezone(&Utc),
+            )
+        } else {
+            None
+        };
+
+        chat_repository::delete_admin_messages(
+            &self.db,
+            session_id,
+            message_id,
+            from_datetime,
+            to_datetime,
+        )
+        .await
     }
 
     /// Store a new chat message

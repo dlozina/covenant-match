@@ -30,8 +30,8 @@ use crate::routes::users::{JwtInfoDto, TokenInfoResponse};
 use crate::sse::messages::{ServerMessage, SessionInfo, SseSessionStatus};
 
 use crate::routes::{
-    admin::*, chat::*, game_data::*, health::*, news::*, sessions::*, sse::*, statistics::*,
-    user_data::*, users::*, ws::*,
+    admin::*, game_data::*, health::*, news::*, sessions::*, sse::*, statistics::*, user_data::*,
+    users::*, ws::*,
 };
 
 // Import SSE models
@@ -81,6 +81,8 @@ use utoipa::{
         get_admin_sessions,
         get_admin_session_by_id,
         delete_admin_session,
+        get_admin_chat_history,
+        delete_admin_chat_messages,
         // User data routes
         get_current_user_data,
         test_cloudflare_headers,
@@ -108,8 +110,7 @@ use utoipa::{
         get_covenants,
         get_nightfarers,
         get_night_lords,
-        // Chat routes
-        get_chat_history,
+        // Chat routes removed since we moved it to admin
         // SSE routes
         events_route,
         events_status,

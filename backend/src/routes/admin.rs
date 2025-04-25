@@ -2,9 +2,14 @@ use crate::models::admin::{
     AdminDashboardStats, AdminSessionResponse, AdminSessionsResponse, SystemInfo,
 };
 use crate::models::error::AppError;
-use crate::services::{admin_service, session_service};
-use actix_web::{delete, get, web, HttpResponse, Responder, ResponseError};
+use crate::services::{admin_service, chat_service, session_service};
+use crate::utils::jwt;
+use actix_web::{
+    delete, get, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError,
+};
+use log::debug;
 use mongodb::Database;
+use serde::{Deserialize, Serialize};
 
 /// Get admin dashboard statistics
 #[utoipa::path(
@@ -166,6 +171,204 @@ async fn delete_admin_session(db: web::Data<Database>, path: web::Path<String>) 
     }
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatHistoryParams {
+    session_id: Option<String>,
+    limit: Option<i64>,
+    from_date: Option<String>,
+    to_date: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatMessage {
+    sender_id: String,
+    sender_name: String,
+    message: String,
+    timestamp: i64,
+    session_id: String,
+}
+
+#[derive(Serialize)]
+pub struct AdminChatResponse {
+    messages: Vec<ChatMessage>,
+    total: usize,
+}
+
+/// Get chat history for admin
+#[utoipa::path(
+    get,
+    path = "/api/v1/admin/chat",
+    params(
+        ("session_id" = Option<String>, Query, description = "Optional session ID to filter chat history"),
+        ("limit" = Option<i64>, Query, description = "Maximum number of messages to retrieve (default: 100)"),
+        ("from_date" = Option<String>, Query, description = "Optional start date (ISO format) to filter messages"),
+        ("to_date" = Option<String>, Query, description = "Optional end date (ISO format) to filter messages")
+    ),
+    responses(
+        (status = 200, description = "Chat history retrieved successfully", body = AdminChatResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - requires admin role"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "admin"
+)]
+#[get("/api/v1/admin/chat")]
+async fn get_admin_chat_history(
+    query: web::Query<ChatHistoryParams>,
+    db: web::Data<Database>,
+    req: HttpRequest,
+) -> impl Responder {
+    let limit = query.limit.unwrap_or(100);
+
+    // Extract user_id for verification
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
+        claims.sub.clone()
+    };
+
+    debug!("Admin fetching chat history, admin user: {}", user_id);
+
+    // Create a chat service instance
+    let chat_service = chat_service::ChatService::new(&db);
+
+    // Get chat history from all or a specific session
+    match chat_service
+        .get_admin_chat_history(
+            query.session_id.as_deref(),
+            limit,
+            query.from_date.as_deref(),
+            query.to_date.as_deref(),
+        )
+        .await
+    {
+        Ok(result) => {
+            let response_messages: Vec<ChatMessage> = result
+                .messages
+                .into_iter()
+                .map(|msg| ChatMessage {
+                    sender_id: msg.sender_id,
+                    sender_name: msg.sender_name,
+                    message: msg.content,
+                    timestamp: msg.timestamp.timestamp_millis(),
+                    session_id: msg.session_id,
+                })
+                .collect();
+
+            HttpResponse::Ok().json(AdminChatResponse {
+                messages: response_messages,
+                total: result.total,
+            })
+        }
+        Err(e) => {
+            debug!("Error fetching admin chat history: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": "error",
+                "message": "Failed to fetch chat history"
+            }))
+        }
+    }
+}
+
+/// Delete chat messages for admin by session or date range
+#[utoipa::path(
+    delete,
+    path = "/api/v1/admin/chat",
+    params(
+        ("session_id" = Option<String>, Query, description = "Optional session ID to delete all messages from"),
+        ("message_id" = Option<String>, Query, description = "Optional specific message ID to delete"),
+        ("from_date" = Option<String>, Query, description = "Optional start date (ISO format) to delete messages"),
+        ("to_date" = Option<String>, Query, description = "Optional end date (ISO format) to delete messages")
+    ),
+    responses(
+        (status = 200, description = "Messages deleted successfully", body = DeleteMessagesResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - requires admin role"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "admin"
+)]
+#[delete("/api/v1/admin/chat")]
+async fn delete_admin_chat_messages(
+    query: web::Query<DeleteMessagesParams>,
+    db: web::Data<Database>,
+    req: HttpRequest,
+) -> impl Responder {
+    // Extract user_id for verification
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
+        claims.sub.clone()
+    };
+
+    debug!("Admin deleting chat messages, admin user: {}", user_id);
+
+    // Create a chat service instance
+    let chat_service = chat_service::ChatService::new(&db);
+
+    // Validate input parameters
+    if query.session_id.is_none()
+        && query.message_id.is_none()
+        && (query.from_date.is_none() || query.to_date.is_none())
+    {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "status": "error",
+            "message": "At least one filter must be provided: session_id, message_id, or both from_date and to_date"
+        }));
+    }
+
+    // Delete messages based on the provided filters
+    match chat_service
+        .delete_admin_messages(
+            query.session_id.as_deref(),
+            query.message_id.as_deref(),
+            query.from_date.as_deref(),
+            query.to_date.as_deref(),
+        )
+        .await
+    {
+        Ok(deleted_count) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "deleted_count": deleted_count,
+            "message": format!("Successfully deleted {} messages", deleted_count)
+        })),
+        Err(e) => {
+            debug!("Error deleting chat messages: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": "error",
+                "message": "Failed to delete chat messages"
+            }))
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct DeleteMessagesParams {
+    session_id: Option<String>,
+    message_id: Option<String>,
+    from_date: Option<String>,
+    to_date: Option<String>,
+}
+
+#[derive(Serialize)]
+struct DeleteMessagesResponse {
+    status: String,
+    deleted_count: u64,
+    message: String,
+}
+
 /// Parameters for sessions query
 #[derive(serde::Deserialize)]
 struct AdminSessionsQuery {
@@ -181,4 +384,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(get_admin_sessions);
     cfg.service(get_admin_session_by_id);
     cfg.service(delete_admin_session);
+    cfg.service(get_admin_chat_history);
+    cfg.service(delete_admin_chat_messages);
 }
