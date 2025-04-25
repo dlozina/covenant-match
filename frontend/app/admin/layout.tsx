@@ -73,8 +73,8 @@ export default function AdminLayout({
   // Admin navigation items
   const navItems = [
     { href: "/admin", icon: <LayoutDashboard size={18} />, label: "Dashboard" },
-    { href: "/admin/users", icon: <Users size={18} />, label: "Users" },
     { href: "/admin/news", icon: <Newspaper size={18} />, label: "News" },
+    { href: "/admin/users", icon: <Users size={18} />, label: "Users" },
     { href: "/admin/sessions", icon: <Database size={18} />, label: "Sessions" },
     { href: "/admin/chat", icon: <MessageSquare size={18} />, label: "Chat Logs" },
     { href: "/admin/settings", icon: <Settings size={18} />, label: "Settings" },

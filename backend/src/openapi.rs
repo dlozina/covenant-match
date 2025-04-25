@@ -1,5 +1,6 @@
 use crate::models::admin::{
-    AdminDashboardStats, DashboardStatsResponse, MemoryUsage, SystemInfo, SystemStatusResponse,
+    AdminDashboardStats, AdminSessionResponse, AdminSessionsData, AdminSessionsPaginationResponse,
+    AdminSessionsResponse, DashboardStatsResponse, MemoryUsage, SystemInfo, SystemStatusResponse,
 };
 use crate::models::chat::ChatMessage;
 use crate::models::common::{LimitQuery, PaginationQuery};
@@ -9,8 +10,8 @@ use crate::models::game_data::{
 };
 use crate::models::geo_location::{CoordinatesDto, GeoLocationDataDto};
 use crate::models::news::{
-    Announcement, CreateNewsDto, NewsListResponse, NewsResponse, UpdateAnnouncementDto,
-    UpdateNewsDto, NewsListData, AnnouncementResponse,
+    Announcement, AnnouncementResponse, CreateNewsDto, NewsListData, NewsListResponse,
+    NewsResponse, UpdateAnnouncementDto, UpdateNewsDto,
 };
 use crate::models::session::{
     CovenantStats, CovenantStatsResponse, CreateSessionDto, GameResult, JoinSessionDto,
@@ -75,6 +76,11 @@ use utoipa::{
         delete_user_admin,
         get_admin_news,
         get_admin_news_by_id,
+        get_dashboard_stats,
+        get_system_info,
+        get_admin_sessions,
+        get_admin_session_by_id,
+        delete_admin_session,
         // User data routes
         get_current_user_data,
         test_cloudflare_headers,
@@ -130,9 +136,6 @@ use utoipa::{
         // Announcement routes
         get_current_announcement,
         update_announcement,
-        // Admin routes
-        get_dashboard_stats,
-        get_system_info,
     ),
     components(
         schemas(
@@ -223,6 +226,10 @@ use utoipa::{
             MemoryUsage,
             SystemStatusResponse,
             DashboardStatsResponse,
+            AdminSessionResponse,
+            AdminSessionsResponse,
+            AdminSessionsPaginationResponse,
+            AdminSessionsData,
             // Common models
             PaginationQuery,
             LimitQuery,

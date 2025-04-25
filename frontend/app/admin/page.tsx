@@ -67,20 +67,21 @@ export default function AdminDashboard() {
         const statsData = await statsResponse.json();
         console.log("Received stats data:", statsData);
         
-        // Validate stats data
-        if (!statsData || typeof statsData !== 'object') {
+        // Validate stats data and handle correct structure
+        if (!statsData || typeof statsData !== 'object' || !statsData.data || !statsData.data.stats) {
           console.error("Invalid stats data format:", statsData);
           setStats(null);
         } else {
-          // Ensure all properties exist with defaults
+          // Extract stats from the correct path in response
+          const apiStats = statsData.data.stats;
           setStats({
-            usersCount: Number(statsData.usersCount) || 0,
-            activeUsersCount: Number(statsData.activeUsersCount) || 0,
-            totalSessions: Number(statsData.totalSessions) || 0,
-            activeSessions: Number(statsData.activeSessions) || 0,
-            completedSessions: Number(statsData.completedSessions) || 0,
-            newsCount: Number(statsData.newsCount) || 0,
-            publishedNewsCount: Number(statsData.publishedNewsCount) || 0
+            usersCount: Number(apiStats.usersCount) || 0,
+            activeUsersCount: Number(apiStats.activeUsersCount) || 0,
+            totalSessions: Number(apiStats.totalSessions) || 0,
+            activeSessions: Number(apiStats.activeSessions) || 0,
+            completedSessions: Number(apiStats.completedSessions) || 0,
+            newsCount: Number(apiStats.newsCount) || 0,
+            publishedNewsCount: Number(apiStats.publishedNewsCount) || 0
           });
         }
         
@@ -96,24 +97,25 @@ export default function AdminDashboard() {
         const sysInfoData = await sysInfoResponse.json();
         console.log("Received system info data:", sysInfoData);
         
-        // Validate system info data
-        if (!sysInfoData || typeof sysInfoData !== 'object') {
+        // Validate system info data and handle correct structure
+        if (!sysInfoData || typeof sysInfoData !== 'object' || !sysInfoData.data || !sysInfoData.data.system_info) {
           console.error("Invalid system info data format:", sysInfoData);
           setSystemInfo(null);
         } else {
-          // Create a normalized system info object with all required fields
+          // Extract system_info from the correct path in response
+          const apiSystemInfo = sysInfoData.data.system_info;
           setSystemInfo({
-            version: sysInfoData.version || 'Unknown',
-            environment: sysInfoData.environment || 'Unknown',
-            uptime: sysInfoData.uptime || 'Unknown',
+            version: apiSystemInfo.version || 'Unknown',
+            environment: apiSystemInfo.environment || 'Unknown',
+            uptime: apiSystemInfo.uptime || 'Unknown',
             memoryUsage: {
-              totalMb: Number(sysInfoData.memoryUsage?.totalMb) || 0,
-              usedMb: Number(sysInfoData.memoryUsage?.usedMb) || 0,
-              freeMb: Number(sysInfoData.memoryUsage?.freeMb) || 0,
-              usedPercent: Number(sysInfoData.memoryUsage?.usedPercent) || 0
+              totalMb: Number(apiSystemInfo.memoryUsage?.totalMb) || 0,
+              usedMb: Number(apiSystemInfo.memoryUsage?.usedMb) || 0,
+              freeMb: Number(apiSystemInfo.memoryUsage?.freeMb) || 0,
+              usedPercent: Number(apiSystemInfo.memoryUsage?.usedPercent) || 0
             },
-            dbStatus: sysInfoData.dbStatus || 'Unknown',
-            apiStatus: sysInfoData.apiStatus || 'Unknown'
+            dbStatus: apiSystemInfo.dbStatus || 'Unknown',
+            apiStatus: apiSystemInfo.apiStatus || 'Unknown'
           });
         }
       } catch (err) {

@@ -54,3 +54,31 @@ pub struct DashboardStatsResponse {
 pub struct DashboardStatsData {
     pub stats: AdminDashboardStats,
 }
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminSessionsPaginationResponse {
+    pub total: u64,
+    pub page: u64,
+    pub limit: u64,
+    pub total_pages: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AdminSessionsResponse {
+    pub status: String,
+    pub data: AdminSessionsData,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct AdminSessionsData {
+    pub sessions: Vec<crate::models::session::GameSession>,
+    pub pagination: AdminSessionsPaginationResponse,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct AdminSessionResponse {
+    pub status: String,
+    pub data: crate::models::session::GameSession,
+}

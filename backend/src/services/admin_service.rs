@@ -1,42 +1,52 @@
-use crate::models::admin::{AdminDashboardStats, MemoryUsage, SystemInfo};
+use crate::models::admin::{
+    AdminDashboardStats, AdminSessionResponse, AdminSessionsData, AdminSessionsPaginationResponse,
+    AdminSessionsResponse, DashboardStatsData, DashboardStatsResponse, MemoryUsage, SystemInfo,
+    SystemStatusData, SystemStatusResponse,
+};
 use crate::models::error::AppError;
-use crate::repository::session_repository;
-use crate::repository::{news_repository, user_repository};
-use mongodb::Database;
-use std::process;
-use std::time::{Duration, SystemTime};
+use crate::models::session::{GameSession, SessionStatus};
+use crate::repository::{news_repository, session_repository, user_repository};
+use chrono::{Duration, Utc};
+use mongodb::{bson, Database};
+use std::process::Command;
+use sysinfo::{System, SystemExt};
 
-pub async fn get_dashboard_stats(db: &Database) -> Result<AdminDashboardStats, AppError> {
-    // Get user counts
-    let users_count = user_repository::count_users_by_role(db, None).await?;
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-    // We don't have an "active_users" concept yet, so we'll just use logged-in users in the last 30 days
-    // For now, using the same value as total users
+/// Get dashboard statistics for admin panel
+pub async fn get_dashboard_stats(db: &Database) -> Result<DashboardStatsResponse, AppError> {
+    // Get users statistics
+    let users = user_repository::find_users_by_role_paginated(db, None, 1, 1000).await?;
+    let users_count = users.len() as u64;
+
+    // Get active users count
+    // Since there's no last_login field, we'll use a simple heuristic:
+    // Consider all users as active users for now
     let active_users_count = users_count;
 
-    // Get session counts using repository function
+    // Get session statistics
     let total_sessions = session_repository::count_sessions_by_status(db, None, None).await?;
 
-    // Count active sessions (Open + InProgress)
-    let open_sessions =
-        session_repository::count_sessions_by_status(db, Some("Open".to_string()), None).await?;
-    let in_progress_sessions =
+    // Get active sessions count (open or in progress)
+    let active_sessions =
         session_repository::count_sessions_by_status(db, Some("InProgress".to_string()), None)
-            .await?;
-    let active_sessions = open_sessions + in_progress_sessions;
+            .await?
+            + session_repository::count_sessions_by_status(db, Some("Open".to_string()), None)
+                .await?;
 
-    // Count completed sessions
+    // Get completed sessions count
     let completed_sessions =
         session_repository::count_sessions_by_status(db, Some("Completed".to_string()), None)
             .await?;
 
-    // Get news counts
-    let news_count = news_repository::count_news(db, true).await?;
+    // Get news count
+    let news_items = news_repository::find_all_news(db).await?;
+    let news_count = news_items.len() as u64;
 
-    // Count published news
-    let published_news_count = news_repository::count_news(db, false).await?;
+    // Get published news count
+    let published_news_count = news_items.iter().filter(|news| news.published).count() as u64;
 
-    Ok(AdminDashboardStats {
+    let stats = AdminDashboardStats {
         users_count,
         active_users_count,
         total_sessions,
@@ -44,80 +54,174 @@ pub async fn get_dashboard_stats(db: &Database) -> Result<AdminDashboardStats, A
         completed_sessions,
         news_count,
         published_news_count,
-    })
+    };
+
+    let response = DashboardStatsResponse {
+        status: "success".to_string(),
+        data: DashboardStatsData { stats },
+    };
+
+    Ok(response)
 }
 
-pub async fn get_system_info() -> Result<SystemInfo, AppError> {
-    // Get application version from environment
-    let version = env!("CARGO_PKG_VERSION").to_string();
-
-    // Get environment name
-    let environment = std::env::var("ENVIRONMENT").unwrap_or_else(|_| "development".to_string());
-
+/// Get system information for admin panel
+pub async fn get_system_info() -> Result<SystemStatusResponse, AppError> {
     // Get uptime
-    let process_start = get_process_start_time().map_err(|e| {
-        AppError::SystemInfoError(format!("Failed to get process start time: {}", e))
-    })?;
+    let uptime = match Command::new("uptime").output() {
+        Ok(output) => String::from_utf8(output.stdout)
+            .unwrap_or_else(|_| "Unknown".to_string())
+            .trim()
+            .to_string(),
+        Err(_) => "Unknown".to_string(),
+    };
 
-    let uptime = format_uptime(process_start);
+    // Get system memory info
+    let mut sys = System::new_all();
+    sys.refresh_all();
 
-    // Get memory usage
-    let memory_usage = get_memory_usage()
-        .map_err(|e| AppError::SystemInfoError(format!("Failed to get memory usage: {}", e)))?;
+    let total_memory = sys.total_memory() / 1024 / 1024; // Convert to MB
+    let used_memory = sys.used_memory() / 1024 / 1024; // Convert to MB
+    let free_memory = total_memory - used_memory;
+    let used_percent = if total_memory > 0 {
+        (used_memory as f64 / total_memory as f64) * 100.0
+    } else {
+        0.0
+    };
 
-    // Database and API status are hard-coded to "OK" for now
-    // In the future, we could add real health checks
-    let db_status = "OK".to_string();
-    let api_status = "OK".to_string();
-
-    Ok(SystemInfo {
-        version,
-        environment,
-        uptime,
-        memory_usage,
-        db_status,
-        api_status,
-    })
-}
-
-fn get_process_start_time() -> Result<SystemTime, String> {
-    // This is a simplified implementation for system time
-    // On real systems, we'd use platform-specific APIs to get the actual process start time
-    // For now, we'll just return the current time minus 1 hour (simulating that the server has been up for 1 hour)
-    let now = SystemTime::now();
-    Ok(now.checked_sub(Duration::from_secs(3600)).unwrap_or(now))
-}
-
-fn format_uptime(start_time: SystemTime) -> String {
-    let now = SystemTime::now();
-    let uptime_seconds = now
-        .duration_since(start_time)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-
-    let days = uptime_seconds / 86400;
-    let hours = (uptime_seconds % 86400) / 3600;
-    let minutes = (uptime_seconds % 3600) / 60;
-    let seconds = uptime_seconds % 60;
-
-    format!("{}d {}h {}m {}s", days, hours, minutes, seconds)
-}
-
-fn get_memory_usage() -> Result<MemoryUsage, String> {
-    // This is a simplified implementation for memory usage
-    // On real systems, we'd use platform-specific APIs to get the actual memory usage
-    // For now, we'll just return some dummy values
-
-    // Dummy values
-    let total_mb = 1024;
-    let used_mb = 512;
-    let free_mb = total_mb - used_mb;
-    let used_percent = (used_mb as f64 / total_mb as f64) * 100.0;
-
-    Ok(MemoryUsage {
-        total_mb,
-        used_mb,
-        free_mb,
+    let memory_usage = MemoryUsage {
+        total_mb: total_memory,
+        used_mb: used_memory,
+        free_mb: free_memory,
         used_percent,
-    })
+    };
+
+    // Get environment
+    let env = if cfg!(debug_assertions) {
+        "development"
+    } else {
+        "production"
+    };
+
+    // Build system info
+    let system_info = SystemInfo {
+        version: VERSION.to_string(),
+        environment: env.to_string(),
+        uptime: uptime,
+        memory_usage,
+        db_status: "OK".to_string(), // Simplified - in reality, you'd want to check DB connection
+        api_status: "OK".to_string(),
+    };
+
+    let response = SystemStatusResponse {
+        status: "success".to_string(),
+        data: SystemStatusData { system_info },
+    };
+
+    Ok(response)
+}
+
+/// Get sessions with pagination for admin panel
+pub async fn get_sessions_paginated(
+    db: &Database,
+    page: u64,
+    limit: u64,
+    status: Option<String>,
+) -> Result<AdminSessionsResponse, AppError> {
+    // Convert status string to SessionStatus enum if provided
+    let status_filter = match &status {
+        Some(ref s) => match s.to_lowercase().as_str() {
+            "open" => Some(SessionStatus::Open),
+            "full" => Some(SessionStatus::Full),
+            "in_progress" | "inprogress" => Some(SessionStatus::InProgress),
+            "completed" => Some(SessionStatus::Completed),
+            "cancelled" => Some(SessionStatus::Cancelled),
+            _ => None,
+        },
+        None => None,
+    };
+
+    // Get all sessions matching the filter
+    let sessions = session_repository::find_sessions(
+        db,
+        status_filter,
+        Some(limit),
+        Some((page - 1) * limit), // Convert to zero-based offset
+        None,                     // Don't filter private/public
+        None,                     // Don't filter by region
+        None,                     // Don't filter by platform
+    )
+    .await?;
+
+    // Get total count for pagination
+    let total = session_repository::count_sessions_by_status(
+        db,
+        status.clone().map(|s| s.to_string()),
+        None,
+    )
+    .await?;
+
+    // Calculate total pages
+    let total_pages = (total + limit - 1) / limit; // Ceiling division
+
+    let pagination = AdminSessionsPaginationResponse {
+        total,
+        page,
+        limit,
+        total_pages,
+    };
+
+    let response = AdminSessionsResponse {
+        status: "success".to_string(),
+        data: AdminSessionsData {
+            sessions,
+            pagination,
+        },
+    };
+
+    Ok(response)
+}
+
+/// Get a specific session by ID for admin
+pub async fn get_session_by_id(
+    db: &Database,
+    session_id: &str,
+) -> Result<AdminSessionResponse, AppError> {
+    let session = session_repository::find_by_id(db, session_id)
+        .await?
+        .ok_or(AppError::SessionNotFound)?;
+
+    let response = AdminSessionResponse {
+        status: "success".to_string(),
+        data: session,
+    };
+
+    Ok(response)
+}
+
+/// Delete a session by ID for admin
+pub async fn delete_session(db: &Database, session_id: &str) -> Result<(), AppError> {
+    // Verify the session exists first
+    let _session = session_repository::find_by_id(db, session_id)
+        .await?
+        .ok_or(AppError::SessionNotFound)?;
+
+    // Delete the session from the database
+    let collection = db.collection::<GameSession>("sessions");
+
+    let object_id =
+        mongodb::bson::oid::ObjectId::parse_str(session_id).map_err(|_| AppError::InvalidId)?;
+
+    let result = collection
+        .delete_one(bson::doc! { "_id": object_id })
+        .await
+        .map_err(|e| {
+            log::error!("Failed to delete session: {:?}", e);
+            AppError::InternalError("Failed to delete session".to_string())
+        })?;
+
+    if result.deleted_count == 0 {
+        return Err(AppError::SessionNotFound);
+    }
+
+    Ok(())
 }
