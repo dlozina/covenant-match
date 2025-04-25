@@ -14,14 +14,13 @@ use crate::config::get_config;
 use crate::routes::{admin, health, news, statistics, users};
 use actix::Actor;
 use actix_cors::Cors;
-use actix_files;
 use actix_web::web::Data;
 use actix_web::{middleware::Logger, App, HttpServer};
 use dotenv::dotenv;
 use log::{info, warn};
 use middleware::auth::Auth;
 use mongodb::{options::ClientOptions, Client};
-use routes::{game_data, sessions};
+use routes::{chat, game_data, sessions};
 use services::{auth_service, chat_service, session_service, user_service};
 use sse::heartbeat::HeartbeatActor;
 use sse::partition::{SessionRouter, DEFAULT_PARTITION_COUNT};
@@ -248,6 +247,7 @@ async fn main() -> std::io::Result<()> {
             .configure(sessions::config)
             .configure(game_data::config)
             .configure(statistics::config)
+            .configure(chat::config)
             .configure(routes::user_data::config)
             .configure(admin::config)
             .configure(news::config)
