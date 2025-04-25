@@ -32,6 +32,7 @@ async fn ensure_collections_exist(db: &Database) -> Result<(), Error> {
         "platforms",
         "covenants",
         "regions",
+        "feature_flags",
     ];
 
     // Get existing collections
@@ -167,6 +168,9 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
     // Seed covenants collection
     seed_collection(db, "covenants", default_covenants).await?;
 
+    // Seed feature flags
+    seed_feature_flags(db).await?;
+
     Ok(())
 }
 
@@ -267,5 +271,45 @@ async fn update_schemas(db: &Database) -> Result<(), Error> {
 
     info!("Created TTL index on login_attempts collection");
 
+    Ok(())
+}
+
+// Helper function to seed feature flags
+async fn seed_feature_flags(db: &Database) -> Result<(), Error> {
+    let collection: Collection<Document> = db.collection("feature_flags");
+
+    let default_flags = vec![(
+        "disable_auto_redirect",
+        "Disable Auto Redirect",
+        "Controls whether users are automatically redirected to newly created sessions",
+        true, // enabled
+        true, // default_value
+    )];
+
+    for (key, name, description, enabled, default_value) in default_flags {
+        let now = bson::DateTime::now();
+
+        // Check if flag already exists
+        let filter = doc! { "key": key };
+        let count = collection.count_documents(filter.clone()).await?;
+
+        // Only insert if it doesn't exist
+        if count == 0 {
+            let doc = doc! {
+                "key": key,
+                "name": name,
+                "description": description,
+                "enabled": enabled,
+                "default_value": default_value,
+                "created_at": now,
+                "updated_at": now
+            };
+
+            collection.insert_one(doc).await?;
+            info!("Created feature flag: {}", key);
+        }
+    }
+
+    info!("Seeded feature flags collection");
     Ok(())
 }

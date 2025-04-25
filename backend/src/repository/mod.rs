@@ -1,5 +1,6 @@
 pub mod auth_repository;
 pub mod chat_repository;
+pub mod feature_flag_repository;
 pub mod game_data_repository;
 pub mod news_repository;
 pub mod session_repository;

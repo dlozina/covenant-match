@@ -1,13 +1,14 @@
 use crate::models::admin::{
-    AdminDashboardStats, AdminSessionResponse, AdminSessionsResponse, SystemInfo,
+    AdminDashboardStats, AdminSessionResponse, AdminSessionsResponse, CreateFeatureFlagDto,
+    FeatureFlag, PatchFeatureFlagDto, SystemInfo,
 };
 use crate::models::error::AppError;
 use crate::services::{admin_service, chat_service, session_service, user_service};
 use crate::utils::jwt;
 use actix_web::{
-    delete, get, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError,
+    delete, get, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError,
 };
-use log::debug;
+use log::{debug, info};
 use mongodb::Database;
 use serde::{Deserialize, Serialize};
 
@@ -439,8 +440,207 @@ struct AdminSessionsQuery {
     status: Option<String>,
 }
 
+// Feature Flag Endpoints
+
+/// Get all feature flags
+#[utoipa::path(
+    get,
+    path = "/api/v1/admin/feature-flags",
+    responses(
+        (status = 200, description = "Feature flags retrieved successfully", body = FeatureFlagsResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - requires admin role"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "admin"
+)]
+#[get("/api/v1/admin/feature-flags")]
+async fn get_feature_flags(db: web::Data<Database>) -> impl Responder {
+    match admin_service::get_feature_flags(&db).await {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => {
+            log::error!("Error fetching feature flags: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
+/// Get a feature flag by key
+#[utoipa::path(
+    get,
+    path = "/api/v1/admin/feature-flags/{key}",
+    params(
+        ("key" = String, Path, description = "Feature flag key"),
+    ),
+    responses(
+        (status = 200, description = "Feature flag retrieved successfully", body = FeatureFlagResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - requires admin role"),
+        (status = 404, description = "Feature flag not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "admin"
+)]
+#[get("/api/v1/admin/feature-flags/{key}")]
+async fn get_feature_flag(db: web::Data<Database>, path: web::Path<String>) -> impl Responder {
+    let key = path.into_inner();
+
+    match admin_service::get_feature_flag(&db, &key).await {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => {
+            log::error!("Error fetching feature flag {}: {:?}", key, e);
+            e.error_response()
+        }
+    }
+}
+
+/// Create a new feature flag
+#[utoipa::path(
+    post,
+    path = "/api/v1/admin/feature-flags",
+    request_body = CreateFeatureFlagDto,
+    responses(
+        (status = 201, description = "Feature flag created successfully", body = FeatureFlagResponse),
+        (status = 400, description = "Invalid request data"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - requires admin role"),
+        (status = 409, description = "Feature flag with the same key already exists"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "admin"
+)]
+#[post("/api/v1/admin/feature-flags")]
+async fn create_feature_flag(
+    db: web::Data<Database>,
+    data: web::Json<CreateFeatureFlagDto>,
+) -> impl Responder {
+    match admin_service::create_feature_flag(&db, data.into_inner()).await {
+        Ok(response) => HttpResponse::Created().json(response),
+        Err(e) => {
+            log::error!("Error creating feature flag: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
+/// Update a feature flag
+#[utoipa::path(
+    put,
+    path = "/api/v1/admin/feature-flags/{key}",
+    params(
+        ("key" = String, Path, description = "Feature flag key"),
+    ),
+    request_body = PatchFeatureFlagDto,
+    responses(
+        (status = 200, description = "Feature flag updated successfully", body = FeatureFlagResponse),
+        (status = 400, description = "Invalid request data"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - requires admin role"),
+        (status = 404, description = "Feature flag not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "admin"
+)]
+#[put("/api/v1/admin/feature-flags/{key}")]
+async fn update_feature_flag(
+    db: web::Data<Database>,
+    path: web::Path<String>,
+    data: web::Json<PatchFeatureFlagDto>,
+) -> impl Responder {
+    let key = path.into_inner();
+
+    match admin_service::update_feature_flag(&db, &key, data.into_inner()).await {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => {
+            log::error!("Error updating feature flag {}: {:?}", key, e);
+            e.error_response()
+        }
+    }
+}
+
+/// Delete a feature flag
+#[utoipa::path(
+    delete,
+    path = "/api/v1/admin/feature-flags/{key}",
+    params(
+        ("key" = String, Path, description = "Feature flag key"),
+    ),
+    responses(
+        (status = 204, description = "Feature flag deleted successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - requires admin role"),
+        (status = 404, description = "Feature flag not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "admin"
+)]
+#[delete("/api/v1/admin/feature-flags/{key}")]
+async fn delete_feature_flag(db: web::Data<Database>, path: web::Path<String>) -> impl Responder {
+    let key = path.into_inner();
+
+    match admin_service::delete_feature_flag(&db, &key).await {
+        Ok(_) => HttpResponse::NoContent().finish(),
+        Err(e) => {
+            log::error!("Error deleting feature flag {}: {:?}", key, e);
+            e.error_response()
+        }
+    }
+}
+
+/// Get feature flag value (client-facing API)
+#[utoipa::path(
+    get,
+    path = "/api/v1/feature-flags/{key}",
+    params(
+        ("key" = String, Path, description = "Feature flag key"),
+    ),
+    responses(
+        (status = 200, description = "Feature flag value retrieved successfully"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "feature-flags"
+)]
+#[get("/api/v1/feature-flags/{key}")]
+async fn get_feature_flag_value(
+    db: web::Data<Database>,
+    path: web::Path<String>,
+) -> impl Responder {
+    let key = path.into_inner();
+
+    match admin_service::get_feature_flag_value(&db, &key).await {
+        Ok(enabled) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "data": {
+                "key": key,
+                "enabled": enabled
+            }
+        })),
+        Err(e) => {
+            log::error!("Error fetching feature flag value {}: {:?}", key, e);
+            e.error_response()
+        }
+    }
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     log::info!("Configuring admin routes");
+
+    // Admin-only endpoints
     cfg.service(get_dashboard_stats);
     cfg.service(get_system_info);
     cfg.service(get_admin_sessions);
@@ -448,4 +648,14 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(delete_admin_session);
     cfg.service(get_admin_chat_history);
     cfg.service(delete_admin_chat_messages);
+
+    // Feature flags endpoints
+    cfg.service(get_feature_flags);
+    cfg.service(get_feature_flag);
+    cfg.service(create_feature_flag);
+    cfg.service(update_feature_flag);
+    cfg.service(delete_feature_flag);
+
+    // Client-facing feature flag endpoint
+    cfg.service(get_feature_flag_value);
 }

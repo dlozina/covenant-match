@@ -1,17 +1,74 @@
 use crate::models::admin::{
     AdminDashboardStats, AdminSessionResponse, AdminSessionsData, AdminSessionsPaginationResponse,
-    AdminSessionsResponse, DashboardStatsData, DashboardStatsResponse, MemoryUsage, SystemInfo,
-    SystemStatusData, SystemStatusResponse,
+    AdminSessionsResponse, CreateFeatureFlagDto, DashboardStatsData, DashboardStatsResponse,
+    FeatureFlag, FeatureFlagApiResponse, FeatureFlagData, FeatureFlagResponse, FeatureFlagsData,
+    FeatureFlagsResponse, MemoryUsage, PatchFeatureFlagDto, SystemInfo, SystemStatusData,
+    SystemStatusResponse,
 };
 use crate::models::error::AppError;
 use crate::models::session::{GameSession, SessionStatus};
-use crate::repository::{news_repository, session_repository, user_repository};
+use crate::repository::{
+    feature_flag_repository, news_repository, session_repository, user_repository,
+};
 use chrono::{Duration, Utc};
+use lazy_static::lazy_static;
+use log::{debug, error, info};
 use mongodb::{bson, Database};
+use std::collections::HashMap;
 use std::process::Command;
+use std::sync::Mutex;
+use std::time::{Duration as StdDuration, Instant};
 use sysinfo::{System, SystemExt};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+// Feature Flag Cache
+lazy_static! {
+    static ref FEATURE_FLAG_CACHE: Mutex<FeatureFlagCache> = Mutex::new(FeatureFlagCache::new());
+}
+
+struct FeatureFlagCache {
+    flags: HashMap<String, FeatureFlag>,
+    last_refresh: Instant,
+    is_initialized: bool,
+}
+
+impl FeatureFlagCache {
+    fn new() -> Self {
+        FeatureFlagCache {
+            flags: HashMap::new(),
+            last_refresh: Instant::now()
+                .checked_sub(StdDuration::from_secs(3600))
+                .unwrap_or_else(Instant::now),
+            is_initialized: false,
+        }
+    }
+
+    fn get(&self, key: &str) -> Option<&FeatureFlag> {
+        self.flags.get(key)
+    }
+
+    fn set(&mut self, flag: FeatureFlag) {
+        self.flags.insert(flag.key.clone(), flag);
+    }
+
+    fn set_all(&mut self, flags: Vec<FeatureFlag>) {
+        self.flags.clear();
+        for flag in flags {
+            self.flags.insert(flag.key.clone(), flag);
+        }
+        self.last_refresh = Instant::now();
+        self.is_initialized = true;
+    }
+
+    fn remove(&mut self, key: &str) {
+        self.flags.remove(key);
+    }
+
+    fn needs_refresh(&self) -> bool {
+        !self.is_initialized || self.last_refresh.elapsed() > StdDuration::from_secs(60)
+    }
+}
 
 /// Get dashboard statistics for admin panel
 pub async fn get_dashboard_stats(db: &Database) -> Result<DashboardStatsResponse, AppError> {
@@ -224,4 +281,257 @@ pub async fn delete_session(db: &Database, session_id: &str) -> Result<(), AppEr
     }
 
     Ok(())
+}
+
+// Feature Flag Functions
+
+/// Get all feature flags
+pub async fn get_feature_flags(db: &Database) -> Result<FeatureFlagsResponse, AppError> {
+    debug!("get_feature_flags: Starting to get feature flags");
+
+    // Use a timeout when acquiring the lock to avoid deadlocks
+    let cache_result = FEATURE_FLAG_CACHE.try_lock();
+
+    let flags = match cache_result {
+        Ok(mut cache) => {
+            debug!("get_feature_flags: Successfully acquired cache lock");
+
+            // Check if cache needs refresh
+            if cache.needs_refresh() {
+                debug!("get_feature_flags: Cache needs refresh, fetching from database");
+                match feature_flag_repository::find_all(db).await {
+                    Ok(db_flags) => {
+                        debug!(
+                            "get_feature_flags: Setting {} flags in cache",
+                            db_flags.len()
+                        );
+                        cache.set_all(db_flags.clone());
+                        db_flags
+                    }
+                    Err(e) => {
+                        error!(
+                            "get_feature_flags: Error fetching flags from database: {:?}",
+                            e
+                        );
+                        // Return an empty list on error instead of failing completely
+                        Vec::new()
+                    }
+                }
+            } else {
+                debug!(
+                    "get_feature_flags: Using cached flags, count: {}",
+                    cache.flags.len()
+                );
+                cache.flags.values().cloned().collect()
+            }
+        }
+        Err(e) => {
+            // If we can't acquire the lock, go directly to the database
+            error!("get_feature_flags: Failed to acquire cache lock: {:?}", e);
+            debug!("get_feature_flags: Bypassing cache, fetching directly from database");
+
+            match feature_flag_repository::find_all(db).await {
+                Ok(db_flags) => {
+                    debug!(
+                        "get_feature_flags: Got {} flags directly from database",
+                        db_flags.len()
+                    );
+                    db_flags
+                }
+                Err(e) => {
+                    error!("get_feature_flags: Error fetching flags directly: {:?}", e);
+                    // Return an empty list on error instead of failing
+                    Vec::new()
+                }
+            }
+        }
+    };
+
+    debug!(
+        "get_feature_flags: Building response with {} flags",
+        flags.len()
+    );
+
+    // Convert FeatureFlag to FeatureFlagApiResponse
+    let api_flags = flags
+        .into_iter()
+        .map(FeatureFlagApiResponse::from)
+        .collect();
+
+    let response = FeatureFlagsResponse {
+        status: "success".to_string(),
+        data: FeatureFlagsData {
+            feature_flags: api_flags,
+        },
+    };
+
+    debug!("get_feature_flags: Successfully built response, returning");
+    Ok(response)
+}
+
+/// Get a feature flag by key
+pub async fn get_feature_flag(db: &Database, key: &str) -> Result<FeatureFlagResponse, AppError> {
+    // Try to get from cache first
+    {
+        let cache = FEATURE_FLAG_CACHE.lock().map_err(|_| {
+            AppError::InternalError("Failed to acquire lock on feature flag cache".to_string())
+        })?;
+
+        if let Some(flag) = cache.get(key) {
+            return Ok(FeatureFlagResponse {
+                status: "success".to_string(),
+                data: FeatureFlagData {
+                    feature_flag: FeatureFlagApiResponse::from(flag.clone()),
+                },
+            });
+        }
+    }
+
+    // If not in cache, fetch from database
+    let flag = feature_flag_repository::find_by_key(db, key)
+        .await?
+        .ok_or_else(|| {
+            AppError::InternalError(format!("Feature flag with key '{}' not found", key))
+        })?;
+
+    // Update cache
+    {
+        let mut cache = FEATURE_FLAG_CACHE.lock().map_err(|_| {
+            AppError::InternalError("Failed to acquire lock on feature flag cache".to_string())
+        })?;
+        cache.set(flag.clone());
+    }
+
+    let response = FeatureFlagResponse {
+        status: "success".to_string(),
+        data: FeatureFlagData {
+            feature_flag: FeatureFlagApiResponse::from(flag),
+        },
+    };
+
+    Ok(response)
+}
+
+/// Create a new feature flag
+pub async fn create_feature_flag(
+    db: &Database,
+    dto: CreateFeatureFlagDto,
+) -> Result<FeatureFlagResponse, AppError> {
+    let mut flag = FeatureFlag {
+        id: None,
+        key: dto.key,
+        name: dto.name,
+        description: dto.description,
+        enabled: dto.enabled,
+        default_value: dto.default_value,
+        created_at: None,
+        updated_at: None,
+    };
+
+    let created_flag = feature_flag_repository::create(db, &mut flag).await?;
+
+    // Update cache
+    {
+        let mut cache = FEATURE_FLAG_CACHE.lock().map_err(|_| {
+            AppError::InternalError("Failed to acquire lock on feature flag cache".to_string())
+        })?;
+        cache.set(created_flag.clone());
+    }
+
+    let response = FeatureFlagResponse {
+        status: "success".to_string(),
+        data: FeatureFlagData {
+            feature_flag: FeatureFlagApiResponse::from(created_flag),
+        },
+    };
+
+    Ok(response)
+}
+
+/// Update a feature flag
+pub async fn update_feature_flag(
+    db: &Database,
+    key: &str,
+    flag_patch: PatchFeatureFlagDto,
+) -> Result<FeatureFlagResponse, AppError> {
+    // First get the existing flag
+    let existing = feature_flag_repository::find_by_key(db, key)
+        .await?
+        .ok_or_else(|| {
+            AppError::InternalError(format!("Feature flag with key '{}' not found", key))
+        })?;
+
+    // Apply the patch to create an updated flag
+    let updated_flag = feature_flag_repository::update_partial(db, key, &flag_patch).await?;
+
+    // Update cache
+    {
+        let mut cache = FEATURE_FLAG_CACHE.lock().map_err(|_| {
+            AppError::InternalError("Failed to acquire lock on feature flag cache".to_string())
+        })?;
+        cache.set(updated_flag.clone());
+    }
+
+    let response = FeatureFlagResponse {
+        status: "success".to_string(),
+        data: FeatureFlagData {
+            feature_flag: FeatureFlagApiResponse::from(updated_flag),
+        },
+    };
+
+    Ok(response)
+}
+
+/// Delete a feature flag
+pub async fn delete_feature_flag(db: &Database, key: &str) -> Result<bool, AppError> {
+    let result = feature_flag_repository::delete(db, key).await?;
+
+    // Update cache
+    if result {
+        let mut cache = FEATURE_FLAG_CACHE.lock().map_err(|_| {
+            AppError::InternalError("Failed to acquire lock on feature flag cache".to_string())
+        })?;
+        cache.remove(key);
+    }
+
+    Ok(result)
+}
+
+/// Get a feature flag value by key (client-facing API)
+pub async fn get_feature_flag_value(db: &Database, key: &str) -> Result<bool, AppError> {
+    // Try to get from cache first
+    {
+        let cache = FEATURE_FLAG_CACHE.lock().map_err(|_| {
+            AppError::InternalError("Failed to acquire lock on feature flag cache".to_string())
+        })?;
+
+        if let Some(flag) = cache.get(key) {
+            return Ok(flag.enabled);
+        }
+    }
+
+    // If not in cache, fetch from database
+    let flag_result = feature_flag_repository::find_by_key(db, key).await?;
+
+    match flag_result {
+        Some(flag) => {
+            // Update cache
+            {
+                let mut cache = FEATURE_FLAG_CACHE.lock().map_err(|_| {
+                    AppError::InternalError(
+                        "Failed to acquire lock on feature flag cache".to_string(),
+                    )
+                })?;
+                cache.set(flag.clone());
+            }
+            Ok(flag.enabled)
+        }
+        None => {
+            debug!(
+                "Feature flag '{}' not found, returning default (false)",
+                key
+            );
+            Ok(false)
+        }
+    }
 }

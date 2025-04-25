@@ -761,21 +761,32 @@ export function SessionEventManager({
           // Store in sessionStorage for recreation page
           sessionStorage.setItem('autoJoinSessionId', newId);
           
-          // FEATURE FLAG: Default to disabling auto-redirect unless explicitly enabled
-          // If the env var is not set or not equal to 'false', disable auto-redirect
-          const disableAutoRedirect = process.env.NEXT_PUBLIC_DISABLE_AUTO_REDIRECT !== 'false';
-          
-          if (disableAutoRedirect) {
-            console.log('Feature flag: Auto-redirect disabled - use the notification link to join');
-          } else {
-            // NOTE: This is the ONLY place where auto-redirection should happen
-            // We've consolidated the redirection logic here to avoid redundancy
-            // Navigate after a short delay to allow state to update
-            setTimeout(() => {
-              console.log('Redirecting to recreate page...');
-              router.push(`/sessions/recreate?id=${sessionId}`);
-            }, 1500);
-          }
+          // Check feature flag for auto-redirect
+          (async () => {
+            try {
+              // Import dynamically to avoid circular dependencies
+              const { FeatureFlagService } = await import('@/utils/api/feature-flag-service');
+              
+              // Check if auto-redirect is disabled via feature flag
+              // Always bypass cache to get the latest value
+              const disableAutoRedirect = await FeatureFlagService.getFeatureFlagValue('disable_auto_redirect', true, true);
+              
+              if (disableAutoRedirect) {
+                console.log('Feature flag: Auto-redirect disabled - use the notification link to join');
+              } else {
+                // NOTE: This is the ONLY place where auto-redirection should happen
+                // We've consolidated the redirection logic here to avoid redundancy
+                // Navigate after a short delay to allow state to update
+                setTimeout(() => {
+                  console.log('Redirecting to recreate page...');
+                  router.push(`/sessions/recreate?id=${sessionId}`);
+                }, 1500);
+              }
+            } catch (err) {
+              console.error('Error checking feature flag, defaulting to disabled auto-redirect:', err);
+              // Default behavior (no auto-redirect) if feature flag check fails
+            }
+          })();
         }
       }
     });
