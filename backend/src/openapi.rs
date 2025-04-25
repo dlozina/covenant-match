@@ -1,6 +1,8 @@
 use crate::models::admin::{
     AdminDashboardStats, AdminSessionResponse, AdminSessionsData, AdminSessionsPaginationResponse,
-    AdminSessionsResponse, DashboardStatsResponse, MemoryUsage, SystemInfo, SystemStatusResponse,
+    AdminSessionsResponse, CreateFeatureFlagDto, DashboardStatsResponse, FeatureFlag,
+    FeatureFlagApiResponse, FeatureFlagData, FeatureFlagResponse, FeatureFlagsData,
+    FeatureFlagsResponse, MemoryUsage, PatchFeatureFlagDto, SystemInfo, SystemStatusResponse,
 };
 use crate::models::chat::ChatMessage;
 use crate::models::common::{LimitQuery, PaginationQuery};
@@ -83,6 +85,13 @@ use utoipa::{
         delete_admin_session,
         get_admin_chat_history,
         delete_admin_chat_messages,
+        // Feature Flag endpoints
+        get_feature_flags,
+        get_feature_flag,
+        create_feature_flag,
+        update_feature_flag,
+        delete_feature_flag,
+        get_feature_flag_value,
         // User data routes
         get_current_user_data,
         test_cloudflare_headers,
@@ -231,6 +240,15 @@ use utoipa::{
             AdminSessionsResponse,
             AdminSessionsPaginationResponse,
             AdminSessionsData,
+            // Feature Flag models
+            FeatureFlag,
+            FeatureFlagApiResponse,
+            FeatureFlagResponse,
+            FeatureFlagData,
+            FeatureFlagsResponse,
+            FeatureFlagsData,
+            CreateFeatureFlagDto,
+            PatchFeatureFlagDto,
             // Common models
             PaginationQuery,
             LimitQuery,
@@ -247,6 +265,7 @@ use utoipa::{
         (name = "chat", description = "Chat messaging endpoints"),
         (name = "realtime", description = "Real-time communication endpoints"),
         (name = "news", description = "News and announcements management endpoints"),
+        (name = "feature-flags", description = "Feature flag management endpoints"),
     ),
     modifiers(&SecurityAddon),
 )]
