@@ -47,6 +47,8 @@ services:
       - CAPTCHA_WINDOW_MINUTES=30
       - LOGIN_ATTEMPTS_RETENTION_DAYS=30
       - LOGIN_ATTEMPTS_CLEANUP_INTERVAL_HOURS=24
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       - mongodb
     secrets:
@@ -100,6 +102,7 @@ networks:
 
 volumes:
   mongodb_data:
+  uploads_data:
 
 secrets:
   mongodb_uri:

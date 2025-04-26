@@ -258,7 +258,8 @@ export default function Home() {
       {!isLoadingAnnouncement && announcement && announcement.active && (
         <div className="relative my-4 lg:my-6 overflow-hidden">
           <div className="bg-gradient-to-r from-purple-900 to-indigo-900 text-white py-3 px-4 rounded-md shadow-lg border border-purple-700">
-            <div className="flex items-center justify-between">
+            {/* Desktop layout (unchanged) - hidden on mobile */}
+            <div className="hidden sm:flex sm:items-center sm:justify-between">
               <div className="flex items-center space-x-2">
                 <AlertCircle className="h-5 w-5 text-purple-300" />
                 <span className="font-semibold">Announcement:</span>
@@ -267,6 +268,20 @@ export default function Home() {
               <Link href="/news" className="text-xs bg-purple-800 hover:bg-purple-700 px-2 py-1 rounded-sm transition-colors">
                 Learn More
               </Link>
+            </div>
+            
+            {/* Mobile layout - flex column with smaller text and more spacing */}
+            <div className="flex flex-col space-y-2 sm:hidden">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="h-4 w-4 text-purple-300" />
+                <span className="font-semibold text-sm">Announcement:</span>
+              </div>
+              <div className="text-sm pl-6 pb-2 break-words">{announcement.content}</div>
+              <div className="flex justify-end">
+                <Link href="/news" className="text-xs bg-purple-800 hover:bg-purple-700 px-2 py-1 rounded-sm transition-colors">
+                  Learn More
+                </Link>
+              </div>
             </div>
           </div>
         </div>
