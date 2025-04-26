@@ -1,11 +1,12 @@
 import { AdminSessionViewClient } from "@/components/admin/AdminSessionViewClient";
 
 interface SessionViewPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
-export default function SessionViewPage({ params }: SessionViewPageProps) {
+export default async function SessionViewPage(props: SessionViewPageProps) {
+  const params = await props.params;
   return <AdminSessionViewClient sessionId={params.id} />;
 } 
