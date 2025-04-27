@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Loader2 } from "lucide-react";
 import { Notification, NotificationType } from "@/components/ui/notification";
 import { useAuth } from "@/lib/auth-context";
+import { ChartConfig, ChartContainer, ChartTooltip } from "@/components/ui/chart";
 
 interface ConnectionsPerHourInfo {
   hour: string;
@@ -132,6 +133,30 @@ export default function RealtimeMonitorPage() {
   // Colors for charts
   const COLORS = ['#8884d8', '#83a6ed', '#8dd1e1', '#82ca9d', '#a4de6c'];
   
+  // Chart configuration for connections over time
+  const connectionsChartConfig = {
+    connections: {
+      label: "Connections",
+      color: "hsl(var(--chart-1))",
+    },
+  } satisfies ChartConfig;
+  
+  // Chart configuration for actor mailbox sizes
+  const mailboxChartConfig = {
+    rate: {
+      label: "Queue Size",
+      color: "hsl(var(--chart-1))",
+    },
+  } satisfies ChartConfig;
+  
+  // Chart configuration for message processing rate
+  const messageRateChartConfig = {
+    rate: {
+      label: "Messages/sec",
+      color: "hsl(var(--chart-2))",
+    },
+  } satisfies ChartConfig;
+  
   return (
     <div className="space-y-6">
       {notification && (
@@ -216,31 +241,54 @@ export default function RealtimeMonitorPage() {
               <CardDescription>WebSocket connections per hour</CardDescription>
             </CardHeader>
             <CardContent className="h-[400px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
+              <ChartContainer
+                config={connectionsChartConfig}
+                className="aspect-auto h-full w-full"
+              >
+                <BarChart
+                  accessibilityLayer
                   data={stats.connectionsPerHour}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 50 }}
+                  margin={{
+                    top: 20,
+                    right: 30,
+                    left: 20,
+                    bottom: 50,
+                  }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="hour" 
-                    angle={-45} 
-                    textAnchor="end"
-                    tick={{ fontSize: 12 }}
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="hour"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    minTickGap={32}
+                    angle={0}
+                    textAnchor="middle"
                     height={60}
+                    tick={{ fontSize: 12 }}
+                    interval={0}
                   />
                   <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line 
-                    type="monotone" 
+                  <ChartTooltip
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      return (
+                        <div className="rounded-lg border bg-background px-3 py-1.5 shadow-md">
+                          <p className="text-sm text-muted-foreground">Hour</p>
+                          <p className="font-medium">{payload[0].payload.hour}</p>
+                          <p className="text-sm text-muted-foreground">Connections</p>
+                          <p className="font-medium">{payload[0].value}</p>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Bar 
                     dataKey="count" 
                     name="Connections" 
-                    stroke="#8884d8" 
-                    activeDot={{ r: 8 }} 
+                    fill="hsl(var(--chart-1))" 
                   />
-                </LineChart>
-              </ResponsiveContainer>
+                </BarChart>
+              </ChartContainer>
             </CardContent>
           </Card>
         </TabsContent>
@@ -253,24 +301,47 @@ export default function RealtimeMonitorPage() {
                 <CardDescription>Current mailbox queue depth</CardDescription>
               </CardHeader>
               <CardContent className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
+                <ChartContainer config={mailboxChartConfig} className="aspect-auto h-full w-full">
                   <BarChart
+                    accessibilityLayer
                     data={stats.mailboxSizes}
                     margin={{ top: 20, right: 30, left: 20, bottom: 50 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis 
                       dataKey="actor"
-                      angle={-45} 
-                      textAnchor="end"
+                      angle={0}
+                      textAnchor="middle" 
                       height={60}
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={10}
+                      tick={{ fontSize: 12 }}
+                      interval={0}
                     />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="rate" name="Queue Size" fill="#8884d8" />
+                    <ChartTooltip
+                      cursor={false}
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        return (
+                          <div className="rounded-lg border bg-background px-3 py-1.5 shadow-md">
+                            <p className="text-sm text-muted-foreground">Actor</p>
+                            <p className="font-medium">{payload[0].payload.actor}</p>
+                            <p className="text-sm text-muted-foreground">Queue Size</p>
+                            <p className="font-medium">{payload[0].value}</p>
+                          </div>
+                        );
+                      }}
+                    />
+                    <Bar dataKey="rate" fill="hsl(var(--chart-1))" radius={4} />
                   </BarChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               </CardContent>
+              <CardFooter className="flex-col items-start gap-2 text-sm">
+                <div className="leading-none text-muted-foreground">
+                  Showing current queue size for each actor
+                </div>
+              </CardFooter>
             </Card>
             
             <Card>
@@ -279,24 +350,47 @@ export default function RealtimeMonitorPage() {
                 <CardDescription>Messages processed per second</CardDescription>
               </CardHeader>
               <CardContent className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
+                <ChartContainer config={messageRateChartConfig} className="aspect-auto h-full w-full">
                   <BarChart
+                    accessibilityLayer
                     data={stats.messageRates}
                     margin={{ top: 20, right: 30, left: 20, bottom: 50 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis 
                       dataKey="actor"
-                      angle={-45} 
-                      textAnchor="end"
+                      angle={0}
+                      textAnchor="middle"
                       height={60}
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={10}
+                      tick={{ fontSize: 12 }}
+                      interval={0}
                     />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="rate" name="Msgs/sec" fill="#82ca9d" />
+                    <ChartTooltip
+                      cursor={false}
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        return (
+                          <div className="rounded-lg border bg-background px-3 py-1.5 shadow-md">
+                            <p className="text-sm text-muted-foreground">Actor</p>
+                            <p className="font-medium">{payload[0].payload.actor}</p>
+                            <p className="text-sm text-muted-foreground">Messages/sec</p>
+                            <p className="font-medium">{payload[0].value}</p>
+                          </div>
+                        );
+                      }}
+                    />
+                    <Bar dataKey="rate" fill="hsl(var(--chart-2))" radius={4} />
                   </BarChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               </CardContent>
+              <CardFooter className="flex-col items-start gap-2 text-sm">
+                <div className="leading-none text-muted-foreground">
+                  Showing message processing rate for each actor
+                </div>
+              </CardFooter>
             </Card>
             
             <Card className="md:col-span-2">
