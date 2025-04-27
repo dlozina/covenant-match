@@ -43,53 +43,46 @@ export class AdminSessionService {
       // Use the DTO type for the API response
       const response = await httpClient.get<AdminSessionsResponseDto>(url, true);
       
-      // Transform the API response to match the AdminSession format
+      // Transform the API response to the AdminSession format
+      // Now the backend already sends camelCase, so we just need to map directly
       const transformedSessions = response.data.sessions.map((session: AdminSessionDto) => ({
-        id: session._id.$oid,
+        id: session.id,
         name: session.name,
-        hostId: session.host_id,
+        hostId: session.hostId,
         status: session.status,
-        nightLord: session.night_lord,
-        joinedPlayers: session.joined_players.map((player) => ({
+        nightLord: session.nightLord,
+        joinedPlayers: session.joinedPlayers.map((player) => ({
           userId: player.userId,
           username: player.username,
           nightfarer: player.nightfarer,
           covenantName: player.covenantName,
           region: player.region,
           platform: player.platform,
-          joinedAt: player.joinedAt.$date.$numberLong
+          joinedAt: player.joinedAt
         })),
         region: session.region,
         platform: session.platform,
-        isPrivate: session.is_private,
+        isPrivate: session.isPrivate,
         password: session.password,
-        createdAt: session.created_at.$date.$numberLong,
-        updatedAt: session.updated_at.$date.$numberLong,
-        startedAt: session.started_at ? session.started_at.$date.$numberLong : null,
-        completedAt: session.completed_at ? session.completed_at.$date.$numberLong : null,
-        statsUpdated: session.stats_updated,
+        createdAt: session.createdAt,
+        updatedAt: session.updatedAt,
+        startedAt: session.startedAt,
+        completedAt: session.completedAt,
+        statsUpdated: session.statsUpdated,
         results: session.results.map((result) => ({
           userId: result.userId,
           result: result.result,
           rating: result.rating,
           feedback: result.feedback,
-          submittedAt: result.submittedAt.$date.$numberLong
+          submittedAt: result.submittedAt
         }))
       }));
-      
-      // Transform pagination
-      const transformedPagination: SessionsPaginationResponse = {
-        total: response.data.pagination.total,
-        page: response.data.pagination.page,
-        limit: response.data.pagination.limit,
-        totalPages: response.data.pagination.totalPages
-      };
       
       return {
         status: response.status,
         data: {
           sessions: transformedSessions,
-          pagination: transformedPagination
+          pagination: response.data.pagination
         }
       };
     } catch (error) {
@@ -113,36 +106,37 @@ export class AdminSessionService {
       const response = await httpClient.get<AdminSessionResponseDto>(`/api/v1/admin/sessions/${sessionId}`, true);
       
       // Transform the API response to match the AdminSession format
+      // Now using direct mapping with camelCase fields
       const transformedSession: AdminSession = {
-        id: response.data._id.$oid,
+        id: response.data.id,
         name: response.data.name,
-        hostId: response.data.host_id,
+        hostId: response.data.hostId,
         status: response.data.status,
-        nightLord: response.data.night_lord,
-        joinedPlayers: response.data.joined_players.map((player) => ({
+        nightLord: response.data.nightLord,
+        joinedPlayers: response.data.joinedPlayers.map((player) => ({
           userId: player.userId,
           username: player.username,
           nightfarer: player.nightfarer,
           covenantName: player.covenantName,
           region: player.region,
           platform: player.platform,
-          joinedAt: player.joinedAt.$date.$numberLong
+          joinedAt: player.joinedAt
         })),
         region: response.data.region,
         platform: response.data.platform,
-        isPrivate: response.data.is_private,
+        isPrivate: response.data.isPrivate,
         password: response.data.password,
-        createdAt: response.data.created_at.$date.$numberLong,
-        updatedAt: response.data.updated_at.$date.$numberLong,
-        startedAt: response.data.started_at ? response.data.started_at.$date.$numberLong : null,
-        completedAt: response.data.completed_at ? response.data.completed_at.$date.$numberLong : null,
-        statsUpdated: response.data.stats_updated,
+        createdAt: response.data.createdAt,
+        updatedAt: response.data.updatedAt,
+        startedAt: response.data.startedAt,
+        completedAt: response.data.completedAt,
+        statsUpdated: response.data.statsUpdated,
         results: response.data.results.map((result) => ({
           userId: result.userId,
           result: result.result,
           rating: result.rating,
           feedback: result.feedback,
-          submittedAt: result.submittedAt.$date.$numberLong
+          submittedAt: result.submittedAt
         }))
       };
       

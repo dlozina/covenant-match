@@ -12,11 +12,7 @@ export interface AdminPlayerDto {
   covenantName: string;
   region: string;
   platform: string;
-  joinedAt: {
-    $date: {
-      $numberLong: string;
-    }
-  };
+  joinedAt: string;
 }
 
 // Result data in a session
@@ -25,11 +21,15 @@ export interface AdminResultDto {
   result: "Win" | "Loss" | "Disconnect";
   rating: number;
   feedback: string;
-  submittedAt: {
-    $date: {
-      $numberLong: string;
-    }
-  };
+  submittedAt: string;
+}
+
+// Rating data in a session
+export interface AdminRatingDto {
+  userId: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
 }
 
 // MongoDB ObjectId format
@@ -44,27 +44,27 @@ export interface MongoDateDto {
   };
 }
 
-// Raw session data from API
+// Raw session data from API - updated to camelCase to match our backend changes
 export interface AdminSessionDto {
-  _id: ObjectIdDto;
+  id: string;
   name: string;
-  host_id: string;
+  hostId: string;
   region: string;
   platform: string;
   password: string;
-  is_private: boolean;
-  night_lord: string;
+  isPrivate: boolean;
+  nightLord: string;
   status: SessionStatus;
-  joined_players: AdminPlayerDto[];
+  joinedPlayers: AdminPlayerDto[];
   results: AdminResultDto[];
-  ratings: any[];
-  created_at: MongoDateDto;
-  updated_at: MongoDateDto;
-  started_at: MongoDateDto | null;
-  completed_at: MongoDateDto | null;
-  stats_updated: boolean;
-  new_session_created: boolean;
-  new_session_created_id: ObjectIdDto | null;
+  ratings: AdminRatingDto[];
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  statsUpdated: boolean;
+  newSessionCreated: boolean;
+  newSessionCreatedId: string | null;
 }
 
 // Pagination data

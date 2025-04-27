@@ -1,9 +1,11 @@
 use crate::models::admin::{
-    AdminDashboardStats, AdminSessionResponse, AdminSessionsData, AdminSessionsPaginationResponse,
-    AdminSessionsResponse, CreateFeatureFlagDto, DashboardStatsData, DashboardStatsResponse,
+    AdminChatResponse, AdminDashboardStats, AdminSessionResponse, AdminSessionsData,
+    AdminSessionsPaginationResponse, AdminSessionsQuery, AdminSessionsResponse,
+    ChatMessageResponseDto, CreateFeatureFlagDto, DashboardStatsData, DashboardStatsResponse,
     FeatureFlag, FeatureFlagApiResponse, FeatureFlagData, FeatureFlagResponse, FeatureFlagsData,
-    FeatureFlagsResponse, MemoryUsage, PatchFeatureFlagDto, SystemInfo, SystemStatusData,
-    SystemStatusResponse,
+    FeatureFlagsResponse, GameSessionDTO, MemoryUsage, PatchFeatureFlagDto, SystemInfo,
+    SystemStatusData, SystemStatusResponse, UserInfoDto, WebSocketStatsData,
+    WebSocketStatsResponse,
 };
 use crate::models::error::AppError;
 use crate::models::session::{GameSession, SessionStatus};
@@ -227,10 +229,13 @@ pub async fn get_sessions_paginated(
         total_pages,
     };
 
+    // Convert GameSession to GameSessionDTO
+    let session_dtos: Vec<GameSessionDTO> = sessions.into_iter().map(|s| s.into()).collect();
+
     let response = AdminSessionsResponse {
         status: "success".to_string(),
         data: AdminSessionsData {
-            sessions,
+            sessions: session_dtos,
             pagination,
         },
     };
@@ -247,9 +252,12 @@ pub async fn get_session_by_id(
         .await?
         .ok_or(AppError::SessionNotFound)?;
 
+    // Convert GameSession to GameSessionDTO
+    let session_dto: GameSessionDTO = session.into();
+
     let response = AdminSessionResponse {
         status: "success".to_string(),
-        data: session,
+        data: session_dto,
     };
 
     Ok(response)
