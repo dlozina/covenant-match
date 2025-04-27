@@ -4,7 +4,6 @@ use std::fmt;
 use utoipa::ToSchema;
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct PlayerInfo {
     #[serde(alias = "user_id")]
     pub user_id: String,
@@ -19,7 +18,32 @@ pub struct PlayerInfo {
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 #[serde(rename_all = "camelCase")]
+pub struct PlayerInfoResponseDto {
+    #[serde(alias = "user_id")]
+    pub user_id: String,
+    pub username: String,
+    pub nightfarer: String,
+    pub covenant_name: String,
+    pub region: String,
+    pub platform: String,
+    #[serde(alias = "joined_at")]
+    pub joined_at: DateTime,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct SessionResult {
+    #[serde(alias = "user_id")]
+    pub user_id: String,
+    pub result: GameResult,
+    pub rating: Option<u8>,
+    pub feedback: Option<String>,
+    #[serde(alias = "submitted_at")]
+    pub submitted_at: DateTime,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionResultResponseDto {
     #[serde(alias = "user_id")]
     pub user_id: String,
     pub result: GameResult,
@@ -142,8 +166,8 @@ pub struct SessionResponseDto {
     pub platform: String,
     pub status: SessionStatus,
     pub night_lord: String,
-    pub joined_players: Vec<PlayerInfo>,
-    pub results: Vec<SessionResult>,
+    pub joined_players: Vec<PlayerInfoResponseDto>,
+    pub results: Vec<SessionResultResponseDto>,
     pub created_at: DateTime,
     pub updated_at: DateTime,
     pub started_at: Option<DateTime>,
@@ -166,8 +190,30 @@ impl From<GameSession> for SessionResponseDto {
             platform: session.platform,
             status: session.status,
             night_lord: session.night_lord,
-            joined_players: session.joined_players,
-            results: session.results,
+            joined_players: session
+                .joined_players
+                .into_iter()
+                .map(|player| PlayerInfoResponseDto {
+                    user_id: player.user_id,
+                    username: player.username,
+                    nightfarer: player.nightfarer,
+                    covenant_name: player.covenant_name,
+                    region: player.region,
+                    platform: player.platform,
+                    joined_at: player.joined_at,
+                })
+                .collect(),
+            results: session
+                .results
+                .into_iter()
+                .map(|result| SessionResultResponseDto {
+                    user_id: result.user_id,
+                    result: result.result,
+                    rating: result.rating,
+                    feedback: result.feedback,
+                    submitted_at: result.submitted_at,
+                })
+                .collect(),
             created_at: session.created_at,
             updated_at: session.updated_at,
             started_at: session.started_at,

@@ -92,7 +92,7 @@ pub struct AdminSessionsQuery {
 }
 
 
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct AdminChatResponse {
     pub messages: Vec<ChatMessageResponseDto>,
     pub total: usize,

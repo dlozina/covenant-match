@@ -2,7 +2,7 @@ use crate::models::admin::{
     AdminDashboardStats, AdminSessionResponse, AdminSessionsData, AdminSessionsPaginationResponse,
     AdminSessionsResponse, CreateFeatureFlagDto, DashboardStatsResponse, FeatureFlag,
     FeatureFlagApiResponse, FeatureFlagData, FeatureFlagResponse, FeatureFlagsData,
-    FeatureFlagsResponse, MemoryUsage, PatchFeatureFlagDto, SystemInfo, SystemStatusResponse,
+    FeatureFlagsResponse, MemoryUsage, PatchFeatureFlagDto, SystemInfo, SystemStatusResponse, AdminChatResponse
 };
 use crate::models::chat::ChatMessage;
 use crate::models::common::{LimitQuery, PaginationQuery};
@@ -240,6 +240,7 @@ use utoipa::{
             AdminSessionsResponse,
             AdminSessionsPaginationResponse,
             AdminSessionsData,
+            AdminChatResponse,
             // Feature Flag models
             FeatureFlag,
             FeatureFlagApiResponse,
