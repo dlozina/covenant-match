@@ -62,3 +62,42 @@ pub struct ChatHistoryMessage {
     pub timestamp: i64,
     pub client_id: Option<String>,
 }
+
+// Request for connection statistics (for admin dashboard)
+#[derive(Message)]
+#[rtype(result = "ConnectionStats")]
+pub struct GetConnectionStats;
+
+// Information about connections per hour
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ConnectionsPerHourInfo {
+    pub hour: String,
+    pub count: u32,
+}
+
+// Information about session connections
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SessionConnectionInfo {
+    pub session_id: String,
+    pub count: u32,
+}
+
+// Information about actor mailbox
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ActorMailboxInfo {
+    pub actor: String,
+    pub rate: u32,
+}
+
+// Connection statistics response
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ConnectionStats {
+    pub current_connections: u32,
+    pub total_connections_today: u32,
+    pub total_messages: u32,
+    pub connections_per_hour: Vec<ConnectionsPerHourInfo>,
+    pub session_connections: Vec<SessionConnectionInfo>,
+    pub mailbox_sizes: Vec<ActorMailboxInfo>,
+    pub message_rates: Vec<ActorMailboxInfo>,
+    pub actor_count: u32,
+}

@@ -1,12 +1,16 @@
 use crate::models::chat::ChatMessage;
 use crate::services::chat_service::ChatService;
 use crate::ws::messages::{
-    Broadcast, ChatHistoryMessage, Connect, Disconnect, GetChatHistory, ServerMessage,
+    ActorMailboxInfo, Broadcast, ChatHistoryMessage, Connect, ConnectionStats,
+    ConnectionsPerHourInfo, Disconnect, GetChatHistory, GetConnectionStats, ServerMessage,
+    SessionConnectionInfo,
 };
 use actix::prelude::*;
+use chrono::{DateTime, NaiveDateTime, Timelike, Utc};
 use log::{debug, error, info};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Actor that manages all active WebSocket sessions
 pub struct SessionManager {
@@ -18,6 +22,148 @@ pub struct SessionManager {
     user_mapping: HashMap<String, String>,
     // Chat service for message persistence
     chat_service: Option<Arc<ChatService>>,
+    // Metrics for connections
+    connection_metrics: ConnectionMetrics,
+}
+
+/// Structure to store connection metrics
+struct ConnectionMetrics {
+    // Total connections since startup
+    total_connections: u64,
+    // Total connections today
+    connections_today: u64,
+    // When the day started (to reset counters at midnight)
+    day_start: DateTime<Utc>,
+    // Total messages processed
+    total_messages: u64,
+    // Connection history by hour for the last 24 hours
+    connections_per_hour: VecDeque<(DateTime<Utc>, u32)>,
+    // Message processing rates
+    messages_processed: HashMap<String, u64>,
+    // Message processing timestamps for rate calculation
+    message_timestamps: HashMap<String, VecDeque<SystemTime>>,
+}
+
+impl ConnectionMetrics {
+    fn new() -> Self {
+        let now = Utc::now();
+        let day_start = now.date().and_hms_opt(0, 0, 0).unwrap_or(now);
+
+        // Initialize the connections per hour with 24 empty slots
+        let mut connections_per_hour = VecDeque::with_capacity(24);
+        for i in 0..24 {
+            let hour_dt = day_start + chrono::Duration::hours(i);
+            connections_per_hour.push_back((hour_dt, 0));
+        }
+
+        Self {
+            total_connections: 0,
+            connections_today: 0,
+            day_start,
+            total_messages: 0,
+            connections_per_hour,
+            messages_processed: HashMap::new(),
+            message_timestamps: HashMap::new(),
+        }
+    }
+
+    fn record_connection(&mut self) {
+        self.total_connections += 1;
+
+        let now = Utc::now();
+
+        // Check if we need to reset the daily counter
+        if now.date() > self.day_start.date() {
+            self.connections_today = 0;
+            self.day_start = now.date().and_hms_opt(0, 0, 0).unwrap_or(now);
+
+            // Reset the hourly counts for a new day
+            self.connections_per_hour.clear();
+            for i in 0..24 {
+                let hour_dt = self.day_start + chrono::Duration::hours(i);
+                self.connections_per_hour.push_back((hour_dt, 0));
+            }
+        }
+
+        self.connections_today += 1;
+
+        // Update connections per hour
+        if let Some(pos) = self
+            .connections_per_hour
+            .iter()
+            .position(|(dt, _)| dt.hour() == now.hour())
+        {
+            let (dt, count) = self.connections_per_hour.remove(pos).unwrap();
+            self.connections_per_hour.insert(pos, (dt, count + 1));
+        }
+    }
+
+    fn record_message(&mut self, actor_type: &str) {
+        self.total_messages += 1;
+
+        // Update message count for this actor type
+        *self
+            .messages_processed
+            .entry(actor_type.to_string())
+            .or_insert(0) += 1;
+
+        // Record timestamp for rate calculation
+        let now = SystemTime::now();
+        let timestamps = self
+            .message_timestamps
+            .entry(actor_type.to_string())
+            .or_insert_with(|| VecDeque::with_capacity(100));
+
+        timestamps.push_back(now);
+
+        // Keep only the last 100 timestamps for rate calculation
+        if timestamps.len() > 100 {
+            timestamps.pop_front();
+        }
+    }
+
+    fn get_hourly_connections(&self) -> Vec<ConnectionsPerHourInfo> {
+        self.connections_per_hour
+            .iter()
+            .map(|(dt, count)| ConnectionsPerHourInfo {
+                hour: format!("{:02}:00", dt.hour()),
+                count: *count,
+            })
+            .collect()
+    }
+
+    fn get_message_rates(&self) -> Vec<ActorMailboxInfo> {
+        let now = SystemTime::now();
+
+        self.message_timestamps
+            .iter()
+            .map(|(actor, timestamps)| {
+                let mut rate = 0.0;
+
+                if !timestamps.is_empty() {
+                    // Count messages in the last second
+                    let recent_count = timestamps
+                        .iter()
+                        .filter(|&ts| {
+                            if let Ok(duration) = now.duration_since(*ts) {
+                                duration.as_secs() < 10 // Messages in the last 10 seconds
+                            } else {
+                                false
+                            }
+                        })
+                        .count();
+
+                    // Calculate messages per second
+                    rate = recent_count as f64 / 10.0;
+                }
+
+                ActorMailboxInfo {
+                    actor: actor.clone(),
+                    rate: (rate * 100.0).round() as u32, // Convert to integer (msgs/sec * 100)
+                }
+            })
+            .collect()
+    }
 }
 
 impl Default for SessionManager {
@@ -27,6 +173,7 @@ impl Default for SessionManager {
             clients: HashMap::new(),
             user_mapping: HashMap::new(),
             chat_service: None,
+            connection_metrics: ConnectionMetrics::new(),
         }
     }
 }
@@ -38,6 +185,7 @@ impl SessionManager {
             clients: HashMap::new(),
             user_mapping: HashMap::new(),
             chat_service,
+            connection_metrics: ConnectionMetrics::new(),
         }
     }
 }
@@ -86,6 +234,9 @@ impl Handler<Connect> for SessionManager {
                 clients.len()
             );
         }
+
+        // Record the connection in metrics
+        self.connection_metrics.record_connection();
     }
 }
 
@@ -133,6 +284,9 @@ impl Handler<Broadcast> for SessionManager {
         if msg.message.message_type == "chat" {
             self.store_chat_message(&msg, ctx);
         }
+
+        // Record the message in metrics
+        self.connection_metrics.record_message("SessionManager");
 
         // First collect the clients to process to avoid borrow conflicts
         let mut to_process = Vec::new();
@@ -246,6 +400,57 @@ impl Handler<GetChatHistory> for SessionManager {
 
             history
         })
+    }
+}
+
+/// Handler for GetConnectionStats message
+impl Handler<GetConnectionStats> for SessionManager {
+    type Result = MessageResult<GetConnectionStats>;
+
+    fn handle(&mut self, _msg: GetConnectionStats, _: &mut Context<Self>) -> Self::Result {
+        // Get the count of current connections
+        let current_connections = self.clients.len() as u32;
+
+        // Get the session distribution
+        let mut session_connections = Vec::new();
+        for (session_id, clients) in &self.sessions {
+            session_connections.push(SessionConnectionInfo {
+                session_id: session_id.clone(),
+                count: clients.len() as u32,
+            });
+        }
+
+        // Get connections per hour
+        let connections_per_hour = self.connection_metrics.get_hourly_connections();
+
+        // Get actor message rates
+        let message_rates = self.connection_metrics.get_message_rates();
+
+        // Create mailbox sizes (this is estimated since we don't have direct access to mailbox queues)
+        let mailbox_sizes = vec![
+            ActorMailboxInfo {
+                actor: "SessionManager".to_string(),
+                rate: 5, // Mock value since we can't get actual queue depth easily
+            },
+            ActorMailboxInfo {
+                actor: "WsSession".to_string(),
+                rate: (current_connections / 2), // Just an estimate
+            },
+        ];
+
+        // Create the stats response
+        let stats = ConnectionStats {
+            current_connections,
+            total_connections_today: self.connection_metrics.connections_today as u32,
+            total_messages: self.connection_metrics.total_messages as u32,
+            connections_per_hour,
+            session_connections,
+            mailbox_sizes,
+            message_rates,
+            actor_count: (self.clients.len() + 1) as u32, // Clients + SessionManager
+        };
+
+        MessageResult(stats)
     }
 }
 

@@ -1,16 +1,21 @@
 use crate::models::admin::{
-    AdminChatResponse, AdminDashboardStats, AdminSessionResponse, AdminSessionsResponse,
-    ChatHistoryParams, ChatMessageResponseDto, CreateFeatureFlagDto, DeleteMessagesParams, FeatureFlag, FeatureFlagResponse, FeatureFlagsResponse, PatchFeatureFlagDto,
-    SystemInfo, UserInfoDto, AdminSessionsQuery,
+    AdminChatResponse, AdminDashboardStats, AdminSessionResponse, AdminSessionsQuery,
+    AdminSessionsResponse, ChatHistoryParams, ChatMessageResponseDto, CreateFeatureFlagDto,
+    DeleteMessagesParams, FeatureFlag, FeatureFlagResponse, FeatureFlagsResponse,
+    PatchFeatureFlagDto, SystemInfo, UserInfoDto,
 };
 use crate::services::{admin_service, chat_service, user_service};
 use crate::utils::request::is_admin;
+use crate::ws::messages::{ConnectionStats, GetConnectionStats};
+use crate::ws::session::SessionManager;
+use actix::Addr;
 use actix_web::{
     delete, get, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError,
 };
 use log::{debug, info};
 use mongodb::Database;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 /// Get admin dashboard statistics
 #[utoipa::path(
@@ -28,11 +33,7 @@ use serde::{Deserialize, Serialize};
     tag = "admin"
 )]
 #[get("/api/v1/admin/dashboard")]
-async fn get_dashboard_stats(
-    db: web::Data<Database>,
-    req: HttpRequest,
-) -> impl Responder {
-    
+async fn get_dashboard_stats(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
     // Check if the user is an admin
     if !is_admin(&req) {
         return HttpResponse::Forbidden().json(serde_json::json!({
@@ -110,7 +111,6 @@ async fn get_admin_sessions(
     query: web::Query<AdminSessionsQuery>,
     req: HttpRequest,
 ) -> impl Responder {
-
     // Check if the user is an admin
     if !is_admin(&req) {
         return HttpResponse::Forbidden().json(serde_json::json!({
@@ -160,7 +160,6 @@ async fn get_admin_session_by_id(
     path: web::Path<String>,
     req: HttpRequest,
 ) -> impl Responder {
-
     // Check if the user is an admin
     if !is_admin(&req) {
         return HttpResponse::Forbidden().json(serde_json::json!({
@@ -168,7 +167,7 @@ async fn get_admin_session_by_id(
             "message": "Admin role required"
         }));
     }
-    
+
     let session_id = path.into_inner();
 
     match admin_service::get_session_by_id(&db, &session_id).await {
@@ -200,8 +199,11 @@ async fn get_admin_session_by_id(
     tag = "admin"
 )]
 #[delete("/api/v1/admin/sessions/{session_id}")]
-async fn delete_admin_session(db: web::Data<Database>, path: web::Path<String>, req: HttpRequest) -> impl Responder {
-
+async fn delete_admin_session(
+    db: web::Data<Database>,
+    path: web::Path<String>,
+    req: HttpRequest,
+) -> impl Responder {
     // Check if the user is an admin
     if !is_admin(&req) {
         return HttpResponse::Forbidden().json(serde_json::json!({
@@ -248,7 +250,6 @@ async fn get_admin_chat_history(
     db: web::Data<Database>,
     req: HttpRequest,
 ) -> impl Responder {
-
     // Check if the user is an admin
     if !is_admin(&req) {
         return HttpResponse::Forbidden().json(serde_json::json!({
@@ -366,7 +367,6 @@ async fn delete_admin_chat_messages(
     db: web::Data<Database>,
     req: HttpRequest,
 ) -> impl Responder {
-
     // Check if the user is an admin
     if !is_admin(&req) {
         return HttpResponse::Forbidden().json(serde_json::json!({
@@ -433,7 +433,6 @@ async fn delete_admin_chat_messages(
 )]
 #[get("/api/v1/admin/feature-flags")]
 async fn get_feature_flags(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
-
     // Check if the user is an admin
     if !is_admin(&req) {
         return HttpResponse::Forbidden().json(serde_json::json!({
@@ -471,8 +470,11 @@ async fn get_feature_flags(db: web::Data<Database>, req: HttpRequest) -> impl Re
     tag = "admin"
 )]
 #[get("/api/v1/admin/feature-flags/{key}")]
-async fn get_feature_flag(db: web::Data<Database>, path: web::Path<String>, req: HttpRequest) -> impl Responder {
-    
+async fn get_feature_flag(
+    db: web::Data<Database>,
+    path: web::Path<String>,
+    req: HttpRequest,
+) -> impl Responder {
     // Check if the user is an admin
     if !is_admin(&req) {
         return HttpResponse::Forbidden().json(serde_json::json!({
@@ -516,7 +518,6 @@ async fn create_feature_flag(
     data: web::Json<CreateFeatureFlagDto>,
     req: HttpRequest,
 ) -> impl Responder {
-
     // Check if the user is an admin
     if !is_admin(&req) {
         return HttpResponse::Forbidden().json(serde_json::json!({
@@ -562,7 +563,6 @@ async fn update_feature_flag(
     data: web::Json<PatchFeatureFlagDto>,
     req: HttpRequest,
 ) -> impl Responder {
-
     // Check if the user is an admin
     if !is_admin(&req) {
         return HttpResponse::Forbidden().json(serde_json::json!({
@@ -602,8 +602,11 @@ async fn update_feature_flag(
     tag = "admin"
 )]
 #[delete("/api/v1/admin/feature-flags/{key}")]
-async fn delete_feature_flag(db: web::Data<Database>, path: web::Path<String>, req: HttpRequest) -> impl Responder {
-
+async fn delete_feature_flag(
+    db: web::Data<Database>,
+    path: web::Path<String>,
+    req: HttpRequest,
+) -> impl Responder {
     // Check if the user is an admin
     if !is_admin(&req) {
         return HttpResponse::Forbidden().json(serde_json::json!({
@@ -658,6 +661,47 @@ async fn get_feature_flag_value(
     }
 }
 
+/// Get WebSocket connection statistics
+#[utoipa::path(
+    get,
+    path = "/api/v1/admin/websocket-stats",
+    responses(
+        (status = 200, description = "WebSocket statistics retrieved successfully", body = ConnectionStats),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - requires admin role"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "admin"
+)]
+#[get("/api/v1/admin/websocket-stats")]
+async fn get_websocket_stats(
+    session_manager: web::Data<Addr<SessionManager>>,
+    req: HttpRequest,
+) -> impl Responder {
+    // Check if the user is an admin
+    if !is_admin(&req) {
+        return HttpResponse::Forbidden().json(serde_json::json!({
+            "status": "error",
+            "message": "Admin role required"
+        }));
+    }
+
+    // Get stats from the session manager
+    match session_manager.send(GetConnectionStats).await {
+        Ok(stats) => HttpResponse::Ok().json(stats),
+        Err(e) => {
+            log::error!("Error fetching WebSocket stats: {:?}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": "error",
+                "message": format!("Failed to get WebSocket stats: {}", e)
+            }))
+        }
+    }
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     log::info!("Configuring admin routes");
 
@@ -679,4 +723,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 
     // Client-facing feature flag endpoint - no auth required or admin role check
     cfg.service(get_feature_flag_value);
+
+    // Add the new route
+    cfg.service(get_websocket_stats);
 }
