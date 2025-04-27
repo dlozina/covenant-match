@@ -7,15 +7,14 @@ import {
   SessionControlButtons,
   SessionInfoSection,
   ResultReportingSection,
-  WarningDialog
-} from "@/components/session";
-import {
+  WarningDialog,
+  NewSessionDialog,
   friendStatusReducer,
   dialogReducer,
   resultReducer,
   FriendState,
   DialogState
-} from "@/components/session/SessionReducers";
+} from "@/components/session";
 import { leaveSession } from "@/utils/api";
 import { Notification, NotificationType } from "@/components/ui/notification";
 import { useSessionContext } from "../context/SessionContext";
@@ -47,7 +46,8 @@ export function SessionParticipant() {
   const [dialogState, dispatchDialog] = useReducer(dialogReducer, {
     showConfirmDialog: false,
     showWarningDialog: false,
-    showDeleteDialog: false
+    showDeleteDialog: false,
+    showNewSessionDialog: false
   } as DialogState);
   const [resultState, dispatchResult] = useReducer(resultReducer, {
     selectedResult: 'win',
@@ -205,6 +205,9 @@ export function SessionParticipant() {
       // Save the new session ID
       setNewSessionId(sessionData.newSessionCreatedId);
       
+      // Show dialog for new session
+      dispatchDialog({ type: 'SHOW_NEW_SESSION' });
+      
       // Show notification with link to join the new session
       // Make notification type success but also persist longer for users waking from sleep
       setNotification({
@@ -221,9 +224,6 @@ export function SessionParticipant() {
       
       // Also store the ID in case the user refreshes
       localStorage.setItem('pendingNewSessionId', sessionData.newSessionCreatedId);
-      
-      // NOTE: We've removed the auto-redirect logic from here since it's handled in SessionContext.tsx
-      // through the WebSocket/SSE newSession event. This avoids redundant redirection code.
     }
   }, [sessionData, hasShownNewSessionNotification]);
   
@@ -429,6 +429,13 @@ export function SessionParticipant() {
       <WarningDialog 
         isOpen={dialogState.showWarningDialog}
         onClose={() => dispatchDialog({ type: 'HIDE_WARNING' })}
+      />
+      
+      {/* New Session Dialog */}
+      <NewSessionDialog
+        isOpen={dialogState.showNewSessionDialog}
+        onClose={() => dispatchDialog({ type: 'HIDE_NEW_SESSION' })}
+        onConfirm={joinNewSession}
       />
     </>
   );

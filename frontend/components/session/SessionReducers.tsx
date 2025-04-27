@@ -23,6 +23,7 @@ export interface SessionState {
     showConfirmDialog: boolean;
     showWarningDialog: boolean;
     showDeleteDialog: boolean;
+    showNewSessionDialog: boolean;
   }
   
   export type DialogAction = 
@@ -31,7 +32,9 @@ export interface SessionState {
     | { type: 'SHOW_WARNING' }
     | { type: 'HIDE_WARNING' }
     | { type: 'SHOW_DELETE' }
-    | { type: 'HIDE_DELETE' };
+    | { type: 'HIDE_DELETE' }
+    | { type: 'SHOW_NEW_SESSION' }
+    | { type: 'HIDE_NEW_SESSION' };
   
   export interface ResultState {
     selectedResult: string;
@@ -131,6 +134,16 @@ export interface SessionState {
         return {
           ...state,
           showDeleteDialog: false
+        };
+      case 'SHOW_NEW_SESSION':
+        return {
+          ...state,
+          showNewSessionDialog: true
+        };
+      case 'HIDE_NEW_SESSION':
+        return {
+          ...state,
+          showNewSessionDialog: false
         };
       default:
         return state;
