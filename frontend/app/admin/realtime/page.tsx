@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, Label, Tooltip } from "recharts";
-import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { Notification, NotificationType } from "@/components/ui/notification";
 import { useAuth } from "@/lib/auth-context";
 import { ChartConfig, ChartContainer } from "@/components/ui/chart";
@@ -201,7 +202,9 @@ export default function RealtimeMonitorPage() {
       
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">WebSocket Monitoring</h1>
-        <button
+        <Button
+          variant="outline" 
+          size="sm" 
           onClick={() => {
             setLoading(true);
             fetchStats();
@@ -215,16 +218,11 @@ export default function RealtimeMonitorPage() {
               setNotification(null);
             }, 3000);
           }}
-          className="px-3 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm flex items-center gap-1"
+          className="w-full sm:w-auto"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 2v6h-6"></path>
-            <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
-            <path d="M3 12a9 9 0 0 0 6.7 15L13 21"></path>
-            <path d="M13 21h6v-6"></path>
-          </svg>
+         <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
-        </button>
+        </Button>
       </div>
       
       <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
