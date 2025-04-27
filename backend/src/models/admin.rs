@@ -83,6 +83,71 @@ pub struct AdminSessionResponse {
     pub data: crate::models::session::GameSession,
 }
 
+/// Parameters for sessions query
+#[derive(serde::Deserialize)]
+pub struct AdminSessionsQuery {
+    pub page: Option<u64>,
+    pub limit: Option<u64>,
+    pub status: Option<String>,
+}
+
+
+#[derive(Serialize)]
+pub struct AdminChatResponse {
+    pub messages: Vec<ChatMessageResponseDto>,
+    pub total: usize,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatHistoryParams {
+    pub session_id: Option<String>,
+    pub limit: Option<i64>,
+    pub from_date: Option<String>,
+    pub to_date: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatMessage {
+    sender_id: String,
+    sender_name: String,
+    message: String,
+    timestamp: i64,
+    session_id: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatMessageResponseDto {
+    pub sender_id: String,
+    pub sender_name: String,
+    pub message: String,
+    pub timestamp: i64,
+    pub session_id: String,
+    // Additional user information
+    pub user: Option<UserInfoDto>,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UserInfoDto {
+    pub username: Option<String>,
+    pub display_name: Option<String>,
+    pub email: Option<String>,
+    pub role: Option<String>,
+    pub avatar_url: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteMessagesParams {
+    pub session_id: Option<String>,
+    pub message_id: Option<String>,
+    pub from_date: Option<String>,
+    pub to_date: Option<String>,
+}
+
 // Feature Flag models
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
