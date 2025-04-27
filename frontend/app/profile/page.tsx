@@ -111,9 +111,18 @@ function ProfileContent() {
             <CardContent className="space-y-4 px-4 md:px-6 py-2 md:py-4">
               <Tabs defaultValue="profile" value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="profile">Profile Information</TabsTrigger>
-                  <TabsTrigger value="settings">Personal Settings</TabsTrigger>
-                  <TabsTrigger value="friends">Friends</TabsTrigger>
+                  <TabsTrigger value="profile">
+                    <span className="hidden xs:inline">Profile Information</span>
+                    <span className="xs:hidden">Profile</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="settings">
+                    <span className="hidden xs:inline">Personal Settings</span>
+                    <span className="xs:hidden">Settings</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="friends">
+                    <span className="hidden xs:inline">Friends</span>
+                    <span className="xs:hidden">Friends</span>
+                  </TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="profile" className="space-y-6 pt-4">
