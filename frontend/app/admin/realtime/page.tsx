@@ -3,11 +3,11 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { Loader2 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, Label, Tooltip } from "recharts";
+import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Notification, NotificationType } from "@/components/ui/notification";
 import { useAuth } from "@/lib/auth-context";
-import { ChartConfig, ChartContainer, ChartTooltip } from "@/components/ui/chart";
+import { ChartConfig, ChartContainer } from "@/components/ui/chart";
 
 interface ConnectionsPerHourInfo {
   hour: string;
@@ -47,6 +47,8 @@ export default function RealtimeMonitorPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notification, setNotification] = useState<NotificationType | null>(null);
+  const [sessionPage, setSessionPage] = useState(0); // Current page for session pagination
+  const sessionsPerPage = 5; // Number of sessions to display per page
   const { fetchWithAuth } = useAuth();
   
   const clearNotification = () => setNotification(null);
@@ -130,9 +132,6 @@ export default function RealtimeMonitorPage() {
     );
   }
   
-  // Colors for charts
-  const COLORS = ['#8884d8', '#83a6ed', '#8dd1e1', '#82ca9d', '#a4de6c'];
-  
   // Chart configuration for connections over time
   const connectionsChartConfig = {
     connections: {
@@ -157,6 +156,39 @@ export default function RealtimeMonitorPage() {
     },
   } satisfies ChartConfig;
   
+  // Chart configuration for session distribution
+  const sessionChartConfig = {
+    count: {
+      label: "Connections",
+    },
+    sessionId: {
+      label: "Session",
+    },
+    ...stats?.sessionConnections.reduce((acc, session, index) => {
+      return {
+        ...acc,
+        [session.sessionId]: {
+          label: session.sessionId,
+          color: `hsl(var(--chart-${(index % 5) + 1}))`,
+        }
+      };
+    }, {}) || {},
+  } satisfies ChartConfig;
+  
+  // Calculate total sessions
+  const totalSessions = stats?.sessionConnections.length || 0;
+  
+  // Calculate pagination for sessions
+  const paginatedSessions = stats
+    ? stats.sessionConnections.slice(
+        sessionPage * sessionsPerPage,
+        (sessionPage + 1) * sessionsPerPage
+      )
+    : [];
+  const totalPages = stats
+    ? Math.ceil(stats.sessionConnections.length / sessionsPerPage)
+    : 0;
+
   return (
     <div className="space-y-6">
       {notification && (
@@ -268,24 +300,42 @@ export default function RealtimeMonitorPage() {
                     tick={{ fontSize: 12 }}
                     interval={0}
                   />
-                  <YAxis />
-                  <ChartTooltip
-                    content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null;
-                      return (
-                        <div className="rounded-lg border bg-background px-3 py-1.5 shadow-md">
-                          <p className="text-sm text-muted-foreground">Hour</p>
-                          <p className="font-medium">{payload[0].payload.hour}</p>
-                          <p className="text-sm text-muted-foreground">Connections</p>
-                          <p className="font-medium">{payload[0].value}</p>
-                        </div>
-                      );
+                  <YAxis 
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={10}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <Tooltip
+                    formatter={(value) => [`${value} connections`]}
+                    contentStyle={{ 
+                      backgroundColor: "hsl(var(--background))", 
+                      border: "1px solid hsl(var(--border))", 
+                      borderRadius: "0.5rem", 
+                      padding: "0.75rem",
+                      boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)",
+                      color: "hsl(var(--foreground))",
+                      fontSize: "0.875rem"
                     }}
+                    itemStyle={{
+                      color: "hsl(var(--foreground))",
+                      padding: "0.25rem 0"
+                    }}
+                    labelStyle={{
+                      fontWeight: "600",
+                      color: "hsl(var(--muted-foreground))",
+                      marginBottom: "0.25rem"
+                    }}
+                    wrapperStyle={{
+                      outline: "none"
+                    }}
+                    cursor={{ fill: "hsl(var(--muted) / 0.5)" }}
                   />
                   <Bar 
                     dataKey="count" 
                     name="Connections" 
                     fill="hsl(var(--chart-1))" 
+                    radius={4}
                   />
                 </BarChart>
               </ChartContainer>
@@ -319,19 +369,36 @@ export default function RealtimeMonitorPage() {
                       tick={{ fontSize: 12 }}
                       interval={0}
                     />
-                    <ChartTooltip
-                      cursor={false}
-                      content={({ active, payload }) => {
-                        if (!active || !payload?.length) return null;
-                        return (
-                          <div className="rounded-lg border bg-background px-3 py-1.5 shadow-md">
-                            <p className="text-sm text-muted-foreground">Actor</p>
-                            <p className="font-medium">{payload[0].payload.actor}</p>
-                            <p className="text-sm text-muted-foreground">Queue Size</p>
-                            <p className="font-medium">{payload[0].value}</p>
-                          </div>
-                        );
+                    <YAxis 
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={10}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Tooltip
+                      formatter={(value, name, props) => [`${value} messages`, props.payload.actor]}
+                      contentStyle={{ 
+                        backgroundColor: "hsl(var(--background))", 
+                        border: "1px solid hsl(var(--border))", 
+                        borderRadius: "0.5rem", 
+                        padding: "0.75rem",
+                        boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)",
+                        color: "hsl(var(--foreground))",
+                        fontSize: "0.875rem"
                       }}
+                      itemStyle={{
+                        color: "hsl(var(--foreground))",
+                        padding: "0.25rem 0"
+                      }}
+                      labelStyle={{
+                        fontWeight: "600",
+                        color: "hsl(var(--muted-foreground))",
+                        marginBottom: "0.25rem"
+                      }}
+                      wrapperStyle={{
+                        outline: "none"
+                      }}
+                      cursor={{ fill: "hsl(var(--muted) / 0.5)" }}
                     />
                     <Bar dataKey="rate" fill="hsl(var(--chart-1))" radius={4} />
                   </BarChart>
@@ -368,19 +435,36 @@ export default function RealtimeMonitorPage() {
                       tick={{ fontSize: 12 }}
                       interval={0}
                     />
-                    <ChartTooltip
-                      cursor={false}
-                      content={({ active, payload }) => {
-                        if (!active || !payload?.length) return null;
-                        return (
-                          <div className="rounded-lg border bg-background px-3 py-1.5 shadow-md">
-                            <p className="text-sm text-muted-foreground">Actor</p>
-                            <p className="font-medium">{payload[0].payload.actor}</p>
-                            <p className="text-sm text-muted-foreground">Messages/sec</p>
-                            <p className="font-medium">{payload[0].value}</p>
-                          </div>
-                        );
+                    <YAxis 
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={10}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Tooltip
+                      formatter={(value, name, props) => [`${value} msgs/sec`, props.payload.actor]}
+                      contentStyle={{ 
+                        backgroundColor: "hsl(var(--background))", 
+                        border: "1px solid hsl(var(--border))", 
+                        borderRadius: "0.5rem", 
+                        padding: "0.75rem",
+                        boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)",
+                        color: "hsl(var(--foreground))",
+                        fontSize: "0.875rem"
                       }}
+                      itemStyle={{
+                        color: "hsl(var(--foreground))",
+                        padding: "0.25rem 0"
+                      }}
+                      labelStyle={{
+                        fontWeight: "600",
+                        color: "hsl(var(--muted-foreground))",
+                        marginBottom: "0.25rem"
+                      }}
+                      wrapperStyle={{
+                        outline: "none"
+                      }}
+                      cursor={{ fill: "hsl(var(--muted) / 0.5)" }}
                     />
                     <Bar dataKey="rate" fill="hsl(var(--chart-2))" radius={4} />
                   </BarChart>
@@ -424,33 +508,90 @@ export default function RealtimeMonitorPage() {
         
         <TabsContent value="sessions" className="space-y-4">
           <Card>
-            <CardHeader>
+            <CardHeader className="items-center">
               <CardTitle>Session Distribution</CardTitle>
               <CardDescription>Active connections per session</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="h-[300px] flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ChartContainer
+                    config={sessionChartConfig}
+                    className="mx-auto aspect-square max-h-[300px]"
+                  >
                     <PieChart>
+                      <Tooltip 
+                        formatter={(value, name) => [`${value} connections`, `${name}`]}
+                        contentStyle={{ 
+                          backgroundColor: "hsl(var(--background))", 
+                          border: "1px solid hsl(var(--border))", 
+                          borderRadius: "0.5rem", 
+                          padding: "0.75rem",
+                          boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)",
+                          color: "hsl(var(--foreground))",
+                          fontSize: "0.875rem"
+                        }}
+                        itemStyle={{
+                          color: "hsl(var(--foreground))",
+                          padding: "0.25rem 0"
+                        }}
+                        labelStyle={{
+                          fontWeight: "600",
+                          color: "hsl(var(--muted-foreground))",
+                          marginBottom: "0.25rem"
+                        }}
+                        wrapperStyle={{
+                          outline: "none"
+                        }}
+                      />
                       <Pie
                         data={stats.sessionConnections}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={true}
-                        outerRadius={80}
-                        fill="#8884d8"
                         dataKey="count"
                         nameKey="sessionId"
-                        label={({ sessionId, count }) => `${sessionId}: ${count}`}
+                        innerRadius={60}
+                        outerRadius={80}
+                        stroke="none"
+                        isAnimationActive={false}
                       >
                         {stats.sessionConnections.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={`hsl(var(--chart-${(index % 5) + 1}))`} 
+                          />
                         ))}
+                        <Label
+                          content={({ viewBox }) => {
+                            if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                              return (
+                                <text
+                                  x={viewBox.cx}
+                                  y={viewBox.cy}
+                                  textAnchor="middle"
+                                  dominantBaseline="middle"
+                                >
+                                  <tspan
+                                    x={viewBox.cx}
+                                    y={viewBox.cy}
+                                    className="fill-foreground text-3xl font-bold"
+                                  >
+                                    {totalSessions}
+                                  </tspan>
+                                  <tspan
+                                    x={viewBox.cx}
+                                    y={(viewBox.cy || 0) + 24}
+                                    className="fill-muted-foreground"
+                                  >
+                                    Sessions
+                                  </tspan>
+                                </text>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
                       </Pie>
-                      <Tooltip />
                     </PieChart>
-                  </ResponsiveContainer>
+                  </ChartContainer>
                 </div>
                 
                 <div>
@@ -462,19 +603,55 @@ export default function RealtimeMonitorPage() {
                   </div>
                   
                   <div className="space-y-2">
-                    {stats.sessionConnections.map((session, index) => (
-                      <div key={session.sessionId} className="flex items-center justify-between p-2 bg-card/60 rounded-md border">
-                        <div className="flex items-center">
-                          <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
-                          <span>{session.sessionId}</span>
+                    {paginatedSessions.map((session, index) => {
+                      // Calculate the actual index in the full array
+                      const actualIndex = sessionPage * sessionsPerPage + index;
+                      return (
+                        <div key={session.sessionId} className="flex items-center justify-between p-2 bg-card/60 rounded-md border">
+                          <div className="flex items-center">
+                            <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: `hsl(var(--chart-${(actualIndex % 5) + 1}))` }}></div>
+                            <span>{session.sessionId}</span>
+                          </div>
+                          <span className="font-medium">{session.count} connections</span>
                         </div>
-                        <span className="font-medium">{session.count} connections</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
+                  
+                  {/* Pagination controls */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-4">
+                      <div className="text-sm text-muted-foreground">
+                        Page {sessionPage + 1} of {totalPages}
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => setSessionPage(p => Math.max(0, p - 1))}
+                          disabled={sessionPage === 0}
+                          className="p-1 rounded-md hover:bg-muted disabled:opacity-50"
+                          aria-label="Previous page"
+                        >
+                          <ChevronLeft className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={() => setSessionPage(p => Math.min(totalPages - 1, p + 1))}
+                          disabled={sessionPage === totalPages - 1}
+                          className="p-1 rounded-md hover:bg-muted disabled:opacity-50"
+                          aria-label="Next page"
+                        >
+                          <ChevronRight className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>
+            <CardFooter className="flex-col items-start gap-2 text-sm">
+              <div className="leading-none text-muted-foreground">
+                Showing active connections distributed across all sessions
+              </div>
+            </CardFooter>
           </Card>
         </TabsContent>
       </Tabs>
