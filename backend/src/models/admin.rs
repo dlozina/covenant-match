@@ -91,7 +91,6 @@ pub struct AdminSessionsQuery {
     pub status: Option<String>,
 }
 
-
 #[derive(Serialize, ToSchema)]
 pub struct AdminChatResponse {
     pub messages: Vec<ChatMessageResponseDto>,
@@ -262,6 +261,96 @@ impl From<FeatureFlag> for FeatureFlagApiResponse {
             default_value: flag.default_value,
             created_at,
             updated_at,
+        }
+    }
+}
+
+// WebSocket Stats Response Models
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct WebSocketStatsResponse {
+    pub status: String,
+    pub data: WebSocketStatsData,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct WebSocketStatsData {
+    pub stats: ConnectionStatsResponse,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionStatsResponse {
+    pub current_connections: u32,
+    pub total_connections_today: u32,
+    pub total_messages: u32,
+    pub connections_per_hour: Vec<ConnectionsPerHourResponse>,
+    pub session_connections: Vec<SessionConnectionResponse>,
+    pub mailbox_sizes: Vec<ActorMailboxResponse>,
+    pub message_rates: Vec<ActorMailboxResponse>,
+    pub actor_count: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionsPerHourResponse {
+    pub hour: String,
+    pub count: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionConnectionResponse {
+    pub session_id: String,
+    pub count: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ActorMailboxResponse {
+    pub actor: String,
+    pub rate: u32,
+}
+
+// Implement conversion from ConnectionStats to ConnectionStatsResponse
+impl From<crate::ws::messages::ConnectionStats> for ConnectionStatsResponse {
+    fn from(stats: crate::ws::messages::ConnectionStats) -> Self {
+        Self {
+            current_connections: stats.current_connections,
+            total_connections_today: stats.total_connections_today,
+            total_messages: stats.total_messages,
+            connections_per_hour: stats
+                .connections_per_hour
+                .into_iter()
+                .map(|info| ConnectionsPerHourResponse {
+                    hour: info.hour,
+                    count: info.count,
+                })
+                .collect(),
+            session_connections: stats
+                .session_connections
+                .into_iter()
+                .map(|info| SessionConnectionResponse {
+                    session_id: info.session_id,
+                    count: info.count,
+                })
+                .collect(),
+            mailbox_sizes: stats
+                .mailbox_sizes
+                .into_iter()
+                .map(|info| ActorMailboxResponse {
+                    actor: info.actor,
+                    rate: info.rate,
+                })
+                .collect(),
+            message_rates: stats
+                .message_rates
+                .into_iter()
+                .map(|info| ActorMailboxResponse {
+                    actor: info.actor,
+                    rate: info.rate,
+                })
+                .collect(),
+            actor_count: stats.actor_count,
         }
     }
 }

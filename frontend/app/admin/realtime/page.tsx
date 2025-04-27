@@ -14,7 +14,7 @@ interface ConnectionsPerHourInfo {
 }
 
 interface SessionConnectionInfo {
-  session_id: string;
+  sessionId: string;
   count: number;
 }
 
@@ -24,14 +24,21 @@ interface ActorMailboxInfo {
 }
 
 interface ConnectionStats {
-  current_connections: number;
-  total_connections_today: number;
-  total_messages: number;
-  connections_per_hour: ConnectionsPerHourInfo[];
-  session_connections: SessionConnectionInfo[];
-  mailbox_sizes: ActorMailboxInfo[];
-  message_rates: ActorMailboxInfo[];
-  actor_count: number;
+  currentConnections: number;
+  totalConnectionsToday: number;
+  totalMessages: number;
+  connectionsPerHour: ConnectionsPerHourInfo[];
+  sessionConnections: SessionConnectionInfo[];
+  mailboxSizes: ActorMailboxInfo[];
+  messageRates: ActorMailboxInfo[];
+  actorCount: number;
+}
+
+interface WebSocketStatsResponse {
+  status: string;
+  data: {
+    stats: ConnectionStats;
+  };
 }
 
 export default function RealtimeMonitorPage() {
@@ -47,8 +54,15 @@ export default function RealtimeMonitorPage() {
     try {
       setLoading(true);
       
-      const data = await fetchWithAuth('/api/v1/admin/websocket-stats');
-      setStats(data as ConnectionStats);
+      const response = await fetchWithAuth('/api/v1/admin/websocket-stats');
+      const data = response as WebSocketStatsResponse;
+      
+      if (data.status === "success" && data.data && data.data.stats) {
+        setStats(data.data.stats);
+      } else {
+        throw new Error("Invalid response format");
+      }
+      
       setLoading(false);
     } catch (err) {
       console.error("Error fetching WebSocket stats:", err);
@@ -163,7 +177,7 @@ export default function RealtimeMonitorPage() {
             <CardDescription>Active WebSocket connections</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-bold">{stats.current_connections}</div>
+            <div className="text-4xl font-bold">{stats.currentConnections}</div>
           </CardContent>
         </Card>
         
@@ -173,7 +187,7 @@ export default function RealtimeMonitorPage() {
             <CardDescription>Total connections today</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-bold">{stats.total_connections_today}</div>
+            <div className="text-4xl font-bold">{stats.totalConnectionsToday}</div>
           </CardContent>
         </Card>
         
@@ -183,7 +197,7 @@ export default function RealtimeMonitorPage() {
             <CardDescription>Total messages processed</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-bold">{stats.total_messages}</div>
+            <div className="text-4xl font-bold">{stats.totalMessages}</div>
           </CardContent>
         </Card>
       </div>
@@ -204,7 +218,7 @@ export default function RealtimeMonitorPage() {
             <CardContent className="h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
-                  data={stats.connections_per_hour}
+                  data={stats.connectionsPerHour}
                   margin={{ top: 20, right: 30, left: 20, bottom: 50 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
@@ -241,7 +255,7 @@ export default function RealtimeMonitorPage() {
               <CardContent className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
-                    data={stats.mailbox_sizes}
+                    data={stats.mailboxSizes}
                     margin={{ top: 20, right: 30, left: 20, bottom: 50 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" />
@@ -267,7 +281,7 @@ export default function RealtimeMonitorPage() {
               <CardContent className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
-                    data={stats.message_rates}
+                    data={stats.messageRates}
                     margin={{ top: 20, right: 30, left: 20, bottom: 50 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" />
@@ -294,18 +308,18 @@ export default function RealtimeMonitorPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-card/60 p-4 rounded-lg border">
                     <div className="text-sm text-muted-foreground mb-1">Total Actors</div>
-                    <div className="text-2xl font-semibold">{stats.actor_count}</div>
+                    <div className="text-2xl font-semibold">{stats.actorCount}</div>
                   </div>
                   <div className="bg-card/60 p-4 rounded-lg border">
                     <div className="text-sm text-muted-foreground mb-1">Busiest Actor</div>
                     <div className="text-2xl font-semibold">
-                      {stats.message_rates.sort((a, b) => b.rate - a.rate)[0]?.actor || "N/A"}
+                      {stats.messageRates.sort((a, b) => b.rate - a.rate)[0]?.actor || "N/A"}
                     </div>
                   </div>
                   <div className="bg-card/60 p-4 rounded-lg border">
                     <div className="text-sm text-muted-foreground mb-1">Most Queued</div>
                     <div className="text-2xl font-semibold">
-                      {stats.mailbox_sizes.sort((a, b) => b.rate - a.rate)[0]?.actor || "N/A"}
+                      {stats.mailboxSizes.sort((a, b) => b.rate - a.rate)[0]?.actor || "N/A"}
                     </div>
                   </div>
                 </div>
@@ -326,17 +340,17 @@ export default function RealtimeMonitorPage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={stats.session_connections}
+                        data={stats.sessionConnections}
                         cx="50%"
                         cy="50%"
                         labelLine={true}
                         outerRadius={80}
                         fill="#8884d8"
                         dataKey="count"
-                        nameKey="session_id"
-                        label={({ session_id, count }) => `${session_id}: ${count}`}
+                        nameKey="sessionId"
+                        label={({ sessionId, count }) => `${sessionId}: ${count}`}
                       >
-                        {stats.session_connections.map((entry, index) => (
+                        {stats.sessionConnections.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
@@ -354,11 +368,11 @@ export default function RealtimeMonitorPage() {
                   </div>
                   
                   <div className="space-y-2">
-                    {stats.session_connections.map((session, index) => (
-                      <div key={session.session_id} className="flex items-center justify-between p-2 bg-card/60 rounded-md border">
+                    {stats.sessionConnections.map((session, index) => (
+                      <div key={session.sessionId} className="flex items-center justify-between p-2 bg-card/60 rounded-md border">
                         <div className="flex items-center">
                           <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
-                          <span>{session.session_id}</span>
+                          <span>{session.sessionId}</span>
                         </div>
                         <span className="font-medium">{session.count} connections</span>
                       </div>

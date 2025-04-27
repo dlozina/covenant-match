@@ -1,8 +1,11 @@
 use crate::models::admin::{
-    AdminDashboardStats, AdminSessionResponse, AdminSessionsData, AdminSessionsPaginationResponse,
-    AdminSessionsResponse, CreateFeatureFlagDto, DashboardStatsResponse, FeatureFlag,
-    FeatureFlagApiResponse, FeatureFlagData, FeatureFlagResponse, FeatureFlagsData,
-    FeatureFlagsResponse, MemoryUsage, PatchFeatureFlagDto, SystemInfo, SystemStatusResponse, AdminChatResponse
+    ActorMailboxResponse, AdminChatResponse, AdminDashboardStats, AdminSessionResponse,
+    AdminSessionsData, AdminSessionsPaginationResponse, AdminSessionsResponse,
+    ConnectionStatsResponse, ConnectionsPerHourResponse, CreateFeatureFlagDto,
+    DashboardStatsResponse, FeatureFlag, FeatureFlagApiResponse, FeatureFlagData,
+    FeatureFlagResponse, FeatureFlagsData, FeatureFlagsResponse, MemoryUsage, PatchFeatureFlagDto,
+    SessionConnectionResponse, SystemInfo, SystemStatusResponse, WebSocketStatsData,
+    WebSocketStatsResponse,
 };
 use crate::models::chat::ChatMessage;
 use crate::models::common::{LimitQuery, PaginationQuery};
@@ -241,6 +244,13 @@ use utoipa::{
             AdminSessionsPaginationResponse,
             AdminSessionsData,
             AdminChatResponse,
+            // WebSocket Stats models
+            WebSocketStatsResponse,
+            WebSocketStatsData,
+            ConnectionStatsResponse,
+            ConnectionsPerHourResponse,
+            SessionConnectionResponse,
+            ActorMailboxResponse,
             // Feature Flag models
             FeatureFlag,
             FeatureFlagApiResponse,

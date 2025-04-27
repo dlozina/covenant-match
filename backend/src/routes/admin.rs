@@ -666,7 +666,7 @@ async fn get_feature_flag_value(
     get,
     path = "/api/v1/admin/websocket-stats",
     responses(
-        (status = 200, description = "WebSocket statistics retrieved successfully", body = ConnectionStats),
+        (status = 200, description = "WebSocket statistics retrieved successfully", body = WebSocketStatsResponse),
         (status = 401, description = "Unauthorized"),
         (status = 403, description = "Forbidden - requires admin role"),
         (status = 500, description = "Internal server error")
@@ -691,7 +691,16 @@ async fn get_websocket_stats(
 
     // Get stats from the session manager
     match session_manager.send(GetConnectionStats).await {
-        Ok(stats) => HttpResponse::Ok().json(stats),
+        Ok(stats) => {
+            // Convert to our API response format
+            let response = crate::models::admin::WebSocketStatsResponse {
+                status: "success".to_string(),
+                data: crate::models::admin::WebSocketStatsData {
+                    stats: crate::models::admin::ConnectionStatsResponse::from(stats),
+                },
+            };
+            HttpResponse::Ok().json(response)
+        }
         Err(e) => {
             log::error!("Error fetching WebSocket stats: {:?}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
