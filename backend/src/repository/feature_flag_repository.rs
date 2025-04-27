@@ -228,9 +228,7 @@ pub async fn update_partial(
 
     // Create update document with only the fields that are provided
     let now = mongodb::bson::DateTime::now();
-    let mut update_doc = doc! {
-        "updated_at": now
-    };
+    let mut update_doc = doc! {};
 
     if let Some(name) = &patch.name {
         update_doc.insert("name", name);
@@ -247,6 +245,9 @@ pub async fn update_partial(
     if let Some(default_value) = patch.default_value {
         update_doc.insert("default_value", default_value);
     }
+
+    // Always update the updated_at field
+    update_doc.insert("updated_at", now);
 
     let update = doc! {
         "$set": update_doc
