@@ -319,24 +319,13 @@ export function AdminUsersClient() {
   const renderUserList = () => {
     if (isLoading) {
       return (
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <Skeleton className="h-10 w-1/3" />
-            <Skeleton className="h-10 w-32" />
-          </div>
-          <div className="border rounded-md">
-            <div className="p-4">
-              {Array.from({ length: 5 }).map((_, index) => (
-                <div key={index} className="flex items-center justify-between py-2">
-                  <Skeleton className="h-6 w-2/3" />
-                  <div className="flex space-x-2">
-                    <Skeleton className="h-8 w-8" />
-                    <Skeleton className="h-8 w-8" />
-                  </div>
-                </div>
-              ))}
+        <div className="space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex flex-col gap-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
             </div>
-          </div>
+          ))}
         </div>
       );
     }
@@ -400,31 +389,8 @@ export function AdminUsersClient() {
         </div>
 
         {users.length === 0 ? (
-          <div className="text-center py-10 border rounded-md">
-            <Users className="h-10 w-10 mx-auto text-muted-foreground" />
-            <p className="mt-2 text-muted-foreground">No users found</p>
-            {searchQuery && (
-              <div className="mt-4">
-                <p className="text-sm text-muted-foreground">No results for search: &quot;{searchQuery}&quot;</p>
-                <Button 
-                  variant="link" 
-                  size="sm" 
-                  onClick={() => {
-                    setSearchQuery("");
-                    loadUsers(1, pagination.limit, currentRole);
-                  }}
-                  className="mt-2"
-                >
-                  Clear search
-                </Button>
-              </div>
-            )}
-            {pagination.total > 0 && (
-              <div className="mt-4 text-sm text-muted-foreground">
-                <p>Total users: {pagination.total}</p>
-                <p>Page {pagination.page} of {pagination.total_pages}</p>
-              </div>
-            )}
+          <div className="p-6 border rounded-lg">
+            <p className="text-center text-muted-foreground">No users found</p>
           </div>
         ) : (
           <div>
@@ -484,58 +450,28 @@ export function AdminUsersClient() {
             </Table>
 
             {pagination.total_pages > 1 && (
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-4 p-4 border rounded-md bg-muted/30">
-                <div className="text-sm text-muted-foreground">
-                  <p>Showing {users.length} of {pagination.total} users</p>
-                  <p className="mt-1">Page <span className="font-semibold">{pagination.page}</span> of {pagination.total_pages} ({pagination.limit} per page)</p>
+              <div className="flex items-center justify-between mt-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    Page {pagination.page} of {pagination.total_pages}
+                  </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(1)}
-                    disabled={pagination.page === 1}
-                  >
-                    First
-                  </Button>
+                <div className="flex space-x-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handlePageChange(pagination.page - 1)}
-                    disabled={pagination.page === 1}
+                    disabled={pagination.page <= 1}
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-                  <Select 
-                    value={pagination.page.toString()} 
-                    onValueChange={(value) => handlePageChange(parseInt(value))}
-                  >
-                    <SelectTrigger className="w-16 h-8">
-                      <SelectValue placeholder={pagination.page.toString()} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: pagination.total_pages }, (_, i) => i + 1).map((page) => (
-                        <SelectItem key={page} value={page.toString()}>
-                          {page}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handlePageChange(pagination.page + 1)}
-                    disabled={pagination.page === pagination.total_pages}
+                    disabled={pagination.page >= pagination.total_pages}
                   >
                     <ChevronRight className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(pagination.total_pages)}
-                    disabled={pagination.page === pagination.total_pages}
-                  >
-                    Last
                   </Button>
                 </div>
               </div>
@@ -867,7 +803,17 @@ export function AdminUsersClient() {
         </TabsList>
         
         <TabsContent value="users-list" className="mt-6">
-          {renderUserList()}
+          <Card>
+            <CardHeader>
+              <CardTitle>User Management</CardTitle>
+              <CardDescription>
+                View and manage all users on the platform
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {renderUserList()}
+            </CardContent>
+          </Card>
         </TabsContent>
         
         <TabsContent value="create-user" className="mt-6">
