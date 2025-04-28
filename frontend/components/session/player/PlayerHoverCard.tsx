@@ -2,7 +2,7 @@ import React from 'react';
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { UserStats } from '@/utils/api';
 import { Card, CardContent } from "@/components/ui/card";
-import { Shield, Swords, Trophy } from 'lucide-react';
+import { Shield, Swords, Trophy, Info } from 'lucide-react';
 
 interface PlayerHoverCardProps {
   player: {
@@ -26,10 +26,16 @@ export const PlayerHoverCard: React.FC<PlayerHoverCardProps> = ({
   return (
     <HoverCard>
       <HoverCardTrigger asChild>
-        {children}
+        <div className="group relative inline-flex items-center">
+          {children}
+          <span className="ml-1.5 text-muted-foreground/50 group-hover:text-primary transition-colors sm:hidden">
+            <Info size={14} />
+          </span>
+          <span className="hidden absolute -bottom-0.5 left-0 right-0 h-0.5 bg-primary origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-200 sm:block"></span>
+        </div>
       </HoverCardTrigger>
-      <HoverCardContent className="w-80">
-        <Card className="border-0 shadow-none">
+      <HoverCardContent side="top" align="start" className="w-80 p-0">
+        <Card className="border-0 shadow-none w-full">
           <CardContent className="p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div>
