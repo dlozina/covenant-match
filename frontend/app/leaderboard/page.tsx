@@ -158,6 +158,9 @@ function LeaderboardContent() {
                     ))}
                   </tbody>
                 </table>
+                <div className="mt-3 text-xs text-muted-foreground italic text-center">
+                  Score = (Wins ÷ Total Games) × (1 + Activity Bonus) | Activity Bonus = 0.02
+                </div>
               </div>
             ) : (
               <div className="py-12 text-center text-muted-foreground">
@@ -230,6 +233,9 @@ function LeaderboardContent() {
                     })}
                   </tbody>
                 </table>
+                <div className="mt-3 text-xs text-muted-foreground italic text-center">
+                  Score = (Wins ÷ Total Games) × (1 + Activity Bonus) | Activity Bonus = 0.02
+                </div>
               </div>
             ) : (
               <div className="py-12 text-center text-muted-foreground">
