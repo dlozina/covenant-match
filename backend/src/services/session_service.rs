@@ -1336,6 +1336,128 @@ pub async fn get_friends_sessions(
     Ok(sessions.into_iter().map(SessionResponseDto::from).collect())
 }
 
+/// Kick a player from a session (host only)
+pub async fn kick_player(
+    db: &Database,
+    session_id: &str,
+    user_id: &str,
+    player_id: &str,
+) -> Result<(), AppError> {
+    // Find the session
+    let session = match session_repository::find_by_id(db, session_id).await? {
+        Some(session) => session,
+        None => return Err(AppError::SessionNotFound),
+    };
+
+    // Verify the requestor is the host
+    if session.host_id != user_id {
+        return Err(AppError::Forbidden(
+            "Only the host can kick players from the session".to_string(),
+        ));
+    }
+
+    // Verify session is not InProgress
+    if session.status == SessionStatus::InProgress {
+        return Err(AppError::BadRequest(
+            "Cannot kick players from a session that is in progress".to_string(),
+        ));
+    }
+
+    // Verify the player is in the session
+    let player_index = session
+        .joined_players
+        .iter()
+        .position(|player| player.user_id == player_id)
+        .ok_or_else(|| AppError::BadRequest("Player not found in this session".to_string()))?;
+
+    // Get player details before we remove them for the WebSocket event
+    let player = &session.joined_players[player_index];
+
+    // Verify we're not kicking the host (should never happen but check anyway)
+    if player_id == session.host_id {
+        return Err(AppError::BadRequest(
+            "Cannot kick the host from their own session".to_string(),
+        ));
+    }
+
+    // Update the session by removing the player
+    let collection = db.collection::<GameSession>("sessions");
+    let object_id =
+        mongodb::bson::oid::ObjectId::parse_str(session_id).map_err(|_| AppError::InvalidId)?;
+
+    // Pull the player from the session's joined_players array
+    collection
+        .update_one(
+            mongodb::bson::doc! { "_id": object_id },
+            mongodb::bson::doc! {
+                "$pull": {
+                    "joined_players": { "user_id": player_id }
+                }
+            },
+        )
+        .await
+        .map_err(|e| {
+            log::error!("Error removing player from session: {:?}", e);
+            AppError::InternalError("Failed to remove player from session".to_string())
+        })?;
+
+    // If session status was Full and now has an open slot, update status to Open
+    let updated_session = match session_repository::find_by_id(db, session_id).await? {
+        Some(session) => session,
+        None => return Ok(()), // Session might have been deleted in the meantime
+    };
+
+    if updated_session.status == SessionStatus::Full && updated_session.joined_players.len() < 3 {
+        collection
+            .update_one(
+                mongodb::bson::doc! { "_id": object_id },
+                mongodb::bson::doc! {
+                    "$set": {
+                        "status": "Open"
+                    }
+                },
+            )
+            .await
+            .map_err(|e| {
+                log::error!("Error updating session status: {:?}", e);
+                AppError::InternalError("Failed to update session status".to_string())
+            })?;
+    }
+
+    // Send WebSocket event to notify all clients about the kicked player
+    let host_username = session
+        .joined_players
+        .iter()
+        .find(|p| p.user_id == session.host_id)
+        .map(|p| p.username.clone())
+        .unwrap_or_else(|| "Host".to_string());
+
+    // Event for the kicked player
+    let kick_data = serde_json::json!({
+        "session_id": session_id,
+        "player_id": player_id,
+        "username": player.username,
+        "host_username": host_username,
+        "timestamp": chrono::Utc::now().timestamp()
+    });
+
+    // For player-specific kick notification
+    broadcast_event(session_id, "player_kicked", kick_data, None);
+
+    // For session update notification to all clients (including the host)
+    let update_data = serde_json::json!({
+        "session_id": session_id,
+        "action": "player_removed",
+        "player_id": player_id,
+        "username": player.username
+    });
+
+    broadcast_event(session_id, "session_update", update_data, None);
+
+    // Return success
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

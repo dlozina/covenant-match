@@ -39,6 +39,7 @@ import {
 
 import { SessionService } from "@/utils/api/session-service";
 import { fetchNightLords } from "@/utils/api";
+import { Notification, NotificationType } from "@/components/ui/notification";
 
 type StatusFilter = "All" | "Open" | "InProgress" | "Completed";
 type FriendFilter = "All" | "Friends";
@@ -59,11 +60,50 @@ export default function SessionsPage() {
   const [nightLords, setNightLords] = useState<NightLord[]>([]);
   const [isLoadingNightLords, setIsLoadingNightLords] = useState(false);
   const [shouldFetch, setShouldFetch] = useState(false); // Single flag to control fetching
+  const [notification, setNotification] = useState<NotificationType | null>(null);
   const limit = 10;
   
   // Get user region and platform data for API calls
   const userRegion = userData?.autoRegion ? userData.cmRegion : userData?.region;
   const userPlatform = userData?.platform;
+
+  // Check for kick notification
+  useEffect(() => {
+    const wasPlayerKicked = sessionStorage.getItem('playerKicked');
+    if (wasPlayerKicked === 'true') {
+      // Get details if available
+      const hostUsername = sessionStorage.getItem('kickedByHost') || 'Host';
+      const kickTimestamp = sessionStorage.getItem('kickTimestamp');
+      
+      // Only show notification if it was stored recently (within the last 30 seconds)
+      const now = Date.now();
+      const isRecentKick = kickTimestamp && 
+                           (now - parseInt(kickTimestamp, 10)) < 30000;
+      
+      if (isRecentKick) {
+        setNotification({
+          message: `You were kicked from the session by ${hostUsername}`,
+          type: "warning"
+        });
+        
+        // Clear the notification after 5 seconds
+        setTimeout(() => {
+          setNotification(null);
+        }, 5000);
+      }
+      
+      // Clear kick data
+      sessionStorage.removeItem('playerKicked');
+      sessionStorage.removeItem('kickedByHost');
+      sessionStorage.removeItem('kickedSessionId');
+      sessionStorage.removeItem('kickTimestamp');
+    }
+  }, []);
+  
+  // Function to dismiss notification
+  const dismissNotification = useCallback(() => {
+    setNotification(null);
+  }, []);
 
   // Fetch Night Lords on component mount
   useEffect(() => {
@@ -267,6 +307,15 @@ export default function SessionsPage() {
   return (
     <MainLayout footer={<Footer />}>
       <div className="container py-6 md:py-10 px-4 sm:px-6 md:px-8 mx-auto">
+        {/* Notification component */}
+        {notification && (
+          <Notification 
+            notification={notification}
+            onDismiss={dismissNotification}
+            className="mb-4"
+          />
+        )}
+        
         <h1 className="text-2xl md:text-3xl font-bold mb-3 md:mb-6">Available Sessions</h1>
         <p className="mb-6 md:mb-8 text-sm md:text-base text-muted-foreground">Join a session or create your own to start playing with other Nightreign enthusiasts.</p>
         

@@ -314,6 +314,60 @@ export class SessionService {
       throw error;
     }
   }
+
+  /**
+   * Cancel a session
+   * @param sessionId Session ID
+   */
+  async cancelSession(sessionId: string): Promise<void> {
+    try {
+      await this.client.post<void>(
+        `/api/v1/sessions/${sessionId}/cancel`,
+        {},
+        true
+      );
+    } catch (error) {
+      throw error;
+    }
+  }
+  
+  /**
+   * Kick a player from a session
+   * @param sessionId Session ID
+   * @param playerId ID of the player to kick
+   */
+  async kickPlayer(sessionId: string, playerId: string): Promise<void> {
+    try {
+      await this.client.post<void>(
+        `/api/v1/sessions/${sessionId}/kick/${playerId}`,
+        {},
+        true
+      );
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Kick a player from a session (static method)
+   * @param sessionId Session ID
+   * @param playerId ID of the player to kick
+   * @returns Promise that resolves when the player is successfully kicked
+   */
+  static async kickPlayer(sessionId: string, playerId: string): Promise<void> {
+    try {
+      await httpClient.post<void>(
+        `/api/v1/sessions/${sessionId}/kick/${playerId}`,
+        {},
+        true
+      );
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to kick player', 500);
+    }
+  }
 }
 
 // Export a singleton instance

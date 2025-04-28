@@ -23,7 +23,10 @@ use crate::models::session::{
     MinimalSessionDto, PlayerInfo, RateSessionDto, ResultsResponseDto, SessionResponseDto,
     SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto,
 };
-use crate::models::statistics::{LeaderboardEntryResponseDto, Stats, UserStatistics, NightLordStatsResponse, PaginatedSessionData, PaginatedSessionResponse, SessionHistoryResponse};
+use crate::models::statistics::{
+    LeaderboardEntryResponseDto, NightLordStatsResponse, PaginatedSessionData,
+    PaginatedSessionResponse, SessionHistoryResponse, Stats, UserStatistics,
+};
 use crate::models::user::{
     AddFriendDto, AuthResponse, CreateUserDto, FriendDto, FriendListResponse, GetUsersQuery,
     LoginUserDto, PaginationInfo, RefreshTokenResponse, RemoveFriendDto, UpdateUserDto,
@@ -34,8 +37,8 @@ use crate::routes::users::{JwtInfoDto, TokenInfoResponse};
 use crate::sse::messages::{ServerMessage, SessionInfo, SseSessionStatus};
 
 use crate::routes::{
-    admin::*, game_data::*, health::*, news::*, sessions::*, sse::*, statistics::*, user_data::*,
-    users::*, ws::*, chat::*,
+    admin::*, chat::*, game_data::*, health::*, news::*, sessions::*, sse::*, statistics::*,
+    user_data::*, users::*, ws::*,
 };
 
 // Import SSE models
@@ -114,6 +117,7 @@ use utoipa::{
         get_user_active_session,
         get_friends_sessions,
         reset_session_flags,
+        kick_player,
         // Game data routes
         get_game_data,
         get_platforms,

@@ -613,7 +613,7 @@ async fn get_multiple_users_statistics(
                             wins: stats.wins,
                             losses: stats.losses,
                             win_rate: stats.win_rate,
-                            score: stats.reputation_score,
+                            score: stats.score,
                         });
                     }
                     Ok(None) => {

@@ -71,6 +71,8 @@ interface SessionContextType {
   handleFinishSession: () => void;
   // Added for manual updates of session data
   updatePlayerReportedStatus: (userId: string, hasReported: boolean) => void;
+  // Added for refreshing session data
+  refreshSession: () => Promise<void>;
   // WebSocket methods using compatible types
   subscribe: (eventType: string, handler: (data: unknown) => void) => (() => void);
   isConnected: () => boolean;
@@ -96,6 +98,7 @@ export const SessionContext = createContext<SessionContextType>({
   startSession: () => {},
   handleFinishSession: () => {},
   updatePlayerReportedStatus: () => {},
+  refreshSession: async () => {},
   subscribe: () => () => {},
   isConnected: () => false,
   sendMessage: () => false,
@@ -301,12 +304,144 @@ export function SessionEventManager({
     }
   }, [sessionState.elapsedSeconds, sessionId, sessionData, fetchWithAuth]);
   
-  // Fetch session data on mount -> Important to do this first
-  // Important when device wakes from sleep mode ex. when user returns to tab, iPad, iPhone etc.
-  useEffect(() => {
+  // Function to fetch session data - define it at component level and memoize
+  const fetchSessionData = useCallback(async () => {
     if (!sessionId) {
       setIsLoading(false);
       setError("Invalid session ID");
+      return;
+    }
+    
+    try {
+      // Skip if we've fetched very recently (within 10 seconds)
+      const now = Date.now();
+      const lastFetchTime = lastSyncTimeRef.current;
+      if (lastFetchTime && now - lastFetchTime < 10000) {
+        console.log('Skipping session fetch - last fetch was less than 10 seconds ago');
+        return;
+      }
+      
+      setIsLoading(true);
+      setError(null);
+
+      // Update last sync time
+      lastSyncTimeRef.current = now;
+      
+      // Use fetchWithAuth to ensure token is valid
+      const data = await fetchWithAuth<SessionData>(`/api/v1/sessions/${sessionId}`);
+      
+      // Ensure proper initialization of hasReported flag for all players
+      if (data && data.joinedPlayers) {
+        data.joinedPlayers.forEach((player: JoinedPlayer) => {
+          // Make sure hasReported is explicitly set to false if not provided by API
+          if (player.hasReported === undefined) {
+            player.hasReported = false;
+          }
+        });
+      }
+      
+      // If we have local storage pendingNewSessionId and we're on that session page now,
+      // clear it to prevent recreation notification issues
+      const pendingSessionId = localStorage.getItem('pendingNewSessionId');
+      if (pendingSessionId && pendingSessionId === sessionId) {
+        localStorage.removeItem('pendingNewSessionId');
+      }
+      
+      // Compare with current state and update accordingly
+      setSessionData(prevData => {
+        if (!prevData) return data;
+        
+        // If status has changed or joinedPlayers count changed
+        const statusChanged = prevData.status !== data.status;
+        const playersChanged = prevData.joinedPlayers.length !== data.joinedPlayers.length;
+        const resultsChanged = (prevData.results?.length || 0) !== (data.results?.length || 0);
+        
+        // Check if there are more substantive changes
+        const startedChanged = prevData.startedAt !== data.startedAt;
+        const completedChanged = prevData.completedAt !== data.completedAt;
+        
+        // If changes detected, apply all updates from server
+        if (statusChanged || playersChanged || resultsChanged || startedChanged || completedChanged) {
+          console.log('Session state refreshed from server - detected changes');
+          
+          // After state update, notify any chat handlers that should update
+          // Only trigger chat sync for meaningful changes
+          setTimeout(() => {
+            Object.entries(visibilityHandlersRef.current).forEach(([id, handler]) => {
+              if (id.includes('chat_sync')) {
+                console.log(`Syncing chat handler ${id} after meaningful session update`);
+                try {
+                  handler();
+                } catch (e) {
+                  console.error(`Error in chat sync handler ${id}:`, e);
+                }
+              }
+            });
+          }, 100);
+          
+          // If session went from not started to started, update local state
+          if (!prevData.startedAt && data.startedAt && data.status === 'InProgress') {
+            dispatchSession({ type: 'START_SESSION' });
+            const startTime = new Date(data.startedAt).getTime();
+            sessionStartTimeRef.current = startTime;
+            lastSyncTimeRef.current = startTime;
+            storageUtils.saveSessionStart(startTime, sessionId);
+          }
+          
+          // If session went from not finished to finished, update local state
+          if (!prevData.completedAt && data.completedAt && data.status === 'Completed') {
+            // Calculate elapsed time based on server timestamps if possible
+            let calculatedDuration = sessionState.elapsedSeconds;
+            if (data.startedAt && data.completedAt) {
+              try {
+                const startTime = new Date(data.startedAt).getTime();
+                const endTime = new Date(data.completedAt).getTime();
+                if (!isNaN(startTime) && !isNaN(endTime) && endTime > startTime) {
+                  calculatedDuration = Math.floor((endTime - startTime) / 1000);
+                  console.log(`Calculated session duration from server timestamps: ${calculatedDuration}s`);
+                }
+              } catch (e) {
+                console.error('Error calculating duration from timestamps:', e);
+              }
+            }
+            
+            dispatchSession({ type: 'FINISH_SESSION', payload: calculatedDuration });
+            storageUtils.saveSessionFinish(calculatedDuration);
+          }
+          
+          // Make sure players' hasReported flags are properly synced with results
+          const updatedData = { ...data };
+          
+          // Only process if the session has results
+          if (data.results && data.results.length > 0) {
+            // Create a set of user IDs who have reported results for quick lookup
+            const reportedUserIds = new Set(data.results.map(result => result.userId));
+            
+            // Update the hasReported flag for each player based on results
+            updatedData.joinedPlayers = data.joinedPlayers.map(player => ({
+              ...player,
+              hasReported: reportedUserIds.has(player.userId)
+            }));
+          }
+          
+          return {
+            ...updatedData,
+            _version: Date.now() // Force re-render
+          };
+        }
+        
+        return prevData;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sessionId, fetchWithAuth, sessionState.elapsedSeconds]);
+  
+  // Fetch session data on mount and when visibility changes
+  useEffect(() => {
+    if (!sessionId) {
       return;
     }
     
@@ -324,135 +459,6 @@ export function SessionEventManager({
         sessionStorage.removeItem('cancelledSessionId');
       }
     }
-    
-    // Function to fetch session data
-    const fetchSessionData = async () => {
-      try {
-        // Skip if we've fetched very recently (within 10 seconds)
-        const now = Date.now();
-        const lastFetchTime = lastSyncTimeRef.current;
-        if (lastFetchTime && now - lastFetchTime < 10000) {
-          console.log('Skipping session fetch - last fetch was less than 10 seconds ago');
-          return;
-        }
-        
-        setIsLoading(true);
-        setError(null);
-
-        // Update last sync time
-        lastSyncTimeRef.current = now;
-        
-        // Use fetchWithAuth to ensure token is valid
-        const data = await fetchWithAuth<SessionData>(`/api/v1/sessions/${sessionId}`);
-        
-        // Ensure proper initialization of hasReported flag for all players
-        if (data && data.joinedPlayers) {
-          data.joinedPlayers.forEach((player: JoinedPlayer) => {
-            // Make sure hasReported is explicitly set to false if not provided by API
-            if (player.hasReported === undefined) {
-              player.hasReported = false;
-            }
-          });
-        }
-        
-        // If we have local storage pendingNewSessionId and we're on that session page now,
-        // clear it to prevent recreation notification issues
-        const pendingSessionId = localStorage.getItem('pendingNewSessionId');
-        if (pendingSessionId && pendingSessionId === sessionId) {
-          localStorage.removeItem('pendingNewSessionId');
-        }
-        
-        // Compare with current state and update accordingly
-        setSessionData(prevData => {
-          if (!prevData) return data;
-          
-          // If status has changed or joinedPlayers count changed
-          const statusChanged = prevData.status !== data.status;
-          const playersChanged = prevData.joinedPlayers.length !== data.joinedPlayers.length;
-          const resultsChanged = (prevData.results?.length || 0) !== (data.results?.length || 0);
-          
-          // Check if there are more substantive changes
-          const startedChanged = prevData.startedAt !== data.startedAt;
-          const completedChanged = prevData.completedAt !== data.completedAt;
-          
-          // If changes detected, apply all updates from server
-          if (statusChanged || playersChanged || resultsChanged || startedChanged || completedChanged) {
-            console.log('Session state refreshed from server - detected changes');
-            
-            // After state update, notify any chat handlers that should update
-            // Only trigger chat sync for meaningful changes
-            setTimeout(() => {
-              Object.entries(visibilityHandlersRef.current).forEach(([id, handler]) => {
-                if (id.includes('chat_sync')) {
-                  console.log(`Syncing chat handler ${id} after meaningful session update`);
-                  try {
-                    handler();
-                  } catch (e) {
-                    console.error(`Error in chat sync handler ${id}:`, e);
-                  }
-                }
-              });
-            }, 100);
-            
-            // If session went from not started to started, update local state
-            if (!prevData.startedAt && data.startedAt && data.status === 'InProgress') {
-              dispatchSession({ type: 'START_SESSION' });
-              const startTime = new Date(data.startedAt).getTime();
-              sessionStartTimeRef.current = startTime;
-              lastSyncTimeRef.current = startTime;
-              storageUtils.saveSessionStart(startTime, sessionId);
-            }
-            
-            // If session went from not finished to finished, update local state
-            if (!prevData.completedAt && data.completedAt && data.status === 'Completed') {
-              // Calculate elapsed time based on server timestamps if possible
-              let calculatedDuration = sessionState.elapsedSeconds;
-              if (data.startedAt && data.completedAt) {
-                try {
-                  const startTime = new Date(data.startedAt).getTime();
-                  const endTime = new Date(data.completedAt).getTime();
-                  if (!isNaN(startTime) && !isNaN(endTime) && endTime > startTime) {
-                    calculatedDuration = Math.floor((endTime - startTime) / 1000);
-                    console.log(`Calculated session duration from server timestamps: ${calculatedDuration}s`);
-                  }
-                } catch (e) {
-                  console.error('Error calculating duration from timestamps:', e);
-                }
-              }
-              
-              dispatchSession({ type: 'FINISH_SESSION', payload: calculatedDuration });
-              storageUtils.saveSessionFinish(calculatedDuration);
-            }
-            
-            // Make sure players' hasReported flags are properly synced with results
-            const updatedData = { ...data };
-            
-            // Only process if the session has results
-            if (data.results && data.results.length > 0) {
-              // Create a set of user IDs who have reported results for quick lookup
-              const reportedUserIds = new Set(data.results.map(result => result.userId));
-              
-              // Update the hasReported flag for each player based on results
-              updatedData.joinedPlayers = data.joinedPlayers.map(player => ({
-                ...player,
-                hasReported: reportedUserIds.has(player.userId)
-              }));
-            }
-            
-            return {
-              ...updatedData,
-              _version: Date.now() // Force re-render
-            };
-          }
-          
-          return prevData;
-        });
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
-      } finally {
-        setIsLoading(false);
-      }
-    };
     
     // Initial fetch
     fetchSessionData();
@@ -504,7 +510,7 @@ export function SessionEventManager({
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [sessionId, fetchWithAuth, isConnected, reconnectWithFreshToken, sessionState.elapsedSeconds]);
+  }, [sessionId, fetchSessionData]);
   
   // Set up event subscriptions
   useEffect(() => {
@@ -817,6 +823,76 @@ export function SessionEventManager({
       }
     });
     
+    // Subscribe to session update events
+    const unsubscribeSessionUpdate = subscribe('session_update', (data) => {
+      if (!data || typeof data !== 'object') return;
+      
+      // Type assertion for TypeScript
+      const updateData = data as Record<string, unknown>;
+      
+      // Handle different types of session updates
+      const action = String(updateData.action || '');
+      
+      if (action === 'player_removed') {
+        // Handle player removal (kick or leave)
+        const removedPlayerId = String(updateData.player_id || '');
+        
+        if (removedPlayerId) {
+          console.log(`Player removed from session: ${removedPlayerId}`);
+          
+          // Update sessionData to remove the player
+          setSessionData(prevData => {
+            if (!prevData) return null;
+            
+            // Create new player list without the removed player
+            const updatedPlayers = prevData.joinedPlayers.filter(
+              player => player.userId !== removedPlayerId
+            );
+            
+            // If host was viewing the removed player's state, update local state
+            return {
+              ...prevData,
+              joinedPlayers: updatedPlayers,
+              _version: Date.now() // Force re-render
+            };
+          });
+          
+          // Update timestamp to force re-render
+          setLastEventTimestamp(Date.now());
+        }
+      } else if (action === 'player_joined') {
+        // Refresh session data from server to get the complete player info
+        fetchSessionData();
+      } else if (action === 'session_status_updated') {
+        // Refresh session data for status changes
+        fetchSessionData();
+      }
+    });
+    
+    // Subscribe to player kicked events
+    const unsubscribePlayerKicked = subscribe('player_kicked', (data) => {
+      if (!data || typeof data !== 'object') return;
+      
+      // Type assertion for TypeScript
+      const kickData = data as Record<string, unknown>;
+      
+      // Only handle the kick event for the current user
+      const kickedPlayerId = String(kickData.player_id || '');
+      if (userData?.id && kickedPlayerId === userData.id) {
+        // Create kick notification
+        const hostUsername = String(kickData.host_username || 'Host');
+        
+        // Set session storage flag to show notification on redirect
+        sessionStorage.setItem('playerKicked', 'true');
+        sessionStorage.setItem('kickedByHost', hostUsername);
+        sessionStorage.setItem('kickedSessionId', sessionId);
+        sessionStorage.setItem('kickTimestamp', String(Date.now()));
+        
+        // Navigate to sessions page
+        router.push('/sessions');
+      }
+    });
+    
     // Check connection status periodically
     const statusInterval = setInterval(() => {
       setRtConnected(isConnected());
@@ -831,6 +907,8 @@ export function SessionEventManager({
       unsubscribeCancel();
       unsubscribeLeave();
       unsubscribeNewSession();
+      unsubscribeSessionUpdate();
+      unsubscribePlayerKicked();
       clearInterval(statusInterval);
       
       // Disconnect when component unmounts
@@ -845,7 +923,8 @@ export function SessionEventManager({
     sessionState.elapsedSeconds,
     disconnect,
     isHost,
-    router
+    router,
+    userData?.id
   ]);
   
   // Handle heartbeat events
@@ -960,7 +1039,8 @@ export function SessionEventManager({
     unregisterVisibilityHandler: (id: string) => {
       console.log(`Unregistering visibility handler ${id}`);
       delete visibilityHandlersRef.current[id];
-    }
+    },
+    refreshSession: fetchSessionData
   }), [
     sessionData,
     isLoading,
@@ -978,7 +1058,8 @@ export function SessionEventManager({
     isConnected,
     wsConnection.sendMessage,
     setSessionData,
-    visibilityHandlersRef
+    visibilityHandlersRef,
+    fetchSessionData
   ]);
   
   return (

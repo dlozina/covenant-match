@@ -3,6 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { FriendButton } from './FriendButton';
+import { KickButton } from './KickButton';
 import { usePlayerStatus } from './usePlayerStatus';
 import { SessionState } from '@/components/session/SessionReducers';
 import { SessionData } from '@/components/session/common/types';
@@ -17,6 +18,8 @@ interface PlayerSectionProps {
   addFriend: (playerId: string) => void;
   sessionData?: SessionData;
   currentUserId?: string;
+  isHostView?: boolean;
+  onKickPlayer?: (playerId: string, playerName: string) => void;
 }
 
 interface PlayerRowProps {
@@ -30,6 +33,8 @@ interface PlayerRowProps {
   };
   addFriend: (playerId: string) => void;
   userStats?: UserStats;
+  isHostView?: boolean;
+  onKickPlayer?: (playerId: string, playerName: string) => void;
 }
 
 const PlayerRowComponent = ({ 
@@ -40,7 +45,9 @@ const PlayerRowComponent = ({
   sessionState, 
   friendState, 
   addFriend,
-  userStats
+  userStats,
+  isHostView,
+  onKickPlayer
 }: PlayerRowProps) => {
   const playerStatus = usePlayerStatus(isHost, sessionState);
   
@@ -67,6 +74,15 @@ const PlayerRowComponent = ({
               onAddFriend={addFriend} 
             />
           )}
+          
+          {/* Show kick button only for host view, not for the host player, and only if session hasn't started */}
+          {isHostView && !isHost && !sessionState.isSessionStarted && onKickPlayer && (
+            <KickButton
+              playerId={player.userId}
+              onKickPlayer={() => onKickPlayer(player.userId, player.username)}
+            />
+          )}
+          
           {/* Session state badge */}
           <Badge 
             variant="outline" 
@@ -129,7 +145,9 @@ const PlayerSectionComponent = ({
   friendState, 
   addFriend, 
   sessionData,
-  currentUserId
+  currentUserId,
+  isHostView,
+  onKickPlayer
 }: PlayerSectionProps) => {
   const [userStats, setUserStats] = useState<Record<string, UserStats>>({});
   
@@ -188,6 +206,8 @@ const PlayerSectionComponent = ({
               friendState={friendState}
               addFriend={addFriend}
               userStats={userStats[player.userId]}
+              isHostView={isHostView}
+              onKickPlayer={onKickPlayer}
             />
             {/* Add divider after each player except the last one */}
             {index < sessionData.joinedPlayers.length - 1 && (

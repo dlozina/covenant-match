@@ -8,7 +8,8 @@ import {
   ResultReportingSection,
   FinishSessionDialog,
   WarningDialog,
-  DeleteSessionDialog
+  DeleteSessionDialog,
+  KickPlayerDialog
 } from "@/components/session";
 import {
   friendStatusReducer,
@@ -18,6 +19,7 @@ import {
   DialogState
 } from "@/components/session/SessionReducers";
 import { cancelSession } from "@/utils/api";
+import { SessionService } from "@/utils/api/session-service";
 import { Notification, NotificationType } from "@/components/ui/notification";
 import { useSessionContext } from "../context/SessionContext";
 
@@ -36,7 +38,8 @@ export function SessionHost() {
     resetSession,
     handleFinishSession,
     updatePlayerReportedStatus,
-    lastHeartbeat
+    lastHeartbeat,
+    refreshSession
   } = useSessionContext();
   
   // Get auth context - moved before conditional return
@@ -53,7 +56,11 @@ export function SessionHost() {
   const [dialogState, dispatchDialog] = useReducer(dialogReducer, {
     showConfirmDialog: false,
     showWarningDialog: false,
-    showDeleteDialog: false
+    showDeleteDialog: false,
+    showNewSessionDialog: false,
+    showKickDialog: false,
+    kickPlayerId: '',
+    kickPlayerName: ''
   } as DialogState);
   const [resultState, dispatchResult] = useReducer(resultReducer, {
     selectedResult: 'win',
@@ -85,6 +92,39 @@ export function SessionHost() {
   const addFriend = useCallback((playerId: string) => {
     dispatchFriend({ type: 'ADD_FRIEND', payload: playerId });
   }, []);
+  
+  // Handle kick player dialog
+  const handleKickPlayerClick = useCallback((playerId: string, playerName: string) => {
+    dispatchDialog({ 
+      type: 'SHOW_KICK_DIALOG', 
+      payload: { 
+        playerId, 
+        playerName 
+      } 
+    });
+  }, []);
+  
+  // Close kick player dialog
+  const closeKickPlayerDialog = useCallback(() => {
+    dispatchDialog({ type: 'HIDE_KICK_DIALOG' });
+  }, []);
+  
+  // Execute kick player
+  const handleKickPlayer = useCallback(async () => {
+    if (!sessionData || !dialogState.kickPlayerId) return;
+    
+    try {
+      await SessionService.kickPlayer(sessionData.id, dialogState.kickPlayerId);
+      
+      showNotification(`Successfully kicked ${dialogState.kickPlayerName} from the session`, 'success');
+      
+      // Refresh session to update player list
+      refreshSession();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      showNotification('Error kicking player: ' + errorMessage, 'error');
+    }
+  }, [sessionData, dialogState.kickPlayerId, dialogState.kickPlayerName, showNotification, refreshSession]);
   
   // Recreate session with same team
   const recreateSession = useCallback(async () => {
@@ -275,6 +315,8 @@ export function SessionHost() {
               addFriend={addFriend}
               sessionData={sessionData}
               currentUserId={userData?.id}
+              isHostView={true}
+              onKickPlayer={handleKickPlayerClick}
             />
           </div>
 
@@ -364,6 +406,13 @@ export function SessionHost() {
         isOpen={dialogState.showDeleteDialog}
         onClose={() => dispatchDialog({ type: 'HIDE_DELETE' })}
         onConfirm={handleCancelSession}
+      />
+      
+      <KickPlayerDialog
+        isOpen={dialogState.showKickDialog}
+        playerName={dialogState.kickPlayerName}
+        onClose={closeKickPlayerDialog}
+        onConfirm={handleKickPlayer}
       />
     </>
   );
