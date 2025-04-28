@@ -1,21 +1,18 @@
 use crate::models::admin::{
-    AdminChatResponse, AdminDashboardStats, AdminSessionResponse, AdminSessionsQuery,
-    AdminSessionsResponse, ChatHistoryParams, ChatMessageResponseDto, CreateFeatureFlagDto,
-    DeleteMessagesParams, FeatureFlag, FeatureFlagResponse, FeatureFlagsResponse,
-    PatchFeatureFlagDto, SystemInfo, UserInfoDto,
+    AdminChatResponse, AdminSessionsQuery, ChatHistoryParams, ChatMessageResponseDto, CreateFeatureFlagDto,
+    DeleteMessagesParams,
+    PatchFeatureFlagDto, UserInfoDto,
 };
 use crate::services::{admin_service, chat_service, user_service};
 use crate::utils::request::is_admin;
-use crate::ws::messages::{ConnectionStats, GetConnectionStats};
+use crate::ws::messages::GetConnectionStats;
 use crate::ws::session::SessionManager;
 use actix::Addr;
 use actix_web::{
-    delete, get, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError,
+    delete, get, post, put, web, HttpRequest, HttpResponse, Responder, ResponseError,
 };
-use log::{debug, info};
+use log::debug;
 use mongodb::Database;
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 /// Get admin dashboard statistics
 #[utoipa::path(

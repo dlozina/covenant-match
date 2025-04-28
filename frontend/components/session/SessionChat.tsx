@@ -333,7 +333,7 @@ export function SessionChat() {
       // Create the request with the full URL
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
       // Only fetch the last 9 messages
-      const url = `${apiBaseUrl}/api/v1/chat/history?session_id=${sessionId}&limit=9`;
+      const url = `${apiBaseUrl}/api/v1/chat/history?sessionId=${sessionId}&limit=9`;
       
       // Get token from storage
       const token = localStorage.getItem('token');

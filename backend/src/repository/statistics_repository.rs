@@ -10,6 +10,19 @@ fn get_collection(db: &Database) -> Collection<UserStatistics> {
     db.collection::<UserStatistics>("statistics")
 }
 
+// Helper function to calculate user score from stats
+fn calculate_score(total_games: i32, wins: i32) -> f64 {
+    if total_games > 0 {
+        ((f64::from(wins) / f64::from(total_games))
+            * (1.0 + (ACTIVITY_BONUS * f64::from(total_games)))
+            * 100.0)
+            .round()
+            / 100.0
+    } else {
+        0.0
+    }
+}
+
 // Helper function to create new user statistics
 fn create_new_statistics(user_id: &str, username: &str) -> UserStatistics {
     UserStatistics {
@@ -21,6 +34,7 @@ fn create_new_statistics(user_id: &str, username: &str) -> UserStatistics {
         losses: 0,
         disconnects: 0,
         win_rate: 0.0,
+        score: 0.0,
         nightfarer_stats: HashMap::new(),
         night_lord_stats: HashMap::new(),
         covenant_stats: HashMap::new(),
@@ -44,6 +58,9 @@ fn update_overall_stats(stats: &mut UserStatistics, result: GameResult) {
         stats.win_rate =
             ((stats.wins as f64 / stats.total_games as f64) * 100.0 * 100.0).round() / 100.0;
     }
+
+    // Calculate and update score
+    stats.score = calculate_score(stats.total_games, stats.wins);
 }
 
 // Helper function to update specific stats for a character/night lord/covenant
@@ -133,30 +150,17 @@ pub async fn get_leaderboard(
     let cursor = get_collection(db).find(doc! {}).await?;
     let mut stats: Vec<UserStatistics> = cursor.try_collect().await?;
 
-    // Convert to leaderboard entries and calculate scores
+    // Convert to leaderboard entries
     let mut leaderboard: Vec<LeaderboardEntryResponseDto> = stats
         .into_iter()
-        .map(|s| {
-            // Calculate score - avoid division by zero
-            let score = if s.total_games > 0 {
-                ((f64::from(s.wins) / f64::from(s.total_games))
-                    * (1.0 + (ACTIVITY_BONUS * f64::from(s.total_games)))
-                    * 100.0)
-                    .round()
-                    / 100.0
-            } else {
-                0.0
-            };
-
-            LeaderboardEntryResponseDto {
-                user_id: s.user_id,
-                username: s.username,
-                total_games: s.total_games,
-                wins: s.wins,
-                win_rate: s.win_rate,
-                reputation_score: s.reputation_score,
-                score,
-            }
+        .map(|s| LeaderboardEntryResponseDto {
+            user_id: s.user_id,
+            username: s.username,
+            total_games: s.total_games,
+            wins: s.wins,
+            win_rate: s.win_rate,
+            reputation_score: s.reputation_score,
+            score: s.score,
         })
         .collect();
 

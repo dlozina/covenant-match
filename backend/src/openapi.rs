@@ -7,7 +7,7 @@ use crate::models::admin::{
     SessionConnectionResponse, SystemInfo, SystemStatusResponse, WebSocketStatsData,
     WebSocketStatsResponse,
 };
-use crate::models::chat::{ChatMessage, ChatMessageResponseDto};
+use crate::models::chat::ChatMessageResponseDto;
 use crate::models::common::{LimitQuery, PaginationQuery};
 use crate::models::game_data::{
     Covenant, CovenantResponse, GameDataResponse, NightLord, NightLordResponse, Nightfarer,
@@ -138,6 +138,7 @@ use utoipa::{
         get_session_details,
         get_sessions_stats,
         get_covenant_stats,
+        get_multiple_users_statistics,
         // News routes
         get_all_news,
         get_news_by_id,
@@ -224,6 +225,8 @@ use utoipa::{
             PlayerDetail,
             SessionsStatsResponse,
             SessionsStatsData,
+            BatchUserStatsResponse,
+            UserStatsResponse,
             // News models
             NewsResponse,
             NewsListResponse,

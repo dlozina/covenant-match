@@ -741,14 +741,6 @@ async fn handle_consensus(
     let players_who_submitted: Vec<String> =
         session.results.iter().map(|r| r.user_id.clone()).collect();
 
-    log::info!(
-        "Consensus reached in session {}: {:?}. Players who submitted: {:?}, stats already updated: {}",
-        session_id,
-        consensus_result,
-        players_who_submitted,
-        session.stats_updated
-    );
-
     // Check if stats have already been updated using the explicit flag
     if session.stats_updated {
         log::info!("Skipping stats update as they have already been updated");

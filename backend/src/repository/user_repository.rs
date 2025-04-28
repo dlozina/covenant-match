@@ -72,11 +72,6 @@ pub async fn find_user_by_id(db: &Database, id: &str) -> Result<Option<User>, Ap
 
     let filter = doc! { "_id": object_id };
 
-    log::info!(
-        "Querying database for user with ObjectId: {}",
-        object_id.to_hex()
-    );
-
     let result = collection.find_one(filter).await;
 
     match &result {

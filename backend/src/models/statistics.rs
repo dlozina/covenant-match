@@ -21,6 +21,7 @@ pub struct UserStatistics {
     pub losses: i32,
     pub disconnects: i32,
     pub win_rate: f64,
+    pub score: f64,
     pub nightfarer_stats: HashMap<String, Stats>,
     pub night_lord_stats: HashMap<String, Stats>,
     pub covenant_stats: HashMap<String, Stats>,
