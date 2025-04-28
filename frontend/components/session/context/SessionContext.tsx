@@ -310,6 +310,21 @@ export function SessionEventManager({
       return;
     }
     
+    // Clear any session cancellation data when loading a new session
+    // This ensures we don't show old cancellation notifications for new sessions
+    if (sessionStorage.getItem('sessionCancelled') === 'true') {
+      // Check if this is a different session than the cancelled one
+      const cancelledSessionId = sessionStorage.getItem('cancelledSessionId');
+      if (!cancelledSessionId || cancelledSessionId !== sessionId) {
+        // Different session, so clear the cancellation data
+        console.log('Clearing old cancellation data when loading new session');
+        sessionStorage.removeItem('sessionCancelled');
+        sessionStorage.removeItem('cancelledSessionName');
+        sessionStorage.removeItem('cancelTimestamp');
+        sessionStorage.removeItem('cancelledSessionId');
+      }
+    }
+    
     // Function to fetch session data
     const fetchSessionData = async () => {
       try {
@@ -497,7 +512,6 @@ export function SessionEventManager({
     
     // Handle player join event
     const unsubscribeJoin = subscribe('join', (data) => {
-      console.log('JOIN EVENT RECEIVED:', data);  
       if (!data || typeof data !== 'object') return;
       
       // Extract player data
@@ -548,7 +562,6 @@ export function SessionEventManager({
     
     // Handle session start event
     const unsubscribeStart = subscribe('start', (data) => {
-      console.log('START EVENT RECEIVED:', data);
       if (!data || typeof data !== 'object') return;
       
       // Only update if not already started
@@ -583,7 +596,6 @@ export function SessionEventManager({
     
     // Handle session complete event
     const unsubscribeComplete = subscribe('complete', (data) => {
-      console.log('COMPLETE EVENT RECEIVED:', data);
       if (!data || typeof data !== 'object') return;
       
       // Only update if not already finished
@@ -623,7 +635,6 @@ export function SessionEventManager({
     
     // Handle result submission event
     const unsubscribeResult = subscribe('result', (data) => {
-      console.log('RESULT EVENT RECEIVED:', data);
       if (!data || typeof data !== 'object') return;
       
       // Get reported user ID
@@ -676,6 +687,9 @@ export function SessionEventManager({
         // Clear session data
         storageUtils.clearSessionData();
         
+        // Capture session name for notification before updating state
+        const sessionName = sessionData?.name || `Session #${sessionId}`;
+        
         // Update session data
         setSessionData(prevData => {
           if (!prevData) return null;
@@ -692,12 +706,26 @@ export function SessionEventManager({
         
         // Disconnect from SSE when session is cancelled
         disconnect();
+
+        // For non-hosts, set cancellation info in storage and redirect
+        if (!isHost()) {
+          // Store in sessionStorage to be picked up by components
+          sessionStorage.setItem('sessionCancelled', 'true');
+          sessionStorage.setItem('cancelledSessionName', sessionName);
+          sessionStorage.setItem('cancelTimestamp', Date.now().toString());
+          sessionStorage.setItem('cancelledSessionId', sessionId);
+          
+          // Add a delay before redirecting to allow notification to appear
+          setTimeout(() => {
+            console.log('Host cancelled session, redirecting to sessions page...');
+            router.push('/sessions');
+          }, 3000);
+        }
       }
     });
     
     // Handle player leave event
     const unsubscribeLeave = subscribe('leave', (data) => {
-      console.log('LEAVE EVENT RECEIVED:', data);
       if (!data || typeof data !== 'object') return;
       
       // Get user ID of leaving player
@@ -727,7 +755,6 @@ export function SessionEventManager({
     
     // Handle new session event
     const unsubscribeNewSession = subscribe('newSession', (data) => {
-      console.log('NEW SESSION EVENT RECEIVED:', data);
       if (!data || typeof data !== 'object') return;
       
       // Extract new session ID and original session ID with type assertions
@@ -735,7 +762,6 @@ export function SessionEventManager({
       const originalId = String((data as Record<string, unknown>).originalSessionId || '');
       
       if (newId && originalId === sessionId) {
-        console.log('New Session ID:', newId);
         
         // Store the session ID in localStorage for persistence
         localStorage.setItem('pendingNewSessionId', newId);

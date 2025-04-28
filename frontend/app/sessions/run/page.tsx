@@ -44,6 +44,9 @@ function SessionRunContent(): JSX.Element {
   // State for notifications
   const [notification, setNotification] = useState<NotificationType | null>(null);
   
+  // Flag to track if we've shown a cancellation notification
+  const [hasShownCancelNotification, setHasShownCancelNotification] = useState<boolean>(false);
+  
   // Function to clear notification
   const clearNotification = () => {
     setNotification(null);
@@ -51,7 +54,7 @@ function SessionRunContent(): JSX.Element {
   
   const router = useRouter();
   
-  // Redirect if session ID is invalid
+  // Redirect if session ID is invalid and handle session cancellation
   useEffect(() => {
     if (!isValidSessionId) {
       setNotification({
@@ -68,7 +71,61 @@ function SessionRunContent(): JSX.Element {
         clearTimeout(redirectTimer);
       };
     }
-  }, [isValidSessionId, router]);
+    
+    // Check for session cancellation flag
+    const wasSessionCancelled = sessionStorage.getItem('sessionCancelled');
+    if (wasSessionCancelled === 'true') {
+      // Get session name if available
+      const sessionName = sessionStorage.getItem('cancelledSessionName') || 'Session';
+      const cancelTimestamp = sessionStorage.getItem('cancelTimestamp');
+      const cancelledSessionId = sessionStorage.getItem('cancelledSessionId');
+      
+      // If this is a different session than the one that was cancelled, clear cancellation data
+      if (cancelledSessionId && cancelledSessionId !== sessionId) {
+        console.log('In a different session than the cancelled one, clearing cancellation data');
+        sessionStorage.removeItem('sessionCancelled');
+        sessionStorage.removeItem('cancelledSessionName');
+        sessionStorage.removeItem('cancelTimestamp');
+        sessionStorage.removeItem('cancelledSessionId');
+        // Reset notification flag
+        setHasShownCancelNotification(false);
+        return;
+      }
+      
+      // Only show notification if it was stored recently (within the last 30 seconds)
+      // AND we haven't already shown a cancellation notification
+      const now = Date.now();
+      const isRecentCancellation = cancelTimestamp && 
+                                 (now - parseInt(cancelTimestamp, 10)) < 30000;
+      
+      if (isRecentCancellation && !hasShownCancelNotification) {
+        setNotification({
+          message: `Host canceled "${sessionName}"`,
+          type: "warning"
+        });
+        
+        // Mark that we've shown the notification
+        setHasShownCancelNotification(true);
+        
+        // Redirect to sessions page after showing the notification
+        const redirectTimer = setTimeout(() => {
+          router.push('/sessions');
+        }, 3000);
+        
+        return () => {
+          clearTimeout(redirectTimer);
+        };
+      } else {
+        // Just clear old cancellation data without showing notification
+        sessionStorage.removeItem('sessionCancelled');
+        sessionStorage.removeItem('cancelledSessionName');
+        sessionStorage.removeItem('cancelTimestamp');
+        sessionStorage.removeItem('cancelledSessionId');
+      }
+    }
+    
+    // No event listener for cancellation events anymore - using only the storage approach
+  }, [isValidSessionId, router, sessionId, hasShownCancelNotification]);
   
   if (!isValidSessionId) {
     return (
