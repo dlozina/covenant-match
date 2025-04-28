@@ -54,13 +54,14 @@ export interface MinimalSession {
 }
 
 // Types for leaderboard
-export interface LeaderboardEntry {
-  user_id: string;
+export interface LeaderboardEntryResponseDto {
+  userId: string;
   username: string;
-  total_games: number;
+  totalGames: number;
   wins: number;
-  win_rate: number;
-  reputation_score: number;
+  winRate: number;
+  reputationScore: number;
+  score: number;
 }
 
 // Types for session history
@@ -182,9 +183,10 @@ export interface NewsItem {
 }
 
 // Function to fetch leaderboard data
-export const fetchLeaderboard = async (): Promise<LeaderboardEntry[]> => {
+export const fetchLeaderboard = async (limit?: number): Promise<LeaderboardEntryResponseDto[]> => {
   try {
-    const response = await fetch(`${API_URL}/api/v1/statistics/leaderboard`, {
+    const params = limit ? `?limit=${limit}` : '';
+    const response = await fetch(`${API_URL}/api/v1/statistics/leaderboard${params}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

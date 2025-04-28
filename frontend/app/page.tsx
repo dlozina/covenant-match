@@ -12,7 +12,7 @@ import { Footer } from "@/components/layout/Footer";
 import { useAuth } from "@/lib/auth-context";
 import { useEffect, useState } from "react";
 import { 
-  LeaderboardEntry, 
+  LeaderboardEntryResponseDto, 
   CovenantStats,
   NewsItem,
   Announcement,
@@ -25,7 +25,7 @@ import {
 
 export default function Home() {
   const { isLoggedIn, isLoading } = useAuth();
-  const [topPlayers, setTopPlayers] = useState<LeaderboardEntry[]>([]);
+  const [topPlayers, setTopPlayers] = useState<LeaderboardEntryResponseDto[]>([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(true);
   const [activeSessions, setActiveSessions] = useState<number>(0);
   const [isLoadingActiveSessions, setIsLoadingActiveSessions] = useState(true);
@@ -41,9 +41,9 @@ export default function Home() {
       try {
         setIsLoadingLeaderboard(true);
         const data = await fetchLeaderboard();
-        // Sort first by wins (descending), then by username (ascending) when wins are equal
+        // Sort by score (descending), then by username (ascending) when scores are equal
         const sortedPlayers = [...data].sort((a, b) => 
-          b.wins === a.wins ? a.username.localeCompare(b.username) : b.wins - a.wins
+          b.score === a.score ? a.username.localeCompare(b.username) : b.score - a.score
         );
         setTopPlayers(sortedPlayers.slice(0, 3)); // Get top 3 players
       } catch (error) {
@@ -153,12 +153,17 @@ export default function Home() {
                   </div>
                   <span className="truncate">{player.username}</span>
                 </div>
-                <span className="text-indigo-400 flex-shrink-0">{player.wins} W</span>
+                <span className="text-indigo-400 flex-shrink-0">{player.score.toFixed(2)}</span>
               </div>
             ))
           ) : (
             <div className="py-2 text-sm text-muted-foreground">No players found</div>
           )}
+        </div>
+        <div className="mt-4 text-center">
+          <Link href="/leaderboard" className="text-sm text-purple-400 hover:text-purple-300 hover:underline">
+            View full leaderboard
+          </Link>
         </div>
       </div>
       
@@ -185,6 +190,11 @@ export default function Home() {
           ) : (
             <div className="py-2 text-sm text-muted-foreground">No covenant data found</div>
           )}
+        </div>
+        <div className="mt-4 text-center">
+          <Link href="/leaderboard?tab=covenants" className="text-sm text-red-400 hover:text-red-300 hover:underline">
+            View all covenants
+          </Link>
         </div>
       </div>
       

@@ -1,6 +1,7 @@
 use crate::models::error::AppError;
 use crate::models::session::GameResult;
-use crate::models::statistics::{LeaderboardEntry, Stats, UserStatistics};
+use crate::models::statistics::{LeaderboardEntryResponseDto, Stats, UserStatistics};
+use crate::utils::constants::ACTIVITY_BONUS;
 use futures::TryStreamExt;
 use mongodb::{bson::doc, Collection, Database};
 use std::collections::HashMap;
@@ -124,35 +125,52 @@ pub async fn update_player_stats(
     Ok(())
 }
 
-pub async fn get_leaderboard(db: &Database, limit: i64) -> Result<Vec<LeaderboardEntry>, AppError> {
+pub async fn get_leaderboard(
+    db: &Database,
+    limit: i64,
+) -> Result<Vec<LeaderboardEntryResponseDto>, AppError> {
     // Get all statistics
     let cursor = get_collection(db).find(doc! {}).await?;
     let mut stats: Vec<UserStatistics> = cursor.try_collect().await?;
 
-    // Manually sort by win_rate and total_games
-    stats.sort_by(|a, b| {
-        b.win_rate
-            .partial_cmp(&a.win_rate)
+    // Convert to leaderboard entries and calculate scores
+    let mut leaderboard: Vec<LeaderboardEntryResponseDto> = stats
+        .into_iter()
+        .map(|s| {
+            // Calculate score - avoid division by zero
+            let score = if s.total_games > 0 {
+                ((f64::from(s.wins) / f64::from(s.total_games))
+                    * (1.0 + (ACTIVITY_BONUS * f64::from(s.total_games)))
+                    * 100.0)
+                    .round()
+                    / 100.0
+            } else {
+                0.0
+            };
+
+            LeaderboardEntryResponseDto {
+                user_id: s.user_id,
+                username: s.username,
+                total_games: s.total_games,
+                wins: s.wins,
+                win_rate: s.win_rate,
+                reputation_score: s.reputation_score,
+                score,
+            }
+        })
+        .collect();
+
+    // Sort by score (descending)
+    leaderboard.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
             .unwrap_or(std::cmp::Ordering::Equal)
-            .then_with(|| b.total_games.cmp(&a.total_games))
     });
 
     // Apply limit
-    if stats.len() > limit as usize {
-        stats.truncate(limit as usize);
+    if leaderboard.len() > limit as usize {
+        leaderboard.truncate(limit as usize);
     }
-
-    let leaderboard = stats
-        .into_iter()
-        .map(|s| LeaderboardEntry {
-            user_id: s.user_id,
-            username: s.username,
-            total_games: s.total_games,
-            wins: s.wins,
-            win_rate: s.win_rate,
-            reputation_score: s.reputation_score,
-        })
-        .collect();
 
     Ok(leaderboard)
 }

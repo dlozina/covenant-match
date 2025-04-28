@@ -7,7 +7,7 @@ use crate::models::admin::{
     SessionConnectionResponse, SystemInfo, SystemStatusResponse, WebSocketStatsData,
     WebSocketStatsResponse,
 };
-use crate::models::chat::ChatMessage;
+use crate::models::chat::{ChatMessage, ChatMessageResponseDto};
 use crate::models::common::{LimitQuery, PaginationQuery};
 use crate::models::game_data::{
     Covenant, CovenantResponse, GameDataResponse, NightLord, NightLordResponse, Nightfarer,
@@ -23,20 +23,19 @@ use crate::models::session::{
     MinimalSessionDto, PlayerInfo, RateSessionDto, ResultsResponseDto, SessionResponseDto,
     SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto,
 };
-use crate::models::statistics::{LeaderboardEntry, Stats, UserStatistics};
+use crate::models::statistics::{LeaderboardEntryResponseDto, Stats, UserStatistics, NightLordStatsResponse, PaginatedSessionData, PaginatedSessionResponse, SessionHistoryResponse};
 use crate::models::user::{
     AddFriendDto, AuthResponse, CreateUserDto, FriendDto, FriendListResponse, GetUsersQuery,
     LoginUserDto, PaginationInfo, RefreshTokenResponse, RemoveFriendDto, UpdateUserDto,
     UpdateUserProfileDto, User, UserResponse, UsersListData, UsersListResponse,
 };
 use crate::models::user_data::UserDataResponseDto;
-use crate::routes::statistics::NightLordStatsResponse;
 use crate::routes::users::{JwtInfoDto, TokenInfoResponse};
 use crate::sse::messages::{ServerMessage, SessionInfo, SseSessionStatus};
 
 use crate::routes::{
     admin::*, game_data::*, health::*, news::*, sessions::*, sse::*, statistics::*, user_data::*,
-    users::*, ws::*,
+    users::*, ws::*, chat::*,
 };
 
 // Import SSE models
@@ -149,6 +148,8 @@ use utoipa::{
         // Announcement routes
         get_current_announcement,
         update_announcement,
+        // Chat routes
+        get_chat_history,
     ),
     components(
         schemas(
@@ -205,7 +206,7 @@ use utoipa::{
             NightfarerResponse,
             NightLordResponse,
             // Chat models
-            ChatMessage,
+            ChatMessageResponseDto,
             // SSE models
             ServerMessage,
             SessionInfo,
@@ -213,7 +214,7 @@ use utoipa::{
             // Statistics models
             Stats,
             UserStatistics,
-            LeaderboardEntry,
+            LeaderboardEntryResponseDto,
             NightLordStatsResponse,
             SessionHistoryResponse,
             PaginatedSessionResponse,

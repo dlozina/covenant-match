@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, UserPlus, Sword, Users, LayoutDashboard, User, LogOut, LogIn, Shield } from "lucide-react";
+import { Menu, UserPlus, Sword, Users, LayoutDashboard, User, LogOut, LogIn, Shield, Trophy } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,12 @@ export function SiteHeader() {
       label: "Find Sessions",
       icon: <Users className="h-4 w-4 mr-2" />,
       active: pathname === "/sessions",
+    },
+    {
+      href: "/leaderboard",
+      label: "Leaderboard",
+      icon: <Trophy className="h-4 w-4 mr-2" />,
+      active: pathname === "/leaderboard",
     },
     ...(isLoggedIn ? [
       {

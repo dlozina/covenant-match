@@ -23,11 +23,11 @@ interface ChatMessage {
 
 // Interface for chat history response from API
 interface ChatHistoryMessage {
-  sender_id: string;
-  sender_name: string;
+  senderId: string;
+  senderName: string;
   message: string;
   timestamp: number;
-  client_id?: string; // Add client_id field
+  clientId?: string; // Add client_id field
 }
 
 // Create a singleton chat manager that persists across component remounts
@@ -368,15 +368,15 @@ export function SessionChat() {
         // Convert to our message format
         const formattedMessages = historyMessages.map(msg => {
           // Add to processed IDs to prevent duplicates
-          if (msg.client_id) {
-            newProcessedIds.add(msg.client_id);
+          if (msg.clientId) {
+            newProcessedIds.add(msg.clientId);
           }
           
           // Determine role from sender
           let role: 'host' | 'participant1' | 'participant2' | 'unknown' = 'unknown';
           
           // Check if this is the host
-          if (sessionData?.hostId === msg.sender_id) {
+          if (sessionData?.hostId === msg.senderId) {
             role = 'host';
           } else {
             // Non-host players all get the participant1 role
@@ -385,12 +385,12 @@ export function SessionChat() {
           }
           
           return {
-            userId: msg.sender_id,
-            username: msg.sender_name,
+            userId: msg.senderId,
+            username: msg.senderName,
             message: msg.message,
             timestamp: msg.timestamp,
             role,
-            clientId: msg.client_id
+            clientId: msg.clientId
           } as ChatMessage;
         });
         

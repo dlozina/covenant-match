@@ -162,6 +162,7 @@ export interface LeaderboardEntry {
   wins: number;
   win_rate: number;
   reputation_score: number;
+  score: number;
 }
 
 export interface SessionHistoryEntry {

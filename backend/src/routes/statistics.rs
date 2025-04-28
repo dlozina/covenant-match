@@ -1,3 +1,4 @@
+use crate::models::statistics::{NightLordStatsResponse, PaginatedSessionData, PaginatedSessionResponse, PaginationInfo, PaginationQuery, SessionHistoryResponse};
 use crate::services::statistics_service;
 use crate::utils::jwt;
 use crate::{repository::session_repository, services::session_service};
@@ -7,55 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use utoipa::ToSchema;
 
-#[derive(Serialize, ToSchema)]
-pub struct NightLordStatsResponse {
-    name: String,
-    played: i32,
-    wins: i32,
-    losses: i32,
-    disconnects: i32,
-    win_rate: f64,
-}
 
-// Add a new response type for session history
-#[derive(Serialize, ToSchema)]
-pub struct SessionHistoryResponse {
-    session_id: String,
-    session_name: String,
-    night_lord: String,
-    player_nightfarer: String,
-    player_result: String,
-    created_at: chrono::DateTime<chrono::Utc>,
-    completed_at: Option<chrono::DateTime<chrono::Utc>>,
-}
-
-// Response structure for paginated session history
-#[derive(Serialize, ToSchema)]
-pub struct PaginatedSessionResponse {
-    status: String,
-    data: PaginatedSessionData,
-}
-
-#[derive(Serialize, ToSchema)]
-pub struct PaginatedSessionData {
-    pagination: PaginationInfo,
-    sessions: Vec<SessionHistoryResponse>,
-}
-
-#[derive(Serialize, ToSchema)]
-pub struct PaginationInfo {
-    page: u64,
-    limit: u64,
-    total: u64,
-    total_pages: u64,
-}
-
-// Query parameters for pagination
-#[derive(Deserialize)]
-pub struct PaginationQuery {
-    page: Option<u64>,
-    limit: Option<u64>,
-}
 
 /// Get current user's statistics
 #[utoipa::path(
