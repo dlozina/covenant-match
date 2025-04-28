@@ -1,8 +1,12 @@
 import React from 'react';
-import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { UserStats } from '@/utils/api';
 import { Card, CardContent } from "@/components/ui/card";
 import { Shield, Swords, Trophy, Info } from 'lucide-react';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogTrigger
+} from "@/components/ui/dialog";
 
 interface PlayerHoverCardProps {
   player: {
@@ -14,30 +18,31 @@ interface PlayerHoverCardProps {
 }
 
 export const PlayerHoverCard: React.FC<PlayerHoverCardProps> = ({ 
-  player, 
   userStats, 
   children 
 }) => {
   if (!userStats) {
-    // If no stats available, just render the children without hover functionality
+    // If no stats available, just render the children without interactivity
     return <>{children}</>;
   }
   
   return (
-    <HoverCard>
-      <HoverCardTrigger asChild>
-        <div className="group relative inline-flex items-center">
+    <Dialog>
+      <div className="inline-block">
+        <DialogTrigger asChild>
           {children}
-          <span className="ml-1.5 text-muted-foreground/50 group-hover:text-primary transition-colors sm:hidden">
+        </DialogTrigger>
+        {/* Info icon as a separate trigger */}
+        <DialogTrigger asChild>
+          <span className="inline-flex ml-1.5 text-muted-foreground/50 hover:text-primary transition-colors cursor-pointer">
             <Info size={14} />
           </span>
-          <span className="hidden absolute -bottom-0.5 left-0 right-0 h-0.5 bg-primary origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-200 sm:block"></span>
-        </div>
-      </HoverCardTrigger>
-      <HoverCardContent side="top" align="start" className="w-80 p-0">
+        </DialogTrigger>
+      </div>
+      <DialogContent className="sm:max-w-[425px] p-0">
         <Card className="border-0 shadow-none w-full">
           <CardContent className="p-4 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between pt-2">
               <div>
                 <h3 className="font-bold text-lg">{userStats.displayName}</h3>
                 <p className="text-sm text-muted-foreground">{userStats.covenantName}</p>
@@ -92,7 +97,7 @@ export const PlayerHoverCard: React.FC<PlayerHoverCardProps> = ({
             </div>
           </CardContent>
         </Card>
-      </HoverCardContent>
-    </HoverCard>
+      </DialogContent>
+    </Dialog>
   );
 }; 
