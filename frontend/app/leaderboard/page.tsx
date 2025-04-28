@@ -124,8 +124,8 @@ function LeaderboardContent() {
                       <th className="px-3 py-3 text-left">Player</th>
                       <th className="px-3 py-3 text-right">Score</th>
                       <th className="px-3 py-3 text-right">Wins</th>
-                      <th className="px-3 py-3 text-right">Total Games</th>
-                      <th className="px-3 py-3 text-right">Win Rate</th>
+                      <th className="px-3 py-3 text-right hidden md:table-cell">Total Games</th>
+                      <th className="px-3 py-3 text-right hidden md:table-cell">Win Rate</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -148,8 +148,8 @@ function LeaderboardContent() {
                         <td className="px-3 py-3 font-medium">{player.username}</td>
                         <td className="px-3 py-3 text-right text-purple-400">{player.score.toFixed(2)}</td>
                         <td className="px-3 py-3 text-right text-green-400">{player.wins}</td>
-                        <td className="px-3 py-3 text-right">{player.totalGames}</td>
-                        <td className="px-3 py-3 text-right">
+                        <td className="px-3 py-3 text-right hidden md:table-cell">{player.totalGames}</td>
+                        <td className="px-3 py-3 text-right hidden md:table-cell">
                           <div className="inline-block px-2 py-1 rounded bg-purple-900/20 text-xs">
                             {player.winRate.toFixed(2)}%
                           </div>
@@ -190,8 +190,8 @@ function LeaderboardContent() {
                       <th className="px-3 py-3 text-left">Rank</th>
                       <th className="px-3 py-3 text-left">Covenant</th>
                       <th className="px-3 py-3 text-right">Wins</th>
-                      <th className="px-3 py-3 text-right">Losses</th>
-                      <th className="px-3 py-3 text-right">Win Rate</th>
+                      <th className="px-3 py-3 text-right hidden md:table-cell">Losses</th>
+                      <th className="px-3 py-3 text-right hidden md:table-cell">Win Rate</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -219,8 +219,8 @@ function LeaderboardContent() {
                           </td>
                           <td className="px-3 py-3 font-medium">{covenant.covenantName}</td>
                           <td className="px-3 py-3 text-right text-green-400">{covenant.wins}</td>
-                          <td className="px-3 py-3 text-right text-red-400">{covenant.losses}</td>
-                          <td className="px-3 py-3 text-right">
+                          <td className="px-3 py-3 text-right text-red-400 hidden md:table-cell">{covenant.losses}</td>
+                          <td className="px-3 py-3 text-right hidden md:table-cell">
                             <div className="inline-block px-2 py-1 rounded bg-indigo-900/20 text-xs">
                               {winRate.toFixed(2)}%
                             </div>
