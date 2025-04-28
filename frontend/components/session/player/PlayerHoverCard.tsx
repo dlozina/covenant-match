@@ -28,13 +28,13 @@ export const PlayerHoverCard: React.FC<PlayerHoverCardProps> = ({
   
   return (
     <Dialog>
-      <div className="inline-block">
+      <div className="inline-flex items-center">
         <DialogTrigger asChild>
           {children}
         </DialogTrigger>
         {/* Info icon as a separate trigger */}
         <DialogTrigger asChild>
-          <span className="inline-flex ml-1.5 text-muted-foreground/50 hover:text-primary transition-colors cursor-pointer">
+          <span className="inline-flex items-center ml-1.5 text-muted-foreground/50 hover:text-primary transition-colors cursor-pointer">
             <Info size={14} />
           </span>
         </DialogTrigger>
