@@ -182,6 +182,25 @@ export interface NewsItem {
   time_ago?: string;
 }
 
+// Types for user statistics
+export interface UserStats {
+  userId: string;
+  displayName: string;
+  platform: string;
+  covenantName: string;
+  totalGames: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  score: number;
+}
+
+export interface UserStatsResponse {
+  status: string;
+  data: UserStats[];
+  notFoundUsers: string[] | null;
+}
+
 // Function to fetch leaderboard data
 export const fetchLeaderboard = async (limit?: number): Promise<LeaderboardEntryResponseDto[]> => {
   try {
@@ -1089,4 +1108,34 @@ export async function updateAnnouncement(announcement: Announcement): Promise<bo
     console.error('Error updating announcement:', error);
     return false;
   }
-} 
+}
+
+// Function to fetch user statistics for multiple users
+export const fetchUserStats = async (userIds: string[]): Promise<UserStats[]> => {
+  try {
+    if (!userIds.length) {
+      return [];
+    }
+
+    const token = getToken();
+    const userIdsParam = userIds.join(',');
+    
+    const response = await fetch(`${API_URL}/api/v1/statistics/batch?userIds=${userIdsParam}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error fetching user stats: ${response.statusText}`);
+    }
+
+    const result: UserStatsResponse = await response.json();
+    return result.data || [];
+  } catch (error) {
+    console.error('Failed to fetch user stats:', error);
+    return []; // Return empty array on error to prevent UI from breaking
+  }
+}; 
