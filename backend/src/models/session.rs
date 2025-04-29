@@ -12,6 +12,7 @@ pub struct PlayerInfo {
     pub covenant_name: String,
     pub region: String,
     pub platform: String,
+    pub experience: String,
     #[serde(alias = "joined_at")]
     pub joined_at: DateTime,
 }
@@ -103,6 +104,7 @@ pub struct GameSession {
     pub platform: String,
     pub password: String,
     pub is_private: bool,
+    pub is_friends_only: bool,
     pub night_lord: String,
     pub status: SessionStatus,
     pub joined_players: Vec<PlayerInfo>,
@@ -127,6 +129,7 @@ pub struct CreateSessionDto {
     pub nightfarer: String,
     pub night_lord: String,
     pub is_private: bool,
+    pub is_friends_only: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -144,6 +147,7 @@ pub struct JoinSessionDto {
     pub nightfarer: String,
     pub covenant_name: String,
     pub region: String,
+    pub experience: String,
     pub platform: String,
 }
 

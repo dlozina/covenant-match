@@ -207,11 +207,13 @@ pub async fn create_session(
         platform: session_data.platform,
         password: session_data.game_password,
         is_private: session_data.is_private,
+        is_friends_only: session_data.is_friends_only,
         status: SessionStatus::Open,
         joined_players: vec![PlayerInfo {
             user_id: user.id.to_hex(),
             region: session_data.region,
             platform: user.platform,
+            experience: user.experience.to_string(),
             username: user.display_name.unwrap_or(user.username),
             nightfarer: session_data.nightfarer,
             covenant_name: user.covenant_name,
@@ -446,6 +448,7 @@ pub async fn join_session(
         username: join_data.username.clone(),
         nightfarer: join_data.nightfarer.clone(),
         covenant_name: join_data.covenant_name.clone(),
+        experience: join_data.experience.clone(),
         joined_at: now,
     });
 
@@ -468,7 +471,8 @@ pub async fn join_session(
             "userId": join_data.user_id,
             "username": join_data.username,
             "nightfarer": join_data.nightfarer,
-            "covenantName": join_data.covenant_name
+            "covenantName": join_data.covenant_name,
+            "experience": join_data.experience
         }),
         Some(user_id.clone()),
     );
@@ -1050,6 +1054,7 @@ pub async fn recreate_session(
         platform: original_session.platform.clone(),
         password: original_session.password.clone(),
         is_private: make_private, // Always make recreated sessions private so they don't show in the sessions list
+        is_friends_only: original_session.is_friends_only,
         status: SessionStatus::Open,
         joined_players: vec![PlayerInfo {
             user_id: user_id.to_string(),
@@ -1058,6 +1063,7 @@ pub async fn recreate_session(
             username: host_user.display_name.unwrap_or(host_user.username),
             nightfarer: host_nightfarer,
             covenant_name: host_user.covenant_name.clone(),
+            experience: host_user.experience.to_string(),
             joined_at: now,
         }],
         night_lord: original_session.night_lord.clone(),
@@ -1598,6 +1604,7 @@ mod tests {
             covenant_name: "Covenant 1".to_string(),
             region: "Europe".to_string(),
             platform: "Playstation".to_string(),
+            experience: "Beginner".to_string(),
             joined_at: now,
         };
 
@@ -1608,6 +1615,7 @@ mod tests {
             covenant_name: "Covenant 2".to_string(),
             region: "Europe".to_string(),
             platform: "Playstation".to_string(),
+            experience: "Beginner".to_string(),
             joined_at: now,
         };
 
@@ -1618,6 +1626,7 @@ mod tests {
             covenant_name: "Covenant 3".to_string(),
             region: "Europe".to_string(),
             platform: "Playstation".to_string(),
+            experience: "Beginner".to_string(),
             joined_at: now,
         };
 
@@ -1630,6 +1639,7 @@ mod tests {
             platform: "Playstation".to_string(),
             password: "test".to_string(),
             is_private: false,
+            is_friends_only: false,
             status: SessionStatus::InProgress,
             joined_players: vec![player1, player2, player3],
             night_lord: "Night Lord 1".to_string(),
@@ -1734,6 +1744,7 @@ mod tests {
             covenant_name: "Covenant 1".to_string(),
             region: "Europe".to_string(),
             platform: "Playstation".to_string(),
+            experience: "Beginner".to_string(),
             joined_at: now,
         };
 
@@ -1744,6 +1755,7 @@ mod tests {
             covenant_name: "Covenant 2".to_string(),
             region: "Europe".to_string(),
             platform: "Playstation".to_string(),
+            experience: "Beginner".to_string(),
             joined_at: now,
         };
 
@@ -1754,6 +1766,7 @@ mod tests {
             covenant_name: "Covenant 3".to_string(),
             region: "Europe".to_string(),
             platform: "Playstation".to_string(),
+            experience: "Beginner".to_string(),
             joined_at: now,
         };
 
@@ -1766,6 +1779,7 @@ mod tests {
             platform: "Playstation".to_string(),
             password: "test".to_string(),
             is_private: false,
+            is_friends_only: false,
             status: SessionStatus::Completed, // Already completed
             joined_players: vec![player1, player2, player3],
             night_lord: "Night Lord 1".to_string(),

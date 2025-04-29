@@ -524,6 +524,7 @@ mod tests {
             platform: "PlayStation".to_string(),
             password: "test".to_string(),
             is_private: false,
+            is_friends_only: false,
             night_lord: "Test Lord".to_string(),
             status: SessionStatus::Completed,
             joined_players: vec![PlayerInfo {
@@ -533,6 +534,7 @@ mod tests {
                 covenant_name: "Way of White".to_string(),
                 region: "Europe".to_string(),
                 platform: "PlayStation".to_string(),
+                experience: "Beginner".to_string(),
                 joined_at: bson_now,
             }],
             results: vec![SessionResult {

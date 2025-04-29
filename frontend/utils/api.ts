@@ -27,6 +27,7 @@ export interface JoinedPlayer {
   userId: string;
   username: string;
   nightfarer: string;
+  experience: string;
   joinedAt: string;
 }
 
@@ -515,7 +516,7 @@ export interface SessionDetails {
   password: string | null;
   hostId: string;
   nightfarer?: string;
-  joinedPlayers?: { userId: string; username: string; nightfarer: string }[];
+  joinedPlayers?: { userId: string; username: string; nightfarer: string; experience: string }[];
 }
 
 // Function to fetch detailed information about a specific session
