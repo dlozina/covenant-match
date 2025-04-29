@@ -174,18 +174,8 @@ export default function SessionsPage() {
       );
       
       if (result.sessions) {
-
         setSessions(result.sessions);
-        
-        // Apply Night Lord filter if it's set
-        if (nightLordFilter !== 'All') {
-          setFilteredSessions(result.sessions.filter(session => 
-            session.nightLord.toLowerCase() === nightLordFilter.toLowerCase()
-          ));
-        } else {
-          setFilteredSessions(result.sessions);
-        }
-        
+        // We'll apply filters in the dedicated useEffect
         setTotalPages(result.sessions.length === limit ? currentPage + 1 : currentPage);
       } else if (result.minimalSessions) {
         setMinimalSessions(result.minimalSessions);
@@ -262,16 +252,20 @@ export default function SessionsPage() {
     }
   }, [friendsCurrentPage, activeTab, shouldFetch, fetchFriendsSessions, isLoggedIn]);
   
-  // Additional effect to handle client-side filtering for general tab
+  // Consolidated effect to apply all filters
   useEffect(() => {
+    // General tab filtering
     if (sessions.length > 0) {
       let filtered = [...sessions];
       
       // Apply Night Lord filter
       if (nightLordFilter !== 'All') {
+        console.log("Applying Night Lord filter:", nightLordFilter);
+        console.log("Original sessions:", sessions.map(s => s.nightLord));
         filtered = filtered.filter(session => 
           session.nightLord.toLowerCase() === nightLordFilter.toLowerCase()
         );
+        console.log("Filtered sessions:", filtered.map(s => s.nightLord));
       }
       
       // Apply Experience filter
@@ -283,16 +277,17 @@ export default function SessionsPage() {
       }
       
       setFilteredSessions(filtered);
+    } else {
+      setFilteredSessions([]);
     }
-  }, [nightLordFilter, experienceFilter, sessions]);
-  
-  // Effect to handle client-side filtering for friends tab
-  useEffect(() => {
+    
+    // Friends tab filtering
     if (friendsSessions.length > 0) {
       let filtered = [...friendsSessions];
       
       // Apply Night Lord filter
       if (friendsNightLordFilter !== 'All') {
+        console.log("Applying Friends Night Lord filter:", friendsNightLordFilter);
         filtered = filtered.filter(session => 
           session.nightLord.toLowerCase() === friendsNightLordFilter.toLowerCase()
         );
@@ -307,17 +302,17 @@ export default function SessionsPage() {
       }
       
       setFilteredFriendsSessions(filtered);
+    } else {
+      setFilteredFriendsSessions([]);
     }
-  }, [friendsNightLordFilter, friendsExperienceFilter, friendsSessions]);
-  
-  // Effect to update filtered sessions when tab changes
-  useEffect(() => {
-    if (activeTab === "general") {
-      setFilteredSessions(sessions);
-    } else if (activeTab === "friends") {
-      setFilteredFriendsSessions(friendsSessions);
-    }
-  }, [activeTab, sessions, friendsSessions]);
+  }, [
+    sessions, 
+    friendsSessions, 
+    nightLordFilter, 
+    experienceFilter, 
+    friendsNightLordFilter, 
+    friendsExperienceFilter
+  ]);
   
   // Handler for refresh button
   const handleRefresh = () => {
@@ -365,12 +360,10 @@ export default function SessionsPage() {
       // Always make sure we have fresh data when switching to friends tab
       fetchFriendsSessions();
       
-      // Reset friends filters to default
-      setFriendsNightLordFilter("All");
+      // Only reset experience filter, keep nightLord filter
       setFriendsExperienceFilter("All");
     } else if (value === "general") {
-      // Reset general filters to default when switching back
-      setNightLordFilter("All");
+      // Only reset experience filter, keep nightLord filter
       setExperienceFilter("All");
       
       // Refresh general sessions if needed
