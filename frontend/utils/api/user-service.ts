@@ -199,12 +199,13 @@ export interface AdminUser {
   platform?: string;
   autoRegion?: boolean;
   covenantName?: string;
+  experience?: string;
   cmRegion?: string;
   cfRegion?: string;
   preferredSessionName?: string;
   preferredSessionPassword?: string;
   preferredNightfarer?: string;
-  active: boolean;
+  disabled?: boolean;
 }
 
 export interface UsersPaginationResponse {

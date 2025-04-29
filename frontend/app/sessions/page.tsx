@@ -53,17 +53,17 @@ const MAX_PLAYERS = 3;
 type SessionTab = "general" | "friends";
 
 // Add maxPlayers to the Session type
-interface ExtendedSession extends Session {
-  maxPlayers: number;
-}
+// interface ExtendedSession extends Session {
+//   maxPlayers: number;
+// }
 
 export default function SessionsPage() {
   const router = useRouter();
   const { isLoggedIn, userData, isLoading: isUserLoading } = useAuth();
-  const [sessions, setSessions] = useState<ExtendedSession[]>([]);
-  const [friendsSessions, setFriendsSessions] = useState<ExtendedSession[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [friendsSessions, setFriendsSessions] = useState<Session[]>([]);
   const [minimalSessions, setMinimalSessions] = useState<MinimalSession[]>([]);
-  const [filteredSessions, setFilteredSessions] = useState<ExtendedSession[]>([]);
+  const [filteredSessions, setFilteredSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingFriends, setIsLoadingFriends] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -171,17 +171,16 @@ export default function SessionsPage() {
       );
       
       if (result.sessions) {
-        // Cast the sessions to include maxPlayers
-        const extendedSessions = result.sessions as unknown as ExtendedSession[];
-        setSessions(extendedSessions);
+
+        setSessions(result.sessions);
         
         // Apply Night Lord filter if it's set
         if (nightLordFilter !== 'All') {
-          setFilteredSessions(extendedSessions.filter(session => 
+          setFilteredSessions(result.sessions.filter(session => 
             session.nightLord.toLowerCase() === nightLordFilter.toLowerCase()
           ));
         } else {
-          setFilteredSessions(extendedSessions);
+          setFilteredSessions(result.sessions);
         }
         
         setTotalPages(result.sessions.length === limit ? currentPage + 1 : currentPage);
@@ -205,9 +204,6 @@ export default function SessionsPage() {
     setError(null);
 
     try {
-      console.log("Fetching friends sessions with region:", userRegion, 
-                 "platform:", userPlatform);
-      
       // Fetch sessions created by friends
       const offset = (friendsCurrentPage - 1) * limit;
       
@@ -218,10 +214,8 @@ export default function SessionsPage() {
         region: userRegion,
         platform: userPlatform
       });
-      
-      // Cast the sessions to include maxPlayers
-      const extendedSessions = sessions as unknown as ExtendedSession[];
-      setFriendsSessions(extendedSessions);
+
+      setFriendsSessions(sessions);
       
       setFriendsTotalPages(sessions.length === limit ? friendsCurrentPage + 1 : friendsCurrentPage);
     } catch (error: unknown) {
