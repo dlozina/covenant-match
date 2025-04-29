@@ -18,6 +18,7 @@ type UserData = {
   cmRegion?: string;
   cfRegion?: string;
   covenantName?: string;
+  experience?: string;
   preferredSessionName?: string;
   preferredSessionPassword?: string;
   preferredNightfarer?: string;
@@ -114,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         cmRegion: data.cmRegion,
         cfRegion: data.cfRegion,
         covenantName: data.covenantName,
+        experience: data.experience,
         preferredSessionName: data.preferredSessionName,
         preferredSessionPassword: data.preferredSessionPassword,
         preferredNightfarer: data.preferredNightfarer,

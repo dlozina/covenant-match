@@ -188,6 +188,7 @@ export interface UserStats {
   displayName: string;
   platform: string;
   covenantName: string;
+  experience: string;
   totalGames: number;
   wins: number;
   losses: number;

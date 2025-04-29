@@ -608,6 +608,7 @@ async fn get_multiple_users_statistics(
                                 .display_name
                                 .unwrap_or_else(|| user.username.clone()),
                             platform: user.platform,
+                            experience: user.experience.to_string(),
                             covenant_name: user.covenant_name,
                             total_games: stats.total_games,
                             wins: stats.wins,
@@ -622,6 +623,7 @@ async fn get_multiple_users_statistics(
                             user_id: user_id.clone(),
                             display_name: stats.username,
                             platform: "Unknown".to_string(),
+                            experience: "Unknown".to_string(),
                             covenant_name: "Unknown".to_string(),
                             total_games: stats.total_games,
                             wins: stats.wins,
@@ -676,6 +678,7 @@ pub struct UserStatsResponse {
     pub user_id: String,
     pub display_name: String,
     pub platform: String,
+    pub experience: String,
     pub covenant_name: String,
     pub total_games: i32,
     pub wins: i32,

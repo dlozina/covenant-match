@@ -179,6 +179,13 @@ function ProfileContent() {
                   {/* Fun Section */}
                   <div className="space-y-4">
                     <h2 className="text-lg font-semibold text-primary">Fun</h2>
+
+                    <div className="space-y-3">
+                      <div>
+                        <h3 className="text-sm md:text-base font-medium">Experience</h3>
+                        <p className="text-sm md:text-base text-muted-foreground break-words">{userData.experience}</p>
+                      </div>
+                    </div>
                     
                     <div className="space-y-3">
                       <div>

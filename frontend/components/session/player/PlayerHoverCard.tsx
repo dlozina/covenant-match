@@ -48,7 +48,7 @@ export const PlayerHoverCard: React.FC<PlayerHoverCardProps> = ({
                 <p className="text-sm text-muted-foreground">{userStats.covenantName}</p>
               </div>
               <div className="bg-primary/10 text-primary px-2 py-1 rounded text-xs">
-                {userStats.platform}
+                {userStats.experience}
               </div>
             </div>
             
