@@ -21,8 +21,10 @@ pub struct User {
     pub cm_region: String,
     pub cf_region: Option<String>,
     pub platform: String,
+    pub experience: Experience,
     pub covenant_name: String,
     pub role: String, // "admin" or "user"
+    pub disabled: bool,
     pub created_at: DateTime,
     pub updated_at: DateTime,
     pub preferred_session_name: Option<String>,
@@ -30,6 +32,13 @@ pub struct User {
     pub preferred_nightfarer: Option<String>,
     #[serde(default)]
     pub friend_list: Vec<ObjectId>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, ToSchema)]
+pub enum Experience {
+    Beginner,
+    Mid,
+    Veteran,
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate, ToSchema)]
@@ -46,9 +55,12 @@ pub struct CreateUserDto {
     pub region: String,
     pub auto_region: bool,
     pub platform: String,
+    pub experience: Experience,
     pub covenant_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub role: Option<String>, // Only used by admins when creating users
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub disabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub preferred_session_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

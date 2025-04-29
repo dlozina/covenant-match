@@ -11,7 +11,7 @@ use crate::models::chat::ChatMessageResponseDto;
 use crate::models::common::{LimitQuery, PaginationQuery};
 use crate::models::game_data::{
     Covenant, CovenantResponse, GameDataResponse, NightLord, NightLordResponse, Nightfarer,
-    NightfarerResponse, Platform, PlatformResponse, Region, RegionResponse,
+    NightfarerResponse, Platform, PlatformResponse, Region, RegionResponse, Experience, ExperienceResponse
 };
 use crate::models::geo_location::{CoordinatesDto, GeoLocationDataDto};
 use crate::models::news::{
@@ -204,12 +204,14 @@ use utoipa::{
             Covenant,
             Nightfarer,
             NightLord,
+            Experience,
             GameDataResponse,
             PlatformResponse,
             RegionResponse,
             CovenantResponse,
             NightfarerResponse,
             NightLordResponse,
+            ExperienceResponse,
             // Chat models
             ChatMessageResponseDto,
             // SSE models

@@ -41,3 +41,10 @@ export const FALLBACK_NIGHTFARERS = [
   "Igon",
   "Alexander",
 ] 
+
+// Fallback experience options
+export const FALLBACK_EXPERIENCE = [
+  "Beginner",
+  "Mid",
+  "Veteran",
+]

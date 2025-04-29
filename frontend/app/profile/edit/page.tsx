@@ -31,7 +31,7 @@ import {
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import React from "react"
-import { FALLBACK_REGIONS, FALLBACK_PLATFORMS, FALLBACK_COVENANT_NAMES, FALLBACK_NIGHTFARERS } from "@/lib/constants"
+import { FALLBACK_REGIONS, FALLBACK_PLATFORMS, FALLBACK_COVENANT_NAMES, FALLBACK_NIGHTFARERS, FALLBACK_EXPERIENCE } from "@/lib/constants"
 import { fetchGameData, updateProfile, deleteProfile } from "@/utils/api"
 
 // Username and display name validation regex
@@ -62,11 +62,19 @@ interface NightfarerData {
   description: string;
 }
 
+interface ExperienceData {
+  id: string;
+  name: string;
+  description: string;
+}
+
 interface GameData {
   platforms: PlatformData[];
   regions: RegionData[];
   covenants: CovenantData[];
   nightfarers: NightfarerData[];
+  experiences?: ExperienceData[];
+  night_lords?: PlatformData[];
 }
 
 const profileFormSchema = z.object({
@@ -99,6 +107,9 @@ const profileFormSchema = z.object({
   covenantName: z
     .string()
     .min(1, { message: "Covenant name is required" }),
+  experience: z
+    .string()
+    .min(1, { message: "Experience is required" }),
   preferredSessionName: z
     .string()
     .max(22, { message: "Session name must not be longer than 22 characters" })
@@ -175,6 +186,7 @@ function EditProfileContent() {
   const PLATFORMS = gameData?.platforms?.map(p => p.name) || FALLBACK_PLATFORMS;
   const COVENANT_NAMES = gameData?.covenants?.map(c => c.name) || FALLBACK_COVENANT_NAMES;
   const NIGHTFARERS = gameData?.nightfarers?.map(n => n.name) || FALLBACK_NIGHTFARERS;
+  const EXPERIENCE = gameData?.experiences?.map(e => e.name) || FALLBACK_EXPERIENCE;
   
   // Memoize the select options to prevent unnecessary re-renders
   const regionOptions = React.useMemo(() => 
@@ -213,6 +225,15 @@ function EditProfileContent() {
     [NIGHTFARERS]
   );
   
+  const experienceOptions = React.useMemo(() => 
+    EXPERIENCE.map(experience => (
+      <SelectItem key={experience} value={experience}>
+        {experience}
+      </SelectItem>
+    )), 
+    [EXPERIENCE]
+  );
+  
   // Debounce timer reference
   const [validationTimeout, setValidationTimeout] = useState<NodeJS.Timeout | null>(null)
 
@@ -226,6 +247,7 @@ function EditProfileContent() {
       platform: userData?.platform || PLATFORMS[0],
       autoRegion: userData?.autoRegion !== undefined ? userData.autoRegion : true,
       covenantName: userData?.covenantName || COVENANT_NAMES[0],
+      experience: userData?.experience || EXPERIENCE[0],
       preferredSessionName: "",
       preferredSessionPassword: "",
       preferredNightfarer: userData?.preferredNightfarer || "",
@@ -245,6 +267,7 @@ function EditProfileContent() {
         platform: userData.platform || PLATFORMS[0],
         autoRegion: userData.autoRegion !== undefined ? userData.autoRegion : true,
         covenantName: userData.covenantName || COVENANT_NAMES[0],
+        experience: userData.experience || EXPERIENCE[0],
         preferredSessionName: userData.preferredSessionName || "",
         preferredSessionPassword: userData.preferredSessionPassword || "",
         preferredNightfarer: userData.preferredNightfarer || "",
@@ -319,6 +342,7 @@ function EditProfileContent() {
         platform: data.platform,
         autoRegion: data.autoRegion,
         covenantName: data.covenantName,
+        experience: data.experience,
         preferredSessionName: data.preferredSessionName,
         preferredSessionPassword: data.preferredSessionPassword,
         preferredNightfarer: data.preferredNightfarer,
@@ -614,6 +638,33 @@ function EditProfileContent() {
                             </Select>
                             <FormDescription className="text-xs md:text-sm">
                               Choose your covenant allegiance.
+                            </FormDescription>
+                            <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="experience"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm md:text-base">Experience</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="h-10">
+                                  <SelectValue placeholder="Select your experience" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {experienceOptions}
+                              </SelectContent>
+                            </Select>
+                            <FormDescription className="text-xs md:text-sm">
+                              Choose your experience level.
                             </FormDescription>
                             <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
                           </FormItem>

@@ -1,7 +1,6 @@
 use crate::models::error::AppError;
 use crate::models::game_data::{
-    CovenantResponse, GameDataResponse, NightLordResponse, NightfarerResponse, PlatformResponse,
-    RegionResponse,
+    CovenantResponse, ExperienceResponse, GameDataResponse, NightLordResponse, NightfarerResponse, PlatformResponse, RegionResponse
 };
 use crate::repository::game_data_repository;
 use mongodb::Database;
@@ -14,14 +13,16 @@ pub async fn get_all_game_data(db: &Database) -> Result<GameDataResponse, AppErr
     let covenants_future = game_data_repository::get_all_covenants(db);
     let nightfarers_future = game_data_repository::get_all_nightfarers(db);
     let nightlords_future = game_data_repository::get_all_nightlords(db);
-
+    let experiences_future = game_data_repository::get_all_experiences(db);
+    
     // Using futures::join! to run futures concurrently
-    let (platforms, regions, covenants, nightfarers, nightlords) = futures::try_join!(
+    let (platforms, regions, covenants, nightfarers, nightlords, experiences) = futures::try_join!(
         platforms_future,
         regions_future,
         covenants_future,
         nightfarers_future,
-        nightlords_future
+        nightlords_future,
+        experiences_future
     )?;
 
     // Convert database models to response DTOs
@@ -44,6 +45,11 @@ pub async fn get_all_game_data(db: &Database) -> Result<GameDataResponse, AppErr
         .map(NightLordResponse::from)
         .collect();
 
+    let experience_responses: Vec<ExperienceResponse> = experiences
+        .into_iter()
+        .map(ExperienceResponse::from)
+        .collect();
+
     // Construct and return the combined response
     Ok(GameDataResponse {
         platforms: platform_responses,
@@ -51,6 +57,7 @@ pub async fn get_all_game_data(db: &Database) -> Result<GameDataResponse, AppErr
         covenants: covenant_responses,
         nightfarers: nightfarer_responses,
         night_lords: nightlord_responses,
+        experiences: experience_responses,
     })
 }
 
@@ -93,4 +100,11 @@ pub async fn get_all_nightlords(db: &Database) -> Result<Vec<NightLordResponse>,
         .map(NightLordResponse::from)
         .collect();
     Ok(nightlord_responses)
+}
+
+/// Get all experiences
+pub async fn get_all_experiences(db: &Database) -> Result<Vec<ExperienceResponse>, AppError> {
+    let experiences = game_data_repository::get_all_experiences(db).await?;
+    let experience_responses = experiences.into_iter().map(ExperienceResponse::from).collect();
+    Ok(experience_responses)
 }

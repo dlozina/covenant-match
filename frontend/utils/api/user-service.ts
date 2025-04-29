@@ -230,6 +230,7 @@ export interface CreateAdminUserParams {
   region?: string;
   platform?: string;
   covenantName: string;
+  experience: string;
   active?: boolean;
   autoRegion?: boolean;
   role?: string;

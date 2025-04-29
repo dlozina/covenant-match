@@ -94,9 +94,12 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
                 "cf_region": "Europe",
                 "platform": "PlayStation",
                 "role": "admin",
+                "disabled": false,
+                "experience": "Veteran",
                 "covenant_name": "Warriors of Sunlight",
                 "created_at": now,
-                "updated_at": now
+                "updated_at": now,
+                "friend_list": []
             })
             .await?;
         info!("Created default admin user");
@@ -167,6 +170,15 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
 
     // Seed covenants collection
     seed_collection(db, "covenants", default_covenants).await?;
+
+    let default_experiences = vec![
+        ("Beginner", "Newly risen from the embers, seeking purpose."),
+        ("Mid", "Tempered by trials, unshaken in the storm."),
+        ("Veteran", "A relic of countless battles, a legend in flesh."),
+    ];
+
+    // Seed experiences collection
+    seed_collection(db, "experiences", default_experiences).await?;
 
     // Seed feature flags
     seed_feature_flags(db).await?;

@@ -66,6 +66,7 @@ export interface RegisterParams {
   platform: string;
   autoRegion: boolean;
   covenantName: string;
+  experience: string;
 }
 
 export interface UpdateProfileParams {
@@ -76,6 +77,7 @@ export interface UpdateProfileParams {
   platform?: string;
   autoRegion?: boolean;
   covenantName?: string;
+  experience?: string;
   preferredSessionName?: string;
   preferredSessionPassword?: string;
   preferredNightfarer?: string;
@@ -90,6 +92,7 @@ export interface UserProfile {
   platform: string;
   autoRegion: boolean;
   covenantName: string;
+  experience?: string;
   preferredSessionName?: string;
   preferredSessionPassword?: string;
   preferredNightfarer?: string;
@@ -129,11 +132,19 @@ export interface Nightfarer {
   description: string;
 }
 
+export interface ExperienceData {
+  id: string;
+  name: string;
+  description: string;
+}
+
 export interface GameData {
   platforms: PlatformData[];
   regions: RegionData[];
   covenants: CovenantData[];
   nightfarers: Nightfarer[];
+  nightLords?: NightLord[];
+  experiences?: ExperienceData[];
 }
 
 // Session creation/management types

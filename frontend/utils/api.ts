@@ -747,6 +747,11 @@ export interface GameData {
     name: string;
     description: string;
   }[];
+  experiences: {
+    id: string;
+    name: string;
+    description: string;
+  }[];
 }
 
 export interface LoginParams {
@@ -764,6 +769,7 @@ export interface RegisterParams {
   platform: string;
   autoRegion: boolean;
   covenantName: string;
+  experience: string;
 }
 
 export interface UpdateProfileParams {

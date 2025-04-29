@@ -57,13 +57,23 @@ pub struct NightLord {
     pub schema_version: i32,
 }
 
+#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
+pub struct Experience {
+    #[serde(rename = "_id")]
+    pub id: ObjectId,
+    pub name: String,
+    pub description: String,
+}
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct GameDataResponse {
     pub platforms: Vec<PlatformResponse>,
     pub regions: Vec<RegionResponse>,
     pub covenants: Vec<CovenantResponse>,
     pub nightfarers: Vec<NightfarerResponse>,
     pub night_lords: Vec<NightLordResponse>,
+    pub experiences: Vec<ExperienceResponse>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -96,6 +106,13 @@ pub struct NightfarerResponse {
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct NightLordResponse {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct ExperienceResponse {
     pub id: String,
     pub name: String,
     pub description: String,
@@ -151,3 +168,15 @@ impl From<NightLord> for NightLordResponse {
         }
     }
 }
+
+impl From<Experience> for ExperienceResponse {
+    fn from(experience: Experience) -> Self {
+        Self {
+            id: experience.id.to_hex(),
+            name: experience.name,
+            description: experience.description,
+        }
+    }
+}
+
+

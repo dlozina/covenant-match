@@ -95,6 +95,7 @@ const adminUserSchema = z.object({
   region: z.string().optional(),
   platform: z.string().optional(),
   covenantName: z.string().min(1, "Covenant name is required"),
+  experience: z.string().min(1, "Experience is required"),
   active: z.boolean().default(true),
   autoRegion: z.boolean().default(true),
   role: z.enum(["admin", "user"]).default("admin"),
@@ -136,6 +137,10 @@ export function AdminUsersClient() {
   const COVENANTS = useMemo(() => 
     gameData?.covenants?.map(c => c.name) || ["Warriors of Sunlight", "Way of White", "Princess Guard", "Way of the Blue", "Heirs of the Sun", "Spears of the Church", "Blades of the Darkmoon", "Watchdogs of Farron"],
   [gameData]);
+  
+  const EXPERIENCE = useMemo(() => 
+    gameData?.experiences?.map(e => e.name) || ["Beginner", "Intermediate", "Expert", "Veteran"],
+  [gameData]);
 
   // Initialize form for admin user creation
   const form = useForm<z.infer<typeof adminUserSchema>>({
@@ -149,6 +154,7 @@ export function AdminUsersClient() {
       region: "",
       platform: "",
       covenantName: "",
+      experience: "",
       active: true,
       autoRegion: true,
       role: "admin",
@@ -290,6 +296,7 @@ export function AdminUsersClient() {
         region: values.region,
         platform: values.platform,
         covenantName: values.covenantName,
+        experience: values.experience,
         active: values.active,
         autoRegion: values.autoRegion,
         role: values.role,
@@ -547,6 +554,23 @@ export function AdminUsersClient() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
+                  name="displayName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Display Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Display Name" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Public display name for the user
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
                   name="covenantName"
                   render={({ field }) => (
                     <FormItem>
@@ -570,23 +594,6 @@ export function AdminUsersClient() {
                       </FormControl>
                       <FormDescription>
                         User&apos;s covenant allegiance name
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="displayName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Display Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Display Name" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Public display name for the user
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -693,6 +700,52 @@ export function AdminUsersClient() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
+                  name="autoRegion"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                      <div className="space-y-0.5">
+                        <FormLabel>Auto Region Detection</FormLabel>
+                        <FormDescription>
+                          Automatically detect and update user&apos;s region
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="active"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                      <div className="space-y-0.5">
+                        <FormLabel>Active Status</FormLabel>
+                        <FormDescription>
+                          Whether this account should be active immediately
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
                   name="role"
                   render={({ field }) => (
                     <FormItem>
@@ -721,48 +774,33 @@ export function AdminUsersClient() {
                 
                 <FormField
                   control={form.control}
-                  name="autoRegion"
+                  name="experience"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                      <div className="space-y-0.5">
-                        <FormLabel>Auto Region Detection</FormLabel>
-                        <FormDescription>
-                          Automatically detect and update user&apos;s region
-                        </FormDescription>
-                      </div>
+                    <FormItem>
+                      <FormLabel>Experience</FormLabel>
                       <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select experience" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {EXPERIENCE.map(experience => (
+                              <SelectItem key={experience} value={experience}>{experience}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </FormControl>
+                      <FormDescription>
+                        User&apos;s gaming experience level
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
-
-              <FormField
-                control={form.control}
-                name="active"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                    <div className="space-y-0.5">
-                      <FormLabel>Active Status</FormLabel>
-                      <FormDescription>
-                        Whether this account should be active immediately
-                      </FormDescription>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
               <Button type="submit" className="w-full" disabled={isSubmitting}>
                 {isSubmitting ? "Creating..." : `Create ${form.getValues().role === 'admin' ? 'Admin' : 'Regular'} User`}
