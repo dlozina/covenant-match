@@ -297,6 +297,9 @@ pub async fn get_sessions(
         None => None,
     };
 
+    // For general sessions list, filter out friends-only sessions
+    let is_friends_only = Some(false);
+
     let sessions = session_repository::find_sessions(
         db,
         status_filter,
@@ -305,6 +308,7 @@ pub async fn get_sessions(
         is_private,
         region,
         platform,
+        is_friends_only,
     )
     .await?;
 
@@ -336,6 +340,9 @@ pub async fn get_minimal_sessions(
     // Always filter out private sessions for this public endpoint
     let is_private = Some(false);
 
+    // For general sessions list, filter out friends-only sessions
+    let is_friends_only = Some(false);
+
     let sessions = session_repository::find_sessions(
         db,
         status_filter,
@@ -344,6 +351,7 @@ pub async fn get_minimal_sessions(
         is_private,
         region,
         platform,
+        is_friends_only,
     )
     .await?;
 

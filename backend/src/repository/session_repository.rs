@@ -36,6 +36,7 @@ pub async fn find_sessions(
     is_private: Option<bool>,
     region: Option<String>,
     platform: Option<String>,
+    is_friends_only: Option<bool>,
 ) -> Result<Vec<GameSession>, AppError> {
     let mut filter = match status {
         Some(status) => doc! { "status": to_bson(&status)? },
@@ -44,6 +45,11 @@ pub async fn find_sessions(
 
     if let Some(is_private) = is_private {
         filter = doc! { "$and": [filter, doc! { "is_private": is_private }] };
+    }
+
+    // Add is_friends_only filter if provided
+    if let Some(is_friends_only) = is_friends_only {
+        filter = doc! { "$and": [filter, doc! { "is_friends_only": is_friends_only }] };
     }
 
     // Add region filter if provided
@@ -253,7 +259,9 @@ pub async fn find_friends_sessions(
     filter = doc! {
         "$and": [
             filter,
-            { "host_id": { "$in": friend_ids_hex } }
+            { "host_id": { "$in": friend_ids_hex } },
+            // For friends tab, only show sessions with is_friends_only flag set to true
+            { "is_friends_only": true }
         ]
     };
 

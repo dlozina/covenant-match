@@ -37,6 +37,7 @@ export interface Session {
   hostId: string;
   status: "Open" | "InProgress" | "Completed";
   nightLord: string;
+  isFriendsOnly: boolean;
   joinedPlayers: JoinedPlayer[];
   createdAt: string;
   updatedAt: string;
@@ -613,7 +614,8 @@ export const joinSession = async (
   username: string,
   covenantName: string,
   region: string,
-  platform: string
+  platform: string,
+  experience: string,
 ): Promise<void> => {
   try {
     const token = getToken();
@@ -630,7 +632,8 @@ export const joinSession = async (
         username,
         covenantName,
         region,
-        platform
+        platform,
+        experience
       }),
     });
     

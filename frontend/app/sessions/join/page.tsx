@@ -205,7 +205,8 @@ function JoinSessionContent() {
         userData.username,
         userData.covenantName || 'Unknown',
         userRegion,
-        userPlatform
+        userPlatform,
+        userData.experience || 'Unknown'
       );
       
       router.push(`/sessions/run?id=${sessionId}`);

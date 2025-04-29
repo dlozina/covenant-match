@@ -266,7 +266,8 @@ function RecreateSessionContent() {
         userData.username,
         userData.covenantName || '',
         userRegion,
-        userPlatform
+        userPlatform,
+        userData.experience || 'Unknown'
       );
       
       setNotification({

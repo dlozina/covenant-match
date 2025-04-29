@@ -423,7 +423,7 @@ export default function SessionsPage() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold mb-2 text-gradient bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-indigo-400">
-              Game Sessions Hub
+            Majula - Game Sessions Hub
             </h1>
             <p className="text-sm md:text-base text-muted-foreground">
               Join a session or create your own to battle alongside fellow Nightreign warriors
@@ -520,6 +520,7 @@ export default function SessionsPage() {
                   disabled={!isLoggedIn}
                 >
                   Friends&apos; Sessions
+                  <span className="ml-2 bg-purple-500/20 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 text-xs px-2 py-0.5 rounded-full">Friends Only</span>
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -661,9 +662,16 @@ export default function SessionsPage() {
                           <div key={session.id} className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-shadow hover:border-purple-500/30">
                             <div className="flex justify-between items-start mb-2">
                               <h3 className="font-medium text-base truncate">{session.name}</h3>
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
-                                {session.nightLord}
-                              </span>
+                              <div className="flex flex-wrap gap-1">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                  {session.nightLord}
+                                </span>
+                                {session.isFriendsOnly && (
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
+                                    Friends Only
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             <div className="text-sm text-muted-foreground mb-3">
                               <div className="flex justify-between mb-1">
@@ -694,9 +702,11 @@ export default function SessionsPage() {
                         <div key={session.id} className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-shadow hover:border-purple-500/30">
                           <div className="flex justify-between items-start mb-2">
                             <h3 className="font-medium text-base truncate">{session.name}</h3>
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
-                              {(session as { nightLord?: string }).nightLord || '-'}
-                            </span>
+                            <div className="flex flex-wrap gap-1">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                {(session as { nightLord?: string }).nightLord || '-'}
+                              </span>
+                            </div>
                           </div>
                           <div className="text-sm text-muted-foreground mb-3">
                             <div className="flex justify-between mb-1">
@@ -785,6 +795,13 @@ export default function SessionsPage() {
             
             {/* Friends Sessions Tab */}
             <TabsContent value="friends" className="p-0">
+              {/* Explanation banner for friend sessions */}
+              <div className="p-4 border-b bg-purple-50 dark:bg-purple-900/10">
+                <p className="text-sm text-purple-700 dark:text-purple-300">
+                  This tab shows sessions created by your friends that are marked as &ldquo;Friends Only&rdquo;. These sessions are exclusive and not visible in the regular sessions list.
+                </p>
+              </div>
+              
               {!isLoggedIn ? (
                 <div className="p-6 text-center">
                   <div className="inline-block p-3 rounded-full bg-muted mb-4">
@@ -822,13 +839,6 @@ export default function SessionsPage() {
                   </div>
                   <div className="flex flex-col sm:flex-row gap-2 mt-2">
                     <Button 
-                      variant="outline" 
-                      className="border-purple-600/40"
-                      asChild
-                    >
-                      <Link href="/friends">Find Friends</Link>
-                    </Button>
-                    <Button 
                       className="bg-gradient-to-r from-purple-600 to-indigo-500" 
                       asChild
                     >
@@ -862,6 +872,11 @@ export default function SessionsPage() {
                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
                                   {session.nightLord}
                                 </span>
+                                {session.isFriendsOnly && (
+                                  <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
+                                    Friends Only
+                                  </span>
+                                )}
                               </TableCell>
                               <TableCell>
                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">
@@ -895,9 +910,16 @@ export default function SessionsPage() {
                         <div key={session.id} className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-shadow hover:border-purple-500/30">
                           <div className="flex justify-between items-start mb-2">
                             <h3 className="font-medium text-base truncate">{session.name}</h3>
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
-                              {session.nightLord}
-                            </span>
+                            <div className="flex flex-wrap gap-1">
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                {session.nightLord}
+                              </span>
+                              {session.isFriendsOnly && (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
+                                  Friends Only
+                                </span>
+                              )}
+                            </div>
                           </div>
                           <div className="text-sm text-muted-foreground mb-3">
                             <div className="flex justify-between mb-1">

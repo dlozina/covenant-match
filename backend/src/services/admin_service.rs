@@ -208,6 +208,7 @@ pub async fn get_sessions_paginated(
         None,                     // Don't filter private/public
         None,                     // Don't filter by region
         None,                     // Don't filter by platform
+        None,                     // Don't filter by friends_only for admin view
     )
     .await?;
 
