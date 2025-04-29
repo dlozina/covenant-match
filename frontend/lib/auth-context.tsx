@@ -22,6 +22,7 @@ type UserData = {
   preferredSessionPassword?: string;
   preferredNightfarer?: string;
   role?: string;
+  disabled?: boolean;
   // Add other user properties as needed
 };
 
@@ -117,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         preferredSessionPassword: data.preferredSessionPassword,
         preferredNightfarer: data.preferredNightfarer,
         role: data.role,
+        disabled: data.disabled,
       };
     } catch (error) {
       console.error("Error fetching user data:", error);
@@ -197,20 +199,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchUserData]);
 
   // Login function
-  const login = useCallback((token: string) => {
-    // Store the token directly without Next.js caching
-    localStorage.setItem('token', token);
-    
-    // Get actual expiration time from the token
-    const now = Date.now();
-    const expiry = getTokenExpiry(token);
-    const expiresIn = expiry - now;
-    console.log(`Login successful. Token expires in ${Math.floor(expiresIn / 3600000)}h ${Math.floor((expiresIn % 3600000) / 60000)}m`);
-    
-    setIsLoggedIn(true);
-    setLastTokenRefresh(now);
-    refreshUserData();
-  }, [refreshUserData]);
+  const login = useCallback(async (token: string) => {
+    try {
+      // First, check if the account is disabled
+      const userData = await fetchUserData(token);
+      
+      if (userData?.disabled) {
+        // Account is disabled - throw a specific error for disabled accounts
+        const disabledError = new Error('Your account has been disabled. Please contact support for assistance.');
+        // Add property to identify this is a disabled account error
+        Object.defineProperty(disabledError, 'isDisabledAccount', { value: true });
+        throw disabledError;
+      }
+      
+      // Store the token directly without Next.js caching
+      localStorage.setItem('token', token);
+      
+      // Get actual expiration time from the token
+      const now = Date.now();
+      const expiry = getTokenExpiry(token);
+      const expiresIn = expiry - now;
+      console.log(`Login successful. Token expires in ${Math.floor(expiresIn / 3600000)}h ${Math.floor((expiresIn % 3600000) / 60000)}m`);
+      
+      setIsLoggedIn(true);
+      setLastTokenRefresh(now);
+      
+      // If we already fetched user data, set it directly to avoid a second API call
+      if (userData) {
+        setUserData(userData);
+      } else {
+        refreshUserData();
+      }
+      
+      return userData; // Return the user data
+    } catch (error) {
+      // Don't store the token if there was an error
+      localStorage.removeItem('token');
+      throw error; // Re-throw the error to be handled by the login page
+    }
+  }, [fetchUserData, getTokenExpiry, refreshUserData]);
 
   // Logout function
   const logout = useCallback(() => {
@@ -251,8 +278,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       if (data) {
-        setUserData(data);
-        setIsLoggedIn(true);
+        // Check if the account is disabled
+        if (data.disabled) {
+          // Account is disabled - logout and clear token
+          localStorage.removeItem('token');
+          setIsLoggedIn(false);
+          setUserData(null);
+          // User will need to log in again where they'll see the disabled message
+        } else {
+          // Account is active - proceed normally
+          setUserData(data);
+          setIsLoggedIn(true);
+        }
       } else {
         // Invalid token and refresh failed
         localStorage.removeItem('token');
@@ -269,8 +306,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const token = localStorage.getItem('token');
           const data = await fetchUserData(token!);
           if (data) {
-            setUserData(data);
-            setIsLoggedIn(true);
+            // Check if account is disabled before proceeding
+            if (data.disabled) {
+              localStorage.removeItem('token');
+              setIsLoggedIn(false);
+              setUserData(null);
+              // User will need to log in again where they'll see the disabled message
+            } else {
+              setUserData(data);
+              setIsLoggedIn(true);
+            }
             setIsLoading(false);
             return;
           }
@@ -284,7 +329,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [fetchUserData, refreshToken]);
+  }, [fetchUserData, refreshToken, router]);
 
   // Check authentication status on initial load and when pathname changes
   useEffect(() => {

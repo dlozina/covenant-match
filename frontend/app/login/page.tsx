@@ -67,15 +67,24 @@ export default function LoginPage() {
   const [showCaptcha, setShowCaptcha] = useState(false)
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [notification, setNotification] = useState<NotificationType | null>(null)
+  // Store form values to prevent losing them on re-render
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
-      username: "",
-      password: "",
+      username: username,
+      password: password,
     },
     mode: "onSubmit", // Only validate on submit
   })
+
+  // Update the form when username/password state changes
+  useEffect(() => {
+    form.setValue("username", username);
+    form.setValue("password", password);
+  }, [username, form]);
 
   // Show CAPTCHA after 3 failed attempts
   useEffect(() => {
@@ -85,16 +94,19 @@ export default function LoginPage() {
   }, [loginAttempts])
 
   async function onSubmit(data: LoginFormValues) {
+    // Save form values to state
+    setUsername(data.username);
+    
     // Reset notification on new submission
-    setNotification(null)
+    setNotification(null);
     
     // Check if we're currently locked out
     if (isLocked) {
       setNotification({
         message: "Too many login attempts. Please try again later.",
         type: 'error'
-      })
-      return
+      });
+      return;
     }
 
     // Check if captcha is shown but not completed
@@ -102,28 +114,28 @@ export default function LoginPage() {
       setNotification({
         message: "Please complete the CAPTCHA verification",
         type: 'warning'
-      })
-      return
+      });
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
     // Increment login attempts
-    setLoginAttempts(prev => prev + 1)
+    setLoginAttempts(prev => prev + 1);
 
     // If we've had too many attempts, lock the form temporarily
     if (loginAttempts >= 5) {
-      setIsLocked(true)
+      setIsLocked(true);
       setTimeout(() => {
-        setIsLocked(false)
-        setLoginAttempts(0)
-      }, 60000) // Lock for 1 minute after 5 attempts
+        setIsLocked(false);
+        setLoginAttempts(0);
+      }, 60000); // Lock for 1 minute after 5 attempts
       
       setNotification({
         message: "Too many failed login attempts. Please try again in 1 minute.",
         type: 'error'
-      })
-      setIsLoading(false)
-      return
+      });
+      setIsLoading(false);
+      return;
     }
 
     try {
@@ -138,36 +150,69 @@ export default function LoginPage() {
         loginData.captchaToken = captchaToken;
       }
       
+      // First attempt to get a token from the API
       const responseData = await apiLogin(loginData);
       
-      // Use the login function from auth context
-      if (responseData.token) {
-        login(responseData.token)
+      if (!responseData || !responseData.token) {
+        throw new Error('Authentication failed');
+      }
+      
+      // Then attempt to login with the token
+      try {
+        await login(responseData.token);
+        
+        // If we get here, login was successful
         setNotification({
           message: "Login successful!",
           type: 'success'
-        })
+        });
+        
         // Reset login attempts and captcha on successful login
-        setLoginAttempts(0)
-        setShowCaptcha(false)
-        setCaptchaToken(null)
-        router.push('/profile')
-      } else {
-        throw new Error('Authentication failed')
+        setLoginAttempts(0);
+        setShowCaptcha(false);
+        setCaptchaToken(null);
+        
+        // Clear password for security
+        setPassword("");
+        
+        // Wait a moment to show success message before redirecting
+        setTimeout(() => {
+          router.push('/profile');
+        }, 1000);
+      } catch (loginError) {
+        // Clear the password field on error
+        setPassword("");
+        
+        // Handle specific disabled account error
+        if (loginError instanceof Error) {
+          setNotification({
+            message: loginError.message,
+            type: 'error'
+          });
+          console.error('Login error:', loginError);
+        } else {
+          setNotification({
+            message: "An unknown error occurred during login.",
+            type: 'error'
+          });
+        }
       }
-    } catch (error: unknown) {
+    } catch (apiError) {
+      // Clear the password field on error
+      setPassword("");
+      
       // Check if error has requiresCaptcha property
       // @ts-expect-error - Custom property on error
-      if (error instanceof Error && error.requiresCaptcha) {
+      if (apiError instanceof Error && apiError.requiresCaptcha) {
         setShowCaptcha(true);
       }
       
       setNotification({
-        message: error instanceof Error ? error.message : "Login failed. Please try again.",
+        message: apiError instanceof Error ? apiError.message : "Login failed. Please try again.",
         type: 'error'
-      })
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
@@ -200,6 +245,10 @@ export default function LoginPage() {
                           placeholder="username" 
                           {...field} 
                           className="h-10 text-base"
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setUsername(e.target.value);
+                          }}
                         />
                       </FormControl>
                       <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
@@ -219,6 +268,10 @@ export default function LoginPage() {
                           type="password" 
                           {...field} 
                           className="h-10 text-base"
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setPassword(e.target.value);
+                          }}
                         />
                       </FormControl>
                       <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />

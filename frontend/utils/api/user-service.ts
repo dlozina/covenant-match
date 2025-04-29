@@ -231,7 +231,7 @@ export interface CreateAdminUserParams {
   platform?: string;
   covenantName: string;
   experience: string;
-  active?: boolean;
+  disabled?: boolean;
   autoRegion?: boolean;
   role?: string;
 }
@@ -239,5 +239,5 @@ export interface CreateAdminUserParams {
 export interface UpdateUserParams {
   email?: string;
   displayName?: string;
-  active?: boolean;
+  disabled?: boolean;
 } 

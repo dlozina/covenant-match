@@ -41,6 +41,17 @@ pub enum Experience {
     Veteran,
 }
 
+// Implement Display for Experience
+impl std::fmt::Display for Experience {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Experience::Beginner => write!(f, "Beginner"),
+            Experience::Mid => write!(f, "Mid"),
+            Experience::Veteran => write!(f, "Veteran"),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Validate, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateUserDto {
@@ -82,7 +93,9 @@ pub struct UserResponse {
     pub cm_region: String,
     pub cf_region: Option<String>,
     pub covenant_name: String,
+    pub experience: Experience,
     pub role: String,
+    pub disabled: bool,
     pub platform: String,
     pub created_at: DateTime,
     pub updated_at: DateTime,
@@ -123,6 +136,8 @@ pub struct UpdateUserProfileDto {
     pub cf_region: Option<String>,
     pub platform: Option<String>,
     pub covenant_name: Option<String>,
+    pub disabled: Option<bool>,
+    pub experience: Option<Experience>,
     pub avatar_url: Option<String>,
     pub preferred_session_name: Option<String>,
     pub preferred_session_password: Option<String>,
@@ -142,7 +157,9 @@ impl From<User> for UserResponse {
             cm_region: user.cm_region,
             cf_region: user.cf_region,
             covenant_name: user.covenant_name,
+            experience: user.experience,
             role: user.role,
+            disabled: user.disabled,
             platform: user.platform,
             created_at: user.created_at,
             updated_at: user.updated_at,

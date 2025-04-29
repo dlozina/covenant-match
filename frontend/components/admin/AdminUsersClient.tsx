@@ -96,7 +96,7 @@ const adminUserSchema = z.object({
   platform: z.string().optional(),
   covenantName: z.string().min(1, "Covenant name is required"),
   experience: z.string().min(1, "Experience is required"),
-  active: z.boolean().default(true),
+  disabled: z.boolean().default(false),
   autoRegion: z.boolean().default(true),
   role: z.enum(["admin", "user"]).default("admin"),
 }).refine(data => data.password === data.confirm_password, {
@@ -155,7 +155,7 @@ export function AdminUsersClient() {
       platform: "",
       covenantName: "",
       experience: "",
-      active: true,
+      disabled: false,
       autoRegion: true,
       role: "admin",
     },
@@ -297,7 +297,7 @@ export function AdminUsersClient() {
         platform: values.platform,
         covenantName: values.covenantName,
         experience: values.experience,
-        active: values.active,
+        disabled: values.disabled,
         autoRegion: values.autoRegion,
         role: values.role,
       });
@@ -722,13 +722,13 @@ export function AdminUsersClient() {
                 
                 <FormField
                   control={form.control}
-                  name="active"
+                  name="disabled"
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                       <div className="space-y-0.5">
-                        <FormLabel>Active Status</FormLabel>
+                        <FormLabel>Disable Account</FormLabel>
                         <FormDescription>
-                          Whether this account should be active immediately
+                          Toggle ON to disable this account
                         </FormDescription>
                       </div>
                       <FormControl>
@@ -803,7 +803,7 @@ export function AdminUsersClient() {
               </div>
 
               <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? "Creating..." : `Create ${form.getValues().role === 'admin' ? 'Admin' : 'Regular'} User`}
+                {isSubmitting ? "Creating..." : `Create ${form.getValues().role === 'admin' ? 'Admin' : 'Regular'} User${form.getValues().disabled ? ' (Disabled)' : ''}`}
               </Button>
             </form>
           </Form>

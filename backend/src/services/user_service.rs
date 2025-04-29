@@ -1,7 +1,7 @@
 use crate::models::error::AppError;
 use crate::models::geo_location::GeoLocation;
 use crate::models::user::{
-    CreateUserDto, Experience, FriendDto, LoginUserDto, UpdateUserProfileDto, User, UserResponse
+    CreateUserDto, Experience, FriendDto, LoginUserDto, UpdateUserProfileDto, User, UserResponse,
 };
 use crate::repository::user_repository;
 use crate::utils::jwt;
@@ -80,13 +80,15 @@ pub async fn create_user(
         email: user.email,
         display_name: user.display_name,
         avatar_url: user.avatar_url,
-        role: user.role,
         region: user.region,
         cm_region: user.cm_region,
         cf_region: user.cf_region,
         platform: user.platform,
         auto_region: user.auto_region,
         covenant_name: user.covenant_name,
+        experience: user.experience,
+        role: user.role,
+        disabled: user.disabled,
         preferred_session_name: user.preferred_session_name,
         preferred_session_password: user.preferred_session_password,
         preferred_nightfarer: user.preferred_nightfarer,
@@ -129,7 +131,9 @@ pub async fn login_user(
         cf_region: user.cf_region,
         platform: user.platform,
         covenant_name: user.covenant_name,
+        experience: user.experience,
         role: user.role,
+        disabled: user.disabled,
         preferred_session_name: user.preferred_session_name,
         preferred_session_password: user.preferred_session_password,
         preferred_nightfarer: user.preferred_nightfarer,
@@ -157,7 +161,9 @@ pub async fn get_user_by_id(db: &Database, user_id: &str) -> Result<UserResponse
             cf_region: user.cf_region,
             platform: user.platform,
             covenant_name: user.covenant_name,
+            experience: user.experience,
             role: user.role,
+            disabled: user.disabled,
             preferred_session_name: user.preferred_session_name,
             preferred_session_password: user.preferred_session_password,
             preferred_nightfarer: user.preferred_nightfarer,
@@ -312,6 +318,13 @@ pub async fn update_user_profile(
     }
     if let Some(preferred_nightfarer) = update_data.preferred_nightfarer.clone() {
         update_doc.insert("preferred_nightfarer", preferred_nightfarer);
+    }
+    if let Some(disabled) = update_data.disabled {
+        update_doc.insert("disabled", disabled);
+    }
+    if let Some(experience) = update_data.experience {
+        // Convert Experience enum to String before inserting into BSON document
+        update_doc.insert("experience", experience.to_string());
     }
 
     // Always update the updated_at field with MongoDB DateTime

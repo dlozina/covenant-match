@@ -61,16 +61,16 @@ export function EditUserClient({ userId }: EditUserClientProps) {
     fetchUser();
   }, [userId]);
 
-  const handleUpdateStatus = async (active: boolean) => {
+  const handleUpdateStatus = async (disabled: boolean) => {
     if (!user) return;
     
     setIsSubmitting(true);
     try {
-      const updatedUser = await UserService.updateUser(userId, { active });
+      const updatedUser = await UserService.updateUser(userId, { disabled });
       
       setNotification({
         type: "success",
-        message: active ? "Account activated successfully" : "Account disabled successfully"
+        message: disabled ? "Account disabled successfully" : "Account activated successfully"
       });
       
       // Update local state with new user data
@@ -286,15 +286,15 @@ export function EditUserClient({ userId }: EditUserClientProps) {
                       <Input value={user.preferredNightfarer || "Not set"} readOnly className="bg-muted/50 mt-2" />
                     </div>
                     <div>
-                      <Label>Account Status</Label>
+                      <Label>Disable Account</Label>
                       <div className="flex items-center space-x-2 mt-2">
                         <Switch 
-                          checked={user.active}
+                          checked={user.disabled}
                           onCheckedChange={(checked) => handleUpdateStatus(checked)}
                           disabled={isSubmitting}
                         />
-                        <span className={user.active ? "text-green-600" : "text-red-600"}>
-                          {user.active ? "Active" : "Disabled"}
+                        <span className={user.disabled ? "text-red-600" : "text-green-600"}>
+                          {user.disabled ? "Disabled" : "Active"}
                         </span>
                       </div>
                     </div>
@@ -325,12 +325,12 @@ export function EditUserClient({ userId }: EditUserClientProps) {
             </Button>
             <Button 
               variant="outline" 
-              className={`gap-2 ${user.active ? "" : "border-destructive text-destructive hover:bg-destructive/10"}`}
-              onClick={() => handleUpdateStatus(!user.active)}
+              className={`gap-2 ${user.disabled ? "border-destructive text-destructive hover:bg-destructive/10" : ""}`}
+              onClick={() => handleUpdateStatus(!user.disabled)}
               disabled={isSubmitting}
             >
               <Ban className="h-4 w-4" />
-              {user.active ? "Disable Account" : "Enable Account"}
+              {user.disabled ? "Enable Account" : "Disable Account"}
             </Button>
             <Button 
               variant="destructive" 
