@@ -13,6 +13,7 @@ export interface Session {
   name: string;
   hostId: string;
   status: "Open" | "InProgress" | "Completed";
+  isFriendsOnly: boolean;
   nightLord: string;
   joinedPlayers: JoinedPlayer[];
   createdAt: string;

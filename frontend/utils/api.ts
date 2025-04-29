@@ -695,6 +695,7 @@ export interface CreateSessionParams {
   nightLord: string;
   nightfarer: string;
   isPrivate: boolean;
+  isFriendsOnly: boolean;
   region: string;
   platform: string;
 }

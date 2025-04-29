@@ -27,6 +27,7 @@ pub struct PlayerInfoResponseDto {
     pub covenant_name: String,
     pub region: String,
     pub platform: String,
+    pub experience: String,
     #[serde(alias = "joined_at")]
     pub joined_at: DateTime,
 }
@@ -204,6 +205,7 @@ impl From<GameSession> for SessionResponseDto {
                     covenant_name: player.covenant_name,
                     region: player.region,
                     platform: player.platform,
+                    experience: player.experience,
                     joined_at: player.joined_at,
                 })
                 .collect(),
