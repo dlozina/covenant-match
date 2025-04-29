@@ -177,8 +177,8 @@ export default function LoginPage() {
         
         // Wait a moment to show success message before redirecting
         setTimeout(() => {
-          router.push('/profile');
-        }, 1000);
+          router.push('/');
+        }, 500);
       } catch (loginError) {
         // Clear the password field on error
         setPassword("");
