@@ -7,11 +7,16 @@ use crate::models::admin::{
     SessionConnectionResponse, SystemInfo, SystemStatusResponse, WebSocketStatsData,
     WebSocketStatsResponse,
 };
+use crate::models::bug::{
+    BugReport, BugReportData, BugReportResponse, BugReportResponseDto, BugReportsData,
+    BugReportsListResponse, CreateBugReportData, CreateBugReportDto, CreateBugReportResponse,
+};
 use crate::models::chat::ChatMessageResponseDto;
 use crate::models::common::{LimitQuery, PaginationQuery};
 use crate::models::game_data::{
-    Covenant, CovenantResponse, GameDataResponse, NightLord, NightLordResponse, Nightfarer,
-    NightfarerResponse, Platform, PlatformResponse, Region, RegionResponse, Experience, ExperienceResponse
+    Covenant, CovenantResponse, Experience, ExperienceResponse, GameDataResponse, NightLord,
+    NightLordResponse, Nightfarer, NightfarerResponse, Platform, PlatformResponse, Region,
+    RegionResponse,
 };
 use crate::models::geo_location::{CoordinatesDto, GeoLocationDataDto};
 use crate::models::news::{
@@ -20,8 +25,9 @@ use crate::models::news::{
 };
 use crate::models::session::{
     CovenantStats, CovenantStatsResponse, CreateSessionDto, GameResult, JoinSessionDto,
-    MinimalSessionDto, PlayerInfo, RateSessionDto, ResultsResponseDto, SessionResponseDto,
-    SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto, PlayerInfoResponseDto, SessionResultResponseDto
+    MinimalSessionDto, PlayerInfo, PlayerInfoResponseDto, RateSessionDto, ResultsResponseDto,
+    SessionResponseDto, SessionResult, SessionResultResponseDto, SessionStatus, SubmitResultDto,
+    UpdateSessionDto,
 };
 use crate::models::statistics::{
     LeaderboardEntryResponseDto, NightLordStatsResponse, PaginatedSessionData,
@@ -37,8 +43,8 @@ use crate::routes::users::{JwtInfoDto, TokenInfoResponse};
 use crate::sse::messages::{ServerMessage, SessionInfo, SseSessionStatus};
 
 use crate::routes::{
-    admin::*, chat::*, game_data::*, health::*, news::*, sessions::*, sse::*, statistics::*,
-    user_data::*, users::*, ws::*,
+    admin::*, bug::*, chat::*, game_data::*, health::*, news::*, sessions::*, sse::*,
+    statistics::*, user_data::*, users::*, ws::*,
 };
 
 // Import SSE models
@@ -155,6 +161,10 @@ use utoipa::{
         update_announcement,
         // Chat routes
         get_chat_history,
+        // Bug routes
+        create_bug_report,
+        get_all_bug_reports,
+        get_bug_report_by_id,
     ),
     components(
         schemas(
@@ -245,6 +255,16 @@ use utoipa::{
             Announcement,
             UpdateAnnouncementDto,
             AnnouncementResponse,
+            // Bug models
+            BugReport,
+            CreateBugReportDto,
+            BugReportResponseDto,
+            BugReportResponse,
+            BugReportData,
+            BugReportsListResponse,
+            BugReportsData,
+            CreateBugReportResponse,
+            CreateBugReportData,
             // Admin models
             AdminDashboardStats,
             SystemInfo,
@@ -267,7 +287,6 @@ use utoipa::{
             FeatureFlag,
             FeatureFlagApiResponse,
             FeatureFlagResponse,
-            FeatureFlagData,
             FeatureFlagsResponse,
             FeatureFlagsData,
             CreateFeatureFlagDto,

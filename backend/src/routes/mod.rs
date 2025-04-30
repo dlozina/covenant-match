@@ -9,3 +9,4 @@ pub mod user_data;
 pub mod news;
 pub mod admin;
 pub mod chat;
+pub mod bug;

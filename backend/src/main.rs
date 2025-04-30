@@ -11,7 +11,7 @@ mod utils;
 mod ws;
 
 use crate::config::get_config;
-use crate::routes::{admin, health, news, statistics, users};
+use crate::routes::{admin, bug, health, news, statistics, users};
 use actix::Actor;
 use actix_cors::Cors;
 use actix_web::web::Data;
@@ -248,7 +248,7 @@ async fn main() -> std::io::Result<()> {
             .configure(game_data::config)
             .configure(statistics::config)
             .configure(chat::config)
-            .configure(routes::user_data::config)
+            .configure(bug::config)
             .configure(admin::config)
             .configure(news::config)
             // Add Swagger UI with the OpenAPI schema from our new module

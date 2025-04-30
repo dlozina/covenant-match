@@ -19,6 +19,9 @@ pub enum AppError {
     #[error("Session not found")]
     SessionNotFound,
 
+    #[error("Bug report not found")]
+    BugReportNotFound,
+
     #[error("User already exists")]
     UserAlreadyExists,
 
@@ -99,6 +102,9 @@ pub enum AppError {
 
     #[error("System info error: {0}")]
     SystemInfoError(String),
+
+    #[error("Not found: {0}")]
+    NotFound(String),
 }
 
 impl ResponseError for AppError {
@@ -125,6 +131,8 @@ impl ResponseError for AppError {
             AppError::SessionNotFound => StatusCode::NOT_FOUND,
             AppError::NewsNotFound => StatusCode::NOT_FOUND,
             AppError::AnnouncementNotFound => StatusCode::NOT_FOUND,
+            AppError::BugReportNotFound => StatusCode::NOT_FOUND,
+            AppError::NotFound(_) => StatusCode::NOT_FOUND,
 
             AppError::UserAlreadyExists => StatusCode::CONFLICT,
             AppError::UserAlreadyInSession => StatusCode::CONFLICT,

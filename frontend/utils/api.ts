@@ -204,6 +204,44 @@ export interface UserStatsResponse {
   notFoundUsers: string[] | null;
 }
 
+// Types for bug reports
+export interface BugReport {
+  id: string;
+  title: string;
+  device: string;
+  description: string;
+  user_id: string;
+  user_name: string;
+  created_at: string;
+}
+
+export interface CreateBugReportDto {
+  title: string;
+  device: string;
+  description: string;
+}
+
+export interface BugReportResponse {
+  status: string;
+  data: {
+    id: string;
+  };
+}
+
+export interface BugReportsResponse {
+  status: string;
+  data: {
+    bugs: BugReport[];
+  };
+}
+
+export interface BugReportDetailResponse {
+  status: string;
+  data: {
+    bug: BugReport;
+  };
+}
+
 // Function to fetch leaderboard data
 export const fetchLeaderboard = async (limit?: number): Promise<LeaderboardEntryResponseDto[]> => {
   try {
@@ -1149,5 +1187,151 @@ export const fetchUserStats = async (userIds: string[]): Promise<UserStats[]> =>
   } catch (error) {
     console.error('Failed to fetch user stats:', error);
     return []; // Return empty array on error to prevent UI from breaking
+  }
+};
+
+// Function to create a bug report
+export const createBugReport = async (bugReport: CreateBugReportDto): Promise<string> => {
+  try {
+    const token = getToken();
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const response = await fetch(`${API_URL}/api/v1/bugs`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(bugReport),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to submit bug report');
+    }
+
+    const data: BugReportResponse = await response.json();
+    return data.data.id;
+  } catch (error) {
+    console.error('Failed to create bug report:', error);
+    throw error;
+  }
+};
+
+// Function to get all bug reports (admin only)
+export const getAllBugReports = async (): Promise<BugReport[]> => {
+  try {
+    const token = getToken();
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const response = await fetch(`${API_URL}/api/v1/bugs`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to fetch bug reports');
+    }
+
+    const data: BugReportsResponse = await response.json();
+    return data.data.bugs;
+  } catch (error) {
+    console.error('Failed to fetch bug reports:', error);
+    throw error;
+  }
+};
+
+// Function to get a bug report by ID
+export const getBugReportById = async (id: string): Promise<BugReport> => {
+  try {
+    const token = getToken();
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const response = await fetch(`${API_URL}/api/v1/bugs/${id}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to fetch bug report');
+    }
+
+    const data: BugReportDetailResponse = await response.json();
+    return data.data.bug;
+  } catch (error) {
+    console.error('Failed to fetch bug report:', error);
+    throw error;
+  }
+};
+
+// Function to get current user's bug reports
+export const getUserBugReports = async (): Promise<BugReport[]> => {
+  try {
+    const token = getToken();
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const response = await fetch(`${API_URL}/api/v1/bugs/user`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to fetch your bug reports');
+    }
+
+    const data: BugReportsResponse = await response.json();
+    return data.data.bugs;
+  } catch (error) {
+    console.error('Failed to fetch user bug reports:', error);
+    throw error;
+  }
+};
+
+// Function to get bugs reported by a specific user (admin only)
+export const getBugReportsByUserId = async (userId: string): Promise<BugReport[]> => {
+  try {
+    const token = getToken();
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const response = await fetch(`${API_URL}/api/v1/bugs/user/${userId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to fetch bug reports for this user');
+    }
+
+    const data: BugReportsResponse = await response.json();
+    return data.data.bugs;
+  } catch (error) {
+    console.error('Failed to fetch bug reports by user ID:', error);
+    throw error;
   }
 }; 
