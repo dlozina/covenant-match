@@ -32,7 +32,6 @@ import {
 } from "@/components/ui/select";
 import {
   Tabs,
-  TabsContent,
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
@@ -47,6 +46,13 @@ import { SessionService } from "@/utils/api/session-service";
 import { fetchNightLords } from "@/utils/api";
 import { Notification, NotificationType } from "@/components/ui/notification";
 import { FALLBACK_EXPERIENCE } from "@/lib/constants";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChevronDown } from "lucide-react";
 
 const MAX_PLAYERS = 3;
 
@@ -497,12 +503,36 @@ export default function SessionsPage() {
             </div>
           </div>
 
-          <Tabs 
-            value={activeTab} 
-            onValueChange={(value) => handleTabChange(value as SessionTab)}
-            className="w-full"
-          >
-            <div className="border-b px-5 py-3 bg-muted/30">
+          {/* Mobile Dropdown Selector - Hidden on Desktop */}
+          <div className="border-b px-5 py-3 bg-muted/30 md:hidden">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="w-full justify-between">
+                  {activeTab === "general" ? "All Sessions" : "Friends' Sessions"}
+                  <ChevronDown className="h-4 w-4 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-[200px]">
+                <DropdownMenuItem 
+                  onClick={() => handleTabChange("general")}
+                  className={activeTab === "general" ? "bg-muted/50" : ""}
+                >
+                  All Sessions
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => handleTabChange("friends")}
+                  className={`${activeTab === "friends" ? "bg-muted/50" : ""} ${!isLoggedIn ? "opacity-50 pointer-events-none" : ""}`}
+                >
+                  Friends&apos; Sessions
+                  <span className="ml-2 bg-purple-500/20 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 text-xs px-1.5 py-0.5 rounded-full">Friends</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Desktop Tabs - Hidden on Mobile */}
+          <div className="border-b px-5 py-3 bg-muted/30 hidden md:block">
+            <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as SessionTab)}>
               <TabsList className="grid w-full grid-cols-2 bg-muted/60">
                 <TabsTrigger value="general" className="text-base font-medium">
                   All Sessions
@@ -516,10 +546,12 @@ export default function SessionsPage() {
                   <span className="ml-2 bg-purple-500/20 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 text-xs px-2 py-0.5 rounded-full">Friends Only</span>
                 </TabsTrigger>
               </TabsList>
-            </div>
-            
-            {/* General Sessions Tab */}
-            <TabsContent value="general" className="p-0">
+            </Tabs>
+          </div>
+          
+          {/* Display content based on active tab */}
+          {activeTab === "general" && (
+            <div className="p-0">
               {isUserLoading && isLoggedIn && (
                 <div className="flex justify-center items-center my-6 py-8">
                   <div className="text-center">
@@ -784,10 +816,11 @@ export default function SessionsPage() {
                   </div>
                 </>
               )}
-            </TabsContent>
-            
-            {/* Friends Sessions Tab */}
-            <TabsContent value="friends" className="p-0">
+            </div>
+          )}
+          
+          {activeTab === "friends" && (
+            <div className="p-0">
               {/* Explanation banner for friend sessions */}
               <div className="p-4 border-b bg-purple-50 dark:bg-purple-900/10">
                 <p className="text-sm text-purple-700 dark:text-purple-300">
@@ -998,8 +1031,8 @@ export default function SessionsPage() {
                   )}
                 </>
               )}
-            </TabsContent>
-          </Tabs>
+            </div>
+          )}
         </div>
       </div>
     </MainLayout>
