@@ -45,12 +45,17 @@ async fn create_bug_report(
     })))
 }
 
-/// Get all bug reports
+/// Get all bug reports with pagination
 ///
-/// Returns a list of all bug reports - Admin only
+/// Returns a paginated list of all bug reports - Admin only
 #[utoipa::path(
     get,
     path = "/api/v1/bugs",
+    params(
+        ("page" = Option<u64>, Query, description = "Page number, starting from 1 (default: 1)"),
+        ("limit" = Option<u64>, Query, description = "Number of items per page (default: 10)"),
+        ("search" = Option<String>, Query, description = "Search term for filtering bug reports")
+    ),
     responses(
         (status = 200, description = "List of bug reports", body = BugReportsListResponse),
         (status = 403, description = "Forbidden - Admin access required", body = ErrorResponse),
@@ -64,18 +69,39 @@ async fn create_bug_report(
 async fn get_all_bug_reports(
     db: web::Data<Database>,
     req: HttpRequest,
+    query: web::Query<std::collections::HashMap<String, String>>,
 ) -> Result<HttpResponse, AppError> {
     // Check if the user is an admin
     if !is_admin(&req) {
         return Err(AppError::Forbidden("Admin role required".to_string()));
     }
 
-    let reports = bug_service::get_all_bug_reports(&db).await?;
+    // Extract pagination parameters
+    let page = query
+        .get("page")
+        .and_then(|p| p.parse::<u64>().ok())
+        .unwrap_or(1);
+
+    let limit = query
+        .get("limit")
+        .and_then(|l| l.parse::<u64>().ok())
+        .unwrap_or(10);
+
+    let search = query.get("search").cloned();
+
+    let (reports, total, total_pages) =
+        bug_service::get_all_bug_reports_paginated(&db, page, limit, search).await?;
 
     Ok(HttpResponse::Ok().json(json!({
         "status": "success",
         "data": {
-            "bugs": reports
+            "bugs": reports,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": total,
+                "total_pages": total_pages
+            }
         }
     })))
 }

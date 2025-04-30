@@ -7,7 +7,8 @@ import {
   Server, 
   Clock, 
   ShieldCheck, 
-  ActivitySquare
+  ActivitySquare,
+  Bug
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth-context";
@@ -21,6 +22,7 @@ interface DashboardStats {
   completedSessions: number;
   newsCount: number;
   publishedNewsCount: number;
+  bugReportsCount: number;
 }
 
 interface SystemInfo {
@@ -81,7 +83,8 @@ export default function AdminDashboard() {
             activeSessions: Number(apiStats.activeSessions) || 0,
             completedSessions: Number(apiStats.completedSessions) || 0,
             newsCount: Number(apiStats.newsCount) || 0,
-            publishedNewsCount: Number(apiStats.publishedNewsCount) || 0
+            publishedNewsCount: Number(apiStats.publishedNewsCount) || 0,
+            bugReportsCount: Number(apiStats.bugReportsCount) || 0
           });
         }
         
@@ -188,6 +191,19 @@ export default function AdminDashboard() {
         
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 md:p-4">
+            <CardTitle className="text-sm font-medium">Completed Sessions</CardTitle>
+            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent className="p-3 md:p-4 pt-0 md:pt-0">
+            <div className="text-2xl font-bold">{stats?.completedSessions || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              {((stats?.completedSessions || 0) / (stats?.totalSessions || 1) * 100).toFixed(0)}% completion rate
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 md:p-4">
             <CardTitle className="text-sm font-medium">News Articles</CardTitle>
             <Newspaper className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
@@ -201,13 +217,13 @@ export default function AdminDashboard() {
         
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 p-3 md:p-4">
-            <CardTitle className="text-sm font-medium">Completed Sessions</CardTitle>
-            <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Bug Reports</CardTitle>
+            <Bug className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent className="p-3 md:p-4 pt-0 md:pt-0">
-            <div className="text-2xl font-bold">{stats?.completedSessions || 0}</div>
+            <div className="text-2xl font-bold">{stats?.bugReportsCount || 0}</div>
             <p className="text-xs text-muted-foreground">
-              {((stats?.completedSessions || 0) / (stats?.totalSessions || 1) * 100).toFixed(0)}% completion rate
+              User feedback
             </p>
           </CardContent>
         </Card>

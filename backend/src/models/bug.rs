@@ -1,3 +1,4 @@
+use chrono;
 use mongodb::bson::{oid::ObjectId, DateTime};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -93,7 +94,8 @@ impl From<BugReport> for BugReportResponseDto {
             description: bug.description,
             user_id: bug.user_id,
             user_name: bug.user_name,
-            created_at: bug.created_at.to_string(),
+            created_at: chrono::DateTime::from_timestamp_millis(bug.created_at.timestamp_millis())
+                .map_or_else(String::new, |cd| cd.to_rfc3339()),
         }
     }
 }

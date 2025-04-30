@@ -44,6 +44,25 @@ pub async fn get_all_bug_reports(
     Ok(response)
 }
 
+/// Get all bug reports with pagination and search capability
+pub async fn get_all_bug_reports_paginated(
+    db: &mongodb::Database,
+    page: u64,
+    limit: u64,
+    search: Option<String>,
+) -> Result<(Vec<BugReportResponseDto>, u64, u64), AppError> {
+    // Get paginated bug reports from repository
+    let (bugs, total) = bug_repository::get_bug_reports_paginated(db, page, limit, search).await?;
+
+    // Calculate total pages
+    let total_pages = (total + limit - 1) / limit; // Ceiling division
+
+    // Convert to response DTOs
+    let response = bugs.into_iter().map(BugReportResponseDto::from).collect();
+
+    Ok((response, total, total_pages))
+}
+
 /// Get bug report by ID
 pub async fn get_bug_report_by_id(
     db: &mongodb::Database,
