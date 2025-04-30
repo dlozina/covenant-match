@@ -124,6 +124,12 @@ export function SiteHeader() {
                         Edit Profile
                       </Link>
                     </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/friends" className="w-full flex items-center">
+                        <Users className="h-4 w-4 mr-2" />
+                        Friends
+                      </Link>
+                    </DropdownMenuItem>
                     {isAdmin && (
                       <DropdownMenuItem asChild>
                         <Link href="/admin" className="w-full flex items-center">
