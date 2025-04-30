@@ -295,4 +295,17 @@ export interface SessionFilterOptions {
 }
 
 // Use existing Session type as SessionResponse
-export type SessionResponse = Session; 
+export type SessionResponse = Session;
+
+export interface UserStats {
+  userId: string;
+  displayName: string;
+  platform: string;
+  experience: string;
+  covenantName: string;
+  totalGames: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  score: number;
+} 

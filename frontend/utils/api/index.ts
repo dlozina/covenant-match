@@ -11,6 +11,7 @@ export * from './http-client';
 export { SessionService } from './session-service';
 export { UserService } from './user-service';
 export { sessionService } from './session-service';
+export { StatisticsService } from './statistics-service';
 
 // Import the SessionService class and types needed for our helper functions
 import { SessionService } from './session-service';

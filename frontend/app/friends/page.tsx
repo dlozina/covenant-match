@@ -6,7 +6,7 @@ import { Footer } from "@/components/layout/Footer"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Search, UserX } from "lucide-react"
+import { Search, UserX, Shield, Swords, Trophy } from "lucide-react"
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute"
 import { Notification, NotificationType } from "@/components/ui/notification"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -19,7 +19,8 @@ import {
   PaginationPrevious
 } from "@/components/ui/pagination"
 import { UserService } from "@/utils/api/user-service"
-import { Friend } from "@/utils/api/types"
+import { Friend, UserStats } from "@/utils/api/types"
+import { StatisticsService } from "@/utils/api/statistics-service"
 
 export default function FriendsPage() {
   return (
@@ -29,13 +30,17 @@ export default function FriendsPage() {
   );
 }
 
+type FriendWithStats = Friend & {
+  stats?: UserStats;
+};
+
 function FriendsContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [notification, setNotification] = useState<NotificationType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
   // State for friends
-  const [friends, setFriends] = useState<Friend[]>([]);
+  const [friends, setFriends] = useState<FriendWithStats[]>([]);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -51,14 +56,71 @@ function FriendsContent() {
     setIsLoading(true);
     try {
       const response = await UserService.getFriendList();
-      setFriends(response.friends);
+      
+      // Get all user IDs to fetch stats in batch
+      const userIds = response.friends.map(friend => friend.id);
+      
+      // Initialize friends without stats
+      const friendsData = response.friends.map(friend => ({
+        ...friend,
+        stats: undefined
+      }));
+      
+      setFriends(friendsData);
       setTotalPages(Math.ceil(response.total / pageSize));
+      
+      // Fetch stats in batch if there are friends
+      if (userIds.length > 0) {
+        fetchFriendsStats(userIds, friendsData);
+      }
     } catch (error) {
       console.error("Error fetching friends:", error);
       setNotification({
         message: "Failed to load friends list. Please try again.",
         type: 'error'
       });
+      setIsLoading(false);
+    }
+  };
+  
+  const fetchFriendsStats = async (userIds: string[], friendsData: FriendWithStats[]) => {
+    try {
+      console.log("Requesting stats for userIds:", userIds);
+      const statsResponse = await StatisticsService.getBatchStatistics(userIds);
+      
+      console.log("Stats API full response:", JSON.stringify(statsResponse, null, 2));
+      
+      if (!statsResponse.data || !Array.isArray(statsResponse.data)) {
+        console.error("Invalid response format - data is not an array:", statsResponse);
+        setIsLoading(false);
+        return;
+      }
+      
+      console.log("Stats found for users:", statsResponse.data.map(stat => stat.userId));
+      console.log("Users with no stats:", userIds.filter(id => 
+        !statsResponse.data.some(stat => stat.userId === id)
+      ));
+      
+      // Map stats to friends
+      const updatedFriends = friendsData.map(friend => {
+        const stats = statsResponse.data.find((stat: UserStats) => stat.userId === friend.id);
+        
+        if (stats) {
+          console.log(`Stats found for friend ${friend.username} (${friend.id})`, stats);
+        } else {
+          console.log(`No stats found for friend ${friend.username} (${friend.id})`);
+        }
+        
+        return {
+          ...friend,
+          stats: stats
+        };
+      });
+      
+      setFriends(updatedFriends);
+    } catch (error) {
+      console.error("Error fetching friends stats:", error);
+      // We still have basic friend data, so don't show error notification
     } finally {
       setIsLoading(false);
     }
@@ -165,11 +227,44 @@ function FriendsContent() {
                         <div>
                           <div className="font-medium">{friend.displayName || friend.username}</div>
                           <div className="text-sm text-muted-foreground">
-                            {friend.platform} • {friend.region}
+                            {friend.platform} {friend.stats?.covenantName && `• ${friend.stats.covenantName}`}
                           </div>
+                          
+                          {friend.stats ? (
+                            <div className="flex items-center gap-2 mt-1">
+                              <div className="flex items-center text-xs text-amber-500">
+                                <Trophy size={12} className="mr-0.5" />
+                                <span>{friend.stats.totalGames}</span>
+                              </div>
+                              <div className="flex items-center text-xs text-green-500">
+                                <Swords size={12} className="mr-0.5" />
+                                <span>{friend.stats.wins}</span>
+                              </div>
+                              <div className="flex items-center text-xs text-red-500">
+                                <Shield size={12} className="mr-0.5" />
+                                <span>{friend.stats.losses}</span>
+                              </div>
+                              <div className="text-xs text-muted-foreground ml-1">
+                                {friend.stats.winRate}% WR
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              No stats available
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        {friend.stats ? (
+                          <div className="bg-primary/10 text-primary px-2 py-1 rounded text-xs mr-2">
+                            {friend.stats.experience}
+                          </div>
+                        ) : (
+                          <div className="bg-secondary/50 text-muted-foreground px-2 py-1 rounded text-xs mr-2">
+                            Unknown
+                          </div>
+                        )}
                         <Button 
                           variant="ghost" 
                           size="sm" 
