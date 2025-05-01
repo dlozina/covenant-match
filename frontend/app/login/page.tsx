@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCircle } from "lucide-react"
 import { login as apiLogin, LoginParams } from "@/utils/api"
-import Script from "next/script"
+import { Turnstile } from "next-turnstile";
 
 // Username validation regex - must match the one used in profile creation
 const usernameRegex = /^[a-zA-Z0-9_.-]+$/;
@@ -68,6 +68,7 @@ export default function LoginPage() {
   // Store form values to prevent losing them on re-render
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
+  const [token, setToken] = useState<string>();
   // Reference to the form element
   const formRef = useRef<HTMLFormElement>(null)
 
@@ -86,14 +87,6 @@ export default function LoginPage() {
     form.setValue("password", password);
   }, [username, form]);
 
-  // Reset Turnstile when needed
-  const resetTurnstile = () => {
-    // Reset the Turnstile widget if available
-    if (window.turnstile) {
-      window.turnstile.reset();
-    }
-  };
-
   async function onSubmit(data: LoginFormValues) {
     // Save form values to state
     setUsername(data.username);
@@ -109,15 +102,11 @@ export default function LoginPage() {
       });
       return;
     }
-
-    // Get turnstile token directly from the DOM
-    const turnstileResponse = document.querySelector('input[name="cf-turnstile-response"]') as HTMLInputElement;
-    const turnstileToken = turnstileResponse?.value;
     
     // Check if Turnstile token is available
-    if (!turnstileToken) {
+    if (!token) {
       setNotification({
-        message: "Please complete the CAPTCHA verification.",
+        message: "Failed to verify turnstile token. Please try again.",
         type: 'error'
       });
       return;
@@ -148,7 +137,7 @@ export default function LoginPage() {
       const loginData: LoginParams = {
         username: data.username.trim().toLowerCase(),
         password: data.password, // passwords should not be modified
-        turnstileToken: turnstileToken,
+        turnstileToken: token,
       };
       
       // First attempt to get a token from the API
@@ -170,7 +159,6 @@ export default function LoginPage() {
         
         // Reset login attempts and turnstile on successful login
         setLoginAttempts(0);
-        resetTurnstile();
         
         // Clear password for security
         setPassword("");
@@ -182,7 +170,6 @@ export default function LoginPage() {
       } catch (loginError) {
         // Clear the password field on error
         setPassword("");
-        resetTurnstile();
         
         // Handle specific disabled account error
         if (loginError instanceof Error) {
@@ -201,7 +188,6 @@ export default function LoginPage() {
     } catch (apiError) {
       // Clear the password field on error
       setPassword("");
-      resetTurnstile();
       
       setNotification({
         message: apiError instanceof Error ? apiError.message : "Login failed. Please try again.",
@@ -223,13 +209,6 @@ export default function LoginPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="px-4 sm:px-6">
-            {/* Add Turnstile script */}
-            <Script
-              src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-              async
-              defer
-            />
-            
             <Form {...form}>
               <form ref={formRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
@@ -289,15 +268,13 @@ export default function LoginPage() {
                     <span>{notification.message}</span>
                   </div>
                 )}
-                
                 {/* Turnstile widget */}
-                <div className="flex justify-center">
-                  <div
-                    className="cf-turnstile"
-                    data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
-                  />
-                </div>
-                
+                <Turnstile
+                  className="flex justify-center"
+                  theme="dark"
+                  siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
+                  onVerify={setToken}
+                />
                 <Button 
                   type="submit" 
                   className="w-full h-10 text-sm sm:text-base" 
@@ -320,13 +297,4 @@ export default function LoginPage() {
       </div>
     </MainLayout>
   )
-}
-
-// Add this interface for TypeScript
-declare global {
-  interface Window {
-    turnstile?: {
-      reset: () => void;
-    };
-  }
 }
