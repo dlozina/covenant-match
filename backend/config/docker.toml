@@ -6,8 +6,8 @@ url = "mongodb://mongodb:27017"
 
 [server]
 port = 8080
-host = "0.0.0.0"  # Bind to all interfaces inside container
-workers = 2
+host = "0.0.0.0"  # Listen on all interfaces in container
+workers = 4
 
 # JWT settings should be provided via environment variables in Docker:
 # CONFIG_JWT__SECRET
@@ -15,3 +15,9 @@ workers = 2
 
 [auth]
 # Auth config is inherited from default.toml 
+
+[domain]
+primary = "covenant-match.com"
+www = "www.covenant-match.com"
+internal_service_name = "backend"
+allow_local = false 

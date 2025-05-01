@@ -99,6 +99,18 @@ async fn main() -> std::io::Result<()> {
     let config = get_config();
     info!("Running in {} environment", config.environment);
 
+    // Log detailed configuration if debug level is enabled
+    config::log_config();
+
+    // Log domain configuration
+    info!("Domain configuration:");
+    info!(" - Primary domain: {}", config.domain_primary());
+    info!(" - WWW domain: {}", config.domain_www());
+    if let Some(internal) = config.domain_internal_service() {
+        info!(" - Internal service name: {}", internal);
+    }
+    info!(" - Allow local testing: {}", config.allow_local_testing());
+
     // Get the MongoDB connection string
     let mongo_uri =
         std::env::var("MONGODB_URI").unwrap_or_else(|_| config.database_url().to_string());
@@ -221,20 +233,137 @@ async fn main() -> std::io::Result<()> {
     }
 
     info!(
-        "Starting HTTP server on {}:{}",
+        "Starting HTTP server on {}:{} with {} workers",
+        get_config().server_host(),
+        get_config().server_port(),
+        get_config().workers()
+    );
+    info!(
+        "Server URL: http://{}:{}",
         get_config().server_host(),
         get_config().server_port()
     );
+    info!(
+        "API base URL: http://{}:{}/api",
+        get_config().server_host(),
+        get_config().server_port()
+    );
+    if config.environment == "development" || config.allow_local_testing() {
+        info!(
+            "Swagger UI available at: http://{}:{}/api-docs/",
+            get_config().server_host(),
+            get_config().server_port()
+        );
+    }
 
     let app = HttpServer::new(move || {
-        // Configure CORS
-        let cors = Cors::default()
-            .allow_any_origin() // For development - restrict in production
-            .allow_any_method()
-            .allow_any_header()
-            .expose_headers(vec!["content-disposition"])
-            .supports_credentials()
-            .max_age(3600);
+        // Configure CORS based on environment
+        let cors = if config.environment == "production" && !config.allow_local_testing() {
+            // Restrict CORS in production to specific domains
+            let production_origins = vec![
+                format!("https://{}", config.domain_primary()),
+                format!("https://{}", config.domain_www()),
+            ];
+
+            info!("CORS configured for production with these origins:");
+            for origin in &production_origins {
+                info!(" - {}", origin);
+            }
+
+            Cors::default()
+                .allowed_origin(&production_origins[0])
+                .allowed_origin(&production_origins[1])
+                .allow_any_method()
+                .allow_any_header()
+                .expose_headers(vec!["content-disposition"])
+                .supports_credentials()
+                .max_age(3600)
+        } else if config.environment == "docker-local" || config.environment == "docker" {
+            // Special configuration for Docker environments with Nginx
+            let mut docker_origins = vec![
+                // External access via Nginx
+                "http://localhost".to_string(),
+                "http://localhost:80".to_string(),
+                "http://localhost:3000".to_string(),
+                // Docker service names
+                "http://frontend".to_string(),
+                "http://frontend:3000".to_string(),
+                "http://backend".to_string(),
+                "http://backend:8080".to_string(),
+                "http://nginx".to_string(),
+                "http://nginx:80".to_string(),
+            ];
+
+            // Add internal service communication
+            if let Some(internal_service) = config.domain_internal_service() {
+                docker_origins.push(format!("http://{internal_service}"));
+                docker_origins.push(format!("http://{internal_service}:8080"));
+            }
+
+            // For testing with production domain on local Docker
+            if config.allow_local_testing() {
+                docker_origins.push(format!("http://{}", config.domain_primary()));
+                docker_origins.push(format!("http://{}", config.domain_www()));
+                docker_origins.push(format!("https://{}", config.domain_primary()));
+                docker_origins.push(format!("https://{}", config.domain_www()));
+            }
+
+            info!("CORS configured for Docker environment with these origins:");
+            for origin in &docker_origins {
+                info!(" - {}", origin);
+            }
+
+            let mut cors_builder = Cors::default()
+                .allow_any_method()
+                .allow_any_header()
+                .expose_headers(vec!["content-disposition"])
+                .supports_credentials()
+                .max_age(3600);
+
+            // Add all origins to the CORS configuration
+            for origin in &docker_origins {
+                cors_builder = cors_builder.allowed_origin(origin);
+            }
+
+            cors_builder
+        } else if config.environment == "production" && config.allow_local_testing() {
+            // Production with local testing allowed
+            let local_prod_origins = vec![
+                format!("https://{}", config.domain_primary()),
+                format!("https://{}", config.domain_www()),
+                "http://localhost".to_string(),
+                "http://localhost:3000".to_string(),
+                "http://localhost:8080".to_string(),
+            ];
+
+            info!("CORS configured for production with local testing allowed:");
+            for origin in &local_prod_origins {
+                info!(" - {}", origin);
+            }
+
+            let mut cors_builder = Cors::default()
+                .allow_any_method()
+                .allow_any_header()
+                .expose_headers(vec!["content-disposition"])
+                .supports_credentials()
+                .max_age(3600);
+
+            for origin in &local_prod_origins {
+                cors_builder = cors_builder.allowed_origin(origin);
+            }
+
+            cors_builder
+        } else {
+            // Development - allow any origin
+            info!("CORS configured for development environment: allowing any origin");
+            Cors::default()
+                .allow_any_origin()
+                .allow_any_method()
+                .allow_any_header()
+                .expose_headers(vec!["content-disposition"])
+                .supports_credentials()
+                .max_age(3600)
+        };
 
         let mut app = App::new()
             .wrap(Logger::default())

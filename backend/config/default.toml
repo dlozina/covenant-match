@@ -17,6 +17,11 @@ port = 8080
 host = "0.0.0.0"
 workers = 1
 
+[domain]
+primary = "localhost"
+www = "localhost"
+allow_local = true  # Allow local testing in development
+
 [realtime]
 # Use WebSockets (true) or Server-Sent Events (false)
 use_websockets = true

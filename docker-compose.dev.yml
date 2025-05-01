@@ -37,6 +37,7 @@ services:
     environment:
       - RUST_LOG=debug
       - PORT=8080
+      - RUST_ENV=docker-local
       - CAPTCHA_ATTEMPTS_THRESHOLD=3
       - CAPTCHA_WINDOW_MINUTES=30
       - LOGIN_ATTEMPTS_RETENTION_DAYS=30
