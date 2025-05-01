@@ -146,9 +146,10 @@ export default function LoginPage() {
       };
       
       // Add captcha token if available
-      if (captchaToken) {
-        loginData.captchaToken = captchaToken;
-      }
+      // --- commented out for now, because we're using Turnstile instead of ReCaptcha
+      // if (captchaToken) {
+      //   loginData.captchaToken = captchaToken;
+      // }
       
       // First attempt to get a token from the API
       const responseData = await apiLogin(loginData);
