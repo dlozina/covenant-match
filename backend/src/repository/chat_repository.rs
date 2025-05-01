@@ -86,14 +86,12 @@ pub async fn get_admin_chat_history(
 
     // Sort by timestamp (descending) - newest first for admin view
     docs.sort_by(|a, b| {
-        let a_time = match a.get_datetime("timestamp") {
-            Ok(time) => time,
-            Err(_) => return std::cmp::Ordering::Equal,
+        let Ok(a_time) = a.get_datetime("timestamp") else {
+            return std::cmp::Ordering::Equal;
         };
 
-        let b_time = match b.get_datetime("timestamp") {
-            Ok(time) => time,
-            Err(_) => return std::cmp::Ordering::Equal,
+        let Ok(b_time) = b.get_datetime("timestamp") else {
+            return std::cmp::Ordering::Equal;
         };
 
         b_time.cmp(a_time) // Descending order
@@ -138,7 +136,7 @@ pub async fn delete_admin_messages(
         filter.insert(
             "_id",
             mongodb::bson::oid::ObjectId::parse_str(mid)
-                .map_err(|e| AppError::BadRequest(format!("Invalid message ID: {}", e)))?,
+                .map_err(|e| AppError::BadRequest(format!("Invalid message ID: {e}")))?,
         );
     }
 
@@ -198,14 +196,12 @@ pub async fn get_chat_history(
 
     // Sort by timestamp (ascending)
     docs.sort_by(|a, b| {
-        let a_time = match a.get_datetime("timestamp") {
-            Ok(time) => time,
-            Err(_) => return std::cmp::Ordering::Equal,
+        let Ok(a_time) = a.get_datetime("timestamp") else {
+            return std::cmp::Ordering::Equal;
         };
 
-        let b_time = match b.get_datetime("timestamp") {
-            Ok(time) => time,
-            Err(_) => return std::cmp::Ordering::Equal,
+        let Ok(b_time) = b.get_datetime("timestamp") else {
+            return std::cmp::Ordering::Equal;
         };
 
         a_time.cmp(b_time)
@@ -369,15 +365,6 @@ pub async fn update_session_activity(db: &Database, session_id: &str) -> Result<
             return Ok(());
         }
 
-        // Create a new session with the participants we found
-        let session = ChatSession::new(session_id.to_string(), participants.into_iter().collect());
-
-        let doc = bson::to_document(&session).map_err(|e| {
-            log::error!("Error converting session to document: {}", e);
-            AppError::InternalError(e.to_string())
-        })?;
-
-        let result = get_sessions_collection(db).insert_one(doc).await?;
         log::info!(
             "Created new chat session from messages: {} with timestamp {}",
             session_id,
@@ -421,6 +408,7 @@ pub async fn get_sessions_to_clean(
 }
 
 // Clean up inactive chat sessions and their messages -> Time is a bitch
+#[allow(clippy::too_many_lines)]
 pub async fn cleanup_inactive_sessions(
     db: &Database,
     inactive_seconds: i64,
@@ -477,7 +465,7 @@ pub async fn cleanup_inactive_sessions(
             if let Ok(last_activity) = session_doc.get_datetime("last_activity") {
                 last_activity_chrono = Some(
                     chrono::DateTime::from_timestamp_millis(last_activity.timestamp_millis())
-                        .unwrap_or_else(|| Utc::now()),
+                        .unwrap_or_else(Utc::now),
                 );
                 log::debug!("Successfully retrieved last_activity as DateTime");
             }
@@ -499,7 +487,7 @@ pub async fn cleanup_inactive_sessions(
             // Try as i64 (timestamp)
             else if let Ok(timestamp) = session_doc.get_i64("last_activity") {
                 last_activity_chrono = Some(
-                    chrono::DateTime::from_timestamp(timestamp, 0).unwrap_or_else(|| Utc::now()),
+                    chrono::DateTime::from_timestamp(timestamp, 0).unwrap_or_else(Utc::now),
                 );
                 log::debug!(
                     "Successfully converted last_activity from i64 timestamp: {}",
