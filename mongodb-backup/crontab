@@ -1,0 +1,4 @@
+# Run backup daily at 2:00 AM
+0 2 * * * root /backup.sh >> /var/log/backup.log 2>&1
+
+# Empty line at end (required for cron)
