@@ -1,4 +1,4 @@
-use crate::models::auth::LoginAttempt;
+use crate::{models::auth::LoginAttempt, utils::secrets};
 use crate::models::error::AppError;
 use crate::repository::auth_repository;
 use mongodb::Database;
@@ -37,8 +37,7 @@ pub async fn verify_turnstile_token(
     ip_address: &str,
     turnstile_token: Option<&str>,
 ) -> Result<(), AppError> {
-    let secret_key = env::var("TURNSTILE_SECRET_KEY")
-        .unwrap_or_else(|_| "1x0000000000000000000000000000000AA".to_string());
+    let secret_key = secrets::read_secret("TURNSTILE_SECRET_KEY", "1x0000000000000000000000000000000AA");
 
     // If using the test key, return true for testing purposes
     if secret_key == "1x0000000000000000000000000000000AA" {

@@ -44,8 +44,6 @@ services:
       - RUST_ENV=production
       - RUST_LOG=info
       - PORT=8080
-      - CAPTCHA_ATTEMPTS_THRESHOLD=3
-      - CAPTCHA_WINDOW_MINUTES=30
       - LOGIN_ATTEMPTS_RETENTION_DAYS=30
       - LOGIN_ATTEMPTS_CLEANUP_INTERVAL_HOURS=24
     volumes:
@@ -55,7 +53,6 @@ services:
     secrets:
       - mongodb_uri
       - jwt_secret
-      - recaptcha_secret_key
       - turnstile_secret_key
     networks:
       - covenant-network
