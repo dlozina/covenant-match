@@ -72,6 +72,9 @@ function FriendsContent() {
       // Fetch stats in batch if there are friends
       if (userIds.length > 0) {
         fetchFriendsStats(userIds, friendsData);
+      } else {
+        // Set loading to false if there are no friends
+        setIsLoading(false);
       }
     } catch (error) {
       console.error("Error fetching friends:", error);
@@ -206,11 +209,18 @@ function FriendsContent() {
           
           {/* Friends List */}
           <div className="space-y-4">
-            {filteredFriends.length === 0 ? (
+            {friends.length === 0 ? (
               <div className="text-center py-10">
-                <p className="text-muted-foreground mb-4">No friends found</p>
+                <p className="text-muted-foreground mb-4">You don&apos;t have any friends yet</p>
                 <p className="text-sm text-muted-foreground">
-                  Complete sessions with other nightfarers to add them as friends.
+                  Play regular sessions to meet new nightfarers and add them as friends.
+                </p>
+              </div>
+            ) : filteredFriends.length === 0 ? (
+              <div className="text-center py-10">
+                <p className="text-muted-foreground mb-4">No friends found matching &quot;{searchQuery}&quot;</p>
+                <p className="text-sm text-muted-foreground">
+                  Try a different search term.
                 </p>
               </div>
             ) : (
