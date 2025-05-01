@@ -5,7 +5,9 @@ import { Shield, Swords, Trophy, Info } from 'lucide-react';
 import { 
   Dialog, 
   DialogContent, 
-  DialogTrigger
+  DialogTitle, 
+  DialogTrigger,
+  DialogDescription
 } from "@/components/ui/dialog";
 
 interface PlayerHoverCardProps {
@@ -39,6 +41,12 @@ export const PlayerHoverCard: React.FC<PlayerHoverCardProps> = ({
           </span>
         </DialogTrigger>
       </div>
+      <DialogTitle className="sr-only">
+        {userStats.displayName}
+      </DialogTitle>
+      <DialogDescription className="sr-only">
+        Player stats for {userStats.displayName}
+      </DialogDescription>
       <DialogContent className="sm:max-w-[425px] p-0">
         <Card className="border-0 shadow-none w-full">
           <CardContent className="p-4 space-y-3">
