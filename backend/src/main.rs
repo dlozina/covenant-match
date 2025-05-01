@@ -64,22 +64,23 @@ fn start_login_attempts_cleanup(db: mongodb::Database) {
 fn start_chat_cleanup(chat_service: Arc<chat_service::ChatService>) {
     task::spawn(async move {
         let config = get_config();
-        let cleanup_interval_minutes = config.chat_cleanup_interval_minutes();
-        let inactive_minutes = config.chat_inactive_minutes();
+        let cleanup_interval_seconds = config.chat_cleanup_interval_seconds();
+        let inactive_seconds = config.chat_inactive_seconds();
 
         loop {
             // Sleep first to avoid cleanup immediately on startup
-            tokio::time::sleep(Duration::from_secs(cleanup_interval_minutes * 60)).await;
+            tokio::time::sleep(Duration::from_secs(cleanup_interval_seconds)).await;
 
-            info!("Running scheduled cleanup of inactive chat sessions");
+            info!("Running scheduled cleanup of inactive chat sessions (marking sessions older than {} seconds as inactive and deleting messages from inactive sessions)", 
+                inactive_seconds);
 
             match chat_service
-                .cleanup_inactive_sessions(inactive_minutes)
+                .cleanup_inactive_sessions(inactive_seconds)
                 .await
             {
-                Ok(_) => info!(
-                    "Cleaned up inactive chat sessions (older than {} minutes)",
-                    inactive_minutes
+                Ok(count) => info!(
+                    "Cleaned up inactive chat sessions: {} sessions marked inactive (sessions older than {} seconds)",
+                    count, inactive_seconds
                 ),
                 Err(e) => warn!("Failed to clean up inactive chat sessions: {:?}", e),
             }

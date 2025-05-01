@@ -484,9 +484,30 @@ impl SessionManager {
                     let sender_id = sender_id.to_string();
                     let sender_name = sender_name.to_string();
 
+                    // Get all participants from this session
+                    let participants =
+                        if let Some(session_clients) = self.sessions.get(&msg.session_id) {
+                            session_clients
+                                .iter()
+                                .filter_map(|client_id| self.user_mapping.get(client_id).cloned())
+                                .collect::<Vec<String>>()
+                        } else {
+                            // Fallback to just the sender if no session data
+                            vec![sender_id.clone()]
+                        };
+
                     // Spawn an async task to store the message
                     ctx.spawn(
                         async move {
+                            // First ensure the chat session exists with all participants
+                            if let Err(e) = chat_service
+                                .ensure_chat_session(&session_id, participants)
+                                .await
+                            {
+                                error!("Failed to ensure chat session: {}", e);
+                                // Continue anyway to try saving the message
+                            }
+
                             let chat_message = ChatMessage::new(
                                 session_id,
                                 sender_id,

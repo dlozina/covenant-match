@@ -13,3 +13,5 @@ allow_local = false  # Don't allow local testing in production
 
 # The database URL and JWT secret should be set via environment variables
 # in production using CONFIG_DATABASE__URL and CONFIG_JWT__SECRET 
+
+# The rest of the settings will be inherited from default.toml 

@@ -65,8 +65,8 @@ pub struct RealtimeConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct ChatConfig {
-    pub cleanup_interval_minutes: u64,
-    pub inactive_minutes: i64,
+    pub cleanup_interval_seconds: u64,
+    pub inactive_seconds: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -202,8 +202,8 @@ impl Config {
                 session_inactive_timeout: env_or_default_parse("SESSION_INACTIVE_TIMEOUT", 86400),
             },
             chat: ChatConfig {
-                cleanup_interval_minutes: env_or_default_parse("CHAT_CLEANUP_INTERVAL", 60),
-                inactive_minutes: env_or_default_parse("CHAT_INACTIVE_MINUTES", 60),
+                cleanup_interval_seconds: env_or_default_parse("CHAT_CLEANUP_INTERVAL", 60),
+                inactive_seconds: env_or_default_parse("CHAT_INACTIVE_SECONDS", 60),
             },
             auth: create_default_auth_config(),
         }
@@ -242,12 +242,12 @@ impl Config {
         self.realtime.session_inactive_timeout
     }
 
-    pub fn chat_cleanup_interval_minutes(&self) -> u64 {
-        self.chat.cleanup_interval_minutes
+    pub fn chat_cleanup_interval_seconds(&self) -> u64 {
+        self.chat.cleanup_interval_seconds
     }
 
-    pub fn chat_inactive_minutes(&self) -> i64 {
-        self.chat.inactive_minutes
+    pub fn chat_inactive_seconds(&self) -> i64 {
+        self.chat.inactive_seconds
     }
 
     pub fn domain_primary(&self) -> &str {
@@ -372,10 +372,10 @@ pub fn log_config() {
         );
         debug!("Chat:");
         debug!(
-            "  Cleanup Interval Minutes: {}",
-            config.chat.cleanup_interval_minutes
+            "  Cleanup Interval Seconds: {}",
+            config.chat.cleanup_interval_seconds
         );
-        debug!("  Inactive Minutes: {}", config.chat.inactive_minutes);
+        debug!("  Inactive Seconds: {}", config.chat.inactive_seconds);
         debug!(
             "Auth Exclusion Patterns: {} entries",
             config.auth.exclude_patterns.len()

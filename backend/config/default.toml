@@ -29,8 +29,8 @@ use_websockets = true
 session_inactive_timeout = 86400 # 24 hours
 
 [chat]
-cleanup_interval_minutes = 60 # 1 hour
-inactive_minutes = 60 # 1 hour
+cleanup_interval_seconds = 3600 # 1 hour (3600 seconds)
+inactive_seconds = 3600 # 1 hour (3600 seconds)
 
 [auth]
 # Exclude patterns format: [path, method, is_regex]

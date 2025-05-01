@@ -1,18 +1,19 @@
+use crate::middleware::auth::Auth;
 use crate::models::admin::{
-    AdminChatResponse, AdminSessionsQuery, ChatHistoryParams, ChatMessageResponseDto, CreateFeatureFlagDto,
-    DeleteMessagesParams,
-    PatchFeatureFlagDto, UserInfoDto,
+    AdminChatResponse, AdminSessionsQuery, ChatHistoryParams, ChatMessageResponseDto,
+    CreateFeatureFlagDto, DeleteMessagesParams, PatchFeatureFlagDto, UserInfoDto,
 };
+use crate::models::error::AppError;
 use crate::services::{admin_service, chat_service, user_service};
 use crate::utils::request::is_admin;
 use crate::ws::messages::GetConnectionStats;
 use crate::ws::session::SessionManager;
 use actix::Addr;
-use actix_web::{
-    delete, get, post, put, web, HttpRequest, HttpResponse, Responder, ResponseError,
-};
-use log::debug;
-use mongodb::Database;
+use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder, ResponseError};
+use chrono::Utc;
+use futures::StreamExt;
+use log::{debug, info};
+use mongodb::{bson::doc, Database};
 
 /// Get admin dashboard statistics
 #[utoipa::path(
@@ -708,6 +709,133 @@ async fn get_websocket_stats(
     }
 }
 
+#[get("/api/v1/admin/debug/chat-sessions")]
+async fn debug_chat_sessions(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
+    // Check if the user is an admin
+    if !is_admin(&req) {
+        return HttpResponse::Forbidden().json(serde_json::json!({
+            "status": "error",
+            "message": "Admin role required"
+        }));
+    }
+
+    info!("Admin checking chat sessions debug info");
+
+    // Get sessions collection
+    let sessions_coll = db.collection::<mongodb::bson::Document>("chat_sessions");
+
+    // Count total, active, and inactive sessions
+    let total = match sessions_coll.count_documents(doc! {}).await {
+        Ok(count) => count,
+        Err(e) => {
+            log::error!("Error counting total sessions: {}", e);
+            0
+        }
+    };
+
+    let active = match sessions_coll.count_documents(doc! { "active": true }).await {
+        Ok(count) => count,
+        Err(e) => {
+            log::error!("Error counting active sessions: {}", e);
+            0
+        }
+    };
+
+    let inactive = match sessions_coll
+        .count_documents(doc! { "active": false })
+        .await
+    {
+        Ok(count) => count,
+        Err(e) => {
+            log::error!("Error counting inactive sessions: {}", e);
+            0
+        }
+    };
+
+    // Get recent sessions
+    let now = Utc::now();
+
+    // Calculate cutoff time for recent sessions (1 hour ago)
+    let one_hour_ago = now - chrono::Duration::hours(1);
+
+    // Convert to MongoDB DateTime
+    let one_hour_ago_bson = mongodb::bson::DateTime::from_millis(one_hour_ago.timestamp_millis());
+
+    // Count recent sessions
+    let recent = match sessions_coll
+        .count_documents(doc! { "last_activity": { "$gt": one_hour_ago_bson } })
+        .await
+    {
+        Ok(count) => count,
+        Err(e) => {
+            log::error!("Error counting recent sessions: {}", e);
+            0
+        }
+    };
+
+    // Get oldest session
+    let mut oldest_session_info = serde_json::json!({
+        "id": "none",
+        "last_activity": now.to_rfc3339(),
+        "minutes_ago": 0
+    });
+
+    // Use aggregation to find the oldest session
+    let pipeline = vec![
+        doc! { "$sort": { "last_activity": 1 } },
+        doc! { "$limit": 1 },
+    ];
+
+    // Perform the aggregation
+    match sessions_coll.aggregate(pipeline).await {
+        Ok(mut cursor) => {
+            while let Some(result) = cursor.next().await {
+                match result {
+                    Ok(doc) => {
+                        if let (Ok(session_id), Ok(last_activity)) =
+                            (doc.get_str("session_id"), doc.get_datetime("last_activity"))
+                        {
+                            // Convert MongoDB DateTime to seconds for calculating minutes
+                            let last_activity_timestamp = last_activity.timestamp_millis() / 1000;
+                            let now_timestamp = now.timestamp();
+                            let seconds_ago = now_timestamp - last_activity_timestamp;
+                            let minutes_ago = seconds_ago / 60;
+
+                            oldest_session_info = serde_json::json!({
+                                "id": session_id,
+                                "last_activity": last_activity.to_string(),
+                                "minutes_ago": minutes_ago
+                            });
+                        }
+                    }
+                    Err(e) => {
+                        log::error!("Error processing document: {}", e);
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            log::error!("Error running aggregation: {}", e);
+        }
+    }
+
+    // Prepare response
+    let response = serde_json::json!({
+        "status": "success",
+        "data": {
+            "total_sessions": total,
+            "active_sessions": active,
+            "inactive_sessions": inactive,
+            "recent_sessions": recent,
+            "current_time": now.to_rfc3339(),
+            "oldest_session": oldest_session_info,
+            "debug_info": "Cleanup tasks use 'last_activity' field to determine which sessions to clean up"
+        }
+    });
+
+    HttpResponse::Ok().json(response)
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     log::info!("Configuring admin routes");
 
@@ -732,4 +860,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 
     // Add the new route
     cfg.service(get_websocket_stats);
+
+    cfg.service(debug_chat_sessions);
 }

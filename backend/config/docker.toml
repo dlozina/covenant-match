@@ -21,3 +21,5 @@ primary = "covenant-match.com"
 www = "www.covenant-match.com"
 internal_service_name = "backend"
 allow_local = false 
+
+# The rest of the settings will be inherited from default.toml 
