@@ -294,7 +294,7 @@ export default function LoginPage() {
                 <div className="flex justify-center">
                   <div
                     className="cf-turnstile"
-                    data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "1x00000000000000000000AA"}
+                    data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
                   />
                 </div>
                 
