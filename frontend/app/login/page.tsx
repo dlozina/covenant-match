@@ -272,7 +272,7 @@ export default function LoginPage() {
                 <Turnstile
                   className="flex justify-center"
                   theme="dark"
-                  siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
+                  siteKey={"0x4AAAAAABYet9mhK3xghhXA"}
                   onVerify={setToken}
                 />
                 <Button 
