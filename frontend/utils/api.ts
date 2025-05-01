@@ -801,7 +801,7 @@ export interface GameData {
 export interface LoginParams {
   username: string;
   password: string;
-  captchaToken?: string;
+  turnstileToken?: string;
 }
 
 export interface RegisterParams {

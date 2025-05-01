@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
@@ -20,9 +20,9 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import ReCaptchaComponent from "@/components/auth/ReCaptcha"
 import { AlertCircle } from "lucide-react"
 import { login as apiLogin, LoginParams } from "@/utils/api"
+import Script from "next/script"
 
 // Username validation regex - must match the one used in profile creation
 const usernameRegex = /^[a-zA-Z0-9_.-]+$/;
@@ -64,12 +64,12 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [loginAttempts, setLoginAttempts] = useState(0)
   const [isLocked, setIsLocked] = useState(false)
-  const [showCaptcha, setShowCaptcha] = useState(false)
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [notification, setNotification] = useState<NotificationType | null>(null)
   // Store form values to prevent losing them on re-render
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
+  // Reference to the form element
+  const formRef = useRef<HTMLFormElement>(null)
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
@@ -86,12 +86,13 @@ export default function LoginPage() {
     form.setValue("password", password);
   }, [username, form]);
 
-  // Show CAPTCHA after 3 failed attempts
-  useEffect(() => {
-    if (loginAttempts >= 3) {
-      setShowCaptcha(true)
+  // Reset Turnstile when needed
+  const resetTurnstile = () => {
+    // Reset the Turnstile widget if available
+    if (window.turnstile) {
+      window.turnstile.reset();
     }
-  }, [loginAttempts])
+  };
 
   async function onSubmit(data: LoginFormValues) {
     // Save form values to state
@@ -109,11 +110,15 @@ export default function LoginPage() {
       return;
     }
 
-    // Check if captcha is shown but not completed
-    if (showCaptcha && !captchaToken) {
+    // Get turnstile token directly from the DOM
+    const turnstileResponse = document.querySelector('input[name="cf-turnstile-response"]') as HTMLInputElement;
+    const turnstileToken = turnstileResponse?.value;
+    
+    // Check if Turnstile token is available
+    if (!turnstileToken) {
       setNotification({
-        message: "Please complete the CAPTCHA verification",
-        type: 'warning'
+        message: "Please complete the CAPTCHA verification.",
+        type: 'error'
       });
       return;
     }
@@ -139,16 +144,12 @@ export default function LoginPage() {
     }
 
     try {
-      // Prepare login data
+      // Prepare login data with turnstile token
       const loginData: LoginParams = {
         username: data.username.trim().toLowerCase(),
         password: data.password, // passwords should not be modified
+        turnstileToken: turnstileToken,
       };
-      
-      // Add captcha token if available
-      if (captchaToken) {
-        loginData.captchaToken = captchaToken;
-      }
       
       // First attempt to get a token from the API
       const responseData = await apiLogin(loginData);
@@ -167,10 +168,9 @@ export default function LoginPage() {
           type: 'success'
         });
         
-        // Reset login attempts and captcha on successful login
+        // Reset login attempts and turnstile on successful login
         setLoginAttempts(0);
-        setShowCaptcha(false);
-        setCaptchaToken(null);
+        resetTurnstile();
         
         // Clear password for security
         setPassword("");
@@ -182,6 +182,7 @@ export default function LoginPage() {
       } catch (loginError) {
         // Clear the password field on error
         setPassword("");
+        resetTurnstile();
         
         // Handle specific disabled account error
         if (loginError instanceof Error) {
@@ -200,12 +201,7 @@ export default function LoginPage() {
     } catch (apiError) {
       // Clear the password field on error
       setPassword("");
-      
-      // Check if error has requiresCaptcha property
-      // @ts-expect-error - Custom property on error
-      if (apiError instanceof Error && apiError.requiresCaptcha) {
-        setShowCaptcha(true);
-      }
+      resetTurnstile();
       
       setNotification({
         message: apiError instanceof Error ? apiError.message : "Login failed. Please try again.",
@@ -214,11 +210,6 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
-  }
-
-  // Handle captcha change
-  const handleCaptchaChange = (token: string | null) => {
-    setCaptchaToken(token)
   }
 
   return (
@@ -232,8 +223,15 @@ export default function LoginPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="px-4 sm:px-6">
+            {/* Add Turnstile script */}
+            <Script
+              src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+              async
+              defer
+            />
+            
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form ref={formRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
                   name="username"
@@ -291,22 +289,19 @@ export default function LoginPage() {
                     <span>{notification.message}</span>
                   </div>
                 )}
-
-                {/* Show captcha if needed */}
-                {showCaptcha && (
-                  <div className="mt-4">
-                    <p className="text-sm text-amber-600 mb-2">Security verification required</p>
-                    <ReCaptchaComponent 
-                      onChange={handleCaptchaChange}
-                      onExpired={() => setCaptchaToken(null)}
-                    />
-                  </div>
-                )}
-
+                
+                {/* Turnstile widget */}
+                <div className="flex justify-center">
+                  <div
+                    className="cf-turnstile"
+                    data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "1x00000000000000000000AA"}
+                  />
+                </div>
+                
                 <Button 
                   type="submit" 
                   className="w-full h-10 text-sm sm:text-base" 
-                  disabled={isLoading || isLocked || (showCaptcha && !captchaToken)}
+                  disabled={isLoading || isLocked}
                 >
                   {isLoading ? "Logging in..." : isLocked ? "Temporarily locked" : "Login"}
                 </Button>
@@ -325,4 +320,13 @@ export default function LoginPage() {
       </div>
     </MainLayout>
   )
-} 
+}
+
+// Add this interface for TypeScript
+declare global {
+  interface Window {
+    turnstile?: {
+      reset: () => void;
+    };
+  }
+}

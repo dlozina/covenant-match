@@ -56,6 +56,7 @@ services:
       - mongodb_uri
       - jwt_secret
       - recaptcha_secret_key
+      - turnstile_secret_key
     networks:
       - covenant-network
 
@@ -111,4 +112,6 @@ secrets:
   jwt_secret:
     external: true
   recaptcha_secret_key:
+    external: true
+  turnstile_secret_key:
     external: true

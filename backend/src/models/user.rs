@@ -107,13 +107,13 @@ pub struct UserResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct LoginUserDto {
     pub username: String,
     #[schema(format = "password")]
     pub password: String,
-    /// reCAPTCHA token for verification
-    #[serde(rename = "captchaToken")]
-    pub captcha_token: Option<String>,
+    /// Cloudflare Turnstile token
+    pub turnstile_token: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
