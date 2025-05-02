@@ -37,7 +37,6 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
   isHost = false,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   currentSessionId,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   resultSubmitted = false,
   onCancelSession,
   onLeaveSession

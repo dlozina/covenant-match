@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, UserPlus, Sword, Users, LayoutDashboard, User, LogOut, LogIn } from "lucide-react";
+import { Menu, UserPlus, Sword, Users, LayoutDashboard, User, LogOut, LogIn, Shield, Trophy, Bug } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-// Add theme toggle back in
-// import { ThemeToggle } from "@/components/theme/theme-toggle";
+// Disabled change theme toggle for now
+//import { ThemeToggle } from "@/components/theme/theme-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,6 +22,8 @@ export function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const { isLoggedIn, userData, logout, isLoading } = useAuth();
+  
+  const isAdmin = userData?.role === "admin";
 
   const handleLogout = () => {
     logout();
@@ -35,6 +37,12 @@ export function SiteHeader() {
       icon: <Users className="h-4 w-4 mr-2" />,
       active: pathname === "/sessions",
     },
+    {
+      href: "/leaderboard",
+      label: "Leaderboard",
+      icon: <Trophy className="h-4 w-4 mr-2" />,
+      active: pathname === "/leaderboard",
+    },
     ...(isLoggedIn ? [
       {
         href: "/dashboard",
@@ -42,7 +50,7 @@ export function SiteHeader() {
         icon: <LayoutDashboard className="h-4 w-4 mr-2" />,
         active: pathname === "/dashboard",
       }
-    ] : []),
+    ] : [])
   ];
 
   return (
@@ -89,51 +97,73 @@ export function SiteHeader() {
           {!isLoading && (
             <>
               {isLoggedIn && userData ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      className="flex items-center gap-2 hover:bg-purple-500/10 hover:text-purple-400 transition-all"
-                    >
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback className="bg-gradient-to-br from-purple-700 to-indigo-900 text-white text-xs">
-                          {userData.displayName?.substring(0, 2) || userData.username?.substring(0, 2)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="hidden sm:inline font-medium">{userData.displayName || userData.username}</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-[200px]">
-                    <DropdownMenuItem asChild>
-                      <Link href="/profile" className="w-full flex items-center">
-                        <User className="h-4 w-4 mr-2" />
-                        Profile
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/profile/edit" className="w-full flex items-center">
-                        <User className="h-4 w-4 mr-2" />
-                        Edit Profile
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                      <div className="flex items-center justify-between mb-1">
-                        <span>Platform:</span>
-                        <span className="font-medium">{userData.platform}</span>
+                <>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        className="flex items-center gap-2 hover:bg-purple-500/10 hover:text-purple-400 transition-all"
+                      >
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="bg-gradient-to-br from-purple-700 to-indigo-900 text-white text-xs">
+                            {userData.displayName?.substring(0, 2) || userData.username?.substring(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="hidden sm:inline font-medium">{userData.displayName || userData.username}</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-[200px]">
+                      <DropdownMenuItem asChild>
+                        <Link href="/profile" className="w-full flex items-center">
+                          <User className="h-4 w-4 mr-2" />
+                          Profile
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/profile/edit" className="w-full flex items-center">
+                          <User className="h-4 w-4 mr-2" />
+                          Edit Profile
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/friends" className="w-full flex items-center">
+                          <Users className="h-4 w-4 mr-2" />
+                          Friends
+                        </Link>
+                      </DropdownMenuItem>
+                      {isAdmin && (
+                        <DropdownMenuItem asChild>
+                          <Link href="/admin" className="w-full flex items-center">
+                            <Shield className="h-4 w-4 mr-2" />
+                            Admin Panel
+                          </Link>
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem asChild>
+                        <Link href="/bug" className="w-full flex items-center">
+                          <Bug className="h-4 w-4 mr-2" />
+                          Report Bug
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                        <div className="flex items-center justify-between mb-1">
+                          <span>Platform:</span>
+                          <span className="font-medium">{userData.platform}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Region:</span>
+                          <span className="font-medium">{userData.autoRegion ? userData.cmRegion : userData.region}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span>Region:</span>
-                        <span className="font-medium">{userData.autoRegion ? userData.cmRegion : userData.region}</span>
-                      </div>
-                    </div>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout} className="w-full flex items-center text-red-500 focus:text-red-500">
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Logout
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleLogout} className="w-full flex items-center text-red-500 focus:text-red-500">
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Logout
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
               ) : (
                 <>
                   <Button 

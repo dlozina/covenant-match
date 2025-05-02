@@ -1,6 +1,6 @@
 use crate::models::error::AppError;
 use crate::models::user::{
-    AddFriendDto, CreateUserDto, FriendListResponse, GetUsersQuery, LoginUserDto, RemoveFriendDto,
+    AddFriendDto, CreateUserDto, FriendListResponse, GetUsersQuery, LoginUserDto,
     UpdateUserProfileDto,
 };
 use crate::services::{auth_service, user_service};
@@ -91,39 +91,40 @@ async fn login(
     // Get the client region
     let client_region = geo_location::get_client_region(&req);
 
+    log::info!("Turnstile token: {:?}", login_data.turnstile_token);
+    // Verify the turnstile token
+    if let Err(e) = auth_service::verify_turnstile_token(
+        &db,
+        &login_data.username,
+        &ip_address,
+        login_data.turnstile_token.as_deref(),
+    )
+    .await
+    {
+        log::warn!(
+            "Turnstile verification failed for user {}: {:?}",
+            &login_data.username,
+            e
+        );
+
+        // For Turnstile required errors, provide a more helpful response
+        if let AppError::CaptchaRequired(_) = &e {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "status": "error",
+                "message": e.to_string(),
+                "requiresTurnstile": true
+            }));
+        }
+
+        return e.error_response();
+    }
+
     // If necessary, update the user's region in db
     match user_service::update_user_region(&db, &login_data.username, client_region).await {
         Ok(()) => (),
         Err(e) => {
             log::error!("Error updating user region: {:?}", e);
         }
-    }
-
-    // Verify CAPTCHA if required based on previous login attempts
-    if let Err(e) = auth_service::verify_captcha_if_required(
-        &db,
-        &login_data.username,
-        &ip_address,
-        login_data.captcha_token.as_deref(),
-    )
-    .await
-    {
-        log::warn!(
-            "CAPTCHA verification failed for user {}: {:?}",
-            &login_data.username,
-            e
-        );
-
-        // For CAPTCHA required errors, provide a more helpful response
-        if let AppError::CaptchaRequired(_) = &e {
-            return HttpResponse::BadRequest().json(serde_json::json!({
-                "status": "error",
-                "message": e.to_string(),
-                "requiresCaptcha": true
-            }));
-        }
-
-        return e.error_response();
     }
 
     // Proceed with login after CAPTCHA verification

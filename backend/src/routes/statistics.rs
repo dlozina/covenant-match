@@ -1,61 +1,17 @@
+use crate::models::statistics::{
+    NightLordStatsResponse, PaginatedSessionData, PaginatedSessionResponse, PaginationInfo,
+    PaginationQuery, SessionHistoryResponse,
+};
 use crate::services::statistics_service;
 use crate::utils::jwt;
-use crate::{repository::session_repository, services::session_service};
+use crate::{
+    repository::session_repository, repository::user_repository, services::session_service,
+};
 use actix_web::{get, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use mongodb::Database;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use utoipa::ToSchema;
-
-#[derive(Serialize, ToSchema)]
-pub struct NightLordStatsResponse {
-    name: String,
-    played: i32,
-    wins: i32,
-    losses: i32,
-    disconnects: i32,
-    win_rate: f64,
-}
-
-// Add a new response type for session history
-#[derive(Serialize, ToSchema)]
-pub struct SessionHistoryResponse {
-    session_id: String,
-    session_name: String,
-    night_lord: String,
-    player_nightfarer: String,
-    player_result: String,
-    created_at: chrono::DateTime<chrono::Utc>,
-    completed_at: Option<chrono::DateTime<chrono::Utc>>,
-}
-
-// Response structure for paginated session history
-#[derive(Serialize, ToSchema)]
-pub struct PaginatedSessionResponse {
-    status: String,
-    data: PaginatedSessionData,
-}
-
-#[derive(Serialize, ToSchema)]
-pub struct PaginatedSessionData {
-    pagination: PaginationInfo,
-    sessions: Vec<SessionHistoryResponse>,
-}
-
-#[derive(Serialize, ToSchema)]
-pub struct PaginationInfo {
-    page: u64,
-    limit: u64,
-    total: u64,
-    total_pages: u64,
-}
-
-// Query parameters for pagination
-#[derive(Deserialize)]
-pub struct PaginationQuery {
-    page: Option<u64>,
-    limit: Option<u64>,
-}
 
 /// Get current user's statistics
 #[utoipa::path(
@@ -601,6 +557,144 @@ pub struct SessionsStatsData {
     pub count: u64,
 }
 
+/// Get statistics for multiple users
+#[utoipa::path(
+    get,
+    path = "/api/v1/statistics/batch",
+    params(
+        ("userIds" = String, Query, description = "Comma-separated list of user IDs to retrieve statistics for")
+    ),
+    responses(
+        (status = 200, description = "Users statistics retrieved successfully", body = BatchUserStatsResponse),
+        (status = 404, description = "Statistics not found for one or more users"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "statistics"
+)]
+#[get("/api/v1/statistics/batch")]
+async fn get_multiple_users_statistics(
+    db: web::Data<Database>,
+    query: web::Query<std::collections::HashMap<String, String>>,
+) -> impl Responder {
+    // Get user_ids from query parameters
+    let user_ids = match query.get("userIds") {
+        Some(ids) => ids.split(',').map(String::from).collect::<Vec<String>>(),
+        None => {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "status": "error",
+                "message": "userIds parameter is required"
+            }));
+        }
+    };
+
+    // Collect statistics for each user
+    let mut stats_collection = Vec::new();
+    let mut not_found_users = Vec::new();
+
+    for user_id in user_ids {
+        // Get user statistics
+        match statistics_service::get_user_statistics(&db, &user_id).await {
+            Ok(Some(stats)) => {
+                // Get user details for additional info
+                match user_repository::find_user_by_id(&db, &user_id).await {
+                    Ok(Some(user)) => {
+                        stats_collection.push(UserStatsResponse {
+                            user_id,
+                            display_name: user
+                                .display_name
+                                .unwrap_or_else(|| user.username.clone()),
+                            platform: user.platform,
+                            experience: user.experience.to_string(),
+                            covenant_name: user.covenant_name,
+                            total_games: stats.total_games,
+                            wins: stats.wins,
+                            losses: stats.losses,
+                            win_rate: stats.win_rate,
+                            score: stats.score,
+                        });
+                    }
+                    Ok(None) => {
+                        // User not found in users collection but has stats
+                        stats_collection.push(UserStatsResponse {
+                            user_id: user_id.clone(),
+                            display_name: stats.username,
+                            platform: "Unknown".to_string(),
+                            experience: "Unknown".to_string(),
+                            covenant_name: "Unknown".to_string(),
+                            total_games: stats.total_games,
+                            wins: stats.wins,
+                            losses: stats.losses,
+                            win_rate: stats.win_rate,
+                            score: stats.reputation_score,
+                        });
+                    }
+                    Err(e) => {
+                        log::error!("Error fetching user details: {:?}", e);
+                        not_found_users.push(user_id.clone());
+                    }
+                }
+            }
+            Ok(None) => {
+                not_found_users.push(user_id);
+            }
+            Err(e) => {
+                log::error!("Error fetching user statistics: {:?}", e);
+                return HttpResponse::InternalServerError().json(serde_json::json!({
+                    "status": "error",
+                    "message": e.to_string()
+                }));
+            }
+        }
+    }
+
+    // If we found no stats for any users
+    if stats_collection.is_empty() {
+        return HttpResponse::NotFound().json(serde_json::json!({
+            "status": "error",
+            "message": "Statistics not found for any of the specified users",
+            "notFoundUsers": not_found_users
+        }));
+    }
+
+    // Return successful response
+    HttpResponse::Ok().json(BatchUserStatsResponse {
+        status: "success".to_string(),
+        data: stats_collection,
+        not_found_users: if not_found_users.is_empty() {
+            None
+        } else {
+            Some(not_found_users)
+        },
+    })
+}
+
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UserStatsResponse {
+    pub user_id: String,
+    pub display_name: String,
+    pub platform: String,
+    pub experience: String,
+    pub covenant_name: String,
+    pub total_games: i32,
+    pub wins: i32,
+    pub losses: i32,
+    pub win_rate: f64,
+    pub score: f64,
+}
+
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchUserStatsResponse {
+    pub status: String,
+    pub data: Vec<UserStatsResponse>,
+    pub not_found_users: Option<Vec<String>>,
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     log::info!("Configuring statistics routes");
     cfg.service(get_current_user_statistics)
@@ -611,5 +705,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         .service(get_current_user_session_history)
         .service(get_session_details)
         .service(get_sessions_stats)
-        .service(get_covenant_stats);
+        .service(get_covenant_stats)
+        .service(get_multiple_users_statistics);
 }

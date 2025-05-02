@@ -7,15 +7,14 @@ import {
   SessionControlButtons,
   SessionInfoSection,
   ResultReportingSection,
-  WarningDialog
-} from "@/components/session";
-import {
+  WarningDialog,
+  NewSessionDialog,
   friendStatusReducer,
   dialogReducer,
   resultReducer,
   FriendState,
   DialogState
-} from "@/components/session/SessionReducers";
+} from "@/components/session";
 import { leaveSession } from "@/utils/api";
 import { Notification, NotificationType } from "@/components/ui/notification";
 import { useSessionContext } from "../context/SessionContext";
@@ -47,7 +46,8 @@ export function SessionParticipant() {
   const [dialogState, dispatchDialog] = useReducer(dialogReducer, {
     showConfirmDialog: false,
     showWarningDialog: false,
-    showDeleteDialog: false
+    showDeleteDialog: false,
+    showNewSessionDialog: false
   } as DialogState);
   const [resultState, dispatchResult] = useReducer(resultReducer, {
     selectedResult: 'win',
@@ -62,6 +62,8 @@ export function SessionParticipant() {
   const [newSessionId, setNewSessionId] = useState<string | null>(null);
   // Track if we've already shown notification for new session
   const [hasShownNewSessionNotification, setHasShownNewSessionNotification] = useState<boolean>(false);
+  // Track if we've shown the cancellation notification to avoid duplicates
+  const [hasShownCancelNotification, setHasShownCancelNotification] = useState<boolean>(false);
   
   // Function to handle notifications
   const showNotification = useCallback((message: string | JSX.Element, type: 'error' | 'success' | 'warning', persist: boolean = false) => {
@@ -79,6 +81,59 @@ export function SessionParticipant() {
   const clearNotification = useCallback(() => {
     setNotification(null);
   }, []);
+  
+  // Check for session cancellation & clear old cancellation data when viewing a new valid session
+  useEffect(() => {
+    // Clear cancellation data if we're in a valid session that's not cancelled
+    if (sessionData && sessionData.status !== 'Cancelled') {
+      const cancelledSessionId = sessionStorage.getItem('cancelledSessionId');
+      
+      // Only clear if the stored cancelled session is different from the current one
+      if (cancelledSessionId && cancelledSessionId !== sessionData.id) {
+        console.log('Clearing old cancellation data - now in a valid session');
+        sessionStorage.removeItem('sessionCancelled');
+        sessionStorage.removeItem('cancelledSessionName');
+        sessionStorage.removeItem('cancelTimestamp');
+        sessionStorage.removeItem('cancelledSessionId');
+        // Reset notification shown flag when entering a new session
+        setHasShownCancelNotification(false);
+      }
+    }
+    
+    // First check for recent cancellation in sessionStorage
+    const wasSessionCancelled = sessionStorage.getItem('sessionCancelled');
+    const cancelTimestamp = sessionStorage.getItem('cancelTimestamp');
+    const sessionName = sessionStorage.getItem('cancelledSessionName') || 'Session';
+    
+    // Only show notification if it was stored recently (within the last 30 seconds)
+    // AND we haven't already shown a cancellation notification
+    const now = Date.now();
+    const isRecentCancellation = cancelTimestamp && 
+                                (now - parseInt(cancelTimestamp, 10)) < 30000;
+    
+    if (wasSessionCancelled === 'true' && isRecentCancellation && !hasShownCancelNotification) {
+      // Show notification with session name
+      showNotification(`Host canceled "${sessionName}"`, 'warning', true);
+      
+      // Mark that we've shown the notification
+      setHasShownCancelNotification(true);
+      
+      // Clear the flags
+      sessionStorage.removeItem('sessionCancelled');
+      sessionStorage.removeItem('cancelledSessionName');
+      sessionStorage.removeItem('cancelTimestamp');
+      sessionStorage.removeItem('cancelledSessionId');
+    } else if (wasSessionCancelled === 'true') {
+      // Clear old cancellation flags without showing notification
+      sessionStorage.removeItem('sessionCancelled');
+      sessionStorage.removeItem('cancelledSessionName');
+      sessionStorage.removeItem('cancelTimestamp');
+      sessionStorage.removeItem('cancelledSessionId');
+    }
+    
+    // No longer listening for session-cancelled events in this component
+    // All cancellation notifications will be handled by the SessionRunContent component
+  }, [showNotification, sessionData, hasShownCancelNotification]);
   
   // Add friend
   const addFriend = useCallback((playerId: string) => {
@@ -205,6 +260,9 @@ export function SessionParticipant() {
       // Save the new session ID
       setNewSessionId(sessionData.newSessionCreatedId);
       
+      // Show dialog for new session
+      dispatchDialog({ type: 'SHOW_NEW_SESSION' });
+      
       // Show notification with link to join the new session
       // Make notification type success but also persist longer for users waking from sleep
       setNotification({
@@ -221,9 +279,6 @@ export function SessionParticipant() {
       
       // Also store the ID in case the user refreshes
       localStorage.setItem('pendingNewSessionId', sessionData.newSessionCreatedId);
-      
-      // NOTE: We've removed the auto-redirect logic from here since it's handled in SessionContext.tsx
-      // through the WebSocket/SSE newSession event. This avoids redundant redirection code.
     }
   }, [sessionData, hasShownNewSessionNotification]);
   
@@ -429,6 +484,13 @@ export function SessionParticipant() {
       <WarningDialog 
         isOpen={dialogState.showWarningDialog}
         onClose={() => dispatchDialog({ type: 'HIDE_WARNING' })}
+      />
+      
+      {/* New Session Dialog */}
+      <NewSessionDialog
+        isOpen={dialogState.showNewSessionDialog}
+        onClose={() => dispatchDialog({ type: 'HIDE_NEW_SESSION' })}
+        onConfirm={joinNewSession}
       />
     </>
   );

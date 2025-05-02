@@ -1,27 +1,10 @@
-use crate::models::auth::{CaptchaConfig, LoginAttempt};
+use crate::{models::auth::LoginAttempt, utils::secrets};
 use crate::models::error::AppError;
 use crate::repository::auth_repository;
-use crate::utils::recaptcha;
 use mongodb::Database;
+use serde::{Deserialize, Serialize};
 use std::env;
 
-/// Get the CAPTCHA configuration from environment or use defaults
-pub fn get_captcha_config() -> CaptchaConfig {
-    let attempts_threshold = env::var("CAPTCHA_ATTEMPTS_THRESHOLD")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(3);
-
-    let window_minutes = env::var("CAPTCHA_WINDOW_MINUTES")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(30);
-
-    CaptchaConfig {
-        attempts_threshold,
-        window_minutes,
-    }
-}
 
 /// Record a login attempt (successful or failed) for tracking purposes
 pub async fn record_login_attempt(
@@ -34,56 +17,70 @@ pub async fn record_login_attempt(
     auth_repository::add_login_attempt(db, &attempt).await
 }
 
-/// Check if a CAPTCHA is required for this login attempt
-pub async fn is_captcha_required(
-    db: &Database,
-    username: &str,
-    ip_address: &str,
-) -> Result<bool, AppError> {
-    let config = get_captcha_config();
-    auth_repository::should_require_captcha(
-        db,
-        username,
-        ip_address,
-        config.attempts_threshold,
-        config.window_minutes,
-    )
-    .await
+
+#[derive(Serialize)]
+struct TurnstileRequest<'a> {
+    secret: &'a str,
+    response: &'a str,
+    remoteip: &'a str,
 }
 
-/// Verify CAPTCHA token if required for this login attempt
-/// Returns Ok(()) if:
-/// - CAPTCHA is not required, or
-/// - CAPTCHA is required and the token is valid
-pub async fn verify_captcha_if_required(
+#[derive(Deserialize)]
+struct TurnstileResponse {
+    success: bool,
+    // Optionally, include more fields as needed from the API response
+}
+
+pub async fn verify_turnstile_token(
     db: &Database,
     username: &str,
     ip_address: &str,
-    captcha_token: Option<&str>,
+    turnstile_token: Option<&str>,
 ) -> Result<(), AppError> {
-    // Check if CAPTCHA is required
-    let captcha_required = is_captcha_required(db, username, ip_address).await?;
+    let secret_key = secrets::read_secret("turnstile_secret_key", "1x0000000000000000000000000000000AA");
 
-    if captcha_required {
-        // If required, we must have a token
-        match captcha_token {
-            Some(token) => {
-                // Verify the token
-                recaptcha::verify_recaptcha(token).await?;
-                Ok(())
-            }
-            None => {
-                // No token provided but CAPTCHA is required
-                Err(AppError::CaptchaRequired(
-                    "CAPTCHA verification required due to multiple failed login attempts"
-                        .to_string(),
-                ))
-            }
-        }
-    } else {
-        // CAPTCHA not required, proceed normally
-        Ok(())
+    // If using the test key, return true for testing purposes
+    if secret_key == "1x0000000000000000000000000000000AA" {
+        log::info!("Using Cloudflare Turnstile test key - verification automatically passing");
+        return Ok(());
     }
+
+    // Check if token is provided
+    let token = turnstile_token
+        .ok_or_else(|| AppError::CaptchaRequired("Turnstile token is required".to_string()))?;
+
+    let client = reqwest::Client::new();
+
+    let url = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+
+    let payload = TurnstileRequest {
+        secret: &secret_key,
+        response: token,
+        remoteip: ip_address,
+    };
+
+    let response =
+        client.post(url).json(&payload).send().await.map_err(|e| {
+            AppError::InternalError(format!("Failed to verify Turnstile token: {e}"))
+        })?;
+
+    let body: TurnstileResponse = response
+        .json()
+        .await
+        .map_err(|e| AppError::InternalError(format!("Failed to parse Turnstile response: {e}")))?;
+
+    if !body.success {
+        record_login_attempt(db, username, ip_address, false).await?;
+        return Err(AppError::CaptchaVerificationFailed(
+            "Turnstile token verification failed".to_string(),
+        ));
+    }
+
+    record_login_attempt(db, username, ip_address, true).await?;
+
+    log::info!("Turnstile token verification passed");
+
+    Ok(())
 }
 
 /// Clean up old login attempt records

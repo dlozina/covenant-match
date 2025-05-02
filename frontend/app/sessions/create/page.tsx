@@ -21,6 +21,13 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   fetchNightLords, 
   fetchNightfarers, 
@@ -49,6 +56,7 @@ const sessionFormSchema = z.object({
     .min(1, { message: "Password is required" })
     .max(6, { message: "Password must not be longer than 6 characters" })
     .trim(),
+  sessionType: z.enum(["regular", "friends-only"])
 });
 
 type SessionFormValues = z.infer<typeof sessionFormSchema>;
@@ -85,6 +93,7 @@ function CreateSessionContent() {
     defaultValues: {
       sessionName: "",
       password: "",
+      sessionType: "regular"
     },
     mode: "onBlur", // Only validate on blur and submit for better UX
   });
@@ -211,6 +220,7 @@ function CreateSessionContent() {
         nightLord: selectedLord,
         nightfarer: selectedFarer,
         isPrivate: false,
+        isFriendsOnly: data.sessionType === "friends-only",
         region: userRegion,
         platform: userPlatform
       };
@@ -329,6 +339,36 @@ function CreateSessionContent() {
                             }}
                           />
                         </FormControl>
+                        <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="sessionType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm md:text-base font-medium">Session Type</FormLabel>
+                        <Select 
+                          onValueChange={field.onChange} 
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="w-full h-10">
+                              <SelectValue placeholder="Select session type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="regular">Regular Session</SelectItem>
+                            <SelectItem value="friends-only">Friends Only</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs mt-1 text-muted-foreground">
+                          {field.value === "friends-only" 
+                            ? "Friends Only: Your session will only be visible to your friends in the Friends tab."
+                            : "Regular: Your session will be visible to all players in the general sessions list."}
+                        </p>
                         <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
                       </FormItem>
                     )}

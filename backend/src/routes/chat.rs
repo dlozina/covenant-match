@@ -1,36 +1,22 @@
-use crate::services::chat_service::ChatService;
+use crate::models::chat::ChatMessageResponseDto;
+use crate::{models::chat::ChatHistoryParams, services::chat_service::ChatService};
 use crate::services::user_service;
 use crate::utils::jwt;
 use actix_web::{get, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use log::debug;
 use mongodb::Database;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-#[derive(Deserialize)]
-pub struct ChatHistoryParams {
-    session_id: String,
-    limit: Option<i64>,
-}
-
-#[derive(Serialize)]
-pub struct ChatMessage {
-    sender_id: String,
-    sender_name: String,
-    message: String,
-    timestamp: i64,
-}
 
 /// Get chat history for a session
 #[utoipa::path(
     get,
     path = "/api/v1/chat/history",
     params(
-        ("session_id" = String, Query, description = "Session ID to retrieve chat history for"),
+        ("sessionId" = String, Query, description = "Session ID to retrieve chat history for"),
         ("limit" = Option<i64>, Query, description = "Maximum number of messages to retrieve (default: 30)")
     ),
     responses(
-        (status = 200, description = "Chat history retrieved successfully", body = Vec<ChatMessage>),
+        (status = 200, description = "Chat history retrieved successfully", body = Vec<ChatMessageResponseDto>),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
@@ -56,11 +42,6 @@ async fn get_chat_history(
             .expect("JWT claims not found in request extensions");
         claims.sub.clone()
     };
-
-    debug!(
-        "Fetching chat history for session: {}, user: {}",
-        session_id, user_id
-    );
 
     // Create a chat service instance
     let chat_service = ChatService::new(&db);
@@ -100,7 +81,7 @@ async fn get_chat_history(
                 }
             }
 
-            let response_messages: Vec<ChatMessage> = messages
+            let response_messages: Vec<ChatMessageResponseDto> = messages
                 .into_iter()
                 .map(|msg| {
                     // Get username from map or use the stored name
@@ -109,7 +90,7 @@ async fn get_chat_history(
                         .cloned()
                         .unwrap_or(msg.sender_name);
 
-                    ChatMessage {
+                    ChatMessageResponseDto {
                         sender_id: msg.sender_id,
                         sender_name,
                         message: msg.content,

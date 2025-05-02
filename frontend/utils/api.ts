@@ -27,6 +27,7 @@ export interface JoinedPlayer {
   userId: string;
   username: string;
   nightfarer: string;
+  experience: string;
   joinedAt: string;
 }
 
@@ -36,6 +37,7 @@ export interface Session {
   hostId: string;
   status: "Open" | "InProgress" | "Completed";
   nightLord: string;
+  isFriendsOnly: boolean;
   joinedPlayers: JoinedPlayer[];
   createdAt: string;
   updatedAt: string;
@@ -54,13 +56,14 @@ export interface MinimalSession {
 }
 
 // Types for leaderboard
-export interface LeaderboardEntry {
-  user_id: string;
+export interface LeaderboardEntryResponseDto {
+  userId: string;
   username: string;
-  total_games: number;
+  totalGames: number;
   wins: number;
-  win_rate: number;
-  reputation_score: number;
+  winRate: number;
+  reputationScore: number;
+  score: number;
 }
 
 // Types for session history
@@ -157,10 +160,93 @@ export interface CovenantStatsResponse {
   covenantStats: CovenantStats[];
 }
 
+// Announcement type for site-wide notifications
+export interface Announcement {
+  active: boolean;
+  content: string;
+  updatedAt: string | { $date: { $numberLong: string } };
+}
+
+// News Types
+export interface NewsItem {
+  id: string;
+  title: string;
+  summary: string;
+  content: string;
+  image_url?: string;
+  author_id?: string;
+  author_username: string;
+  updated_by_id?: string;
+  updated_by_username?: string;
+  published: boolean;
+  created_at: string | { $date: { $numberLong: string } };
+  updated_at: string | { $date: { $numberLong: string } };
+  time_ago?: string;
+}
+
+// Types for user statistics
+export interface UserStats {
+  userId: string;
+  displayName: string;
+  platform: string;
+  covenantName: string;
+  experience: string;
+  totalGames: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  score: number;
+}
+
+export interface UserStatsResponse {
+  status: string;
+  data: UserStats[];
+  notFoundUsers: string[] | null;
+}
+
+// Types for bug reports
+export interface BugReport {
+  id: string;
+  title: string;
+  device: string;
+  description: string;
+  user_id: string;
+  user_name: string;
+  created_at: string;
+}
+
+export interface CreateBugReportDto {
+  title: string;
+  device: string;
+  description: string;
+}
+
+export interface BugReportResponse {
+  status: string;
+  data: {
+    id: string;
+  };
+}
+
+export interface BugReportsResponse {
+  status: string;
+  data: {
+    bugs: BugReport[];
+  };
+}
+
+export interface BugReportDetailResponse {
+  status: string;
+  data: {
+    bug: BugReport;
+  };
+}
+
 // Function to fetch leaderboard data
-export const fetchLeaderboard = async (): Promise<LeaderboardEntry[]> => {
+export const fetchLeaderboard = async (limit?: number): Promise<LeaderboardEntryResponseDto[]> => {
   try {
-    const response = await fetch(`${API_URL}/api/v1/statistics/leaderboard`, {
+    const params = limit ? `?limit=${limit}` : '';
+    const response = await fetch(`${API_URL}/api/v1/statistics/leaderboard${params}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -469,7 +555,7 @@ export interface SessionDetails {
   password: string | null;
   hostId: string;
   nightfarer?: string;
-  joinedPlayers?: { userId: string; username: string; nightfarer: string }[];
+  joinedPlayers?: { userId: string; username: string; nightfarer: string; experience: string }[];
 }
 
 // Function to fetch detailed information about a specific session
@@ -566,7 +652,8 @@ export const joinSession = async (
   username: string,
   covenantName: string,
   region: string,
-  platform: string
+  platform: string,
+  experience: string,
 ): Promise<void> => {
   try {
     const token = getToken();
@@ -583,7 +670,8 @@ export const joinSession = async (
         username,
         covenantName,
         region,
-        platform
+        platform,
+        experience
       }),
     });
     
@@ -648,6 +736,7 @@ export interface CreateSessionParams {
   nightLord: string;
   nightfarer: string;
   isPrivate: boolean;
+  isFriendsOnly: boolean;
   region: string;
   platform: string;
 }
@@ -702,12 +791,17 @@ export interface GameData {
     name: string;
     description: string;
   }[];
+  experiences: {
+    id: string;
+    name: string;
+    description: string;
+  }[];
 }
 
 export interface LoginParams {
   username: string;
   password: string;
-  captchaToken?: string;
+  turnstileToken?: string;
 }
 
 export interface RegisterParams {
@@ -719,6 +813,7 @@ export interface RegisterParams {
   platform: string;
   autoRegion: boolean;
   covenantName: string;
+  experience: string;
 }
 
 export interface UpdateProfileParams {
@@ -847,6 +942,396 @@ export const fetchGameData = async (): Promise<GameData> => {
     return await response.json();
   } catch (error) {
     console.error('Failed to fetch game data:', error);
+    throw error;
+  }
+};
+
+// Function to fetch recent news for homepage
+export async function fetchRecentNews(limit: number = 5): Promise<NewsItem[]> {
+  try {
+    const response = await fetch(`${API_URL}/api/v1/news/recent?limit=${limit}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Error from news API:', errorData);
+      throw new Error(errorData.message || 'Failed to fetch news');
+    }
+
+    const data = await response.json();
+    console.log('Recent news API response:', data);
+    
+    if (data.status === 'success' && data.data && Array.isArray(data.data.news)) {
+      return data.data.news;
+    } else {
+      console.error('Unexpected API response format:', data);
+      return [];
+    }
+  } catch (error) {
+    console.error('Error fetching recent news:', error);
+    return [];
+  }
+}
+
+// Function to fetch a single news item by ID
+export async function fetchNewsById(id: string): Promise<NewsItem | null> {
+  try {
+    const response = await fetch(`${API_URL}/api/v1/news/${id}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch news');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching news item:', error);
+    return null;
+  }
+}
+
+// Function to fetch a single news item by ID for admin (includes drafts)
+export async function fetchAdminNewsById(id: string): Promise<NewsItem | null> {
+  try {
+    // Get the authentication token
+    const token = getToken();
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+    
+    const response = await fetch(`${API_URL}/api/v1/admin/news/${id}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch news item');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching admin news item:', error);
+    return null;
+  }
+}
+
+// Function to fetch paginated news list with search
+export async function fetchAllNews(page: number = 1, limit: number = 10, search?: string): Promise<{ news: NewsItem[], total: number, page: number, totalPages: number }> {
+  try {
+    let url = `${API_URL}/api/v1/news?page=${page}&limit=${limit}`;
+    if (search) {
+      url += `&search=${encodeURIComponent(search)}`;
+      console.log(`Searching news with term: "${search}"`);
+    }
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch news');
+    }
+
+    const data = await response.json();
+    return {
+      news: data.data.news,
+      total: data.data.pagination.total,
+      page: data.data.pagination.page,
+      totalPages: data.data.pagination.total_pages
+    };
+  } catch (error) {
+    console.error('Error fetching news list:', error);
+    return { news: [], total: 0, page: 1, totalPages: 0 };
+  }
+}
+
+// Function to fetch news for admin dashboard (includes drafts)
+export async function fetchAdminNews(): Promise<NewsItem[]> {
+  try {
+    // Get the authentication token
+    const token = getToken();
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+    
+    const response = await fetch(`${API_URL}/api/v1/admin/news`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch admin news');
+    }
+
+    const data = await response.json();
+    if (data.status === 'success' && data.data && Array.isArray(data.data.news)) {
+      return data.data.news;
+    } else {
+      console.error('Unexpected API response format:', data);
+      return [];
+    }
+  } catch (error) {
+    console.error('Error fetching admin news:', error);
+    return [];
+  }
+}
+
+// Function to fetch the current announcement
+export async function fetchAnnouncement(): Promise<Announcement | null> {
+  try {
+    const response = await fetch(`${API_URL}/api/v1/announcements/current`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    if (data.status === 'success' && data.data) {
+      return data.data.announcement;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error fetching announcement:', error);
+    return null;
+  }
+}
+
+// Function to update the announcement (admin only)
+export async function updateAnnouncement(announcement: Announcement): Promise<boolean> {
+  try {
+    // Get the authentication token
+    const token = getToken();
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+    
+    // Ensure we're sending a properly formatted date string
+    let updatedAt = announcement.updatedAt;
+    
+    // If updated_at is a MongoDB date object, convert it to a string
+    if (typeof updatedAt === 'object' && updatedAt !== null && '$date' in updatedAt) {
+      // Don't send the MongoDB object format at all - backend handles timestamps
+      updatedAt = new Date().toISOString();
+    }
+    
+    const response = await fetch(`${API_URL}/api/v1/admin/announcements`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        active: announcement.active,
+        content: announcement.content
+        // Don't send updated_at at all - let the backend handle it
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to update announcement');
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error updating announcement:', error);
+    return false;
+  }
+}
+
+// Function to fetch user statistics for multiple users
+export const fetchUserStats = async (userIds: string[]): Promise<UserStats[]> => {
+  try {
+    if (!userIds.length) {
+      return [];
+    }
+
+    const token = getToken();
+    const userIdsParam = userIds.join(',');
+    
+    const response = await fetch(`${API_URL}/api/v1/statistics/batch?userIds=${userIdsParam}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error fetching user stats: ${response.statusText}`);
+    }
+
+    const result: UserStatsResponse = await response.json();
+    return result.data || [];
+  } catch (error) {
+    console.error('Failed to fetch user stats:', error);
+    return []; // Return empty array on error to prevent UI from breaking
+  }
+};
+
+// Function to create a bug report
+export const createBugReport = async (bugReport: CreateBugReportDto): Promise<string> => {
+  try {
+    const token = getToken();
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const response = await fetch(`${API_URL}/api/v1/bugs`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(bugReport),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to submit bug report');
+    }
+
+    const data: BugReportResponse = await response.json();
+    return data.data.id;
+  } catch (error) {
+    console.error('Failed to create bug report:', error);
+    throw error;
+  }
+};
+
+// Function to get all bug reports (admin only)
+export const getAllBugReports = async (): Promise<BugReport[]> => {
+  try {
+    const token = getToken();
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const response = await fetch(`${API_URL}/api/v1/bugs`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to fetch bug reports');
+    }
+
+    const data: BugReportsResponse = await response.json();
+    return data.data.bugs;
+  } catch (error) {
+    console.error('Failed to fetch bug reports:', error);
+    throw error;
+  }
+};
+
+// Function to get a bug report by ID
+export const getBugReportById = async (id: string): Promise<BugReport> => {
+  try {
+    const token = getToken();
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const response = await fetch(`${API_URL}/api/v1/bugs/${id}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to fetch bug report');
+    }
+
+    const data: BugReportDetailResponse = await response.json();
+    return data.data.bug;
+  } catch (error) {
+    console.error('Failed to fetch bug report:', error);
+    throw error;
+  }
+};
+
+// Function to get current user's bug reports
+export const getUserBugReports = async (): Promise<BugReport[]> => {
+  try {
+    const token = getToken();
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const response = await fetch(`${API_URL}/api/v1/bugs/user`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to fetch your bug reports');
+    }
+
+    const data: BugReportsResponse = await response.json();
+    return data.data.bugs;
+  } catch (error) {
+    console.error('Failed to fetch user bug reports:', error);
+    throw error;
+  }
+};
+
+// Function to get bugs reported by a specific user (admin only)
+export const getBugReportsByUserId = async (userId: string): Promise<BugReport[]> => {
+  try {
+    const token = getToken();
+    if (!token) {
+      throw new Error('Authentication required');
+    }
+
+    const response = await fetch(`${API_URL}/api/v1/bugs/user/${userId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to fetch bug reports for this user');
+    }
+
+    const data: BugReportsResponse = await response.json();
+    return data.data.bugs;
+  } catch (error) {
+    console.error('Failed to fetch bug reports by user ID:', error);
     throw error;
   }
 }; 

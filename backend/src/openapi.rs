@@ -1,28 +1,50 @@
-use crate::models::chat::ChatMessage;
+use crate::models::admin::{
+    ActorMailboxResponse, AdminChatResponse, AdminDashboardStats, AdminSessionResponse,
+    AdminSessionsData, AdminSessionsPaginationResponse, AdminSessionsResponse,
+    ConnectionStatsResponse, ConnectionsPerHourResponse, CreateFeatureFlagDto,
+    DashboardStatsResponse, FeatureFlag, FeatureFlagApiResponse, FeatureFlagData,
+    FeatureFlagResponse, FeatureFlagsData, FeatureFlagsResponse, MemoryUsage, PatchFeatureFlagDto,
+    SessionConnectionResponse, SystemInfo, SystemStatusResponse, WebSocketStatsData,
+    WebSocketStatsResponse,
+};
+use crate::models::bug::{
+    BugReport, BugReportData, BugReportResponse, BugReportResponseDto, BugReportsData,
+    BugReportsListResponse, CreateBugReportData, CreateBugReportDto, CreateBugReportResponse,
+};
+use crate::models::chat::ChatMessageResponseDto;
+use crate::models::common::{LimitQuery, PaginationQuery};
 use crate::models::game_data::{
-    Covenant, CovenantResponse, GameDataResponse, NightLord, NightLordResponse, Nightfarer,
-    NightfarerResponse, Platform, PlatformResponse, Region, RegionResponse,
+    Covenant, CovenantResponse, Experience, ExperienceResponse, GameDataResponse, NightLord,
+    NightLordResponse, Nightfarer, NightfarerResponse, Platform, PlatformResponse, Region,
+    RegionResponse,
 };
 use crate::models::geo_location::{CoordinatesDto, GeoLocationDataDto};
+use crate::models::news::{
+    Announcement, AnnouncementResponse, CreateNewsDto, NewsListData, NewsListResponse,
+    NewsResponse, UpdateAnnouncementDto, UpdateNewsDto,
+};
 use crate::models::session::{
     CovenantStats, CovenantStatsResponse, CreateSessionDto, GameResult, JoinSessionDto,
-    MinimalSessionDto, PlayerInfo, RateSessionDto, ResultsResponseDto, SessionResponseDto,
-    SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto,
+    MinimalSessionDto, PlayerInfo, PlayerInfoResponseDto, RateSessionDto, ResultsResponseDto,
+    SessionResponseDto, SessionResult, SessionResultResponseDto, SessionStatus, SubmitResultDto,
+    UpdateSessionDto,
 };
-use crate::models::statistics::{LeaderboardEntry, Stats, UserStatistics};
+use crate::models::statistics::{
+    LeaderboardEntryResponseDto, NightLordStatsResponse, PaginatedSessionData,
+    PaginatedSessionResponse, SessionHistoryResponse, Stats, UserStatistics,
+};
 use crate::models::user::{
     AddFriendDto, AuthResponse, CreateUserDto, FriendDto, FriendListResponse, GetUsersQuery,
     LoginUserDto, PaginationInfo, RefreshTokenResponse, RemoveFriendDto, UpdateUserDto,
     UpdateUserProfileDto, User, UserResponse, UsersListData, UsersListResponse,
 };
 use crate::models::user_data::UserDataResponseDto;
-use crate::routes::statistics::NightLordStatsResponse;
 use crate::routes::users::{JwtInfoDto, TokenInfoResponse};
 use crate::sse::messages::{ServerMessage, SessionInfo, SseSessionStatus};
 
 use crate::routes::{
-    chat::*, game_data::*, health::*, sessions::*, sse::*, statistics::*, user_data::*, users::*,
-    ws::*,
+    admin::*, bug::*, chat::*, game_data::*, health::*, news::*, sessions::*, sse::*,
+    statistics::*, user_data::*, users::*, ws::*,
 };
 
 // Import SSE models
@@ -65,6 +87,22 @@ use utoipa::{
         get_user_by_id_admin,
         update_user_admin,
         delete_user_admin,
+        get_admin_news,
+        get_admin_news_by_id,
+        get_dashboard_stats,
+        get_system_info,
+        get_admin_sessions,
+        get_admin_session_by_id,
+        delete_admin_session,
+        get_admin_chat_history,
+        delete_admin_chat_messages,
+        // Feature Flag endpoints
+        get_feature_flags,
+        get_feature_flag,
+        create_feature_flag,
+        update_feature_flag,
+        delete_feature_flag,
+        get_feature_flag_value,
         // User data routes
         get_current_user_data,
         test_cloudflare_headers,
@@ -85,6 +123,7 @@ use utoipa::{
         get_user_active_session,
         get_friends_sessions,
         reset_session_flags,
+        kick_player,
         // Game data routes
         get_game_data,
         get_platforms,
@@ -92,8 +131,7 @@ use utoipa::{
         get_covenants,
         get_nightfarers,
         get_night_lords,
-        // Chat routes
-        get_chat_history,
+        // Chat routes removed since we moved it to admin
         // SSE routes
         events_route,
         events_status,
@@ -110,6 +148,23 @@ use utoipa::{
         get_session_details,
         get_sessions_stats,
         get_covenant_stats,
+        get_multiple_users_statistics,
+        // News routes
+        get_all_news,
+        get_news_by_id,
+        create_news,
+        update_news,
+        delete_news,
+        get_recent_news,
+        // Announcement routes
+        get_current_announcement,
+        update_announcement,
+        // Chat routes
+        get_chat_history,
+        // Bug routes
+        create_bug_report,
+        get_all_bug_reports,
+        get_bug_report_by_id,
     ),
     components(
         schemas(
@@ -150,6 +205,8 @@ use utoipa::{
             SessionStatus,
             GameResult,
             SessionResult,
+            PlayerInfoResponseDto,
+            SessionResultResponseDto,
             // Covenant statistics models
             CovenantStats,
             CovenantStatsResponse,
@@ -159,14 +216,16 @@ use utoipa::{
             Covenant,
             Nightfarer,
             NightLord,
+            Experience,
             GameDataResponse,
             PlatformResponse,
             RegionResponse,
             CovenantResponse,
             NightfarerResponse,
             NightLordResponse,
+            ExperienceResponse,
             // Chat models
-            ChatMessage,
+            ChatMessageResponseDto,
             // SSE models
             ServerMessage,
             SessionInfo,
@@ -174,7 +233,7 @@ use utoipa::{
             // Statistics models
             Stats,
             UserStatistics,
-            LeaderboardEntry,
+            LeaderboardEntryResponseDto,
             NightLordStatsResponse,
             SessionHistoryResponse,
             PaginatedSessionResponse,
@@ -184,6 +243,57 @@ use utoipa::{
             PlayerDetail,
             SessionsStatsResponse,
             SessionsStatsData,
+            BatchUserStatsResponse,
+            UserStatsResponse,
+            // News models
+            NewsResponse,
+            NewsListResponse,
+            CreateNewsDto,
+            UpdateNewsDto,
+            NewsListData,
+            // Announcement models
+            Announcement,
+            UpdateAnnouncementDto,
+            AnnouncementResponse,
+            // Bug models
+            BugReport,
+            CreateBugReportDto,
+            BugReportResponseDto,
+            BugReportResponse,
+            BugReportData,
+            BugReportsListResponse,
+            BugReportsData,
+            CreateBugReportResponse,
+            CreateBugReportData,
+            // Admin models
+            AdminDashboardStats,
+            SystemInfo,
+            MemoryUsage,
+            SystemStatusResponse,
+            DashboardStatsResponse,
+            AdminSessionResponse,
+            AdminSessionsResponse,
+            AdminSessionsPaginationResponse,
+            AdminSessionsData,
+            AdminChatResponse,
+            // WebSocket Stats models
+            WebSocketStatsResponse,
+            WebSocketStatsData,
+            ConnectionStatsResponse,
+            ConnectionsPerHourResponse,
+            SessionConnectionResponse,
+            ActorMailboxResponse,
+            // Feature Flag models
+            FeatureFlag,
+            FeatureFlagApiResponse,
+            FeatureFlagResponse,
+            FeatureFlagsResponse,
+            FeatureFlagsData,
+            CreateFeatureFlagDto,
+            PatchFeatureFlagDto,
+            // Common models
+            PaginationQuery,
+            LimitQuery,
         ),
     ),
     tags(
@@ -195,7 +305,9 @@ use utoipa::{
         (name = "game-data", description = "Game data endpoints"),
         (name = "statistics", description = "Statistics endpoints"),
         (name = "chat", description = "Chat messaging endpoints"),
-        (name = "realtime", description = "Real-time communication endpoints")
+        (name = "realtime", description = "Real-time communication endpoints"),
+        (name = "news", description = "News and announcements management endpoints"),
+        (name = "feature-flags", description = "Feature flag management endpoints"),
     ),
     modifiers(&SecurityAddon),
 )]

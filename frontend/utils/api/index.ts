@@ -11,6 +11,7 @@ export * from './http-client';
 export { SessionService } from './session-service';
 export { UserService } from './user-service';
 export { sessionService } from './session-service';
+export { StatisticsService } from './statistics-service';
 
 // Import the SessionService class and types needed for our helper functions
 import { SessionService } from './session-service';
@@ -100,4 +101,34 @@ export const fetchFriendSessions = async (
     console.error('Error fetching friend sessions:', error);
     throw error;
   }
+};
+
+// Session Management
+export const createSession = async (sessionData: any) => {
+  const res = await fetch('/api/v1/sessions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(sessionData)
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json();
+    throw new Error(errorData.message || 'Error creating session');
+  }
+
+  return res.json();
+};
+
+export const kickPlayer = async (sessionId: string, playerId: string) => {
+  const res = await fetch(`/api/v1/sessions/${sessionId}/kick/${playerId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json();
+    throw new Error(errorData.message || 'Error kicking player');
+  }
+
+  return true;
 };

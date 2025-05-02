@@ -103,4 +103,142 @@ export class UserService {
       throw error;
     }
   }
+
+  /**
+   * Fetch users with pagination (admin only)
+   * @param page Current page number (starting from 1)
+   * @param limit Number of items per page
+   * @param role Optional role filter (admin or user)
+   * @returns Paginated list of users
+   */
+  static async getUsers(
+    page: number = 1,
+    limit: number = 10,
+    role?: string | null
+  ): Promise<GetUsersResponse> {
+    try {
+      let url = `/api/v1/admin/users?page=${page}&limit=${limit}`;
+      if (role) {
+        url += `&role=${role}`;
+      }
+      return await httpClient.get<GetUsersResponse>(url, true);
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get a specific user by ID (admin only)
+   * @param userId User ID to fetch
+   * @returns User data
+   */
+  static async getAdminUserById(userId: string): Promise<AdminUser> {
+    try {
+      return await httpClient.get<AdminUser>(`/api/v1/admin/users/${userId}`, true);
+    } catch (error) {
+      console.error(`Failed to fetch user with ID ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a new admin user (admin only)
+   * @param userData User data for the new admin
+   * @returns Created user data
+   */
+  static async createAdminUser(userData: CreateAdminUserParams): Promise<AdminUser> {
+    try {
+      return await httpClient.post<AdminUser>('/api/v1/admin/users', userData, true);
+    } catch (error) {
+      console.error('Failed to create admin user:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update a user (admin only)
+   * @param userId ID of the user to update
+   * @param userData Updated user data
+   * @returns Updated user data
+   */
+  static async updateUser(userId: string, userData: UpdateUserParams): Promise<AdminUser> {
+    try {
+      return await httpClient.put<AdminUser>(`/api/v1/admin/users/${userId}`, userData, true);
+    } catch (error) {
+      console.error(`Failed to update user with ID ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a user (admin only)
+   * @param userId ID of the user to delete
+   */
+  static async deleteUser(userId: string): Promise<void> {
+    try {
+      await httpClient.delete<void>(`/api/v1/admin/users/${userId}`, true);
+    } catch (error) {
+      console.error(`Failed to delete user with ID ${userId}:`, error);
+      throw error;
+    }
+  }
+}
+
+// Admin user types
+export interface AdminUser {
+  id: string;
+  username: string;
+  email: string;
+  displayName: string;
+  role: string;
+  createdAt: string | { $date: { $numberLong: string } };
+  updatedAt: string | { $date: { $numberLong: string } };
+  profileImage?: string;
+  region?: string;
+  platform?: string;
+  autoRegion?: boolean;
+  covenantName?: string;
+  experience?: string;
+  cmRegion?: string;
+  cfRegion?: string;
+  preferredSessionName?: string;
+  preferredSessionPassword?: string;
+  preferredNightfarer?: string;
+  disabled?: boolean;
+}
+
+export interface UsersPaginationResponse {
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+}
+
+export interface GetUsersResponse {
+  status: string;
+  data: {
+    users: AdminUser[];
+    pagination: UsersPaginationResponse;
+  };
+}
+
+export interface CreateAdminUserParams {
+  username: string;
+  email: string;
+  displayName: string;
+  password: string;
+  region?: string;
+  platform?: string;
+  covenantName: string;
+  experience: string;
+  disabled?: boolean;
+  autoRegion?: boolean;
+  role?: string;
+}
+
+export interface UpdateUserParams {
+  email?: string;
+  displayName?: string;
+  disabled?: boolean;
 } 

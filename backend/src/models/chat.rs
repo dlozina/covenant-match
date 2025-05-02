@@ -78,3 +78,20 @@ impl ChatSession {
         self.last_activity = now;
     }
 }
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatHistoryParams {
+    pub session_id: String,
+    pub limit: Option<i64>,
+}
+
+
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatMessageResponseDto {
+    pub sender_id: String,
+    pub sender_name: String,
+    pub message: String,
+    pub timestamp: i64,
+}

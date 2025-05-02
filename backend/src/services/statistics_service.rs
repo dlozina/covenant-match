@@ -1,5 +1,5 @@
 use crate::models::error::AppError;
-use crate::models::statistics::{LeaderboardEntry, UserStatistics};
+use crate::models::statistics::{LeaderboardEntryResponseDto, UserStatistics};
 use crate::repository::session_repository;
 use crate::repository::statistics_repository;
 use crate::routes::statistics::{PlayerDetail, SessionDetail};
@@ -45,7 +45,10 @@ pub async fn get_all_user_statistics(db: &Database) -> Result<Vec<UserStatistics
     statistics_repository::find_all(db).await
 }
 
-pub async fn get_leaderboard(db: &Database, limit: i64) -> Result<Vec<LeaderboardEntry>, AppError> {
+pub async fn get_leaderboard(
+    db: &Database,
+    limit: i64,
+) -> Result<Vec<LeaderboardEntryResponseDto>, AppError> {
     statistics_repository::get_leaderboard(db, limit).await
 }
 

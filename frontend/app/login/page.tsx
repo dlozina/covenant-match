@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
@@ -20,9 +20,9 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import ReCaptchaComponent from "@/components/auth/ReCaptcha"
 import { AlertCircle } from "lucide-react"
 import { login as apiLogin, LoginParams } from "@/utils/api"
+import { Turnstile } from "next-turnstile";
 
 // Username validation regex - must match the one used in profile creation
 const usernameRegex = /^[a-zA-Z0-9_.-]+$/;
@@ -64,116 +64,138 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [loginAttempts, setLoginAttempts] = useState(0)
   const [isLocked, setIsLocked] = useState(false)
-  const [showCaptcha, setShowCaptcha] = useState(false)
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [notification, setNotification] = useState<NotificationType | null>(null)
+  // Store form values to prevent losing them on re-render
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
+  const [token, setToken] = useState<string>();
+  // Reference to the form element
+  const formRef = useRef<HTMLFormElement>(null)
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
-      username: "",
-      password: "",
+      username: username,
+      password: password,
     },
     mode: "onSubmit", // Only validate on submit
   })
 
-  // Show CAPTCHA after 3 failed attempts
+  // Update the form when username/password state changes
   useEffect(() => {
-    if (loginAttempts >= 3) {
-      setShowCaptcha(true)
-    }
-  }, [loginAttempts])
+    form.setValue("username", username);
+    form.setValue("password", password);
+  }, [username, form]);
 
   async function onSubmit(data: LoginFormValues) {
+    // Save form values to state
+    setUsername(data.username);
+    
     // Reset notification on new submission
-    setNotification(null)
+    setNotification(null);
     
     // Check if we're currently locked out
     if (isLocked) {
       setNotification({
         message: "Too many login attempts. Please try again later.",
         type: 'error'
-      })
-      return
+      });
+      return;
     }
-
-    // Check if captcha is shown but not completed
-    if (showCaptcha && !captchaToken) {
+    
+    // Check if Turnstile token is available
+    if (!token) {
       setNotification({
-        message: "Please complete the CAPTCHA verification",
-        type: 'warning'
-      })
-      return
+        message: "Failed to verify turnstile token. Please try again.",
+        type: 'error'
+      });
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
     // Increment login attempts
-    setLoginAttempts(prev => prev + 1)
+    setLoginAttempts(prev => prev + 1);
 
     // If we've had too many attempts, lock the form temporarily
     if (loginAttempts >= 5) {
-      setIsLocked(true)
+      setIsLocked(true);
       setTimeout(() => {
-        setIsLocked(false)
-        setLoginAttempts(0)
-      }, 60000) // Lock for 1 minute after 5 attempts
+        setIsLocked(false);
+        setLoginAttempts(0);
+      }, 60000); // Lock for 1 minute after 5 attempts
       
       setNotification({
         message: "Too many failed login attempts. Please try again in 1 minute.",
         type: 'error'
-      })
-      setIsLoading(false)
-      return
+      });
+      setIsLoading(false);
+      return;
     }
 
     try {
-      // Prepare login data
+      // Prepare login data with turnstile token
       const loginData: LoginParams = {
         username: data.username.trim().toLowerCase(),
         password: data.password, // passwords should not be modified
+        turnstileToken: token,
       };
       
-      // Add captcha token if available
-      if (captchaToken) {
-        loginData.captchaToken = captchaToken;
-      }
-      
+      // First attempt to get a token from the API
       const responseData = await apiLogin(loginData);
       
-      // Use the login function from auth context
-      if (responseData.token) {
-        login(responseData.token)
+      if (!responseData || !responseData.token) {
+        throw new Error('Authentication failed');
+      }
+      
+      // Then attempt to login with the token
+      try {
+        await login(responseData.token);
+        
+        // If we get here, login was successful
         setNotification({
           message: "Login successful!",
           type: 'success'
-        })
-        // Reset login attempts and captcha on successful login
-        setLoginAttempts(0)
-        setShowCaptcha(false)
-        setCaptchaToken(null)
-        router.push('/profile')
-      } else {
-        throw new Error('Authentication failed')
+        });
+        
+        // Reset login attempts and turnstile on successful login
+        setLoginAttempts(0);
+        
+        // Clear password for security
+        setPassword("");
+        
+        // Wait a moment to show success message before redirecting
+        setTimeout(() => {
+          router.push('/');
+        }, 500);
+      } catch (loginError) {
+        // Clear the password field on error
+        setPassword("");
+        
+        // Handle specific disabled account error
+        if (loginError instanceof Error) {
+          setNotification({
+            message: loginError.message,
+            type: 'error'
+          });
+          console.error('Login error:', loginError);
+        } else {
+          setNotification({
+            message: "An unknown error occurred during login.",
+            type: 'error'
+          });
+        }
       }
-    } catch (error: unknown) {
-      // Check if error has requiresCaptcha property
-      // @ts-expect-error - Custom property on error
-      if (error instanceof Error && error.requiresCaptcha) {
-        setShowCaptcha(true);
-      }
+    } catch (apiError) {
+      // Clear the password field on error
+      setPassword("");
       
       setNotification({
-        message: error instanceof Error ? error.message : "Login failed. Please try again.",
+        message: apiError instanceof Error ? apiError.message : "Login failed. Please try again.",
         type: 'error'
-      })
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
-
-  // Handle captcha change
-  const handleCaptchaChange = (token: string | null) => {
-    setCaptchaToken(token)
   }
 
   return (
@@ -188,7 +210,7 @@ export default function LoginPage() {
           </CardHeader>
           <CardContent className="px-4 sm:px-6">
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form ref={formRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
                   name="username"
@@ -200,6 +222,10 @@ export default function LoginPage() {
                           placeholder="username" 
                           {...field} 
                           className="h-10 text-base"
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setUsername(e.target.value);
+                          }}
                         />
                       </FormControl>
                       <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
@@ -219,6 +245,10 @@ export default function LoginPage() {
                           type="password" 
                           {...field} 
                           className="h-10 text-base"
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setPassword(e.target.value);
+                          }}
                         />
                       </FormControl>
                       <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
@@ -238,22 +268,17 @@ export default function LoginPage() {
                     <span>{notification.message}</span>
                   </div>
                 )}
-
-                {/* Show captcha if needed */}
-                {showCaptcha && (
-                  <div className="mt-4">
-                    <p className="text-sm text-amber-600 mb-2">Security verification required</p>
-                    <ReCaptchaComponent 
-                      onChange={handleCaptchaChange}
-                      onExpired={() => setCaptchaToken(null)}
-                    />
-                  </div>
-                )}
-
+                {/* Turnstile widget */}
+                <Turnstile
+                  className="flex justify-center"
+                  theme="dark"
+                  siteKey="0x4AAAAAABYet9mhK3xghhXA"
+                  onVerify={setToken}
+                />
                 <Button 
                   type="submit" 
                   className="w-full h-10 text-sm sm:text-base" 
-                  disabled={isLoading || isLocked || (showCaptcha && !captchaToken)}
+                  disabled={isLoading || isLocked}
                 >
                   {isLoading ? "Logging in..." : isLocked ? "Temporarily locked" : "Login"}
                 </Button>
@@ -272,4 +297,4 @@ export default function LoginPage() {
       </div>
     </MainLayout>
   )
-} 
+}

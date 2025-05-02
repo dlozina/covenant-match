@@ -12,6 +12,8 @@ export { SessionHeader } from './SessionHeader';
 export { FinishSessionDialog } from './dialogs/FinishSessionDialog';
 export { WarningDialog } from './dialogs/WarningDialog';
 export { DeleteSessionDialog } from './dialogs/DeleteSessionDialog';
+export { KickPlayerDialog } from './dialogs/KickPlayerDialog';
+export { NewSessionDialog } from './dialogs/NewSessionDialog';
 
 // Export session roles
 export { SessionHost, SessionParticipant } from './roles';

@@ -207,11 +207,13 @@ pub async fn create_session(
         platform: session_data.platform,
         password: session_data.game_password,
         is_private: session_data.is_private,
+        is_friends_only: session_data.is_friends_only,
         status: SessionStatus::Open,
         joined_players: vec![PlayerInfo {
             user_id: user.id.to_hex(),
             region: session_data.region,
             platform: user.platform,
+            experience: user.experience.to_string(),
             username: user.display_name.unwrap_or(user.username),
             nightfarer: session_data.nightfarer,
             covenant_name: user.covenant_name,
@@ -295,6 +297,9 @@ pub async fn get_sessions(
         None => None,
     };
 
+    // For general sessions list, filter out friends-only sessions
+    let is_friends_only = Some(false);
+
     let sessions = session_repository::find_sessions(
         db,
         status_filter,
@@ -303,6 +308,7 @@ pub async fn get_sessions(
         is_private,
         region,
         platform,
+        is_friends_only,
     )
     .await?;
 
@@ -334,6 +340,9 @@ pub async fn get_minimal_sessions(
     // Always filter out private sessions for this public endpoint
     let is_private = Some(false);
 
+    // For general sessions list, filter out friends-only sessions
+    let is_friends_only = Some(false);
+
     let sessions = session_repository::find_sessions(
         db,
         status_filter,
@@ -342,6 +351,7 @@ pub async fn get_minimal_sessions(
         is_private,
         region,
         platform,
+        is_friends_only,
     )
     .await?;
 
@@ -446,6 +456,7 @@ pub async fn join_session(
         username: join_data.username.clone(),
         nightfarer: join_data.nightfarer.clone(),
         covenant_name: join_data.covenant_name.clone(),
+        experience: join_data.experience.clone(),
         joined_at: now,
     });
 
@@ -468,7 +479,8 @@ pub async fn join_session(
             "userId": join_data.user_id,
             "username": join_data.username,
             "nightfarer": join_data.nightfarer,
-            "covenantName": join_data.covenant_name
+            "covenantName": join_data.covenant_name,
+            "experience": join_data.experience
         }),
         Some(user_id.clone()),
     );
@@ -740,14 +752,6 @@ async fn handle_consensus(
     // Get the list of players who have already submitted results
     let players_who_submitted: Vec<String> =
         session.results.iter().map(|r| r.user_id.clone()).collect();
-
-    log::info!(
-        "Consensus reached in session {}: {:?}. Players who submitted: {:?}, stats already updated: {}",
-        session_id,
-        consensus_result,
-        players_who_submitted,
-        session.stats_updated
-    );
 
     // Check if stats have already been updated using the explicit flag
     if session.stats_updated {
@@ -1058,6 +1062,7 @@ pub async fn recreate_session(
         platform: original_session.platform.clone(),
         password: original_session.password.clone(),
         is_private: make_private, // Always make recreated sessions private so they don't show in the sessions list
+        is_friends_only: original_session.is_friends_only,
         status: SessionStatus::Open,
         joined_players: vec![PlayerInfo {
             user_id: user_id.to_string(),
@@ -1066,6 +1071,7 @@ pub async fn recreate_session(
             username: host_user.display_name.unwrap_or(host_user.username),
             nightfarer: host_nightfarer,
             covenant_name: host_user.covenant_name.clone(),
+            experience: host_user.experience.to_string(),
             joined_at: now,
         }],
         night_lord: original_session.night_lord.clone(),
@@ -1344,6 +1350,128 @@ pub async fn get_friends_sessions(
     Ok(sessions.into_iter().map(SessionResponseDto::from).collect())
 }
 
+/// Kick a player from a session (host only)
+pub async fn kick_player(
+    db: &Database,
+    session_id: &str,
+    user_id: &str,
+    player_id: &str,
+) -> Result<(), AppError> {
+    // Find the session
+    let session = match session_repository::find_by_id(db, session_id).await? {
+        Some(session) => session,
+        None => return Err(AppError::SessionNotFound),
+    };
+
+    // Verify the requestor is the host
+    if session.host_id != user_id {
+        return Err(AppError::Forbidden(
+            "Only the host can kick players from the session".to_string(),
+        ));
+    }
+
+    // Verify session is not InProgress
+    if session.status == SessionStatus::InProgress {
+        return Err(AppError::BadRequest(
+            "Cannot kick players from a session that is in progress".to_string(),
+        ));
+    }
+
+    // Verify the player is in the session
+    let player_index = session
+        .joined_players
+        .iter()
+        .position(|player| player.user_id == player_id)
+        .ok_or_else(|| AppError::BadRequest("Player not found in this session".to_string()))?;
+
+    // Get player details before we remove them for the WebSocket event
+    let player = &session.joined_players[player_index];
+
+    // Verify we're not kicking the host (should never happen but check anyway)
+    if player_id == session.host_id {
+        return Err(AppError::BadRequest(
+            "Cannot kick the host from their own session".to_string(),
+        ));
+    }
+
+    // Update the session by removing the player
+    let collection = db.collection::<GameSession>("sessions");
+    let object_id =
+        mongodb::bson::oid::ObjectId::parse_str(session_id).map_err(|_| AppError::InvalidId)?;
+
+    // Pull the player from the session's joined_players array
+    collection
+        .update_one(
+            mongodb::bson::doc! { "_id": object_id },
+            mongodb::bson::doc! {
+                "$pull": {
+                    "joined_players": { "user_id": player_id }
+                }
+            },
+        )
+        .await
+        .map_err(|e| {
+            log::error!("Error removing player from session: {:?}", e);
+            AppError::InternalError("Failed to remove player from session".to_string())
+        })?;
+
+    // If session status was Full and now has an open slot, update status to Open
+    let updated_session = match session_repository::find_by_id(db, session_id).await? {
+        Some(session) => session,
+        None => return Ok(()), // Session might have been deleted in the meantime
+    };
+
+    if updated_session.status == SessionStatus::Full && updated_session.joined_players.len() < 3 {
+        collection
+            .update_one(
+                mongodb::bson::doc! { "_id": object_id },
+                mongodb::bson::doc! {
+                    "$set": {
+                        "status": "Open"
+                    }
+                },
+            )
+            .await
+            .map_err(|e| {
+                log::error!("Error updating session status: {:?}", e);
+                AppError::InternalError("Failed to update session status".to_string())
+            })?;
+    }
+
+    // Send WebSocket event to notify all clients about the kicked player
+    let host_username = session
+        .joined_players
+        .iter()
+        .find(|p| p.user_id == session.host_id)
+        .map(|p| p.username.clone())
+        .unwrap_or_else(|| "Host".to_string());
+
+    // Event for the kicked player
+    let kick_data = serde_json::json!({
+        "session_id": session_id,
+        "player_id": player_id,
+        "username": player.username,
+        "host_username": host_username,
+        "timestamp": chrono::Utc::now().timestamp()
+    });
+
+    // For player-specific kick notification
+    broadcast_event(session_id, "player_kicked", kick_data, None);
+
+    // For session update notification to all clients (including the host)
+    let update_data = serde_json::json!({
+        "session_id": session_id,
+        "action": "player_removed",
+        "player_id": player_id,
+        "username": player.username
+    });
+
+    broadcast_event(session_id, "session_update", update_data, None);
+
+    // Return success
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1484,6 +1612,7 @@ mod tests {
             covenant_name: "Covenant 1".to_string(),
             region: "Europe".to_string(),
             platform: "Playstation".to_string(),
+            experience: "Beginner".to_string(),
             joined_at: now,
         };
 
@@ -1494,6 +1623,7 @@ mod tests {
             covenant_name: "Covenant 2".to_string(),
             region: "Europe".to_string(),
             platform: "Playstation".to_string(),
+            experience: "Beginner".to_string(),
             joined_at: now,
         };
 
@@ -1504,6 +1634,7 @@ mod tests {
             covenant_name: "Covenant 3".to_string(),
             region: "Europe".to_string(),
             platform: "Playstation".to_string(),
+            experience: "Beginner".to_string(),
             joined_at: now,
         };
 
@@ -1516,6 +1647,7 @@ mod tests {
             platform: "Playstation".to_string(),
             password: "test".to_string(),
             is_private: false,
+            is_friends_only: false,
             status: SessionStatus::InProgress,
             joined_players: vec![player1, player2, player3],
             night_lord: "Night Lord 1".to_string(),
@@ -1620,6 +1752,7 @@ mod tests {
             covenant_name: "Covenant 1".to_string(),
             region: "Europe".to_string(),
             platform: "Playstation".to_string(),
+            experience: "Beginner".to_string(),
             joined_at: now,
         };
 
@@ -1630,6 +1763,7 @@ mod tests {
             covenant_name: "Covenant 2".to_string(),
             region: "Europe".to_string(),
             platform: "Playstation".to_string(),
+            experience: "Beginner".to_string(),
             joined_at: now,
         };
 
@@ -1640,6 +1774,7 @@ mod tests {
             covenant_name: "Covenant 3".to_string(),
             region: "Europe".to_string(),
             platform: "Playstation".to_string(),
+            experience: "Beginner".to_string(),
             joined_at: now,
         };
 
@@ -1652,6 +1787,7 @@ mod tests {
             platform: "Playstation".to_string(),
             password: "test".to_string(),
             is_private: false,
+            is_friends_only: false,
             status: SessionStatus::Completed, // Already completed
             joined_players: vec![player1, player2, player3],
             night_lord: "Night Lord 1".to_string(),

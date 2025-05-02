@@ -1,5 +1,5 @@
 use crate::models::error::AppError;
-use crate::models::game_data::{Covenant, NightLord, Nightfarer, Platform, Region};
+use crate::models::game_data::{Covenant, Experience, NightLord, Nightfarer, Platform, Region};
 use futures::StreamExt;
 use log::error;
 use mongodb::{bson::doc, Collection, Database};
@@ -10,6 +10,7 @@ const REGIONS_COLLECTION: &str = "regions";
 const COVENANTS_COLLECTION: &str = "covenants";
 const NIGHTFARERS_COLLECTION: &str = "nightfarers";
 const NIGHTLORDS_COLLECTION: &str = "nightlords";
+const EXPERIENCES_COLLECTION: &str = "experiences";
 
 // Helper functions to get collections
 fn get_platforms_collection(db: &Database) -> Collection<Platform> {
@@ -30,6 +31,10 @@ fn get_nightfarers_collection(db: &Database) -> Collection<Nightfarer> {
 
 fn get_nightlords_collection(db: &Database) -> Collection<NightLord> {
     db.collection::<NightLord>(NIGHTLORDS_COLLECTION)
+}
+
+fn get_experiences_collection(db: &Database) -> Collection<Experience> {
+    db.collection::<Experience>(EXPERIENCES_COLLECTION)
 }
 
 // Platform repository functions
@@ -185,4 +190,35 @@ pub async fn get_all_nightlords(db: &Database) -> Result<Vec<NightLord>, AppErro
     }
 
     Ok(nightlords)
+}
+
+// Experience repository functions
+pub async fn get_all_experiences(db: &Database) -> Result<Vec<Experience>, AppError> {
+    let collection = get_experiences_collection(db);
+
+    // Create an empty filter to get all documents
+    let filter = doc! {};
+
+    // Execute the find operation
+    let cursor_result = collection.find(filter).await;
+
+    // Handle any errors from the find operation
+    let mut cursor = cursor_result.map_err(|e| {
+        error!("Database error fetching experiences: {:?}", e);
+        AppError::DatabaseError(e)
+    })?;
+
+    // Collect results
+    let mut experiences = Vec::new();
+    while let Some(result) = cursor.next().await {
+        match result {
+            Ok(experience) => experiences.push(experience),
+            Err(e) => {
+                error!("Error parsing experience document: {:?}", e);
+                return Err(AppError::DatabaseError(e));
+            }
+        }
+    }
+
+    Ok(experiences)
 }

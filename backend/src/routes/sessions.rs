@@ -787,6 +787,58 @@ async fn get_friends_sessions(
     }
 }
 
+/// Kick a player from a session (host only)
+#[utoipa::path(
+    post,
+    path = "/api/v1/sessions/{id}/kick/{playerId}",
+    params(
+        ("id" = String, Path, description = "Session ID"),
+        ("playerId" = String, Path, description = "Player ID to kick from the session")
+    ),
+    responses(
+        (status = 200, description = "Player kicked successfully"),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Only the host can kick players"),
+        (status = 404, description = "Session or player not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "sessions"
+)]
+#[post("/api/v1/sessions/{id}/kick/{playerId}")]
+async fn kick_player(
+    db: web::Data<Database>,
+    path: web::Path<(String, String)>,
+    req: HttpRequest,
+) -> impl Responder {
+    let (id, player_id) = path.into_inner();
+
+    // Extract user_id before any await points
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
+        claims.sub.clone()
+    };
+
+    match session_service::kick_player(&db, &id, &user_id, &player_id).await {
+        Ok(()) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "message": "Player kicked successfully"
+        })),
+        Err(e) => {
+            log::error!("Error kicking player: {:?}", e);
+            HttpResponse::BadRequest().json(serde_json::json!({
+                "status": "error",
+                "message": e.to_string()
+            }))
+        }
+    }
+}
+
 /// Get sessions created by friends
 pub fn config(cfg: &mut web::ServiceConfig) {
     // Register paths from most specific to most general
@@ -808,5 +860,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         .service(update_session)
         .service(submit_result)
         .service(get_results)
-        .service(reset_session_flags);
+        .service(reset_session_flags)
+        .service(kick_player);
 }

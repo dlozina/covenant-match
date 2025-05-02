@@ -13,6 +13,7 @@ export interface Session {
   name: string;
   hostId: string;
   status: "Open" | "InProgress" | "Completed";
+  isFriendsOnly: boolean;
   nightLord: string;
   joinedPlayers: JoinedPlayer[];
   createdAt: string;
@@ -66,6 +67,7 @@ export interface RegisterParams {
   platform: string;
   autoRegion: boolean;
   covenantName: string;
+  experience: string;
 }
 
 export interface UpdateProfileParams {
@@ -76,6 +78,7 @@ export interface UpdateProfileParams {
   platform?: string;
   autoRegion?: boolean;
   covenantName?: string;
+  experience?: string;
   preferredSessionName?: string;
   preferredSessionPassword?: string;
   preferredNightfarer?: string;
@@ -90,11 +93,13 @@ export interface UserProfile {
   platform: string;
   autoRegion: boolean;
   covenantName: string;
+  experience?: string;
   preferredSessionName?: string;
   preferredSessionPassword?: string;
   preferredNightfarer?: string;
   createdAt: string;
   updatedAt: string;
+  role?: string;
 }
 
 // Game data types
@@ -128,11 +133,19 @@ export interface Nightfarer {
   description: string;
 }
 
+export interface ExperienceData {
+  id: string;
+  name: string;
+  description: string;
+}
+
 export interface GameData {
   platforms: PlatformData[];
   regions: RegionData[];
   covenants: CovenantData[];
   nightfarers: Nightfarer[];
+  nightLords?: NightLord[];
+  experiences?: ExperienceData[];
 }
 
 // Session creation/management types
@@ -161,6 +174,7 @@ export interface LeaderboardEntry {
   wins: number;
   win_rate: number;
   reputation_score: number;
+  score: number;
 }
 
 export interface SessionHistoryEntry {
@@ -281,4 +295,17 @@ export interface SessionFilterOptions {
 }
 
 // Use existing Session type as SessionResponse
-export type SessionResponse = Session; 
+export type SessionResponse = Session;
+
+export interface UserStats {
+  userId: string;
+  displayName: string;
+  platform: string;
+  experience: string;
+  covenantName: string;
+  totalGames: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  score: number;
+} 

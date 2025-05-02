@@ -23,6 +23,10 @@ export interface SessionState {
     showConfirmDialog: boolean;
     showWarningDialog: boolean;
     showDeleteDialog: boolean;
+    showNewSessionDialog: boolean;
+    showKickDialog: boolean;
+    kickPlayerId: string;
+    kickPlayerName: string;
   }
   
   export type DialogAction = 
@@ -31,7 +35,11 @@ export interface SessionState {
     | { type: 'SHOW_WARNING' }
     | { type: 'HIDE_WARNING' }
     | { type: 'SHOW_DELETE' }
-    | { type: 'HIDE_DELETE' };
+    | { type: 'HIDE_DELETE' }
+    | { type: 'SHOW_NEW_SESSION' }
+    | { type: 'HIDE_NEW_SESSION' }
+    | { type: 'SHOW_KICK_DIALOG', payload: { playerId: string, playerName: string } }
+    | { type: 'HIDE_KICK_DIALOG' };
   
   export interface ResultState {
     selectedResult: string;
@@ -132,6 +140,25 @@ export interface SessionState {
           ...state,
           showDeleteDialog: false
         };
+      case 'SHOW_NEW_SESSION':
+        return {
+          ...state,
+          showNewSessionDialog: true
+        };
+      case 'HIDE_NEW_SESSION':
+        return {
+          ...state,
+          showNewSessionDialog: false
+        };
+      case 'SHOW_KICK_DIALOG':
+        return { 
+          ...state, 
+          showKickDialog: true, 
+          kickPlayerId: action.payload.playerId,
+          kickPlayerName: action.payload.playerName
+        };
+      case 'HIDE_KICK_DIALOG':
+        return { ...state, showKickDialog: false };
       default:
         return state;
     }

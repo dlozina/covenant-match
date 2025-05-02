@@ -21,8 +21,10 @@ pub struct User {
     pub cm_region: String,
     pub cf_region: Option<String>,
     pub platform: String,
+    pub experience: Experience,
     pub covenant_name: String,
     pub role: String, // "admin" or "user"
+    pub disabled: bool,
     pub created_at: DateTime,
     pub updated_at: DateTime,
     pub preferred_session_name: Option<String>,
@@ -30,6 +32,24 @@ pub struct User {
     pub preferred_nightfarer: Option<String>,
     #[serde(default)]
     pub friend_list: Vec<ObjectId>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, ToSchema)]
+pub enum Experience {
+    Beginner,
+    Mid,
+    Veteran,
+}
+
+// Implement Display for Experience
+impl std::fmt::Display for Experience {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Experience::Beginner => write!(f, "Beginner"),
+            Experience::Mid => write!(f, "Mid"),
+            Experience::Veteran => write!(f, "Veteran"),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate, ToSchema)]
@@ -46,9 +66,12 @@ pub struct CreateUserDto {
     pub region: String,
     pub auto_region: bool,
     pub platform: String,
+    pub experience: Experience,
     pub covenant_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub role: Option<String>, // Only used by admins when creating users
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub disabled: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub preferred_session_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -70,7 +93,9 @@ pub struct UserResponse {
     pub cm_region: String,
     pub cf_region: Option<String>,
     pub covenant_name: String,
+    pub experience: Experience,
     pub role: String,
+    pub disabled: bool,
     pub platform: String,
     pub created_at: DateTime,
     pub updated_at: DateTime,
@@ -82,13 +107,13 @@ pub struct UserResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct LoginUserDto {
     pub username: String,
     #[schema(format = "password")]
     pub password: String,
-    /// reCAPTCHA token for verification
-    #[serde(rename = "captchaToken")]
-    pub captcha_token: Option<String>,
+    /// Cloudflare Turnstile token
+    pub turnstile_token: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -111,6 +136,8 @@ pub struct UpdateUserProfileDto {
     pub cf_region: Option<String>,
     pub platform: Option<String>,
     pub covenant_name: Option<String>,
+    pub disabled: Option<bool>,
+    pub experience: Option<Experience>,
     pub avatar_url: Option<String>,
     pub preferred_session_name: Option<String>,
     pub preferred_session_password: Option<String>,
@@ -130,7 +157,9 @@ impl From<User> for UserResponse {
             cm_region: user.cm_region,
             cf_region: user.cf_region,
             covenant_name: user.covenant_name,
+            experience: user.experience,
             role: user.role,
+            disabled: user.disabled,
             platform: user.platform,
             created_at: user.created_at,
             updated_at: user.updated_at,

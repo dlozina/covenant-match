@@ -17,6 +17,11 @@ port = 8080
 host = "0.0.0.0"
 workers = 1
 
+[domain]
+primary = "localhost"
+www = "localhost"
+allow_local = true  # Allow local testing in development
+
 [realtime]
 # Use WebSockets (true) or Server-Sent Events (false)
 use_websockets = true
@@ -24,8 +29,8 @@ use_websockets = true
 session_inactive_timeout = 86400 # 24 hours
 
 [chat]
-cleanup_interval_minutes = 60 # 1 hour
-inactive_minutes = 60 # 1 hour
+cleanup_interval_seconds = 3600 # 1 hour (3600 seconds)
+inactive_seconds = 3600 # 1 hour (3600 seconds)
 
 [auth]
 # Exclude patterns format: [path, method, is_regex]
@@ -47,4 +52,10 @@ exclude_patterns = [
     # { path = "/api/v1/sse/.*", method = "GET", is_regex = true },
     # { path = "/api/public/.*", method = "GET", is_regex = true },
     # { path = "/favicon.ico", method = "GET", is_regex = false },
+    # Serve uploaded files
+    { path = "/uploads/.*", method = "GET", is_regex = true },
+    # Serve news
+    { path = "/api/v1/news", method = "GET", is_regex = false },
+    { path = "/api/v1/news/.*", method = "GET", is_regex = true },
+    { path = "/api/v1/announcements/current", method = "GET", is_regex = false },
 ] 

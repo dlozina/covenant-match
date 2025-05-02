@@ -28,7 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { FALLBACK_REGIONS, FALLBACK_PLATFORMS, FALLBACK_COVENANT_NAMES } from "@/lib/constants"
+import { FALLBACK_REGIONS, FALLBACK_PLATFORMS, FALLBACK_COVENANT_NAMES, FALLBACK_EXPERIENCE } from "@/lib/constants"
 import { fetchGameData, register, RegisterParams } from "@/utils/api"
 
 // Username and display name validation regex
@@ -53,10 +53,19 @@ interface CovenantData {
   description: string;
 }
 
+interface ExperienceData {
+  id: string;
+  name: string;
+  description: string;
+}
+
 interface GameData {
   platforms: PlatformData[];
   regions: RegionData[];
   covenants: CovenantData[];
+  nightfarers: PlatformData[];
+  night_lords?: PlatformData[];
+  experiences?: ExperienceData[];
 }
 
 // Validation schema with consistent rules
@@ -107,6 +116,9 @@ const profileFormSchema = z.object({
   covenantName: z
     .string()
     .min(1, { message: "Covenant name is required" }),
+  experience: z
+    .string()
+    .min(1, { message: "Experience is required" }),
 }).refine((data) => data.password === data.passwordConfirm, {
   message: "Passwords do not match",
   path: ["passwordConfirm"],
@@ -156,6 +168,7 @@ export default function CreateProfilePage() {
   const REGIONS = gameData?.regions?.map(r => r.description) || FALLBACK_REGIONS;
   const PLATFORMS = gameData?.platforms?.map(p => p.name) || FALLBACK_PLATFORMS;
   const COVENANT_NAMES = gameData?.covenants?.map(c => c.name) || FALLBACK_COVENANT_NAMES;
+  const EXPERIENCE = gameData?.experiences?.map(e => e.name) || FALLBACK_EXPERIENCE;
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -169,6 +182,7 @@ export default function CreateProfilePage() {
       platform: "",
       autoRegion: true,
       covenantName: "",
+      experience: "",
     },
     mode: "onBlur",  // Only validate on blur and submit for better UX
   });
@@ -179,6 +193,7 @@ export default function CreateProfilePage() {
       form.setValue('region', REGIONS[0]);
       form.setValue('platform', PLATFORMS[0]);
       form.setValue('covenantName', COVENANT_NAMES[0]);
+      form.setValue('experience', EXPERIENCE[0]);
     }
     
     // Show notification if there's an error loading game data
@@ -239,6 +254,7 @@ export default function CreateProfilePage() {
         platform: data.platform,
         autoRegion: data.autoRegion,
         covenantName: data.covenantName,
+        experience: data.experience,
       };
     
       // Register the user
@@ -531,6 +547,37 @@ export default function CreateProfilePage() {
                 {/* Fun Section */}
                 <div className="space-y-4">
                   <h2 className="text-lg font-semibold text-primary">Fun</h2>
+
+                  <FormField
+                    control={form.control}
+                    name="experience"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm md:text-base">Experience</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-10">
+                              <SelectValue placeholder="Select your experience" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {EXPERIENCE.map((experience) => (
+                              <SelectItem key={experience} value={experience}>
+                                {experience}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormDescription className="text-xs md:text-sm">
+                          Choose your experience level.
+                        </FormDescription>
+                        <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
+                      </FormItem>
+                    )}
+                  />
                   
                   <FormField
                     control={form.control}

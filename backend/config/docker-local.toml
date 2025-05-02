@@ -1,0 +1,32 @@
+environment = "docker-local"
+
+# Database settings for local Docker environment
+[database]
+url = "mongodb://mongodb:27017"  # Use Docker service name for Mongo
+
+# Server settings
+[server]
+port = 8080
+host = "0.0.0.0"  # Listen on all interfaces in container
+workers = 1       # Single worker is sufficient for local testing
+
+# Domain settings for local Docker testing
+[domain]
+# In Docker with Nginx, "localhost" is the hostname that clients use
+# but services communicate via their service names
+primary = "localhost"
+www = "localhost"
+# The hostname Nginx uses to proxy requests to the backend
+internal_service_name = "backend"
+allow_local = true
+
+# Security settings for local Docker testing
+[jwt]
+# Longer expiration for easier testing
+expires_in = "24h"
+
+[chat]
+cleanup_interval_seconds = 30 # 5 minutes (300 seconds)
+inactive_seconds = 30 # 5 minutes (300 seconds)
+
+# The rest of the settings will be inherited from default.toml 

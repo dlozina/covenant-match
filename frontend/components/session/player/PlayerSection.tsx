@@ -1,11 +1,14 @@
-import React, { memo } from 'react';
+import React, { memo, useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { FriendButton } from './FriendButton';
+import { KickButton } from './KickButton';
 import { usePlayerStatus } from './usePlayerStatus';
 import { SessionState } from '@/components/session/SessionReducers';
 import { SessionData } from '@/components/session/common/types';
+import { PlayerHoverCard } from './PlayerHoverCard';
+import { UserStats, fetchUserStats } from '@/utils/api';
 
 interface PlayerSectionProps {
   sessionState: SessionState;
@@ -15,6 +18,8 @@ interface PlayerSectionProps {
   addFriend: (playerId: string) => void;
   sessionData?: SessionData;
   currentUserId?: string;
+  isHostView?: boolean;
+  onKickPlayer?: (playerId: string, playerName: string) => void;
 }
 
 interface PlayerRowProps {
@@ -27,6 +32,9 @@ interface PlayerRowProps {
     [playerId: string]: boolean;
   };
   addFriend: (playerId: string) => void;
+  userStats?: UserStats;
+  isHostView?: boolean;
+  onKickPlayer?: (playerId: string, playerName: string) => void;
 }
 
 const PlayerRowComponent = ({ 
@@ -36,7 +44,10 @@ const PlayerRowComponent = ({
   isCurrentUser, 
   sessionState, 
   friendState, 
-  addFriend
+  addFriend,
+  userStats,
+  isHostView,
+  onKickPlayer
 }: PlayerRowProps) => {
   const playerStatus = usePlayerStatus(isHost, sessionState);
   
@@ -46,9 +57,11 @@ const PlayerRowComponent = ({
         <span>{index + 1 === 1 ? "⚔️" : "🛡️"}</span>
       </Avatar>
       <div className="flex flex-1 flex-col sm:flex-row sm:items-center gap-2">
-        <div className="bg-secondary/50 px-3 py-2 rounded-md">
-          <span className="text-foreground">{player.username}</span>
-        </div>
+        <PlayerHoverCard player={player} userStats={userStats}>
+          <div className="bg-secondary/50 px-3 py-2 rounded-md cursor-pointer hover:bg-secondary/70 transition-colors">
+            <span className="text-foreground">{player.username}</span>
+          </div>
+        </PlayerHoverCard>
         <div className="bg-secondary/50 px-3 py-2 rounded-md">
           <span className="text-foreground">{player.nightfarer}</span>
         </div>
@@ -61,6 +74,15 @@ const PlayerRowComponent = ({
               onAddFriend={addFriend} 
             />
           )}
+          
+          {/* Show kick button only for host view, not for the host player, and only if session hasn't started */}
+          {isHostView && !isHost && !sessionState.isSessionStarted && onKickPlayer && (
+            <KickButton
+              playerId={player.userId}
+              onKickPlayer={() => onKickPlayer(player.userId, player.username)}
+            />
+          )}
+          
           {/* Session state badge */}
           <Badge 
             variant="outline" 
@@ -123,8 +145,39 @@ const PlayerSectionComponent = ({
   friendState, 
   addFriend, 
   sessionData,
-  currentUserId
+  currentUserId,
+  isHostView,
+  onKickPlayer
 }: PlayerSectionProps) => {
+  const [userStats, setUserStats] = useState<Record<string, UserStats>>({});
+  
+  // Fetch user stats when session data changes
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!sessionData || !sessionData.joinedPlayers.length) return;
+      
+      // Get unique user IDs from the session data
+      const userIds = sessionData.joinedPlayers.map(player => player.userId);
+      
+      try {
+        // Fetch stats for all players
+        const stats = await fetchUserStats(userIds);
+        
+        // Convert array to object with userId as key for easier lookup
+        const statsMap = stats.reduce((acc, stat) => {
+          acc[stat.userId] = stat;
+          return acc;
+        }, {} as Record<string, UserStats>);
+        
+        setUserStats(statsMap);
+      } catch (error) {
+        console.error('Failed to fetch player stats:', error);
+      }
+    };
+    
+    fetchStats();
+  }, [sessionData]);
+  
   // Function to check if a player is the host
   const isPlayerHost = (playerId: string): boolean => {
     return Boolean(sessionData && sessionData.hostId === playerId);
@@ -152,6 +205,9 @@ const PlayerSectionComponent = ({
               sessionState={sessionState}
               friendState={friendState}
               addFriend={addFriend}
+              userStats={userStats[player.userId]}
+              isHostView={isHostView}
+              onKickPlayer={onKickPlayer}
             />
             {/* Add divider after each player except the last one */}
             {index < sessionData.joinedPlayers.length - 1 && (

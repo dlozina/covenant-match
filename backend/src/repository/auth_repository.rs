@@ -58,18 +58,6 @@ pub async fn count_recent_failed_attempts(
     Ok(count as usize)
 }
 
-/// Check if CAPTCHA should be required for this user or IP
-pub async fn should_require_captcha(
-    db: &Database,
-    username: &str,
-    ip_address: &str,
-    threshold: usize,
-    window_minutes: i64,
-) -> Result<bool, AppError> {
-    let attempts = count_recent_failed_attempts(db, username, ip_address, window_minutes).await?;
-    Ok(attempts >= threshold)
-}
-
 /// Clean up old login attempts beyond retention period
 pub async fn cleanup_old_attempts(db: &Database, retention_days: i64) -> Result<u64, AppError> {
     let collection = get_collection(db);

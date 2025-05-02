@@ -2,8 +2,9 @@
 
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import Image from "next/image";
 import { MainLayout } from "@/components/layout";
-import { Sword, Shield, Timer, Users, Trophy, Skull, ScrollText, Compass, Award } from "lucide-react";
+import { Sword, Shield, Timer, Users, Trophy, Skull, ScrollText, Compass, Award, AlertCircle } from "lucide-react";
 // Use for test if css config is not working
 // import { TestStyled } from "@/components/ui/test-styled";
 // import { BasicTest } from "@/components/ui/basic-test";
@@ -11,30 +12,38 @@ import { Footer } from "@/components/layout/Footer";
 import { useAuth } from "@/lib/auth-context";
 import { useEffect, useState } from "react";
 import { 
-  LeaderboardEntry, 
+  LeaderboardEntryResponseDto, 
   CovenantStats,
+  NewsItem,
+  Announcement,
   fetchLeaderboard, 
   fetchSessionsCount,
-  fetchCovenantStats 
+  fetchCovenantStats,
+  fetchRecentNews,
+  fetchAnnouncement 
 } from "@/utils/api";
 
 export default function Home() {
   const { isLoggedIn, isLoading } = useAuth();
-  const [topPlayers, setTopPlayers] = useState<LeaderboardEntry[]>([]);
+  const [topPlayers, setTopPlayers] = useState<LeaderboardEntryResponseDto[]>([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(true);
   const [activeSessions, setActiveSessions] = useState<number>(0);
   const [isLoadingActiveSessions, setIsLoadingActiveSessions] = useState(true);
   const [topCovenants, setTopCovenants] = useState<CovenantStats[]>([]);
   const [isLoadingCovenants, setIsLoadingCovenants] = useState(true);
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [isLoadingNews, setIsLoadingNews] = useState(true);
+  const [announcement, setAnnouncement] = useState<Announcement | null>(null);
+  const [isLoadingAnnouncement, setIsLoadingAnnouncement] = useState(true);
 
   useEffect(() => {
     const getLeaderboard = async () => {
       try {
         setIsLoadingLeaderboard(true);
         const data = await fetchLeaderboard();
-        // Sort first by wins (descending), then by username (ascending) when wins are equal
+        // Sort by score (descending), then by username (ascending) when scores are equal
         const sortedPlayers = [...data].sort((a, b) => 
-          b.wins === a.wins ? a.username.localeCompare(b.username) : b.wins - a.wins
+          b.score === a.score ? a.username.localeCompare(b.username) : b.score - a.score
         );
         setTopPlayers(sortedPlayers.slice(0, 3)); // Get top 3 players
       } catch (error) {
@@ -83,9 +92,45 @@ export default function Home() {
       }
     };
 
+    const getNews = async () => {
+      try {
+        setIsLoadingNews(true);
+        console.log('Fetching recent news...');
+        const newsData = await fetchRecentNews(6); // Only show top 6 news items on homepage
+        console.log('News data received:', newsData);
+        
+        if (Array.isArray(newsData)) {
+          setNews(newsData);
+        } else {
+          console.error('News data is not an array:', newsData);
+          setNews([]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch news:", error);
+        setNews([]);
+      } finally {
+        setIsLoadingNews(false);
+      }
+    };
+
+    const getAnnouncement = async () => {
+      try {
+        setIsLoadingAnnouncement(true);
+        const data = await fetchAnnouncement();
+        setAnnouncement(data);
+      } catch (error) {
+        console.error("Failed to fetch announcement:", error);
+        setAnnouncement(null);
+      } finally {
+        setIsLoadingAnnouncement(false);
+      }
+    };
+
     getLeaderboard();
     getActiveSessions();
     getTopCovenants();
+    getNews();
+    getAnnouncement();
   }, []);
 
   // Add custom sidebars with improved styling
@@ -108,12 +153,17 @@ export default function Home() {
                   </div>
                   <span className="truncate">{player.username}</span>
                 </div>
-                <span className="text-indigo-400 flex-shrink-0">{player.wins} W</span>
+                <span className="text-indigo-400 flex-shrink-0">{player.score.toFixed(2)}</span>
               </div>
             ))
           ) : (
             <div className="py-2 text-sm text-muted-foreground">No players found</div>
           )}
+        </div>
+        <div className="mt-4 text-center">
+          <Link href="/leaderboard" className="text-sm text-purple-400 hover:text-purple-300 hover:underline">
+            View full leaderboard
+          </Link>
         </div>
       </div>
       
@@ -140,6 +190,11 @@ export default function Home() {
           ) : (
             <div className="py-2 text-sm text-muted-foreground">No covenant data found</div>
           )}
+        </div>
+        <div className="mt-4 text-center">
+          <Link href="/leaderboard?tab=covenants" className="text-sm text-red-400 hover:text-red-300 hover:underline">
+            View all covenants
+          </Link>
         </div>
       </div>
       
@@ -170,15 +225,28 @@ export default function Home() {
           <span>News & Updates</span>
         </h3>
         <div className="space-y-4">
-          <div className="border-b border-purple-900/20 pb-3">
-            <h4 className="font-medium">New Character Added</h4>
-            <p className="text-sm text-muted-foreground">The Dark Knight is now available in Nightreign.</p>
-            <p className="text-xs text-purple-400 mt-1">2 days ago</p>
-          </div>
-          <div className="border-b border-purple-900/20 pb-3">
-            <h4 className="font-medium">Matchmaking Improved</h4>
-            <p className="text-sm text-muted-foreground">Session joining is now faster than ever.</p>
-            <p className="text-xs text-purple-400 mt-1">5 days ago</p>
+          {isLoadingNews ? (
+            <div className="py-2 text-sm text-muted-foreground">Loading news...</div>
+          ) : Array.isArray(news) && news.length > 0 ? (
+            news.map((item, i) => (
+              <div key={i} className="border-b border-purple-900/20 pb-3">
+                <h4 className="font-medium">{item.title}</h4>
+                <p className="text-sm text-muted-foreground">{item.summary}</p>
+                <div className="flex justify-between items-center mt-1">
+                  <p className="text-xs text-purple-400">{item.time_ago || "Recently"}</p>
+                  <Link href={`/news/${item.id}`} className="text-xs text-blue-400 hover:underline">
+                    Read more
+                  </Link>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="py-2 text-sm text-muted-foreground">No news available</div>
+          )}
+          <div className="pt-2 text-center">
+            <Link href="/news" className="text-sm text-blue-400 hover:underline">
+              View all news
+            </Link>
           </div>
         </div>
       </div>
@@ -196,10 +264,52 @@ export default function Home() {
       rightSidebar={rightSidebar}
       footer={footer}
     >
+      {/* Urgent News Ribbon - Only shown if active */}
+      {!isLoadingAnnouncement && announcement && announcement.active && (
+        <div className="relative my-4 lg:my-6 overflow-hidden">
+          <div className="bg-gradient-to-r from-purple-900 to-indigo-900 text-white py-3 px-4 rounded-md shadow-lg border border-purple-700">
+            {/* Desktop layout (unchanged) - hidden on mobile */}
+            <div className="hidden sm:flex sm:items-center sm:justify-between">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="h-5 w-5 text-purple-300" />
+                <span className="font-semibold">Announcement:</span>
+                <span>{announcement.content}</span>
+              </div>
+              <Link href="/news" className="text-xs bg-purple-800 hover:bg-purple-700 px-2 py-1 rounded-sm transition-colors">
+                Learn More
+              </Link>
+            </div>
+            
+            {/* Mobile layout - flex column with smaller text and more spacing */}
+            <div className="flex flex-col space-y-2 sm:hidden">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="h-4 w-4 text-purple-300" />
+                <span className="font-semibold text-sm">Announcement:</span>
+              </div>
+              <div className="text-sm pl-6 pb-2 break-words">{announcement.content}</div>
+              <div className="flex justify-end">
+                <Link href="/news" className="text-xs bg-purple-800 hover:bg-purple-700 px-2 py-1 rounded-sm transition-colors">
+                  Learn More
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Hero Section */}
       <div className="relative rounded-lg overflow-hidden mb-8 lg:mb-12">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900/80 to-indigo-900/80 z-10"></div>
-        <div className="absolute inset-0 bg-[url('/nightreign-bg.jpeg')] bg-cover bg-center opacity-100"></div>
+        <div className="absolute inset-0">
+          <Image
+            src="/nightreign-bg.jpeg"
+            alt="Nightreign Background"
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover"
+          />
+        </div>
         <div className="relative z-20 px-4 py-12 lg:px-6 lg:py-24 max-w-4xl mx-auto text-center">
           <h1 className="text-3xl lg:text-5xl lg:text-6xl font-bold mb-4 lg:mb-6 bg-clip-text text-transparent bg-gradient-to-r from-purple-300 to-indigo-200">
             Welcome to Covenant Match
