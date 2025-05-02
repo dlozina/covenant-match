@@ -47,6 +47,8 @@ exclude_patterns = [
     { path = "/api/v1/statistics/leaderboard", method = "GET", is_regex = false },
     { path = "/api/v1/statistics/covenants", method = "GET", is_regex = false },
     { path = "/api/v1/public/sessions", method = "GET", is_regex = false },
+    # Verify email
+    { path = "/api/v1/verify-email", method = "POST", is_regex = false },
     # Uncomment to allow WebSocket and SSE connections without auth
     # (they use token in query parameter instead)
     { path = "/api/v1/ws/.*", method = "GET", is_regex = true },

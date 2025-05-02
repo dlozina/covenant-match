@@ -8,7 +8,7 @@ pub async fn send_email(user_email: &str, email_verification_token: &str) -> Res
     let client = Client::new();
 
     let verification_url = format!(
-        "{}/verify-email?token={}",
+        "{}/verify?token={}",
         config.email_frontend_url(),
         email_verification_token
     );

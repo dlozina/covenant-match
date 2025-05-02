@@ -183,7 +183,26 @@ export class UserService {
       throw error;
     }
   }
+
+  /**
+ * Vefify email
+ * @param token Token to verify
+ * @returns Verified email
+ */
+  static async verifyEmail(token: string): Promise<VerifyEmailResponse> {
+    try {
+     return await httpClient.post<VerifyEmailResponse>(`/api/v1/verify-email?${token}`);
+    } catch (error) {
+      throw error;
+    }
+  }
 }
+
+export interface VerifyEmailResponse {
+  status: string;
+  message: string;
+}
+
 
 // Admin user types
 export interface AdminUser {
