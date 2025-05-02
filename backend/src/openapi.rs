@@ -2,7 +2,7 @@ use crate::models::admin::{
     ActorMailboxResponse, AdminChatResponse, AdminDashboardStats, AdminSessionResponse,
     AdminSessionsData, AdminSessionsPaginationResponse, AdminSessionsResponse,
     ConnectionStatsResponse, ConnectionsPerHourResponse, CreateFeatureFlagDto,
-    DashboardStatsResponse, FeatureFlag, FeatureFlagApiResponse, FeatureFlagData,
+    DashboardStatsResponse, FeatureFlag, FeatureFlagApiResponse,
     FeatureFlagResponse, FeatureFlagsData, FeatureFlagsResponse, MemoryUsage, PatchFeatureFlagDto,
     SessionConnectionResponse, SystemInfo, SystemStatusResponse, WebSocketStatsData,
     WebSocketStatsResponse,
@@ -78,6 +78,7 @@ use utoipa::{
         create_admin_user,
         update_profile,
         delete_user,
+        verify_email,
         // Friend routes
         get_friend_list,
         add_friend,

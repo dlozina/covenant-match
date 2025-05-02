@@ -30,6 +30,7 @@ pub struct User {
     pub preferred_session_name: Option<String>,
     pub preferred_session_password: Option<String>,
     pub preferred_nightfarer: Option<String>,
+    pub email_verified: bool,
     #[serde(default)]
     pub friend_list: Vec<ObjectId>,
 }
@@ -96,6 +97,7 @@ pub struct UserResponse {
     pub experience: Experience,
     pub role: String,
     pub disabled: bool,
+    pub email_verified: bool,
     pub platform: String,
     pub created_at: DateTime,
     pub updated_at: DateTime,
@@ -160,6 +162,7 @@ impl From<User> for UserResponse {
             experience: user.experience,
             role: user.role,
             disabled: user.disabled,
+            email_verified: user.email_verified,
             platform: user.platform,
             created_at: user.created_at,
             updated_at: user.updated_at,

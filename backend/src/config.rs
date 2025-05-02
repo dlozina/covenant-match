@@ -38,6 +38,7 @@ pub struct DatabaseConfig {
 #[derive(Debug, Deserialize)]
 pub struct JwtConfig {
     pub secret: String,
+    pub email_secret: String,
     pub expires_in: String,
 }
 
@@ -70,6 +71,15 @@ pub struct ChatConfig {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct EmailConfig {
+    pub frontend_url: String,
+    pub mailersend_api_key: Option<String>,
+    pub from_email: Option<String>,
+    pub from_name: Option<String>,
+    pub mailersend_url: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct Config {
     pub environment: String,
     pub database: DatabaseConfig,
@@ -79,6 +89,7 @@ pub struct Config {
     pub realtime: RealtimeConfig,
     pub chat: ChatConfig,
     pub auth: AuthConfig,
+    pub email: EmailConfig,
 }
 
 impl Config {
@@ -185,6 +196,7 @@ impl Config {
             jwt: JwtConfig {
                 secret: env_or_default("JWT_SECRET", "malenia_is_the_best_girl_in_the_world"),
                 expires_in: env_or_default("JWT_EXPIRES_IN", "12h"),
+                email_secret: env_or_default("EMAIL_SECRET", "promised_consort_radahn"),
             },
             server: ServerConfig {
                 port: env_or_default_parse("PORT", 8080),
@@ -205,6 +217,13 @@ impl Config {
                 cleanup_interval_seconds: env_or_default_parse("CHAT_CLEANUP_INTERVAL", 60),
                 inactive_seconds: env_or_default_parse("CHAT_INACTIVE_SECONDS", 60),
             },
+            email: EmailConfig {
+                frontend_url: env_or_default("FRONTEND_URL", "http://localhost"),
+                mailersend_api_key: std::env::var("MAILERSEND_API_KEY").ok(),
+                from_email: std::env::var("EMAIL_FROM").ok(),
+                from_name: std::env::var("EMAIL_SENDER_NAME").ok(),
+                mailersend_url: env_or_default("MAILERSEND_URL", "https://api.mailersend.com/v1/email" ),
+            },
             auth: create_default_auth_config(),
         }
     }
@@ -216,6 +235,10 @@ impl Config {
 
     pub fn jwt_secret(&self) -> &str {
         &self.jwt.secret
+    }
+
+    pub fn email_secret(&self) -> &str {
+        &self.jwt.email_secret
     }
 
     pub fn jwt_expires_in(&self) -> &str {
@@ -264,6 +287,26 @@ impl Config {
 
     pub fn allow_local_testing(&self) -> bool {
         self.domain.allow_local
+    }
+
+    pub fn email_frontend_url(&self) -> &str {
+        &self.email.frontend_url
+    }
+
+    pub fn email_mailersend_api_key(&self) -> Option<&str> {
+        self.email.mailersend_api_key.as_deref()
+    }
+
+    pub fn email_from(&self) -> Option<&str> {
+        self.email.from_email.as_deref()
+    }
+
+    pub fn email_sender_name(&self) -> Option<&str> {
+        self.email.from_name.as_deref()
+    }
+
+    pub fn email_mailersend_url(&self) -> &str {
+        &self.email.mailersend_url
     }
 }
 
@@ -397,7 +440,7 @@ fn hide_secrets(url: &str) -> String {
             let proto = if proto_parts.len() >= 2 {
                 format!("{}://", proto_parts[0])
             } else {
-                "".to_string()
+                String::new()
             };
 
             return format!("{proto}***@{host_part}");

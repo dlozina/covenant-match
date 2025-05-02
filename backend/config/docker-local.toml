@@ -29,4 +29,12 @@ expires_in = "24h"
 cleanup_interval_seconds = 30 # 5 minutes (300 seconds)
 inactive_seconds = 30 # 5 minutes (300 seconds)
 
+[email]
+frontend_url = "http://localhost"
+mailersend_api_key = ""
+mailersend_url = "https://api.mailersend.com/v1/email"
+from_email = "noreply@covenant-match.com"
+from_name = "Covenant Match"
+
+
 # The rest of the settings will be inherited from default.toml 

@@ -7,3 +7,4 @@ pub mod session_service;
 pub mod statistics_service;
 pub mod user_service;
 pub mod bug_service;
+pub mod email_service;

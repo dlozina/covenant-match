@@ -13,13 +13,13 @@ fn get_collection(db: &Database) -> Collection<User> {
     db.collection::<User>(COLLECTION_NAME)
 }
 
-pub async fn create_user(db: &Database, user: &User) -> Result<(), AppError> {
+pub async fn create_user(db: &Database, user: &User) -> Result<User, AppError> {
     let collection = db.collection::<User>(COLLECTION_NAME);
     collection.insert_one(user).await.map_err(|e| {
         error!("Database error creating user: {:?}", e);
         AppError::DatabaseError(e)
     })?;
-    Ok(())
+    Ok(user.clone())
 }
 
 pub async fn find_by_username(db: &Database, username: &str) -> Result<Option<User>, AppError> {

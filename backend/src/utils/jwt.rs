@@ -1,4 +1,4 @@
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
@@ -15,6 +15,66 @@ pub struct Claims {
     pub role: String, // Role: "admin" or "user"
     pub exp: usize,   // Expiration time (as UTC timestamp)
     pub iat: usize,   // Issued at (as UTC timestamp)
+}
+
+/// Claims structure for email verification
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct EmailVerificationClaims {
+    pub sub: String, // Subject (user ID)
+    pub email: String, // Email address
+    pub exp: usize,  // Expiration time (as UTC timestamp)
+    pub purpose: String, // Purpose of the token
+    pub iat: usize,  // Issued at (as UTC timestamp)
+}
+
+impl EmailVerificationClaims {
+    fn new(user_id: &str, email: &str) -> Self {
+        let expiration = Utc::now()
+            .checked_add_signed(Duration::hours(24))
+            .expect("valid timestamp")
+            .timestamp() as usize;
+        
+        let issued_at = Utc::now().timestamp().max(0) as usize;
+
+        Self {
+            sub: user_id.to_string(),
+            email: email.to_string(),
+            exp: expiration,
+            purpose: "email_verification".to_string(),
+            iat: issued_at,
+        }
+    }
+}
+
+/// Generate a JWT for email verification
+pub fn generate_email_verification_token(user_id: &str, email: &str) -> Result<String, AppError> {
+    let claims = EmailVerificationClaims::new(user_id, email);
+    let config = get_config();
+    let jwt_secret = config.email_secret();
+
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(jwt_secret.as_bytes()),
+    )
+    .map_err(|e| AppError::InternalError(format!("Token generation error: {e}")))
+}
+
+/// Validate a JWT for email verification
+pub fn validate_email_verification_token(token: &str) -> Result<EmailVerificationClaims, AppError> {
+    let config = get_config();
+    let jwt_secret = config.email_secret();
+
+    decode::<EmailVerificationClaims>(
+        token,
+        &DecodingKey::from_secret(jwt_secret.as_bytes()),
+        &Validation::default(),
+    )
+    .map(|token_data| token_data.claims)
+    .map_err(|e| match e.kind() {
+        jsonwebtoken::errors::ErrorKind::ExpiredSignature => AppError::TokenExpired,
+        _ => AppError::InvalidToken,
+    })
 }
 
 /// Generate a JWT for a user

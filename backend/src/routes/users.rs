@@ -31,7 +31,7 @@ async fn create_user(
     user_data: web::Json<CreateUserDto>,
     req: HttpRequest,
 ) -> impl Responder {
-    // Check if request has authentication (for role check)
+    // Check if request has authentication (for role check) -> In order for admins to create users
     let requesting_user_role = if let Some(auth_header) = req.headers().get("Authorization") {
         let auth_str = auth_header.to_str().unwrap_or("");
         if auth_str.starts_with("Bearer ") {
@@ -59,6 +59,52 @@ async fn create_user(
         Ok(user) => HttpResponse::Created().json(user),
         Err(e) => {
             log::error!("Error creating user: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
+/// Verify new user
+#[utoipa::path(
+    post,
+    path = "/api/v1/verify-email",
+    request_body = String,
+    responses(
+        (status = 200, description = "Email verified successfully"),
+        (status = 400, description = "Invalid input"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "users"
+)]
+#[post("/api/v1/verify-email")]
+async fn verify_email(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
+    let token = req.query_string();
+    let token_data = jwt::validate_email_verification_token(token);
+
+    let claims = match token_data {
+        Ok(claims) => claims,
+        Err(e) => {
+            log::error!("Error verifying email: {:?}", e);
+            return e.error_response();
+        }
+    };
+
+    if claims.purpose != "email_verification" {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "status": "error",
+            "message": "Invalid token purpose"
+        }));
+    }
+
+    // Update user email in db email_verified to true
+    match user_service::update_user_email_verified(&db, &claims.sub, true).await {
+        Ok(()) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "message": "Email verified successfully"
+        })),
+        Err(e) => {
+            log::error!("Error verifying email: {:?}", e);
             e.error_response()
         }
     }
@@ -813,7 +859,7 @@ async fn add_friend(
 
     // Add friend
     match user_service::add_friend(&db, &user_id, &friend_data.friend_id).await {
-        Ok(_) => HttpResponse::Created().json(serde_json::json!({
+        Ok(()) => HttpResponse::Created().json(serde_json::json!({
             "status": "success",
             "message": "Friend added to your list"
         })),
@@ -862,7 +908,7 @@ async fn remove_friend(
 
     // Remove friend
     match user_service::remove_friend(&db, &user_id, &friend_id).await {
-        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+        Ok(()) => HttpResponse::Ok().json(serde_json::json!({
             "status": "success",
             "message": "Friend removed from your list"
         })),
@@ -890,4 +936,5 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(get_friend_list);
     cfg.service(add_friend);
     cfg.service(remove_friend);
+    cfg.service(verify_email);
 }

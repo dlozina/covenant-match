@@ -4,6 +4,7 @@ use crate::models::user::{
     CreateUserDto, Experience, FriendDto, LoginUserDto, UpdateUserProfileDto, User, UserResponse,
 };
 use crate::repository::user_repository;
+use crate::services::email_service;
 use crate::utils::jwt;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use log::{info, warn};
@@ -66,13 +67,23 @@ pub async fn create_user(
         preferred_nightfarer: user_data.preferred_nightfarer,
         role,
         disabled: false,
+        email_verified: false,
         created_at: now,
         updated_at: now,
         friend_list: Vec::new(),
     };
 
     // Save the user to the database
-    user_repository::create_user(db, &user).await?;
+    let created_user = user_repository::create_user(db, &user).await?;
+
+    let email_verification_token =
+        jwt::generate_email_verification_token(&created_user.id.to_string(), &created_user.email)
+            .map_err(|e| AppError::InternalError(e.to_string()))?;
+
+    // Send email verification email
+    email_service::send_email(&created_user.email, &email_verification_token)
+        .await
+        .map_err(|e| AppError::InternalError(e.to_string()))?;
 
     Ok(UserResponse {
         id: user.id.to_hex(),
@@ -89,6 +100,7 @@ pub async fn create_user(
         experience: user.experience,
         role: user.role,
         disabled: user.disabled,
+        email_verified: user.email_verified,
         preferred_session_name: user.preferred_session_name,
         preferred_session_password: user.preferred_session_password,
         preferred_nightfarer: user.preferred_nightfarer,
@@ -134,6 +146,7 @@ pub async fn login_user(
         experience: user.experience,
         role: user.role,
         disabled: user.disabled,
+        email_verified: user.email_verified,
         preferred_session_name: user.preferred_session_name,
         preferred_session_password: user.preferred_session_password,
         preferred_nightfarer: user.preferred_nightfarer,
@@ -164,6 +177,7 @@ pub async fn get_user_by_id(db: &Database, user_id: &str) -> Result<UserResponse
             experience: user.experience,
             role: user.role,
             disabled: user.disabled,
+            email_verified: user.email_verified,
             preferred_session_name: user.preferred_session_name,
             preferred_session_password: user.preferred_session_password,
             preferred_nightfarer: user.preferred_nightfarer,
@@ -448,4 +462,30 @@ pub async fn get_friend_list(db: &Database, user_id: &str) -> Result<Vec<FriendD
         .collect();
 
     Ok(friend_dtos)
+}
+
+pub async fn update_user_email_verified(
+    db: &Database,
+    user_id: &str,
+    verified: bool,
+) -> Result<(), AppError> {
+    // Create the update document
+    let update_doc = doc! {
+        "email_verified": verified,
+        "updated_at": mongodb::bson::DateTime::now()
+    };
+
+    // Update the user
+    let result = user_repository::update_user_with_doc(db, user_id, update_doc).await?;
+
+    // Check if user was found and updated
+    if result.is_none() {
+        return Err(AppError::UserNotFound);
+    }
+
+    info!(
+        "Updated email verification status to {} for user {}",
+        verified, user_id
+    );
+    Ok(())
 }
