@@ -4,3 +4,4 @@ pub mod ip_address;
 pub mod request;
 pub mod constants;
 pub mod secrets;
+pub mod email;

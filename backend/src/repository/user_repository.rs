@@ -156,6 +156,40 @@ pub async fn update_user_with_doc(
     find_user_by_id(db, user_id).await
 }
 
+/// Update user's password by user ID
+pub async fn update_user_password(
+    db: &Database,
+    user_id: &str,
+    password_hash: String,
+) -> Result<(), AppError> {
+    let collection = db.collection::<User>(COLLECTION_NAME);
+
+    // Convert string ID to ObjectId
+    let object_id = ObjectId::parse_str(user_id).map_err(|e| {
+        error!("Invalid ObjectId format: {:?}", e);
+        AppError::InvalidId
+    })?;
+
+    let filter = doc! { "_id": object_id };
+    let update = doc! {
+        "$set": {
+            "password_hash": password_hash,
+            "updated_at": mongodb::bson::DateTime::now()
+        }
+    };
+
+    let result = collection.update_one(filter, update).await.map_err(|e| {
+        error!("Database error updating user password: {:?}", e);
+        AppError::DatabaseError(e)
+    })?;
+
+    if result.matched_count == 0 {
+        return Err(AppError::UserNotFound);
+    }
+
+    Ok(())
+}
+
 pub async fn find_by_display_name(
     db: &Database,
     display_name: &str,

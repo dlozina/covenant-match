@@ -39,6 +39,7 @@ pub struct DatabaseConfig {
 pub struct JwtConfig {
     pub secret: String,
     pub email_secret: String,
+    pub reset_password_secret: String,
     pub expires_in: String,
 }
 
@@ -196,6 +197,7 @@ impl Config {
                 secret: env_or_default("JWT_SECRET", "malenia_is_the_best_girl_in_the_world"),
                 expires_in: env_or_default("JWT_EXPIRES_IN", "12h"),
                 email_secret: env_or_default("EMAIL_SECRET", "promised_consort_radahn"),
+                reset_password_secret: env_or_default("RESET_PASSWORD_SECRET", "dancing_lion_in_the_wind"),
             },
             server: ServerConfig {
                 port: env_or_default_parse("PORT", 8080),
@@ -237,6 +239,10 @@ impl Config {
 
     pub fn email_secret(&self) -> &str {
         &self.jwt.email_secret
+    }
+
+    pub fn reset_password_secret(&self) -> &str {
+        &self.jwt.reset_password_secret
     }
 
     pub fn jwt_expires_in(&self) -> &str {

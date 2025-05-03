@@ -105,6 +105,9 @@ pub enum AppError {
 
     #[error("Not found: {0}")]
     NotFound(String),
+
+    #[error("Invalid or expired token")]
+    InvalidOrExpiredToken,
 }
 
 impl ResponseError for AppError {
@@ -162,6 +165,8 @@ impl ResponseError for AppError {
             AppError::InvalidInput(_) => StatusCode::BAD_REQUEST,
 
             AppError::SystemInfoError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+
+            AppError::InvalidOrExpiredToken => StatusCode::UNAUTHORIZED,
         }
     }
 }

@@ -6,6 +6,7 @@ url = "mongodb://localhost:27017"
 [jwt]
 secret = "malenia_is_the_best_girl_in_the_world"
 email_secret = "promised_consort_radahn"
+reset_password_secret = "dancing_lion_in_the_wind"
 # Duration formats:
 # - "30s" = 30 seconds
 # - "10m" = 10 minutes

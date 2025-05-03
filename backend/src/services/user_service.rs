@@ -6,6 +6,8 @@ use crate::models::user::{
 use crate::repository::user_repository;
 use crate::services::email_service;
 use crate::utils::jwt;
+use crate::models::token::TokenPurpose;
+use crate::repository::token_repository;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use log::{info, warn};
 use mongodb::bson::oid::ObjectId;
@@ -81,7 +83,7 @@ pub async fn create_user(
             .map_err(|e| AppError::InternalError(e.to_string()))?;
 
     // Send email verification email
-    email_service::send_email(&created_user.email, &email_verification_token)
+    email_service::send_verification_email(&created_user.email, &email_verification_token)
         .await
         .map_err(|e| AppError::InternalError(e.to_string()))?;
 
@@ -156,6 +158,88 @@ pub async fn login_user(
     };
 
     Ok((token, user_response))
+}
+
+// Reset password
+pub async fn reset_password(db: &Database, user_id: &str, password: &str) -> Result<(), AppError> {
+    // Check if the user exists
+    let user = user_repository::find_user_by_id(db, user_id).await?;
+
+    if user.is_none() {
+        return Err(AppError::UserNotFound);
+    }
+
+    // Hash the password
+    let password_hash =
+        hash(password, DEFAULT_COST).map_err(|e| AppError::InternalError(e.to_string()))?;
+
+    user_repository::update_user_password(db, user_id, password_hash).await
+}
+
+// Reset password with token validation
+pub async fn reset_password_with_token(
+    db: &Database,
+    token: &str,
+    new_password: &str,
+) -> Result<(), AppError> {
+    use crate::models::token::TokenPurpose;
+    use crate::repository::token_repository;
+
+    // Validate the token
+    let token_doc =
+        token_repository::validate_token(db, token, TokenPurpose::PasswordReset).await?;
+
+    if token_doc.is_none() {
+        return Err(AppError::InvalidOrExpiredToken);
+    }
+
+    let token_doc = token_doc.expect("Token document not found");
+    let user_id = token_doc.user_id.to_hex();
+
+    // Reset the password
+    let result = reset_password(db, &user_id, new_password).await;
+
+    // Delete the used token regardless of password reset result
+    // This is to prevent token reuse even if there's an error later
+    let _ = token_repository::delete_token(db, token).await;
+
+    result
+}
+
+// send reset password email
+pub async fn send_reset_password_email(db: &Database, email: &str) -> Result<(), AppError> {
+    let user = user_repository::find_by_email(db, email).await?;
+
+    if user.is_none() {
+        return Ok(());
+    }
+
+    let user = user.expect("User not found");
+
+    let reset_password_token =
+        jwt::generate_reset_password_token(&user.id.to_string(), &user.email)
+            .map_err(|e| AppError::InternalError(e.to_string()))?;
+
+    // Delete any existing password reset tokens for this user
+    token_repository::delete_tokens_by_user_and_purpose(
+        db,
+        &user.id.to_string(),
+        TokenPurpose::PasswordReset,
+    )
+    .await?;
+
+    token_repository::create_token(
+        db,
+        &user.id.to_string(),
+        &reset_password_token,
+        TokenPurpose::PasswordReset,
+        jwt::EXPIRY_HOURS_FOR_PASSWORD_RESET,
+    )
+    .await?;
+
+    email_service::send_reset_password_email(&user.email, &reset_password_token)
+        .await
+        .map_err(|e| AppError::InternalError(e.to_string()))
 }
 
 pub async fn get_user_by_id(db: &Database, user_id: &str) -> Result<UserResponse, AppError> {

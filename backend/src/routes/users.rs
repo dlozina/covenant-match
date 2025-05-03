@@ -4,7 +4,7 @@ use crate::models::user::{
     UpdateUserProfileDto,
 };
 use crate::services::{auth_service, user_service};
-use crate::utils::{geo_location, ip_address, jwt};
+use crate::utils::{email, geo_location, ip_address, jwt};
 use actix_web::{
     delete, get, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError,
 };
@@ -105,6 +105,101 @@ async fn verify_email(db: web::Data<Database>, req: HttpRequest) -> impl Respond
         })),
         Err(e) => {
             log::error!("Error verifying email: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ResetPasswordDto {
+    pub email: String,
+}
+
+/// Send reset password email
+#[utoipa::path(
+    post,
+    path = "/api/v1/reset-password-email",
+    request_body = ResetPasswordDto,
+    responses(
+        (status = 200, description = "Email sent successfully"),            
+        (status = 400, description = "Invalid input"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "users"
+)]
+#[post("/api/v1/reset-password-email")]
+async fn send_reset_password_email(
+    db: web::Data<Database>,
+    reset_password_data: web::Json<ResetPasswordDto>,
+) -> impl Responder {
+    // Grab the email from the request body
+    let reset_password_data = reset_password_data.into_inner();
+
+    // Define the success response once
+    let success_response = HttpResponse::Ok().json(serde_json::json!({
+        "status": "success",
+        "message": "Email sent successfully"
+    }));
+
+    // Check if the email is valid
+    if !email::is_valid_email(&reset_password_data.email) {
+        return success_response;
+    }
+
+    // Send the reset password email -> we always want to return ok even if the user doesn't exist - security
+    match user_service::send_reset_password_email(&db, &reset_password_data.email).await {
+        Ok(()) => success_response,
+        Err(e) => {
+            log::error!("Error sending reset password email: {:?}", e);
+            success_response
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NewPasswordDto {
+    pub password: String,
+}
+
+/// Reset password endpoint
+#[utoipa::path(
+    post,
+    path = "/api/v1/reset-password",
+    request_body = NewPasswordDto,
+    responses(
+        (status = 200, description = "Password reset successfully"),
+        (status = 400, description = "Invalid input"),          
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "users"
+)]
+#[post("/api/v1/reset-password")]
+async fn reset_password(
+    db: web::Data<Database>,
+    new_password_data: web::Json<NewPasswordDto>,
+    req: HttpRequest,
+) -> impl Responder {
+    let token = req.query_string();
+
+    // First validate the JWT to ensure proper format
+    let token_data = jwt::validate_reset_password_token(token);
+    if token_data.is_err() {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "status": "error",
+            "message": "Invalid token format"
+        }));
+    }
+
+    // Then use the token repository to reset password with token validation
+    match user_service::reset_password_with_token(&db, token, &new_password_data.password).await {
+        Ok(()) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "message": "Password reset successfully"
+        })),
+        Err(e) => {
+            log::error!("Error resetting password: {:?}", e);
             e.error_response()
         }
     }
