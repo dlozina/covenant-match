@@ -80,25 +80,8 @@ async fn create_user(
 #[post("/api/v1/verify-email")]
 async fn verify_email(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
     let token = req.query_string();
-    let token_data = jwt::validate_email_verification_token(token);
 
-    let claims = match token_data {
-        Ok(claims) => claims,
-        Err(e) => {
-            log::error!("Error verifying email: {:?}", e);
-            return e.error_response();
-        }
-    };
-
-    if claims.purpose != "email_verification" {
-        return HttpResponse::BadRequest().json(serde_json::json!({
-            "status": "error",
-            "message": "Invalid token purpose"
-        }));
-    }
-
-    // Update user email in db email_verified to true
-    match user_service::update_user_email_verified(&db, &claims.sub, true).await {
+    match user_service::verify_user_email(&db, token).await {
         Ok(()) => HttpResponse::Ok().json(serde_json::json!({
             "status": "success",
             "message": "Email verified successfully"
@@ -142,7 +125,7 @@ async fn send_reset_password_email(
         "message": "Email sent successfully"
     }));
 
-    // Check if the email is valid
+    // Check if the email is valid -> we always want to return ok even if the user doesn't exist - security
     if !email::is_valid_email(&reset_password_data.email) {
         return success_response;
     }

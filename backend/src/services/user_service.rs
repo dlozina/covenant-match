@@ -1,13 +1,13 @@
 use crate::models::error::AppError;
 use crate::models::geo_location::GeoLocation;
+use crate::models::token::TokenPurpose;
 use crate::models::user::{
     CreateUserDto, Experience, FriendDto, LoginUserDto, UpdateUserProfileDto, User, UserResponse,
 };
+use crate::repository::token_repository;
 use crate::repository::user_repository;
 use crate::services::email_service;
 use crate::utils::jwt;
-use crate::models::token::TokenPurpose;
-use crate::repository::token_repository;
 use bcrypt::{hash, verify, DEFAULT_COST};
 use log::{info, warn};
 use mongodb::bson::oid::ObjectId;
@@ -81,6 +81,16 @@ pub async fn create_user(
     let email_verification_token =
         jwt::generate_email_verification_token(&created_user.id.to_string(), &created_user.email)
             .map_err(|e| AppError::InternalError(e.to_string()))?;
+
+    // Store the email verification token in the database
+    token_repository::create_token(
+        db,
+        &created_user.id.to_string(),
+        &email_verification_token,
+        TokenPurpose::EmailVerification,
+        jwt::EXPIRY_HOURS_FOR_EMAIL_VERIFICATION,
+    )
+    .await?;
 
     // Send email verification email
     email_service::send_verification_email(&created_user.email, &email_verification_token)
@@ -176,36 +186,6 @@ pub async fn reset_password(db: &Database, user_id: &str, password: &str) -> Res
     user_repository::update_user_password(db, user_id, password_hash).await
 }
 
-// Reset password with token validation
-pub async fn reset_password_with_token(
-    db: &Database,
-    token: &str,
-    new_password: &str,
-) -> Result<(), AppError> {
-    use crate::models::token::TokenPurpose;
-    use crate::repository::token_repository;
-
-    // Validate the token
-    let token_doc =
-        token_repository::validate_token(db, token, TokenPurpose::PasswordReset).await?;
-
-    if token_doc.is_none() {
-        return Err(AppError::InvalidOrExpiredToken);
-    }
-
-    let token_doc = token_doc.expect("Token document not found");
-    let user_id = token_doc.user_id.to_hex();
-
-    // Reset the password
-    let result = reset_password(db, &user_id, new_password).await;
-
-    // Delete the used token regardless of password reset result
-    // This is to prevent token reuse even if there's an error later
-    let _ = token_repository::delete_token(db, token).await;
-
-    result
-}
-
 // send reset password email
 pub async fn send_reset_password_email(db: &Database, email: &str) -> Result<(), AppError> {
     let user = user_repository::find_by_email(db, email).await?;
@@ -216,6 +196,7 @@ pub async fn send_reset_password_email(db: &Database, email: &str) -> Result<(),
 
     let user = user.expect("User not found");
 
+    // Generate JWT token for password reset
     let reset_password_token =
         jwt::generate_reset_password_token(&user.id.to_string(), &user.email)
             .map_err(|e| AppError::InternalError(e.to_string()))?;
@@ -228,6 +209,8 @@ pub async fn send_reset_password_email(db: &Database, email: &str) -> Result<(),
     )
     .await?;
 
+    // Store the token in the database
+    // The token will be formatted with userId prefix inside create_token
     token_repository::create_token(
         db,
         &user.id.to_string(),
@@ -237,9 +220,50 @@ pub async fn send_reset_password_email(db: &Database, email: &str) -> Result<(),
     )
     .await?;
 
+    // Send the JWT token in email (not the reformatted token)
+    // We're sending the original JWT token because that's what the endpoint expects
     email_service::send_reset_password_email(&user.email, &reset_password_token)
         .await
         .map_err(|e| AppError::InternalError(e.to_string()))
+}
+
+// Reset password with token validation
+pub async fn reset_password_with_token(
+    db: &Database,
+    token: &str,
+    new_password: &str,
+) -> Result<(), AppError> {
+    use crate::models::token::TokenPurpose;
+    use crate::repository::token_repository;
+
+    // First, validate the JWT token structure
+    let jwt_claims = jwt::validate_reset_password_token(token)?;
+    let user_id = &jwt_claims.sub;
+
+    // Then validate the token in our database
+    // This checks if it exists, hasn't expired, and hasn't been used
+    let token_doc =
+        token_repository::validate_token(db, token, TokenPurpose::PasswordReset).await?;
+
+    if token_doc.is_none() {
+        return Err(AppError::InvalidOrExpiredToken);
+    }
+
+    let token_doc = token_doc.expect("Token document not found");
+
+    // Double check user ID matches
+    if token_doc.user_id.to_hex() != user_id.as_str() {
+        return Err(AppError::InvalidToken);
+    }
+
+    // Reset the password
+    let result = reset_password(db, user_id, new_password).await;
+
+    // Delete the used token regardless of password reset result
+    // This is to prevent token reuse even if there's an error later
+    let _ = token_repository::delete_token(db, token).await;
+
+    result
 }
 
 pub async fn get_user_by_id(db: &Database, user_id: &str) -> Result<UserResponse, AppError> {
@@ -572,4 +596,30 @@ pub async fn update_user_email_verified(
         verified, user_id
     );
     Ok(())
+}
+
+/// Verify a user's email using the verification token
+pub async fn verify_user_email(db: &Database, token: &str) -> Result<(), AppError> {
+    // First validate the JWT structure
+    let token_data = jwt::validate_email_verification_token(token)?;
+
+    // Check if the token purpose is for email verification
+    // The purpose is a custom claim field, not the standard JWT purpose field
+    if token_data.purpose != "email_verification" {
+        return Err(AppError::InvalidToken);
+    }
+
+    // Then validate the token in our database
+    let token_doc =
+        token_repository::validate_token(db, token, TokenPurpose::EmailVerification).await?;
+
+    if token_doc.is_none() {
+        return Err(AppError::InvalidOrExpiredToken);
+    }
+
+    // Delete the used token to prevent reuse
+    let _ = token_repository::delete_token(db, token).await;
+
+    // Update user email verified status
+    update_user_email_verified(db, &token_data.sub, true).await
 }
