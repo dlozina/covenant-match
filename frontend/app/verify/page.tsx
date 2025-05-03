@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Shield, Check, X, RefreshCw, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,49 @@ const motion = {
   ),
 };
 
-const VerifyEmailPage = () => {
+// Loading fallback component
+const LoadingVerification = () => (
+  <div className="container max-w-3xl mx-auto px-4 py-12">
+    <div className="text-center mb-8">
+      <h1 className="text-3xl md:text-4xl font-bold mb-2 text-shadow-md bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-600">
+        Email Verification
+      </h1>
+      <p className="text-muted-foreground text-lg">
+        Join the covenant, nightfarer.
+      </p>
+    </div>
+
+    <div className="gothic-card p-8 relative overflow-hidden">
+      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-700 via-indigo-500 to-purple-700 opacity-70"></div>
+      <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-purple-700 via-indigo-500 to-purple-700 opacity-70"></div>
+      
+      <div className="flex flex-col items-center justify-center py-8 relative z-10">
+        <div className="w-24 h-24 mb-6 flex items-center justify-center rounded-full bg-indigo-950/30 text-indigo-400">
+          <RefreshCw className="w-12 h-12 animate-spin" />
+        </div>
+
+        <h2 className="text-2xl font-bold mb-4 text-center w-full text-indigo-400">
+          Loading...
+        </h2>
+
+        <div className="text-center mb-8 max-w-md mx-auto px-4">
+          <p className="text-muted-foreground">
+            Preparing verification interface...
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div className="mt-8 text-center">
+      <div className="flex items-center justify-center gap-2 text-muted-foreground">
+        <Shield className="w-4 h-4" />
+        <span className="text-sm">Covenant Match Authentication System</span>
+      </div>
+    </div>
+  </div>
+);
+
+const VerificationContent = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
@@ -156,6 +198,14 @@ const VerifyEmailPage = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+const VerifyEmailPage = () => {
+  return (
+    <Suspense fallback={<LoadingVerification />}>
+      <VerificationContent />
+    </Suspense>
   );
 };
 

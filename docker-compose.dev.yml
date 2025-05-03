@@ -49,6 +49,7 @@ services:
       - mongodb_uri_dev
       - jwt_secret_dev
       - recaptcha_secret_key_dev
+      - mailersend_api_key_dev
     networks:
       - covenant-network-dev
 
@@ -109,3 +110,5 @@ secrets:
     file: ./dev-secrets/jwt_secret.txt
   recaptcha_secret_key_dev:
     file: ./dev-secrets/recaptcha_secret_key.txt
+  mailersend_api_key_dev:
+    file: ./dev-secrets/mailersend_api_key.txt

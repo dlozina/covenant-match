@@ -66,7 +66,6 @@ exclude_patterns = [
 [email]
 frontend_url = "http://localhost"
 # MailerSend configuration - these values should be overridden in environment-specific configs
-# mailersend_api_key = "" # For security reasons, set this using environment variables
 # mailersend_url = "https://api.mailersend.com/v1/email"
 # from_email = "noreply@covenant-match.com"
 # from_name = "Covenant Match" 

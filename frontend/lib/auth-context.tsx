@@ -22,6 +22,7 @@ type UserData = {
   preferredSessionName?: string;
   preferredSessionPassword?: string;
   preferredNightfarer?: string;
+  emailVerified?: boolean;
   role?: string;
   disabled?: boolean;
   // Add other user properties as needed
@@ -64,7 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [lastTokenRefresh, setLastTokenRefresh] = useState<number>(0);
-
+   
+  //todo: We dont need this on frontend when testing is over
   // Helper to parse JWT and get expiration
   const getTokenExpiry = (token: string): number => {
     try {
@@ -119,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         preferredSessionName: data.preferredSessionName,
         preferredSessionPassword: data.preferredSessionPassword,
         preferredNightfarer: data.preferredNightfarer,
+        emailVerified: data.emailVerified,
         role: data.role,
         disabled: data.disabled,
       };
@@ -167,6 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Store the token directly to avoid next.js cache expiration
         localStorage.setItem('token', data.token);
         
+        //todo: We dont need this on frontend when testing is over
         // Get actual expiration time from the token
         const expiry = getTokenExpiry(data.token);
         const expiresIn = expiry - now;
@@ -205,6 +209,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // First, check if the account is disabled
       const userData = await fetchUserData(token);
+
+      if (!userData?.emailVerified) {
+        // Account is not verified - throw a specific error for not verified accounts
+        const notVerifiedError = new Error('Your account has not been verified. Please check your email for verification instructions.');
+        // Add property to identify this is a not verified account error
+        Object.defineProperty(notVerifiedError, 'isNotVerifiedAccount', { value: true });
+        throw notVerifiedError;
+      }
       
       if (userData?.disabled) {
         // Account is disabled - throw a specific error for disabled accounts
@@ -247,6 +259,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoggedIn(false);
     setUserData(null);
     
+    // Important: We need to redirect to home page if on a protected route
     // Redirect to home page if on a protected route
     const protectedRoutes = ['/dashboard', '/profile', '/edit-profile'];
     if (protectedRoutes.some(route => pathname?.startsWith(route))) {

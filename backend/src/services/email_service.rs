@@ -1,4 +1,4 @@
-use crate::config::get_config;
+use crate::{config::get_config, utils};
 use log::{error, info};
 use reqwest::Client;
 use serde_json::{json, Value};
@@ -13,10 +13,7 @@ pub async fn send_email(user_email: &str, email_verification_token: &str) -> Res
         email_verification_token
     );
 
-    // Get API key from config
-    let api_key = config
-        .email_mailersend_api_key()
-        .ok_or_else(|| "MailerSend API key is not set in configuration".to_string())?;
+    let api_key = utils::secrets::read_secret_without_default("mailersend_api_key");
 
     // Get email sender information from config with fallbacks
     let email_from = config.email_from().unwrap_or("noreply@covenant-match.com");

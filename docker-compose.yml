@@ -54,6 +54,7 @@ services:
       - mongodb_uri
       - jwt_secret
       - turnstile_secret_key
+      - mailersend_api_key
     networks:
       - covenant-network
 
@@ -109,4 +110,6 @@ secrets:
   jwt_secret:
     external: true
   turnstile_secret_key:
+    external: true
+  mailersend_api_key:
     external: true

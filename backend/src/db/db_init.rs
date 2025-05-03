@@ -95,6 +95,7 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
                 "platform": "PlayStation",
                 "role": "admin",
                 "disabled": false,
+                "email_verified": true,
                 "experience": "Veteran",
                 "covenant_name": "Warriors of Sunlight",
                 "created_at": now,

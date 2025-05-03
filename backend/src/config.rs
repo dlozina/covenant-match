@@ -73,7 +73,6 @@ pub struct ChatConfig {
 #[derive(Debug, Deserialize)]
 pub struct EmailConfig {
     pub frontend_url: String,
-    pub mailersend_api_key: Option<String>,
     pub from_email: Option<String>,
     pub from_name: Option<String>,
     pub mailersend_url: String,
@@ -219,7 +218,6 @@ impl Config {
             },
             email: EmailConfig {
                 frontend_url: env_or_default("FRONTEND_URL", "http://localhost"),
-                mailersend_api_key: std::env::var("MAILERSEND_API_KEY").ok(),
                 from_email: std::env::var("EMAIL_FROM").ok(),
                 from_name: std::env::var("EMAIL_SENDER_NAME").ok(),
                 mailersend_url: env_or_default("MAILERSEND_URL", "https://api.mailersend.com/v1/email" ),
@@ -291,10 +289,6 @@ impl Config {
 
     pub fn email_frontend_url(&self) -> &str {
         &self.email.frontend_url
-    }
-
-    pub fn email_mailersend_api_key(&self) -> Option<&str> {
-        self.email.mailersend_api_key.as_deref()
     }
 
     pub fn email_from(&self) -> Option<&str> {
