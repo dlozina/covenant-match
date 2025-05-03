@@ -32,7 +32,7 @@ services:
       target: development
     volumes:
       - ./backend:/app
-      - ./dev-secrets:/dev-secrets
+      - ./run/secrets:/run/secrets
       - ./uploads:/app/uploads
     environment:
       - RUST_LOG=debug
@@ -46,10 +46,10 @@ services:
     depends_on:
       - mongodb
     secrets:
-      - mongodb_uri_dev
-      - jwt_secret_dev
-      - recaptcha_secret_key_dev
-      - mailersend_api_key_dev
+      - mongodb_uri
+      - jwt_secret
+      - recaptcha_secret_key
+      - mailersend_api_key
     networks:
       - covenant-network-dev
 
@@ -104,11 +104,11 @@ volumes:
   frontend_node_modules:
   mongodb_backup_data:
 secrets:
-  mongodb_uri_dev:
-    file: ./dev-secrets/mongodb_uri.txt
-  jwt_secret_dev:
-    file: ./dev-secrets/jwt_secret.txt
-  recaptcha_secret_key_dev:
-    file: ./dev-secrets/recaptcha_secret_key.txt
-  mailersend_api_key_dev:
-    file: ./dev-secrets/mailersend_api_key.txt
+  mongodb_uri:
+    file: ./run/secrets/mongodb_uri.txt
+  jwt_secret:
+    file: ./run/secrets/jwt_secret.txt
+  recaptcha_secret_key:
+    file: ./run/secrets/recaptcha_secret_key.txt
+  mailersend_api_key:
+    file: ./run/secrets/mailersend_api_key.txt
