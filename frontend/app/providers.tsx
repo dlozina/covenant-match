@@ -19,6 +19,12 @@ const queryClient = new QueryClient({
       retry: 1, // Retry once if fetch fails
       refetchOnReconnect: true, // Refetch when network reconnects
       refetchOnMount: true, // Refetch when the component mounts, to ensure data is up to date
+      // Prevent infinite error loops with improved retry delay
+      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+    },
+    mutations: {
+      // Add better retry behavior for mutations too
+      retry: 1,
     },
   },
 })

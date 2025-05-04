@@ -29,10 +29,8 @@ export function SessionParticipant() {
     isLoading,
     error,
     isHost,
-    formatTime,
     resetSession,
     updatePlayerReportedStatus,
-    lastHeartbeat
   } = useSessionContext();
   
   // Get auth context - moved before conditional return
@@ -416,17 +414,15 @@ export function SessionParticipant() {
                 resultState={resultState}
                 dispatchResult={dispatchResult}
                 sessionState={sessionState}
-                formatTime={formatTime}
                 onSubmitResult={handleSubmitResult}
                 isSubmitted={resultSubmitted}
                 submissionError={submissionError}
+                sessionData={sessionData}
               />
             ) : (
               <SessionInfoSection
                 sessionState={sessionState}
-                formatTime={formatTime}
                 sessionData={sessionData}
-                lastHeartbeat={lastHeartbeat}
               />
             )}
           </div>
@@ -457,17 +453,15 @@ export function SessionParticipant() {
               resultState={resultState}
               dispatchResult={dispatchResult}
               sessionState={sessionState}
-              formatTime={formatTime}
               onSubmitResult={handleSubmitResult}
               isSubmitted={resultSubmitted}
               submissionError={submissionError}
+              sessionData={sessionData}
             />
           ) : (
             <SessionInfoSection
               sessionState={sessionState}
-              formatTime={formatTime}
               sessionData={sessionData}
-              lastHeartbeat={lastHeartbeat}
             />
           )}
         </div>

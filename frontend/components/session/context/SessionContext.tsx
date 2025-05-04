@@ -3,8 +3,9 @@ import { useSessionState } from '@/hooks/useSessionState';
 import { useAuth } from '@/lib/auth-context';
 import { useRealTimeUpdates } from '@/hooks/useEventSource';
 import { useWebSocketUpdates } from '@/hooks/useWebSocket';
-import { SessionData } from '../common/types';
+import { SessionData, JoinedPlayer, SessionResult } from '../common/types';
 import { useRouter } from 'next/navigation';
+import { useSessionData } from '@/hooks/queries/useSessionQueries';
 import realtimeConfig from '@/config/realtimeConfig';
 
 // Define the session context interface
@@ -19,14 +20,11 @@ export interface SessionContextType {
   sessionState: {
     isSessionStarted: boolean;
     isSessionFinished: boolean;
-    elapsedSeconds: number;
-    finalDuration: number | null;
   };
   rtConnected: boolean;
   
   // Methods
   isHost: () => boolean;
-  formatTime: (seconds: number) => string;
   resetSession: () => void;
   startSession: () => Promise<void>;
   handleFinishSession: () => Promise<void>;
@@ -52,12 +50,9 @@ export const SessionContext = createContext<SessionContextType>({
   sessionState: {
     isSessionStarted: false,
     isSessionFinished: false,
-    elapsedSeconds: 0,
-    finalDuration: null
   },
   rtConnected: false,
   isHost: () => false,
-  formatTime: () => '',
   resetSession: () => {},
   startSession: async () => {},
   handleFinishSession: async () => {},
@@ -84,19 +79,24 @@ export function SessionEventManager({
   const router = useRouter();
   const { userData } = useAuth();
   
+  // Fetch session data separately
+  const { data: sessionData, isLoading: isSessionDataLoading, error: sessionDataError } = useSessionData(sessionId);
+  
   // Use our custom hook for session state management
   const {
-    sessionData,
-    isLoading,
-    error,
     sessionState,
     isHost,
-    formatTime,
     startSession,
     finishSession: handleFinishSession,
     resetSession,
-    refreshSession: rawRefreshSession
+    isLoading: isStateLoading,
+    error: stateError,
+    refetch
   } = useSessionState(sessionId);
+  
+  // Combine loading and error states
+  const isLoading = isSessionDataLoading || isStateLoading;
+  const error = sessionDataError || stateError;
   
   // Initialize real-time updates connection
   const useWs = realtimeConfig.useWebSockets;
@@ -143,14 +143,14 @@ export function SessionEventManager({
     // Set a new timer - 1000ms debounce
     refreshTimerRef.current = setTimeout(() => {
       console.log('Executing debounced session refresh');
-      void rawRefreshSession();
+      void refetch();
     }, 1000);
-  }, [rawRefreshSession]);
+  }, [refetch]);
 
   // Wrap refreshSession to void the return value
   const refreshSession = useCallback(() => {
-    void rawRefreshSession();
-  }, [rawRefreshSession]);
+    void refetch();
+  }, [refetch]);
   
   // Update player reported status - we ignore the parameters since we just refresh
   const updatePlayerReportedStatus = useCallback(() => {
@@ -397,12 +397,12 @@ export function SessionEventManager({
     
     if (processedSessionData && processedSessionData.results && processedSessionData.results.length > 0) {
       // Create a set of user IDs who have submitted results for quick lookup
-      const reportedUserIds = new Set(processedSessionData.results.map(result => result.userId));
+      const reportedUserIds = new Set(processedSessionData.results.map((result: SessionResult) => result.userId));
       
       // Create a deep copy of the session data to avoid mutating the original
       processedSessionData = {
         ...processedSessionData,
-        joinedPlayers: processedSessionData.joinedPlayers.map(player => ({
+        joinedPlayers: processedSessionData.joinedPlayers.map((player: JoinedPlayer) => ({
           ...player,
           // Set hasReported to true if the user ID is in the results array
           hasReported: reportedUserIds.has(player.userId) || player.hasReported === true
@@ -418,7 +418,6 @@ export function SessionEventManager({
       sessionState,
       rtConnected,
       isHost,
-      formatTime,
       resetSession,
       startSession,
       handleFinishSession,
@@ -438,7 +437,6 @@ export function SessionEventManager({
     sessionState,
     rtConnected,
     isHost,
-    formatTime,
     resetSession,
     startSession,
     handleFinishSession,
