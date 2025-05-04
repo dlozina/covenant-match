@@ -185,6 +185,45 @@ export function SessionEventManager({
       }
     });
     
+    // Handle new session created event
+    const unsubscribeNewSession = subscribe('newSession', (data) => {
+      if (!data || typeof data !== 'object') return;
+      
+      console.log('Received new session created event:', data);
+      
+      // Type assertion for TypeScript
+      const newSessionData = data as Record<string, unknown>;
+      
+      // Get new session information
+      const newSessionId = newSessionData.sessionId ? String(newSessionData.sessionId) : null;
+      const originalSessionId = newSessionData.originalSessionId ? String(newSessionData.originalSessionId) : null;
+      
+      // Only process if this event is for the current session
+      if (originalSessionId === sessionId && newSessionId) {
+        console.log(`Host created a new session (${newSessionId}) from this session (${sessionId})`);
+        
+        // For non-host users, automatically redirect to the recreate page
+        if (!isHost()) {
+          console.log('Auto-redirecting participant to recreate page after newSession WebSocket event');
+          
+          // Store the new session ID in localStorage and sessionStorage
+          localStorage.setItem('pendingNewSessionId', newSessionId);
+          sessionStorage.setItem('autoJoinSessionId', newSessionId);
+          
+          // IMPORTANT: We use the ORIGINAL sessionId for the recreate route, not the new one
+          // The recreate endpoint needs the original session ID to join the new session
+          const recreateUrl = `/sessions/recreate?id=${sessionId}`;
+          console.log(`Redirecting to: ${recreateUrl}`);
+          
+          // Add a small delay before redirecting to ensure the localStorage changes propagate
+          // This is important for smooth transitions
+          setTimeout(() => {
+            router.push(recreateUrl);
+          }, 500);
+        }
+      }
+    });
+    
     // Handle player join event
     const unsubscribePlayerJoin = subscribe('join', (data) => {
       if (!data || typeof data !== 'object') return;
@@ -280,6 +319,7 @@ export function SessionEventManager({
     // Clean up
     return () => {
       unsubscribePlayerKicked();
+      unsubscribeNewSession();
       unsubscribePlayerJoin();
       unsubscribePlayerLeave();
       unsubscribeSessionStarted();
@@ -294,7 +334,7 @@ export function SessionEventManager({
         clearTimeout(refreshTimerRef.current);
       }
     };
-  }, [sessionId, subscribe, isConnected, disconnect, isHost, router, userData?.id, sessionData?.name, useWs, debouncedRefresh, refreshSession]);
+  }, [sessionId, subscribe, isConnected, disconnect, isHost, router, userData?.id, sessionData?.name, useWs, debouncedRefresh, refreshSession, sessionData]);
   
   // Handle visibility change
   useEffect(() => {
@@ -369,7 +409,7 @@ export function SessionEventManager({
         }))
       };
     }
-
+    
     return {
       sessionData: processedSessionData || null,
       isLoading,
