@@ -212,7 +212,7 @@ function RecreateSessionContent() {
     try {
       // First, recreate the session using the API function with the ORIGINAL session ID
       const recreateData = await recreateSession(originalSessionId);
-      const newSessionId = recreateData.id;
+      const newSessionId = extractMongoId(recreateData.id);
       console.log('Created new session with ID:', newSessionId);
       
       // Now, update the new session with the selected characters
@@ -221,12 +221,8 @@ function RecreateSessionContent() {
       // Clear declined session flags when creating a new session
       sessionStorage.removeItem('declinedNewSession');
       
-      // Extract proper ID for navigation
-      const newSessionForNavigation = extractMongoId(newSessionId as string | Record<string, unknown>);
-      console.log('Navigation URL will use session ID:', newSessionForNavigation);
-      
       // Navigate to the new session
-      router.push(`/sessions/run?id=${newSessionForNavigation}`);
+      router.push(`/sessions/run?id=${newSessionId}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
       setNotification({
@@ -283,7 +279,7 @@ function RecreateSessionContent() {
       // Check if the session details contain the new session ID
       if (sessionDetails && 'newSessionCreatedId' in sessionDetails && sessionDetails.newSessionCreatedId) {
         // Extract the ID, handling MongoDB ObjectId format if needed
-        newSessionId = extractMongoId(sessionDetails.newSessionCreatedId as string | Record<string, unknown>);
+        newSessionId = extractMongoId(sessionDetails.newSessionCreatedId as string | MongoDBObjectId | Record<string, unknown>);
         console.log('Using newSessionId from session details:', newSessionId);
       }
       

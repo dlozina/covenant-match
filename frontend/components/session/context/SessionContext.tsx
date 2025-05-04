@@ -39,11 +39,6 @@ export interface SessionContextType {
   // Visibility handlers for chat sync
   registerVisibilityHandler: (id: string, handler: () => void) => void;
   unregisterVisibilityHandler: (id: string) => void;
-  
-  // New session dialog properties
-  showNewSessionDialog: boolean;
-  setShowNewSessionDialog: (show: boolean) => void;
-  newSessionInfo: { newSessionId: string; originalSessionId: string } | null;
 }
 
 // Create the context with a default value
@@ -68,9 +63,6 @@ export const SessionContext = createContext<SessionContextType>({
   sendMessage: () => false,
   registerVisibilityHandler: () => {},
   unregisterVisibilityHandler: () => {},
-  showNewSessionDialog: false,
-  setShowNewSessionDialog: () => {},
-  newSessionInfo: null
 });
 
 // Custom hook to use the session context
@@ -122,10 +114,6 @@ export function SessionEventManager({
   
   // Track real-time connection status
   const [rtConnected, setRtConnected] = useState<boolean>(false);
-  
-  // State for new session dialog
-  const [showNewSessionDialog, setShowNewSessionDialog] = useState(false);
-  const [newSessionInfo, setNewSessionInfo] = useState<{ newSessionId: string; originalSessionId: string } | null>(null);
   
   // Create a ref to store visibility change handlers
   const visibilityHandlersRef = useRef<Record<string, () => void>>({});
@@ -194,29 +182,6 @@ export function SessionEventManager({
         
         // Refresh from server to get updated session data
         debouncedRefresh();
-        
-        // For non-host users, show the dialog
-        if (!isHost()) {
-          // Check if user declined this dialog already
-          const declinedSessionId = sessionStorage.getItem('declinedNewSession');
-          if (declinedSessionId === newSessionId) {
-            console.log('User already declined joining session from WebSocket event', newSessionId);
-            return;
-          }
-          
-          // Check if we're already in the new session
-          if (sessionId === newSessionId) {
-            console.log('Already in the new session from WebSocket event', newSessionId);
-            return;
-          }
-          
-          // Show the new session dialog using context state
-          setNewSessionInfo({
-            newSessionId,
-            originalSessionId: sessionId
-          });
-          setShowNewSessionDialog(true);
-        }
       }
     });
     
@@ -447,10 +412,7 @@ export function SessionEventManager({
       isConnected,
       sendMessage: wsConnection.sendMessage,
       registerVisibilityHandler,
-      unregisterVisibilityHandler,
-      showNewSessionDialog,
-      setShowNewSessionDialog,
-      newSessionInfo
+      unregisterVisibilityHandler
     };
   }, [
     sessionData,
@@ -469,9 +431,7 @@ export function SessionEventManager({
     isConnected,
     wsConnection.sendMessage,
     registerVisibilityHandler,
-    unregisterVisibilityHandler,
-    showNewSessionDialog,
-    newSessionInfo
+    unregisterVisibilityHandler
   ]);
   
   return (

@@ -30,10 +30,7 @@ export function SessionParticipant() {
     error,
     isHost,
     resetSession,
-    updatePlayerReportedStatus,
-    showNewSessionDialog: contextShowNewSessionDialog,
-    setShowNewSessionDialog: contextSetShowNewSessionDialog,
-    newSessionInfo: contextNewSessionInfo
+    updatePlayerReportedStatus
   } = useSessionContext();
   
   // Get auth context - moved before conditional return
@@ -54,6 +51,9 @@ export function SessionParticipant() {
     selectedResult: 'win',
     rating: 5
   });
+  
+  // Local state for new session info
+  const [newSessionInfo, setNewSessionInfo] = useState<{ newSessionId: string; originalSessionId: string } | null>(null);
   
   // State for result submission
   const [resultSubmitted, setResultSubmitted] = useState<boolean>(false);
@@ -136,8 +136,8 @@ export function SessionParticipant() {
   
   // Handle dialog actions for new session
   const handleCloseNewSessionDialog = useCallback(() => {
-    // Get the session ID we're declining directly from the context or session data
-    const newSessionId = contextNewSessionInfo?.newSessionId || 
+    // Get the session ID we're declining directly from our local state or session data
+    const newSessionId = newSessionInfo?.newSessionId || 
                          (sessionData?.newSessionCreated ? String(sessionData.newSessionCreatedId) : null);
     
     if (newSessionId) {
@@ -147,10 +147,9 @@ export function SessionParticipant() {
       console.log('User declined new session:', newSessionId);
     }
     
-    // Close both the local dialog and the context dialog
+    // Close the dialog
     dispatchDialog({ type: 'HIDE_NEW_SESSION' });
-    contextSetShowNewSessionDialog(false);
-  }, [contextNewSessionInfo, contextSetShowNewSessionDialog, sessionData]);
+  }, [newSessionInfo, sessionData]);
   
   // Effect to detect when host has created a new session based on server data
   useEffect(() => {
@@ -165,6 +164,9 @@ export function SessionParticipant() {
     const declinedSessionId = sessionStorage.getItem('declinedNewSession');
     if (declinedSessionId === newSessionId) {
       console.log('User already declined joining session', newSessionId);
+      
+      // Make sure dialog is closed
+      dispatchDialog({ type: 'HIDE_NEW_SESSION' });
       return;
     }
     
@@ -173,6 +175,12 @@ export function SessionParticipant() {
       console.log('Already in the new session', newSessionId);
       return;
     }
+    
+    // Update our local state
+    setNewSessionInfo({
+      newSessionId,
+      originalSessionId: String(sessionData.id)
+    });
     
     // Show dialog for new session
     dispatchDialog({ type: 'SHOW_NEW_SESSION' });
@@ -483,9 +491,9 @@ export function SessionParticipant() {
         onClose={() => dispatchDialog({ type: 'HIDE_WARNING' })}
       />
       
-      {/* New Session Dialog - use the context value if available, otherwise fallback to local state */}
+      {/* New Session Dialog - use only local state */}
       <NewSessionDialog
-        isOpen={contextShowNewSessionDialog || dialogState.showNewSessionDialog}
+        isOpen={dialogState.showNewSessionDialog}
         onClose={handleCloseNewSessionDialog}
         onConfirm={joinNewSession}
       />
