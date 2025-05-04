@@ -6,7 +6,7 @@ import { FriendButton } from './FriendButton';
 import { KickButton } from './KickButton';
 import { usePlayerStatus } from './usePlayerStatus';
 import { SessionState } from '@/components/session/SessionReducers';
-import { SessionData } from '@/components/session/common/types';
+import { SessionData, SessionResult } from '@/components/session/common/types';
 import { PlayerHoverCard } from './PlayerHoverCard';
 import { UserStats, fetchUserStats } from '@/utils/api';
 
@@ -35,6 +35,7 @@ interface PlayerRowProps {
   userStats?: UserStats;
   isHostView?: boolean;
   onKickPlayer?: (playerId: string, playerName: string) => void;
+  sessionData?: SessionData;
 }
 
 const PlayerRowComponent = ({ 
@@ -47,7 +48,8 @@ const PlayerRowComponent = ({
   addFriend,
   userStats,
   isHostView,
-  onKickPlayer
+  onKickPlayer,
+  sessionData
 }: PlayerRowProps) => {
   const playerStatus = usePlayerStatus(isHost, sessionState);
   
@@ -95,11 +97,15 @@ const PlayerRowComponent = ({
           {sessionState.isSessionFinished && (
             <Badge 
               variant="outline" 
-              className={player.hasReported 
+              className={
+                (player.hasReported || sessionData?.results?.some((result: SessionResult) => result.userId === player.userId))
                 ? "bg-green-950/30 text-green-500 border-green-500" 
-                : "bg-red-950/30 text-red-500 border-red-500"}
+                : "bg-red-950/30 text-red-500 border-red-500"
+              }
             >
-              {player.hasReported ? "Reported" : "Result Pending"}
+              {(player.hasReported || sessionData?.results?.some((result: SessionResult) => result.userId === player.userId)) 
+                ? "Reported" 
+                : "Result Pending"}
             </Badge>
           )}
         </div>
@@ -208,6 +214,7 @@ const PlayerSectionComponent = ({
               userStats={userStats[player.userId]}
               isHostView={isHostView}
               onKickPlayer={onKickPlayer}
+              sessionData={sessionData}
             />
             {/* Add divider after each player except the last one */}
             {index < sessionData.joinedPlayers.length - 1 && (

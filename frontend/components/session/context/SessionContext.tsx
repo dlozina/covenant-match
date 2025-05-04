@@ -168,6 +168,56 @@ export function SessionEventManager({
       }
     });
     
+    // Handle player join event
+    const unsubscribePlayerJoin = subscribe('join', (data) => {
+      if (!data || typeof data !== 'object') return;
+      
+      console.log('Received player join event:', data);
+      
+      // Immediately refresh session data from server
+      refreshSession();
+    });
+    
+    // Handle player leave event
+    const unsubscribePlayerLeave = subscribe('leave', (data) => {
+      if (!data || typeof data !== 'object') return;
+      
+      console.log('Received player leave event:', data);
+      
+      // Immediately refresh session data from server
+      refreshSession();
+    });
+    
+    // Handle session started event
+    const unsubscribeSessionStarted = subscribe('session_started', (data) => {
+      if (!data || typeof data !== 'object') return;
+      
+      console.log('Received session started event:', data);
+      
+      // Immediately refresh session data from server
+      refreshSession();
+    });
+    
+    // Handle session completed event
+    const unsubscribeSessionCompleted = subscribe('session_completed', (data) => {
+      if (!data || typeof data !== 'object') return;
+      
+      console.log('Received session completed event:', data);
+      
+      // Immediately refresh session data from server
+      refreshSession();
+    });
+    
+    // Handle results submitted event
+    const unsubscribeResultSubmitted = subscribe('result_submitted', (data) => {
+      if (!data || typeof data !== 'object') return;
+      
+      console.log('Received result submitted event:', data);
+      
+      // Immediately refresh session data from server
+      refreshSession();
+    });
+    
     // Handle session cancel event
     const unsubscribeCancel = subscribe('cancel', (data) => {
       if (!data || typeof data !== 'object') return;
@@ -212,12 +262,17 @@ export function SessionEventManager({
     
     return () => {
       unsubscribePlayerKicked();
+      unsubscribePlayerJoin();
+      unsubscribePlayerLeave();
+      unsubscribeSessionStarted();
+      unsubscribeSessionCompleted();
+      unsubscribeResultSubmitted();
       unsubscribeCancel();
       clearInterval(statusInterval);
       window.removeEventListener(heartbeatEventName, handleHeartbeat);
       disconnect();
     };
-  }, [sessionId, subscribe, isConnected, disconnect, isHost, router, userData?.id, sessionData?.name, useWs]);
+  }, [sessionId, subscribe, isConnected, disconnect, isHost, router, userData?.id, sessionData?.name, useWs, refreshSession]);
   
   // Handle visibility change
   useEffect(() => {
@@ -262,26 +317,46 @@ export function SessionEventManager({
   }, [isConnected, reconnectWithFreshToken, rtConnected, sessionId]);
   
   // Create context value
-  const contextValue = useMemo(() => ({
-    sessionData: sessionData || null,
-    isLoading,
-    error: error ? String(error) : null,
-    lastHeartbeat,
-    sessionState,
-    rtConnected,
-    isHost,
-    formatTime,
-    resetSession,
-    startSession,
-    handleFinishSession,
-    updatePlayerReportedStatus,
-    refreshSession,
-    subscribe,
-    isConnected,
-    sendMessage: wsConnection.sendMessage,
-    registerVisibilityHandler,
-    unregisterVisibilityHandler
-  }), [
+  const contextValue = useMemo(() => {
+    // Process session data to update hasReported flags based on results array
+    let processedSessionData = sessionData;
+    
+    if (processedSessionData && processedSessionData.results && processedSessionData.results.length > 0) {
+      // Create a set of user IDs who have submitted results for quick lookup
+      const reportedUserIds = new Set(processedSessionData.results.map(result => result.userId));
+      
+      // Create a deep copy of the session data to avoid mutating the original
+      processedSessionData = {
+        ...processedSessionData,
+        joinedPlayers: processedSessionData.joinedPlayers.map(player => ({
+          ...player,
+          // Set hasReported to true if the user ID is in the results array
+          hasReported: reportedUserIds.has(player.userId) || player.hasReported === true
+        }))
+      };
+    }
+
+    return {
+      sessionData: processedSessionData || null,
+      isLoading,
+      error: error ? String(error) : null,
+      lastHeartbeat,
+      sessionState,
+      rtConnected,
+      isHost,
+      formatTime,
+      resetSession,
+      startSession,
+      handleFinishSession,
+      updatePlayerReportedStatus,
+      refreshSession,
+      subscribe,
+      isConnected,
+      sendMessage: wsConnection.sendMessage,
+      registerVisibilityHandler,
+      unregisterVisibilityHandler
+    };
+  }, [
     sessionData,
     isLoading,
     error,
