@@ -32,5 +32,5 @@ export interface SessionResult {
   result: string;
   rating: number;
   feedback?: string;
-  submittedAt?: any;
+  submittedAt?: string;
 } 
