@@ -189,7 +189,7 @@ export function SessionEventManager({
     });
     
     // Handle session started event
-    const unsubscribeSessionStarted = subscribe('session_started', (data) => {
+    const unsubscribeSessionStarted = subscribe('start', (data) => {
       if (!data || typeof data !== 'object') return;
       
       console.log('Received session started event:', data);
@@ -199,7 +199,7 @@ export function SessionEventManager({
     });
     
     // Handle session completed event
-    const unsubscribeSessionCompleted = subscribe('session_completed', (data) => {
+    const unsubscribeSessionCompleted = subscribe('complete', (data) => {
       if (!data || typeof data !== 'object') return;
       
       console.log('Received session completed event:', data);
@@ -209,7 +209,7 @@ export function SessionEventManager({
     });
     
     // Handle results submitted event
-    const unsubscribeResultSubmitted = subscribe('result_submitted', (data) => {
+    const unsubscribeResultSubmitted = subscribe('result', (data) => {
       if (!data || typeof data !== 'object') return;
       
       console.log('Received result submitted event:', data);
