@@ -126,8 +126,6 @@ function SessionRunContent(): JSX.Element {
         sessionStorage.removeItem('cancelledSessionId');
       }
     }
-    
-    // No event listener for cancellation events anymore - using only the storage approach
   }, [isValidSessionId, router, sessionId, hasShownCancelNotification]);
   
   if (!isValidSessionId) {

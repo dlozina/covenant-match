@@ -15,6 +15,7 @@ export interface SessionData {
   status: string;
   nightLord: string;
   joinedPlayers: JoinedPlayer[];
+  results?: SessionResult[];
   createdAt: string;
   updatedAt: string;
   startedAt: string | null;
@@ -23,4 +24,13 @@ export interface SessionData {
   _version?: number;
   newSessionCreated?: boolean;
   newSessionCreatedId?: string;
+}
+
+// Define the SessionResult interface
+export interface SessionResult {
+  userId: string;
+  result: string;
+  rating: number;
+  feedback?: string;
+  submittedAt?: any;
 } 

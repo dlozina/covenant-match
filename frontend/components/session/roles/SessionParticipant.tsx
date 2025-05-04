@@ -334,15 +334,15 @@ export function SessionParticipant() {
   // Check if result state needs to be updated from server data
   useEffect(() => {
     if (sessionData && userData) {
-      // Find current user in joined players
-      const currentUserPlayer = sessionData.joinedPlayers.find(
-        player => player.userId === userData.id
+      // Check if the current user has already submitted a result in the results array
+      const userHasSubmittedResult = sessionData.results?.some(
+        (result) => result.userId === userData.id
       );
       
       // If server indicates user has reported but local state doesn't reflect it,
       // update the local state
-      if (currentUserPlayer && currentUserPlayer.hasReported && !resultSubmitted) {
-        console.log('Server indicates result was submitted, updating local state');
+      if (userHasSubmittedResult && !resultSubmitted) {
+        console.log('Server indicates result was submitted (found in results array), updating local state');
         setResultSubmitted(true);
       }
     }
