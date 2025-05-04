@@ -1,8 +1,8 @@
 use crate::models::error::AppError;
-use crate::models::token::{Token, TokenPurpose};
+use crate::models::token::{StoredToken, TokenPurpose};
 use bcrypt::{hash, verify, DEFAULT_COST};
 use futures::stream::TryStreamExt;
-use log::error;
+use log::{error, info, warn};
 use mongodb::{
     bson::{doc, oid::ObjectId},
     Collection, Database,
@@ -18,8 +18,8 @@ fn hash_token(token: &str) -> Result<String, AppError> {
     })
 }
 
-fn get_collection(db: &Database) -> Collection<Token> {
-    db.collection::<Token>(COLLECTION_NAME)
+fn get_collection(db: &Database) -> Collection<StoredToken> {
+    db.collection::<StoredToken>(COLLECTION_NAME)
 }
 
 /// Create a new token in the database
@@ -29,7 +29,7 @@ pub async fn create_token(
     token: &str,
     purpose: TokenPurpose,
     expiry_hours: i64,
-) -> Result<Token, AppError> {
+) -> Result<StoredToken, AppError> {
     let collection = get_collection(db);
 
     // Convert string ID to ObjectId
@@ -61,8 +61,10 @@ pub async fn create_token(
     // Create hashed token for storage
     let hashed_token = hash_token(&formatted_token)?;
 
-    let token_doc = Token {
-        id: ObjectId::new(),
+    // Create the token document
+    // MongoDB will automatically assign _id when inserted
+    let token_doc = StoredToken {
+        id: ObjectId::new(), // This will be set as _id in MongoDB
         user_id: user_object_id,
         token: hashed_token,
         purpose,
@@ -76,14 +78,14 @@ pub async fn create_token(
     })?;
 
     // Return with original plain token for client use
-    Ok(Token {
+    Ok(StoredToken {
         token: plain_token,
         ..token_doc
     })
 }
 
 /// Find a token by its value
-pub async fn find_by_token(db: &Database, token: &str) -> Result<Option<Token>, AppError> {
+pub async fn find_by_token(db: &Database, token: &str) -> Result<Option<StoredToken>, AppError> {
     // Token format could be like "{userId}:{random}" to help with lookup
     // If your tokens follow this format, extract the user ID first
     let parts: Vec<&str> = token.split(':').collect();
@@ -103,10 +105,13 @@ pub async fn find_by_token(db: &Database, token: &str) -> Result<Option<Token>, 
         AppError::DatabaseError(e)
     })?;
 
-    let tokens = cursor.try_collect::<Vec<Token>>().await.map_err(|e| {
-        error!("Database error collecting tokens: {:?}", e);
-        AppError::DatabaseError(e)
-    })?;
+    let tokens = cursor
+        .try_collect::<Vec<StoredToken>>()
+        .await
+        .map_err(|e| {
+            error!("Database error collecting tokens: {:?}", e);
+            AppError::DatabaseError(e)
+        })?;
 
     for db_token in tokens {
         // Verify if the provided token matches the stored hash
@@ -115,7 +120,7 @@ pub async fn find_by_token(db: &Database, token: &str) -> Result<Option<Token>, 
             AppError::InternalError(e.to_string())
         })? {
             // Return with original plain token
-            return Ok(Some(Token {
+            return Ok(Some(StoredToken {
                 token: token.to_string(),
                 ..db_token
             }));
@@ -127,23 +132,133 @@ pub async fn find_by_token(db: &Database, token: &str) -> Result<Option<Token>, 
 
 /// Delete a token by its value
 pub async fn delete_token(db: &Database, token: &str) -> Result<bool, AppError> {
+    // Log the token attempt for debugging (only showing first few chars for security)
+    let safe_token_prefix = if token.len() > 8 { &token[0..8] } else { token };
+    info!(
+        "Attempting to delete token starting with: {}...",
+        safe_token_prefix
+    );
+
     // Find the token first (which verifies the hash)
     let token_doc = find_by_token(db, token).await?;
 
     if let Some(token_doc) = token_doc {
         // Delete using the token's ID
         let collection = get_collection(db);
-        let filter = doc! { "_id": token_doc.id };
+        let token_id = token_doc.id;
+
+        info!("Found token with ID: {}, deleting by id", token_id);
+
+        // Use just id - because of the #[serde(rename = "_id")] in the model
+        // this will automatically map to MongoDB's _id field
+        let filter = doc! { "_id": token_id };
 
         let result = collection.delete_one(filter).await.map_err(|e| {
             error!("Database error deleting token: {:?}", e);
             AppError::DatabaseError(e)
         })?;
 
-        Ok(result.deleted_count > 0)
+        if result.deleted_count == 0 {
+            // If that didn't work, try by user_id and purpose
+            let user_id = token_doc.user_id;
+            let purpose = token_doc.purpose.to_string();
+
+            info!(
+                "Failed to delete by ID, trying by user_id: {} and purpose: {}",
+                user_id, purpose
+            );
+
+            let filter = doc! {
+                "user_id": user_id,
+                "purpose": purpose
+            };
+
+            let result = collection.delete_one(filter).await.map_err(|e| {
+                error!(
+                    "Database error deleting token by user_id and purpose: {:?}",
+                    e
+                );
+                AppError::DatabaseError(e)
+            })?;
+
+            if result.deleted_count > 0 {
+                info!("Successfully deleted token by user_id and purpose");
+            } else {
+                warn!("Failed to delete token by any method");
+            }
+
+            Ok(result.deleted_count > 0)
+        } else {
+            info!("Successfully deleted token by ID");
+            Ok(true)
+        }
     } else {
-        // Token not found, so "deletion" is considered successful
-        Ok(false)
+        // Try to delete by user_id and purpose if we can extract user_id from token
+        let parts: Vec<&str> = token.split(':').collect();
+        if parts.len() > 1 && ObjectId::parse_str(parts[0]).is_ok() {
+            let user_id = ObjectId::parse_str(parts[0]).unwrap();
+            let collection = get_collection(db);
+
+            info!(
+                "Token not found by hash verification, trying to delete by user_id: {}",
+                user_id
+            );
+
+            // Try both possible purposes
+            // Try EmailVerification first
+            let filter = doc! {
+                "user_id": user_id,
+                "purpose": TokenPurpose::EmailVerification.to_string()
+            };
+
+            let email_result = collection.delete_many(filter).await.map_err(|e| {
+                error!(
+                    "Database error deleting email verification token by user_id: {:?}",
+                    e
+                );
+                AppError::DatabaseError(e)
+            })?;
+
+            if email_result.deleted_count > 0 {
+                info!(
+                    "Deleted {} email verification token(s)",
+                    email_result.deleted_count
+                );
+                return Ok(true);
+            }
+
+            // Try PasswordReset next
+            let filter = doc! {
+                "user_id": user_id,
+                "purpose": TokenPurpose::PasswordReset.to_string()
+            };
+
+            let reset_result = collection.delete_many(filter).await.map_err(|e| {
+                error!(
+                    "Database error deleting password reset token by user_id: {:?}",
+                    e
+                );
+                AppError::DatabaseError(e)
+            })?;
+
+            if reset_result.deleted_count > 0 {
+                info!(
+                    "Deleted {} password reset token(s)",
+                    reset_result.deleted_count
+                );
+                return Ok(true);
+            }
+
+            warn!("Could not delete any tokens for user: {}", user_id);
+            Ok(false)
+        } else {
+            // Token not found and couldn't extract user_id
+            error!(
+                "Token not found for deletion and couldn't extract user_id from token: {}",
+                safe_token_prefix
+            );
+            Ok(false)
+        }
     }
 }
 
@@ -194,7 +309,7 @@ pub async fn validate_token(
     db: &Database,
     token: &str,
     purpose: TokenPurpose,
-) -> Result<Option<Token>, AppError> {
+) -> Result<Option<StoredToken>, AppError> {
     let collection = get_collection(db);
     let now = mongodb::bson::DateTime::now();
 
@@ -210,7 +325,7 @@ pub async fn validate_token(
 
     // If token contains user ID as first part, only search that user's tokens
     if parts.len() > 1 && ObjectId::parse_str(parts[0]).is_ok() {
-        let user_id = ObjectId::parse_str(parts[0]).unwrap();
+        let user_id = ObjectId::parse_str(parts[0]).expect("Invalid ObjectId format");
         filter_doc.insert("user_id", user_id);
     }
 
@@ -219,10 +334,13 @@ pub async fn validate_token(
         AppError::DatabaseError(e)
     })?;
 
-    let tokens = cursor.try_collect::<Vec<Token>>().await.map_err(|e| {
-        error!("Database error collecting tokens: {:?}", e);
-        AppError::DatabaseError(e)
-    })?;
+    let tokens = cursor
+        .try_collect::<Vec<StoredToken>>()
+        .await
+        .map_err(|e| {
+            error!("Database error collecting tokens: {:?}", e);
+            AppError::DatabaseError(e)
+        })?;
 
     for db_token in tokens {
         // Verify if the provided token matches the stored hash
@@ -231,7 +349,7 @@ pub async fn validate_token(
             AppError::InternalError(e.to_string())
         })? {
             // Return with original plain token
-            return Ok(Some(Token {
+            return Ok(Some(StoredToken {
                 token: token.to_string(),
                 ..db_token
             }));

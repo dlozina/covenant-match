@@ -292,6 +292,12 @@ export default function LoginPage() {
                 Create one
               </Link>
             </div>
+            <div className="text-xs sm:text-sm text-muted-foreground">
+              Forgot password?{" "}
+              <Link href="/send-email" className="text-primary hover:underline">
+                Reset password
+              </Link>
+            </div>
           </CardFooter>
         </Card>
       </div>

@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::get_config;
 use crate::models::error::AppError;
+use crate::models::token::TokenPurpose;
 
 /// Constants for JWT token expiration times
 pub const EXPIRY_HOURS_FOR_EMAIL_VERIFICATION: i64 = 24;
@@ -47,7 +48,7 @@ impl EmailVerificationClaims {
             sub: user_id.to_string(),
             email: email.to_string(),
             exp: expiration,
-            purpose: "email_verification".to_string(),
+            purpose: TokenPurpose::EmailVerification.to_string(),
             iat: issued_at,
         }
     }
@@ -79,7 +80,7 @@ impl ResetPasswordClaims {
             sub: user_id.to_string(),
             email: email.to_string(),
             exp: expiration,
-            purpose: "forget_password".to_string(),
+            purpose: TokenPurpose::PasswordReset.to_string(),
             iat: issued_at,
         }
     }

@@ -283,3 +283,13 @@ pub struct FriendListResponse {
     pub friends: Vec<FriendDto>,
     pub total: usize,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NewPasswordDto {
+    pub password: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ResetPasswordDto {
+    pub email: String,
+}

@@ -1,7 +1,6 @@
 use crate::models::error::AppError;
 use crate::models::user::{
-    AddFriendDto, CreateUserDto, FriendListResponse, GetUsersQuery, LoginUserDto,
-    UpdateUserProfileDto,
+    AddFriendDto, CreateUserDto, FriendListResponse, GetUsersQuery, LoginUserDto, NewPasswordDto, ResetPasswordDto, UpdateUserProfileDto
 };
 use crate::services::{auth_service, user_service};
 use crate::utils::{email, geo_location, ip_address, jwt};
@@ -93,11 +92,6 @@ async fn verify_email(db: web::Data<Database>, req: HttpRequest) -> impl Respond
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ResetPasswordDto {
-    pub email: String,
-}
-
 /// Send reset password email
 #[utoipa::path(
     post,
@@ -112,7 +106,7 @@ pub struct ResetPasswordDto {
     tag = "users"
 )]
 #[post("/api/v1/reset-password-email")]
-async fn send_reset_password_email(
+async fn reset_password_email(
     db: web::Data<Database>,
     reset_password_data: web::Json<ResetPasswordDto>,
 ) -> impl Responder {
@@ -138,11 +132,6 @@ async fn send_reset_password_email(
             success_response
         }
     }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct NewPasswordDto {
-    pub password: String,
 }
 
 /// Reset password endpoint
@@ -1015,4 +1004,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(add_friend);
     cfg.service(remove_friend);
     cfg.service(verify_email);
+    cfg.service(reset_password);
+    cfg.service(reset_password_email);
 }

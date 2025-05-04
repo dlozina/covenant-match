@@ -36,7 +36,7 @@ use crate::models::statistics::{
 use crate::models::user::{
     AddFriendDto, AuthResponse, CreateUserDto, FriendDto, FriendListResponse, GetUsersQuery,
     LoginUserDto, PaginationInfo, RefreshTokenResponse, RemoveFriendDto, UpdateUserDto,
-    UpdateUserProfileDto, User, UserResponse, UsersListData, UsersListResponse,
+    UpdateUserProfileDto, User, UserResponse, UsersListData, UsersListResponse, ResetPasswordDto, NewPasswordDto
 };
 use crate::models::user_data::UserDataResponseDto;
 use crate::routes::users::{JwtInfoDto, TokenInfoResponse};
@@ -79,6 +79,8 @@ use utoipa::{
         update_profile,
         delete_user,
         verify_email,
+        reset_password_email,
+        reset_password,
         // Friend routes
         get_friend_list,
         add_friend,
