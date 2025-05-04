@@ -18,6 +18,21 @@ import {
   joinSession 
 } from "@/utils/api";
 import { sessionService } from "@/utils/api/session-service";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 // Define JWT Claims interface
 interface JwtClaims {
@@ -32,6 +47,68 @@ export default function JoinSessionPage() {
     <ProtectedRoute>
       <JoinSessionContent />
     </ProtectedRoute>
+  );
+}
+
+function CharacterComboBox({
+  characters,
+  selectedValue,
+  onSelect,
+  placeholder,
+  emptyMessage,
+}: {
+  characters: { id: string; name: string }[];
+  selectedValue: string | null;
+  onSelect: (value: string) => void;
+  placeholder: string;
+  emptyMessage: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between h-10"
+        >
+          {selectedValue
+            ? characters.find((char) => char.name === selectedValue)?.name || placeholder
+            : placeholder}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-full p-0">
+        <Command>
+          <CommandInput placeholder={`Search ${placeholder.toLowerCase()}...`} />
+          <CommandList>
+            <CommandEmpty>{emptyMessage}</CommandEmpty>
+            <CommandGroup>
+              {characters.map((character) => (
+                <CommandItem
+                  key={character.id}
+                  value={character.name}
+                  onSelect={(currentValue) => {
+                    onSelect(currentValue);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      selectedValue === character.name ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {character.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -300,7 +377,26 @@ function JoinSessionContent() {
                 </div>
               )}
 
-              <div className="space-y-2">
+              {/* Mobile: ComboBox for Nightfarer selection */}
+              <div className="space-y-2 md:hidden">
+                <label className="text-sm md:text-base font-medium">
+                  Select Nightfarer
+                </label>
+                {isLoadingCharacters ? (
+                  <div className="text-center py-4">Loading Nightfarers...</div>
+                ) : (
+                  <CharacterComboBox
+                    characters={nightfarers}
+                    selectedValue={selectedFarer}
+                    onSelect={setSelectedFarer}
+                    placeholder="Select Nightfarer..."
+                    emptyMessage="No Nightfarer found."
+                  />
+                )}
+              </div>
+
+              {/* Desktop: Grid for Nightfarer selection */}
+              <div className="space-y-2 hidden md:block">
                 <label className="text-sm md:text-base font-medium">
                   Select Nightfarer
                 </label>

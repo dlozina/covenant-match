@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Check, ChevronsUpDown } from "lucide-react";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -37,6 +37,20 @@ import {
   CreateSessionParams
 } from "@/utils/api";
 import { sessionService } from "@/utils/api/session-service";
+import { cn } from "@/lib/utils";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 // Type for our notification state
 type NotificationType = {
@@ -66,6 +80,68 @@ export default function CreateSessionPage() {
     <ProtectedRoute>
       <CreateSessionContent />
     </ProtectedRoute>
+  );
+}
+
+function CharacterComboBox({
+  characters,
+  selectedValue,
+  onSelect,
+  placeholder,
+  emptyMessage,
+}: {
+  characters: { id: string; name: string }[];
+  selectedValue: string | null;
+  onSelect: (value: string) => void;
+  placeholder: string;
+  emptyMessage: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between h-10"
+        >
+          {selectedValue
+            ? characters.find((char) => char.name === selectedValue)?.name || placeholder
+            : placeholder}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-full p-0">
+        <Command>
+          <CommandInput placeholder={`Search ${placeholder.toLowerCase()}...`} />
+          <CommandList>
+            <CommandEmpty>{emptyMessage}</CommandEmpty>
+            <CommandGroup>
+              {characters.map((character) => (
+                <CommandItem
+                  key={character.id}
+                  value={character.name}
+                  onSelect={(currentValue) => {
+                    onSelect(currentValue);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      selectedValue === character.name ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {character.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -329,7 +405,7 @@ function CreateSessionContent() {
                         </div>
                         <FormControl>
                           <Input 
-                            placeholder="Enter an in-game password for your session" 
+                            placeholder="Enter an in-game password" 
                             className="w-full h-10"
                             {...field}
                             onChange={(e) => {
@@ -374,7 +450,29 @@ function CreateSessionContent() {
                     )}
                   />
 
-                  <div className="space-y-2">
+                  {/* Mobile: ComboBox for Nightfarer selection */}
+                  <div className="space-y-2 md:hidden">
+                    <label className="text-sm md:text-base font-medium">
+                      Select Nightfarer
+                    </label>
+                    {isLoadingCharacters ? (
+                      <div className="text-center py-4">Loading Nightfarers...</div>
+                    ) : (
+                      <CharacterComboBox
+                        characters={nightfarers}
+                        selectedValue={selectedFarer}
+                        onSelect={setSelectedFarer}
+                        placeholder="Select Nightfarer..."
+                        emptyMessage="No Nightfarer found."
+                      />
+                    )}
+                    {!selectedFarer && form.formState.isSubmitted && (
+                      <p className="text-xs sm:text-sm text-red-600 font-medium mt-1">Please select a Nightfarer</p>
+                    )}
+                  </div>
+
+                  {/* Desktop: Grid for Nightfarer selection */}
+                  <div className="space-y-2 hidden md:block">
                     <label className="text-sm md:text-base font-medium">
                       Select Nightfarer
                     </label>
@@ -403,7 +501,29 @@ function CreateSessionContent() {
                     )}
                   </div>
 
-                  <div className="space-y-2">
+                  {/* Mobile: ComboBox for Night Lord selection */}
+                  <div className="space-y-2 md:hidden">
+                    <label className="text-sm md:text-base font-medium">
+                      Select Night Lord
+                    </label>
+                    {isLoadingCharacters ? (
+                      <div className="text-center py-4">Loading Night Lords...</div>
+                    ) : (
+                      <CharacterComboBox
+                        characters={nightLords}
+                        selectedValue={selectedLord}
+                        onSelect={setSelectedLord}
+                        placeholder="Select Night Lord..."
+                        emptyMessage="No Night Lord found."
+                      />
+                    )}
+                    {!selectedLord && form.formState.isSubmitted && (
+                      <p className="text-xs sm:text-sm text-red-600 font-medium mt-1">Please select a Night Lord</p>
+                    )}
+                  </div>
+
+                  {/* Desktop: Grid for Night Lord selection */}
+                  <div className="space-y-2 hidden md:block">
                     <label className="text-sm md:text-base font-medium">
                       Select Night Lord
                     </label>
