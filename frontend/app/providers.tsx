@@ -10,13 +10,15 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
   return <NextThemesProvider {...props}>{children}</NextThemesProvider>
 }
 
-// Create a client
+// Create a client with optimizations for WebSocket-first approach
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 60 * 1000, // 1 minute
-      refetchOnWindowFocus: true,
-      retry: 1,
+      staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh longer since WebSockets handle updates
+      refetchOnWindowFocus: true, // Still refetch on focus as fallback
+      retry: 1, // Retry once if fetch fails
+      refetchOnReconnect: true, // Refetch when network reconnects
+      refetchOnMount: true, // Refetch when the component mounts, to ensure data is up to date
     },
   },
 })

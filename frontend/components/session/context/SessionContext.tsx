@@ -130,6 +130,23 @@ export function SessionEventManager({
     delete visibilityHandlersRef.current[id];
   }, []);
   
+  // Create a ref to store the debounce timer
+  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Create a debounced refresh function
+  const debouncedRefresh = useCallback(() => {
+    // Clear any existing timer
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+    }
+    
+    // Set a new timer - 1000ms debounce
+    refreshTimerRef.current = setTimeout(() => {
+      console.log('Executing debounced session refresh');
+      void rawRefreshSession();
+    }, 1000);
+  }, [rawRefreshSession]);
+
   // Wrap refreshSession to void the return value
   const refreshSession = useCallback(() => {
     void rawRefreshSession();
@@ -174,8 +191,8 @@ export function SessionEventManager({
       
       console.log('Received player join event:', data);
       
-      // Immediately refresh session data from server
-      refreshSession();
+      // Use debounced refresh to avoid hammering the server
+      debouncedRefresh();
     });
     
     // Handle player leave event
@@ -184,8 +201,8 @@ export function SessionEventManager({
       
       console.log('Received player leave event:', data);
       
-      // Immediately refresh session data from server
-      refreshSession();
+      // Use debounced refresh to avoid hammering the server
+      debouncedRefresh();
     });
     
     // Handle session started event
@@ -194,7 +211,7 @@ export function SessionEventManager({
       
       console.log('Received session started event:', data);
       
-      // Immediately refresh session data from server
+      // Immediately refresh session data from server - this is an important state change
       refreshSession();
     });
     
@@ -204,7 +221,7 @@ export function SessionEventManager({
       
       console.log('Received session completed event:', data);
       
-      // Immediately refresh session data from server
+      // Immediately refresh session data from server - this is an important state change
       refreshSession();
     });
     
@@ -214,8 +231,8 @@ export function SessionEventManager({
       
       console.log('Received result submitted event:', data);
       
-      // Immediately refresh session data from server
-      refreshSession();
+      // Use debounced refresh to avoid hammering the server if multiple results come in
+      debouncedRefresh();
     });
     
     // Handle session cancel event
@@ -260,6 +277,7 @@ export function SessionEventManager({
     
     window.addEventListener(heartbeatEventName, handleHeartbeat);
     
+    // Clean up
     return () => {
       unsubscribePlayerKicked();
       unsubscribePlayerJoin();
@@ -271,14 +289,30 @@ export function SessionEventManager({
       clearInterval(statusInterval);
       window.removeEventListener(heartbeatEventName, handleHeartbeat);
       disconnect();
+      
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+      }
     };
-  }, [sessionId, subscribe, isConnected, disconnect, isHost, router, userData?.id, sessionData?.name, useWs, refreshSession]);
+  }, [sessionId, subscribe, isConnected, disconnect, isHost, router, userData?.id, sessionData?.name, useWs, debouncedRefresh, refreshSession]);
   
   // Handle visibility change
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        console.log('Page visibility changed to visible, calling handlers');
+        console.log('Page visibility changed to visible');
+        
+        // Refresh session data when tab becomes visible
+        if (sessionId) {
+          console.log('Refreshing session data after visibility change');
+          refreshSession();
+          
+          // If WebSocket connection is disconnected, attempt to reconnect
+          if (!isConnected() && sessionId) {
+            console.log('Attempting to reconnect WebSocket after visibility change');
+            reconnectWithFreshToken();
+          }
+        }
         
         // Call all registered visibility handlers
         Object.entries(visibilityHandlersRef.current).forEach(([id, handler]) => {
@@ -297,7 +331,7 @@ export function SessionEventManager({
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [refreshSession, isConnected, reconnectWithFreshToken, sessionId]);
   
   // Handle connection changes
   useEffect(() => {

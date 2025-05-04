@@ -27,8 +27,12 @@ export function useSessionData(sessionId: string | null) {
       return await fetchWithAuth(`/api/v1/sessions/${sessionId}`);
     },
     enabled: !!sessionId,
-    refetchInterval: 15000, // Refetch every 15 seconds
-    staleTime: 10000, // Consider data stale after 10 seconds
+    // Remove refetchInterval and rely on WebSocket events for real-time updates
+    // refetchInterval: 15000, // Refetch every 15 seconds
+    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+    refetchOnWindowFocus: true, // Refetch when the window regains focus
+    refetchOnMount: true, // Refetch when component mounts
+    refetchOnReconnect: true, // Refetch when reconnecting after being offline
   });
 }
 
