@@ -9,7 +9,8 @@ import {
   SessionHeader,
   SessionHost,
   SessionParticipant,
-  SessionChat
+  SessionChat,
+  useSessionContext
 } from "@/components/session";
 import { Notification, NotificationType } from "@/components/ui/notification";
 
@@ -23,12 +24,14 @@ export default function SessionRunPage(): JSX.Element {
 
 // Helper component to determine if user is host or participant
 function ParticipantOrHostView(): JSX.Element {
-  // In a real implementation, this would determine the role based on authentication or maybe DB info
-  // and session data. For now, showing both components for demonstration.
+  // Get the isHost function from session context
+  const { isHost } = useSessionContext();
+  
+  // Render SessionHost for hosts, SessionParticipant for participants
+  // We know that the user is either a host or a participant, from the session context
   return (
     <div className="space-y-6">
-      <SessionHost />
-      <SessionParticipant />
+      {isHost() ? <SessionHost /> : <SessionParticipant />}
     </div>
   );
 }
