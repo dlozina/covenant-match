@@ -30,6 +30,27 @@ interface JwtClaims {
   iat: number;
 }
 
+// MongoDB ObjectId type
+interface MongoDBObjectId {
+  $oid: string;
+}
+
+// Helper to extract MongoDB ObjectId
+const extractMongoId = (id: string | MongoDBObjectId | Record<string, unknown> | null | undefined): string => {
+  if (!id) return '';
+  
+  if (typeof id === 'object') {
+    // Check if it's a MongoDB ObjectId format with $oid property
+    if (id !== null && '$oid' in id) {
+      return (id as MongoDBObjectId).$oid;
+    }
+    // Fall back to String() for other object types
+    return String(id);
+  }
+  
+  return id;
+};
+
 export default function RecreateSessionPage() {
   return (
     <ProtectedRoute>
@@ -189,17 +210,23 @@ function RecreateSessionContent() {
     setIsLoading(true);
     
     try {
-      // First, recreate the session using the API function
+      // First, recreate the session using the API function with the ORIGINAL session ID
       const recreateData = await recreateSession(originalSessionId);
       const newSessionId = recreateData.id;
+      console.log('Created new session with ID:', newSessionId);
       
       // Now, update the new session with the selected characters
       await updateSessionCharacters(newSessionId, selectedLord, selectedFarer);
       
-      // Set a flag in sessionStorage so the run page knows we came from here
-      sessionStorage.setItem('fromRecreatePage', 'true');
+      // Clear declined session flags when creating a new session
+      sessionStorage.removeItem('declinedNewSession');
       
-      router.push(`/sessions/run?id=${newSessionId}`);
+      // Extract proper ID for navigation
+      const newSessionForNavigation = extractMongoId(newSessionId as string | Record<string, unknown>);
+      console.log('Navigation URL will use session ID:', newSessionForNavigation);
+      
+      // Navigate to the new session
+      router.push(`/sessions/run?id=${newSessionForNavigation}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
       setNotification({
@@ -232,35 +259,41 @@ function RecreateSessionContent() {
     setIsLoading(true);
     
     try {
-      // We need to get the new session ID from sessionStorage
-      const autoJoinSessionId = sessionStorage.getItem('autoJoinSessionId');
-      
-      if (!autoJoinSessionId) {
-        throw new Error("New session ID not found");
-      }
-      
+      // Get user information first
       const userId = getUserIdFromToken();
-      
       if (!userId || !userData) {
         throw new Error("User information not available");
       }
       
       // Get region based on user settings
       const userRegion = userData.autoRegion ? userData.cmRegion : userData.region;
-      
       if (!userRegion) {
         throw new Error("User region information is missing");
       }
       
       // Get platform from user data
       const userPlatform = userData.platform;
-      
       if (!userPlatform) {
         throw new Error("User platform information is missing");
       }
-       
+      
+      // Get the new session ID from session details
+      let newSessionId = null;
+      
+      // Check if the session details contain the new session ID
+      if (sessionDetails && 'newSessionCreatedId' in sessionDetails && sessionDetails.newSessionCreatedId) {
+        // Extract the ID, handling MongoDB ObjectId format if needed
+        newSessionId = extractMongoId(sessionDetails.newSessionCreatedId as string | Record<string, unknown>);
+        console.log('Using newSessionId from session details:', newSessionId);
+      }
+      
+      if (!newSessionId) {
+        throw new Error("New session ID not found in session data");
+      }
+      
+      // Join the session
       await joinSession(
-        autoJoinSessionId,
+        newSessionId,
         selectedFarer,
         userId,
         userData.username,
@@ -275,15 +308,13 @@ function RecreateSessionContent() {
         message: "Successfully joined new session"
       });
       
-      // Clear the auto-join data from sessionStorage
-      sessionStorage.removeItem('autoJoinSessionId');
-      sessionStorage.removeItem('autoJoinCharacter');
+      // Clear any declined session flags
+      sessionStorage.removeItem('declinedNewSession');
       
-      // Set a flag in sessionStorage so the run page knows we came from here
-      sessionStorage.setItem('fromRecreatePage', 'true');
-      
-      router.push(`/sessions/run?id=${autoJoinSessionId}`);
+      // Navigate to the new session
+      router.push(`/sessions/run?id=${newSessionId}`);
     } catch (error) {
+      console.error('Join session error details:', error);
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
       setNotification({
         type: 'error',

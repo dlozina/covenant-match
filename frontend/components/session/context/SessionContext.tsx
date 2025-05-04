@@ -39,6 +39,11 @@ export interface SessionContextType {
   // Visibility handlers for chat sync
   registerVisibilityHandler: (id: string, handler: () => void) => void;
   unregisterVisibilityHandler: (id: string) => void;
+  
+  // New session dialog properties
+  showNewSessionDialog: boolean;
+  setShowNewSessionDialog: (show: boolean) => void;
+  newSessionInfo: { newSessionId: string; originalSessionId: string } | null;
 }
 
 // Create the context with a default value
@@ -62,7 +67,10 @@ export const SessionContext = createContext<SessionContextType>({
   isConnected: () => false,
   sendMessage: () => false,
   registerVisibilityHandler: () => {},
-  unregisterVisibilityHandler: () => {}
+  unregisterVisibilityHandler: () => {},
+  showNewSessionDialog: false,
+  setShowNewSessionDialog: () => {},
+  newSessionInfo: null
 });
 
 // Custom hook to use the session context
@@ -115,6 +123,10 @@ export function SessionEventManager({
   // Track real-time connection status
   const [rtConnected, setRtConnected] = useState<boolean>(false);
   
+  // State for new session dialog
+  const [showNewSessionDialog, setShowNewSessionDialog] = useState(false);
+  const [newSessionInfo, setNewSessionInfo] = useState<{ newSessionId: string; originalSessionId: string } | null>(null);
+  
   // Create a ref to store visibility change handlers
   const visibilityHandlersRef = useRef<Record<string, () => void>>({});
   
@@ -161,6 +173,53 @@ export function SessionEventManager({
   useEffect(() => {
     if (!sessionId) return;
     
+    // Handle new session created event
+    const unsubscribeNewSession = subscribe('newSession', (data) => {
+      if (!data || typeof data !== 'object') return;
+      
+      console.log('Received new session created event:', data);
+      
+      // Type assertion for TypeScript
+      const newSessionData = data as Record<string, unknown>;
+      
+      // Get session IDs from event
+      const newSessionId = newSessionData.sessionId ? String(newSessionData.sessionId) : null;
+      const originalSessionId = newSessionData.originalSessionId ? String(newSessionData.originalSessionId) : null;
+      
+      console.log('Parsed session IDs from event:', { newSessionId, originalSessionId });
+      
+      // Only process if this event is for the current session
+      if (originalSessionId === sessionId && newSessionId) {
+        console.log(`Host created a new session (${newSessionId}) from this session (${sessionId})`);
+        
+        // Refresh from server to get updated session data
+        debouncedRefresh();
+        
+        // For non-host users, show the dialog
+        if (!isHost()) {
+          // Check if user declined this dialog already
+          const declinedSessionId = sessionStorage.getItem('declinedNewSession');
+          if (declinedSessionId === newSessionId) {
+            console.log('User already declined joining session from WebSocket event', newSessionId);
+            return;
+          }
+          
+          // Check if we're already in the new session
+          if (sessionId === newSessionId) {
+            console.log('Already in the new session from WebSocket event', newSessionId);
+            return;
+          }
+          
+          // Show the new session dialog using context state
+          setNewSessionInfo({
+            newSessionId,
+            originalSessionId: sessionId
+          });
+          setShowNewSessionDialog(true);
+        }
+      }
+    });
+    
     // Handle player kicked events
     const unsubscribePlayerKicked = subscribe('player_kicked', (data) => {
       if (!data || typeof data !== 'object') return;
@@ -185,41 +244,29 @@ export function SessionEventManager({
       }
     });
     
-    // Handle new session created event
-    const unsubscribeNewSession = subscribe('newSession', (data) => {
+    // Handle session cancel event
+    const unsubscribeCancel = subscribe('cancel', (data) => {
       if (!data || typeof data !== 'object') return;
       
-      console.log('Received new session created event:', data);
+      // Get cancelled session ID
+      const cancelledSessionId = typeof data === 'object' && data !== null && 'sessionId' in data 
+                ? String(data.sessionId) : null;
       
-      // Type assertion for TypeScript
-      const newSessionData = data as Record<string, unknown>;
-      
-      // Get new session information
-      const newSessionId = newSessionData.sessionId ? String(newSessionData.sessionId) : null;
-      const originalSessionId = newSessionData.originalSessionId ? String(newSessionData.originalSessionId) : null;
-      
-      // Only process if this event is for the current session
-      if (originalSessionId === sessionId && newSessionId) {
-        console.log(`Host created a new session (${newSessionId}) from this session (${sessionId})`);
-        
-        // For non-host users, automatically redirect to the recreate page
+      if (cancelledSessionId === sessionId) {
+        // For non-hosts, set cancellation info in storage and redirect
         if (!isHost()) {
-          console.log('Auto-redirecting participant to recreate page after newSession WebSocket event');
+          // Store in sessionStorage to be picked up by components
+          const sessionName = sessionData?.name || `Session #${sessionId}`;
+          sessionStorage.setItem('sessionCancelled', 'true');
+          sessionStorage.setItem('cancelledSessionName', sessionName);
+          sessionStorage.setItem('cancelTimestamp', Date.now().toString());
+          sessionStorage.setItem('cancelledSessionId', sessionId);
           
-          // Store the new session ID in localStorage and sessionStorage
-          localStorage.setItem('pendingNewSessionId', newSessionId);
-          sessionStorage.setItem('autoJoinSessionId', newSessionId);
-          
-          // IMPORTANT: We use the ORIGINAL sessionId for the recreate route, not the new one
-          // The recreate endpoint needs the original session ID to join the new session
-          const recreateUrl = `/sessions/recreate?id=${sessionId}`;
-          console.log(`Redirecting to: ${recreateUrl}`);
-          
-          // Add a small delay before redirecting to ensure the localStorage changes propagate
-          // This is important for smooth transitions
+          // Add a delay before redirecting to allow notification to appear
           setTimeout(() => {
-            router.push(recreateUrl);
-          }, 500);
+            console.log('Host cancelled session, redirecting to sessions page...');
+            router.push('/sessions');
+          }, 3000);
         }
       }
     });
@@ -272,33 +319,6 @@ export function SessionEventManager({
       
       // Use debounced refresh to avoid hammering the server if multiple results come in
       debouncedRefresh();
-    });
-    
-    // Handle session cancel event
-    const unsubscribeCancel = subscribe('cancel', (data) => {
-      if (!data || typeof data !== 'object') return;
-      
-      // Get cancelled session ID
-      const cancelledSessionId = typeof data === 'object' && data !== null && 'sessionId' in data 
-                ? String(data.sessionId) : null;
-      
-      if (cancelledSessionId === sessionId) {
-        // For non-hosts, set cancellation info in storage and redirect
-        if (!isHost()) {
-          // Store in sessionStorage to be picked up by components
-          const sessionName = sessionData?.name || `Session #${sessionId}`;
-          sessionStorage.setItem('sessionCancelled', 'true');
-          sessionStorage.setItem('cancelledSessionName', sessionName);
-          sessionStorage.setItem('cancelTimestamp', Date.now().toString());
-          sessionStorage.setItem('cancelledSessionId', sessionId);
-          
-          // Add a delay before redirecting to allow notification to appear
-          setTimeout(() => {
-            console.log('Host cancelled session, redirecting to sessions page...');
-            router.push('/sessions');
-          }, 3000);
-        }
-      }
     });
     
     // Check connection status periodically
@@ -427,7 +447,10 @@ export function SessionEventManager({
       isConnected,
       sendMessage: wsConnection.sendMessage,
       registerVisibilityHandler,
-      unregisterVisibilityHandler
+      unregisterVisibilityHandler,
+      showNewSessionDialog,
+      setShowNewSessionDialog,
+      newSessionInfo
     };
   }, [
     sessionData,
@@ -446,7 +469,9 @@ export function SessionEventManager({
     isConnected,
     wsConnection.sendMessage,
     registerVisibilityHandler,
-    unregisterVisibilityHandler
+    unregisterVisibilityHandler,
+    showNewSessionDialog,
+    newSessionInfo
   ]);
   
   return (

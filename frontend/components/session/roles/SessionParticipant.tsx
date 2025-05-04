@@ -31,6 +31,9 @@ export function SessionParticipant() {
     isHost,
     resetSession,
     updatePlayerReportedStatus,
+    showNewSessionDialog: contextShowNewSessionDialog,
+    setShowNewSessionDialog: contextSetShowNewSessionDialog,
+    newSessionInfo: contextNewSessionInfo
   } = useSessionContext();
   
   // Get auth context - moved before conditional return
@@ -56,11 +59,7 @@ export function SessionParticipant() {
   const [resultSubmitted, setResultSubmitted] = useState<boolean>(false);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   
-  // State for new session
-  const [newSessionId, setNewSessionId] = useState<string | null>(null);
-  // Track if we've already shown notification for new session
-  const [hasShownNewSessionNotification, setHasShownNewSessionNotification] = useState<boolean>(false);
-  // Track if we've shown the cancellation notification to avoid duplicates
+  // Track if we've already shown the cancellation notification to avoid duplicates
   const [hasShownCancelNotification, setHasShownCancelNotification] = useState<boolean>(false);
   
   // Function to handle notifications
@@ -128,9 +127,6 @@ export function SessionParticipant() {
       sessionStorage.removeItem('cancelTimestamp');
       sessionStorage.removeItem('cancelledSessionId');
     }
-    
-    // No longer listening for session-cancelled events in this component
-    // All cancellation notifications will be handled by the SessionRunContent component
   }, [showNotification, sessionData, hasShownCancelNotification]);
   
   // Add friend
@@ -138,19 +134,107 @@ export function SessionParticipant() {
     dispatchFriend({ type: 'ADD_FRIEND', payload: playerId });
   }, []);
   
+  // Handle dialog actions for new session
+  const handleCloseNewSessionDialog = useCallback(() => {
+    // Get the session ID we're declining directly from the context or session data
+    const newSessionId = contextNewSessionInfo?.newSessionId || 
+                         (sessionData?.newSessionCreated ? String(sessionData.newSessionCreatedId) : null);
+    
+    if (newSessionId) {
+      // Store this single piece of information to track declined sessions
+      sessionStorage.setItem('declinedNewSession', String(newSessionId));
+      
+      console.log('User declined new session:', newSessionId);
+    }
+    
+    // Close both the local dialog and the context dialog
+    dispatchDialog({ type: 'HIDE_NEW_SESSION' });
+    contextSetShowNewSessionDialog(false);
+  }, [contextNewSessionInfo, contextSetShowNewSessionDialog, sessionData]);
+  
+  // Effect to detect when host has created a new session based on server data
+  useEffect(() => {
+    // If we don't have session data or it doesn't have new session info, just return
+    if (!sessionData?.newSessionCreated || !sessionData.newSessionCreatedId) {
+      return;
+    }
+    
+    const newSessionId = String(sessionData.newSessionCreatedId);
+    
+    // Check if user declined this dialog already
+    const declinedSessionId = sessionStorage.getItem('declinedNewSession');
+    if (declinedSessionId === newSessionId) {
+      console.log('User already declined joining session', newSessionId);
+      return;
+    }
+    
+    // Check if we're already in the new session
+    if (sessionData.id === newSessionId) {
+      console.log('Already in the new session', newSessionId);
+      return;
+    }
+    
+    // Show dialog for new session
+    dispatchDialog({ type: 'SHOW_NEW_SESSION' });
+    
+    // Show notification with link to join the new session
+    setNotification({
+      type: 'success',
+      message: (
+        <div>
+          The host has created a new session. <Link href={`/sessions/recreate?id=${sessionData.id}`} className="underline font-bold">Click here</Link> to join the new session.
+        </div>
+      )
+    });
+  }, [sessionData, dispatchDialog, setNotification]);
+  
   // Join new session created by host
   const joinNewSession = useCallback(() => {
-    if (!newSessionId) return;
+    if (!sessionData) return;
     
-    // Store in sessionStorage for recreation page
-    sessionStorage.setItem('autoJoinSessionId', newSessionId);
+    // Get the new session ID directly from the session data
+    if (sessionData.newSessionCreated && sessionData.newSessionCreatedId) {
+      const originalId = String(sessionData.id);
+      
+      console.log('Navigating to recreate page with original session ID:', originalId);
+      
+      // Clear the declined flag
+      sessionStorage.removeItem('declinedNewSession');
+      
+      // Navigate to recreate with the ORIGINAL session ID
+      router.push(`/sessions/recreate?id=${originalId}`);
+      return;
+    }
     
-    // Clear the pending session ID from localStorage
-    localStorage.removeItem('pendingNewSessionId');
-    
-    // Navigate to recreate
-    router.push(`/sessions/recreate?id=${sessionData?.id}`);
-  }, [newSessionId, router, sessionData]);
+    console.log('Missing session data for joining new session');
+  }, [router, sessionData]);
+  
+  // Additional effect to check for redirects that might have failed due to sleep mode
+  useEffect(() => {
+    // Check if newSessionCreated flag is true but we're still on this page
+    // This indicates the automatic redirect might have failed
+    if (
+      sessionData?.newSessionCreated && 
+      sessionData.newSessionCreatedId
+    ) {
+      // Check if we're already on the new session page
+      if (
+        window.location.href.includes(sessionData.newSessionCreatedId) ||
+        window.location.href.includes(`/sessions/run?id=${sessionData.newSessionCreatedId}`)
+      ) {
+        // We're already on the new session page
+        console.log('Already on the new session page');
+      } else {
+        // We're not on the new session page, show the notification
+        const message = (
+          <div className="font-medium">
+            A new session is available. <Link href={`/sessions/recreate?id=${sessionData.id}`} className="underline font-bold">Click here</Link> to join the new session.
+          </div>
+        );
+        showNotification(message, 'success', true);
+      }
+    }
+  }, [sessionData, showNotification]);
   
   // Function to handle result submission
   const handleSubmitResult = useCallback(async () => {
@@ -247,87 +331,6 @@ export function SessionParticipant() {
       showNotification('Error leaving session: ' + err, 'error');
     }
   }, [sessionData, router, showNotification]);
-  
-  // Effect to detect when host has created a new session based on server data
-  useEffect(() => {
-    if (
-      sessionData?.newSessionCreated && 
-      sessionData.newSessionCreatedId && 
-      !hasShownNewSessionNotification
-    ) {
-      // Save the new session ID
-      setNewSessionId(sessionData.newSessionCreatedId);
-      
-      // Show dialog for new session
-      dispatchDialog({ type: 'SHOW_NEW_SESSION' });
-      
-      // Show notification with link to join the new session
-      // Make notification type success but also persist longer for users waking from sleep
-      setNotification({
-        type: 'success',
-        message: (
-          <div>
-            The host has created a new session. <Link href={`/sessions/recreate?id=${sessionData.id}`} className="underline font-bold">Click here</Link> to join the new session.
-          </div>
-        )
-      });
-      
-      // Mark that we've shown the notification
-      setHasShownNewSessionNotification(true);
-      
-      // Also store the ID in case the user refreshes
-      localStorage.setItem('pendingNewSessionId', sessionData.newSessionCreatedId);
-    }
-  }, [sessionData, hasShownNewSessionNotification]);
-  
-  // Additional effect to check for redirects that might have failed due to sleep mode
-  useEffect(() => {
-    // Check if newSessionCreated flag is true but we're still on this page
-    // This indicates the automatic redirect might have failed
-    if (
-      sessionData?.newSessionCreated && 
-      sessionData.newSessionCreatedId
-    ) {
-      // Check if we're already on the new session page
-      if (
-        window.location.href.includes(sessionData.newSessionCreatedId) ||
-        window.location.href.includes(`/sessions/run?id=${sessionData.newSessionCreatedId}`)
-      ) {
-        // We're already on the new session page, clear the localStorage
-        localStorage.removeItem('pendingNewSessionId');
-      } else {
-        // We're not on the new session page, show the notification
-        const message = (
-          <div className="font-medium">
-            A new session is available. <Link href={`/sessions/recreate?id=${sessionData.id}`} className="underline font-bold">Click here</Link> to join the new session.
-          </div>
-        );
-        showNotification(message, 'success', true);
-      }
-    }
-  }, [sessionData, showNotification]);
-  
-  // Effect to update newSessionId when it changes in localStorage
-  useEffect(() => {
-    // Check if we have a pending new session ID
-    const storedSessionId = localStorage.getItem('pendingNewSessionId');
-    if (storedSessionId) {
-      setNewSessionId(storedSessionId);
-    }
-    
-    // Listen for storage changes to detect when a new session ID is added
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === 'pendingNewSessionId' && event.newValue) {
-        setNewSessionId(event.newValue);
-      }
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, []);
   
   // Check if result state needs to be updated from server data
   useEffect(() => {
@@ -433,7 +436,7 @@ export function SessionParticipant() {
             startSession={undefined} // Participants can't start sessions
             resetSession={resetSession}
             showConfirmDialog={undefined} // Participants can't end sessions
-            onRecreateSession={newSessionId ? joinNewSession : undefined}
+            onRecreateSession={joinNewSession}
             isNewSessionLoading={false}
             disabled={!sessionData}
             sessionData={sessionData}
@@ -480,10 +483,10 @@ export function SessionParticipant() {
         onClose={() => dispatchDialog({ type: 'HIDE_WARNING' })}
       />
       
-      {/* New Session Dialog */}
+      {/* New Session Dialog - use the context value if available, otherwise fallback to local state */}
       <NewSessionDialog
-        isOpen={dialogState.showNewSessionDialog}
-        onClose={() => dispatchDialog({ type: 'HIDE_NEW_SESSION' })}
+        isOpen={contextShowNewSessionDialog || dialogState.showNewSessionDialog}
+        onClose={handleCloseNewSessionDialog}
         onConfirm={joinNewSession}
       />
     </>
