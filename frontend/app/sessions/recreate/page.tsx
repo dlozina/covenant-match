@@ -290,13 +290,9 @@ function RecreateSessionContent() {
       // First, recreate the session using the API function with the ORIGINAL session ID
       const recreateData = await recreateSession(originalSessionId);
       const newSessionId = extractMongoId(recreateData.id);
-      console.log('Created new session with ID:', newSessionId);
       
       // Now, update the new session with the selected characters
       await updateSessionCharacters(newSessionId, selectedLord, selectedFarer);
-      
-      // Clear declined session flags when creating a new session
-      sessionStorage.removeItem('declinedNewSession');
       
       // Navigate to the new session
       router.push(`/sessions/run?id=${newSessionId}`);
@@ -380,9 +376,6 @@ function RecreateSessionContent() {
         type: 'success',
         message: "Successfully joined new session"
       });
-      
-      // Clear any declined session flags
-      sessionStorage.removeItem('declinedNewSession');
       
       // Navigate to the new session
       router.push(`/sessions/run?id=${newSessionId}`);

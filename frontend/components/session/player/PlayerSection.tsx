@@ -78,7 +78,7 @@ const PlayerRowComponent = ({
           )}
           
           {/* Show kick button only for host view, not for the host player, and only if session hasn't started */}
-          {isHostView && !isHost && !sessionState.isSessionStarted && onKickPlayer && (
+          {isHostView && !isHost && !sessionState.isSessionStarted && !sessionState.isSessionFinished && onKickPlayer && (
             <KickButton
               playerId={player.userId}
               onKickPlayer={() => onKickPlayer(player.userId, player.username)}

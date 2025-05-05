@@ -52,9 +52,6 @@ export function SessionParticipant() {
     rating: 5
   });
   
-  // Local state for new session info
-  const [newSessionInfo, setNewSessionInfo] = useState<{ newSessionId: string; originalSessionId: string } | null>(null);
-  
   // State for result submission
   const [resultSubmitted, setResultSubmitted] = useState<boolean>(false);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
@@ -136,51 +133,26 @@ export function SessionParticipant() {
   
   // Handle dialog actions for new session
   const handleCloseNewSessionDialog = useCallback(() => {
-    // Get the session ID we're declining directly from our local state or session data
-    const newSessionId = newSessionInfo?.newSessionId || 
-                         (sessionData?.newSessionCreated ? String(sessionData.newSessionCreatedId) : null);
-    
-    if (newSessionId) {
-      // Store this single piece of information to track declined sessions
-      sessionStorage.setItem('declinedNewSession', String(newSessionId));
-      
-      console.log('User declined new session:', newSessionId);
-    }
-    
     // Close the dialog
     dispatchDialog({ type: 'HIDE_NEW_SESSION' });
-  }, [newSessionInfo, sessionData]);
+  }, []);
   
   // Effect to detect when host has created a new session based on server data
   useEffect(() => {
     // If we don't have session data or it doesn't have new session info, just return
     if (!sessionData?.newSessionCreated || !sessionData.newSessionCreatedId) {
+      //todo: check if this is needed
+      dispatchDialog({ type: 'HIDE_NEW_SESSION' });
       return;
     }
     
     const newSessionId = String(sessionData.newSessionCreatedId);
     
-    // Check if user declined this dialog already
-    const declinedSessionId = sessionStorage.getItem('declinedNewSession');
-    if (declinedSessionId === newSessionId) {
-      console.log('User already declined joining session', newSessionId);
-      
-      // Make sure dialog is closed
+    // Check if we're already in the new session
+    if (sessionData.id === newSessionId) {
       dispatchDialog({ type: 'HIDE_NEW_SESSION' });
       return;
     }
-    
-    // Check if we're already in the new session
-    if (sessionData.id === newSessionId) {
-      console.log('Already in the new session', newSessionId);
-      return;
-    }
-    
-    // Update our local state
-    setNewSessionInfo({
-      newSessionId,
-      originalSessionId: String(sessionData.id)
-    });
     
     // Show dialog for new session
     dispatchDialog({ type: 'SHOW_NEW_SESSION' });
@@ -203,11 +175,6 @@ export function SessionParticipant() {
     // Get the new session ID directly from the session data
     if (sessionData.newSessionCreated && sessionData.newSessionCreatedId) {
       const originalId = String(sessionData.id);
-      
-      console.log('Navigating to recreate page with original session ID:', originalId);
-      
-      // Clear the declined flag
-      sessionStorage.removeItem('declinedNewSession');
       
       // Navigate to recreate with the ORIGINAL session ID
       router.push(`/sessions/recreate?id=${originalId}`);

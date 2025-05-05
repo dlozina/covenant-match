@@ -262,7 +262,6 @@ export function SessionHost() {
       // If server indicates user has reported but local state doesn't reflect it,
       // update the local state
       if (userHasSubmittedResult && !resultSubmitted) {
-        console.log('Server indicates result was submitted (found in results array), updating local state');
         setResultSubmitted(true);
       }
     }
