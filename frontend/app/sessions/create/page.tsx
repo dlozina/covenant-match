@@ -146,18 +146,18 @@ function CharacterComboBox({
 }
 
 function CreateSessionContent() {
+  const { userData } = useAuth();
   const [selectedLord, setSelectedLord] = useState<string | null>(null);
-  const [selectedFarer, setSelectedFarer] = useState<string | null>(null);
+  const [selectedFarer, setSelectedFarer] = useState<string | null>(userData?.preferredNightfarer || null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [notification, setNotification] = useState<NotificationType | null>(null);
   const [nightLords, setNightLords] = useState<NightLord[]>([]);
   const [nightfarers, setNightfarers] = useState<Nightfarer[]>([]);
   const [isLoadingCharacters, setIsLoadingCharacters] = useState<boolean>(true);
-  const { userData } = useAuth();
   
   // Character counter states
-  const [sessionNameLength, setSessionNameLength] = useState(0);
-  const [passwordLength, setPasswordLength] = useState(0);
+  const [sessionNameLength, setSessionNameLength] = useState(userData?.preferredSessionName?.length || 0);
+  const [passwordLength, setPasswordLength] = useState(userData?.preferredSessionPassword?.length || 0);
   
   // Debounce timer reference
   const [validationTimeout, setValidationTimeout] = useState<NodeJS.Timeout | null>(null);
@@ -167,8 +167,8 @@ function CreateSessionContent() {
   const form = useForm<SessionFormValues>({
     resolver: zodResolver(sessionFormSchema),
     defaultValues: {
-      sessionName: "",
-      password: "",
+      sessionName: userData?.preferredSessionName || "",
+      password: userData?.preferredSessionPassword || "",
       sessionType: "regular"
     },
     mode: "onBlur", // Only validate on blur and submit for better UX
