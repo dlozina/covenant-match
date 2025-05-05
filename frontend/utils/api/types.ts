@@ -211,6 +211,8 @@ export interface SessionDetailResponse {
 }
 
 // User sessions response type for the GET /api/v1/users/sessions endpoint
+export type SessionRating = Record<string, never>;
+
 export interface UserSessionsResponse {
   previousSession: {
     id: string;
@@ -248,7 +250,7 @@ export interface UserSessionsResponse {
         }
       };
     }>;
-    ratings: any[];
+    ratings: SessionRating[];
     createdAt: {
       $date: {
         $numberLong: string;
@@ -299,8 +301,18 @@ export interface UserSessionsResponse {
         }
       };
     }>;
-    results: any[];
-    ratings: any[];
+    results: Array<{
+      userId: string;
+      result: string;
+      rating: number;
+      feedback: string;
+      submittedAt: {
+        $date: {
+          $numberLong: string;
+        }
+      };
+    }>;
+    ratings: SessionRating[];
     createdAt: {
       $date: {
         $numberLong: string;
