@@ -4,7 +4,7 @@ use crate::models::token::TokenPurpose;
 use crate::models::user::{
     CreateUserDto, Experience, FriendDto, LoginUserDto, UpdateUserProfileDto, User, UserResponse,
 };
-use crate::repository::token_repository;
+use crate::repository::{session_repository, token_repository};
 use crate::repository::user_repository;
 use crate::services::email_service;
 use crate::utils::jwt;

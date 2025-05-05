@@ -2,8 +2,8 @@ use crate::models::error::AppError;
 use crate::models::user::{
     AddFriendDto, CreateUserDto, FriendListResponse, GetUsersQuery, LoginUserDto, NewPasswordDto, ResetPasswordDto, UpdateUserProfileDto
 };
-use crate::services::{auth_service, user_service};
-use crate::utils::{email, geo_location, ip_address, jwt};
+use crate::services::{auth_service, session_service, user_service};
+use crate::utils::{email, geo_location, ip_address, jwt, request};
 use actix_web::{
     delete, get, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError,
 };
@@ -986,6 +986,43 @@ async fn remove_friend(
     }
 }
 
+/// Get current user session and one previous session
+#[utoipa::path(
+    get,
+    path = "/api/v1/users/sessions",
+    responses(
+        (status = 200, description = "Current and previous sessions retrieved successfully", body = UserSessionResponseDto),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "users"
+)]
+#[get("/api/v1/users/sessions")]
+async fn get_user_sessions(
+    db: web::Data<Database>,
+    req: HttpRequest,
+) -> impl Responder {
+    // Get claims from request extensions (set by middleware)   
+    let claims = request::get_claims(&req)
+        .ok_or(actix_web::error::ErrorUnauthorized("Unauthorized"));
+
+    let user_id = claims.expect("JWT claims not found in request extensions").sub;
+
+    let sessions = session_service::get_user_sessions(&db, &user_id).await;
+
+    match sessions {
+        Ok(sessions) => HttpResponse::Ok().json(sessions),
+        Err(e) => {
+            log::error!("Error fetching user sessions: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     log::info!("Configuring user routes");
     cfg.service(create_user);
@@ -1006,4 +1043,5 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(verify_email);
     cfg.service(reset_password);
     cfg.service(reset_password_email);
+    cfg.service(get_user_sessions);
 }

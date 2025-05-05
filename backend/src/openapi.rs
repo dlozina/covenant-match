@@ -24,10 +24,7 @@ use crate::models::news::{
     NewsResponse, UpdateAnnouncementDto, UpdateNewsDto,
 };
 use crate::models::session::{
-    CovenantStats, CovenantStatsResponse, CreateSessionDto, GameResult, JoinSessionDto,
-    MinimalSessionDto, PlayerInfo, PlayerInfoResponseDto, RateSessionDto, ResultsResponseDto,
-    SessionResponseDto, SessionResult, SessionResultResponseDto, SessionStatus, SubmitResultDto,
-    UpdateSessionDto,
+    CovenantStats, CovenantStatsResponse, CreateSessionDto, GameResult, GameSessionDto, JoinSessionDto, MinimalSessionDto, PlayerInfo, PlayerInfoResponseDto, RateSessionDto, ResultsResponseDto, SessionResponseDto, SessionResult, SessionResultResponseDto, SessionStatus, SubmitResultDto, UpdateSessionDto, UserSessionResponseDto
 };
 use crate::models::statistics::{
     LeaderboardEntryResponseDto, NightLordStatsResponse, PaginatedSessionData,
@@ -36,7 +33,7 @@ use crate::models::statistics::{
 use crate::models::user::{
     AddFriendDto, AuthResponse, CreateUserDto, FriendDto, FriendListResponse, GetUsersQuery,
     LoginUserDto, PaginationInfo, RefreshTokenResponse, RemoveFriendDto, UpdateUserDto,
-    UpdateUserProfileDto, User, UserResponse, UsersListData, UsersListResponse, ResetPasswordDto, NewPasswordDto
+    UpdateUserProfileDto, User, UserResponse, UsersListData, UsersListResponse
 };
 use crate::models::user_data::UserDataResponseDto;
 use crate::routes::users::{JwtInfoDto, TokenInfoResponse};
@@ -81,6 +78,7 @@ use utoipa::{
         verify_email,
         reset_password_email,
         reset_password,
+        get_user_sessions,
         // Friend routes
         get_friend_list,
         add_friend,
@@ -186,6 +184,8 @@ use utoipa::{
             PaginationInfo,
             JwtInfoDto,
             TokenInfoResponse,
+            UserSessionResponseDto,
+            GameSessionDto,
             // Friend models
             AddFriendDto,
             RemoveFriendDto,

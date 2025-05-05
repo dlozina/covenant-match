@@ -286,3 +286,106 @@ pub struct CovenantStats {
 pub struct CovenantStatsResponse {
     pub covenant_stats: Vec<CovenantStats>,
 }
+
+/// DTO representation of GameSession for API documentation
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GameSessionDto {
+    pub id: String,
+    pub name: String,
+    pub host_id: String,
+    pub region: String,
+    pub platform: String,
+    pub password: String,
+    pub is_private: bool,
+    pub is_friends_only: bool,
+    pub night_lord: String,
+    pub status: SessionStatus,
+    pub joined_players: Vec<PlayerInfoResponseDto>,
+    pub results: Vec<SessionResultResponseDto>,
+    pub ratings: Vec<RateSessionDto>,
+    pub created_at: DateTime,
+    pub updated_at: DateTime,
+    pub started_at: Option<DateTime>,
+    pub completed_at: Option<DateTime>,
+    pub stats_updated: bool,
+    pub new_session_created: bool,
+    #[schema(value_type = String)]
+    pub new_session_created_id: Option<ObjectId>,
+}
+
+impl From<GameSession> for GameSessionDto {
+    fn from(session: GameSession) -> Self {
+        Self {
+            id: session.id.to_hex(),
+            name: session.name,
+            host_id: session.host_id,
+            region: session.region,
+            platform: session.platform,
+            password: session.password,
+            is_private: session.is_private,
+            is_friends_only: session.is_friends_only,
+            night_lord: session.night_lord,
+            status: session.status,
+            joined_players: session
+                .joined_players
+                .into_iter()
+                .map(|player| PlayerInfoResponseDto {
+                    user_id: player.user_id,
+                    username: player.username,
+                    nightfarer: player.nightfarer,
+                    covenant_name: player.covenant_name,
+                    region: player.region,
+                    platform: player.platform,
+                    experience: player.experience,
+                    joined_at: player.joined_at,
+                })
+                .collect(),
+            results: session
+                .results
+                .into_iter()
+                .map(|result| SessionResultResponseDto {
+                    user_id: result.user_id,
+                    result: result.result,
+                    rating: result.rating,
+                    feedback: result.feedback,
+                    submitted_at: result.submitted_at,
+                })
+                .collect(),
+            ratings: session.ratings,
+            created_at: session.created_at,
+            updated_at: session.updated_at,
+            started_at: session.started_at,
+            completed_at: session.completed_at,
+            stats_updated: session.stats_updated,
+            new_session_created: session.new_session_created,
+            new_session_created_id: session.new_session_created_id,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UserSessionResponseDto {
+    pub previous_session: Option<GameSessionDto>,
+    pub current_session: Option<GameSessionDto>,
+}
+
+/// Helper struct for converting between GameSession and GameSessionDto
+pub struct UserSessionHelper;
+
+impl UserSessionHelper {
+    pub fn convert_session_data(data: Option<GameSession>) -> Option<GameSessionDto> {
+        data.map(GameSessionDto::from)
+    }
+
+    pub fn from_game_sessions(
+        previous: Option<GameSession>,
+        current: Option<GameSession>,
+    ) -> UserSessionResponseDto {
+        UserSessionResponseDto {
+            previous_session: Self::convert_session_data(previous),
+            current_session: Self::convert_session_data(current),
+        }
+    }
+}

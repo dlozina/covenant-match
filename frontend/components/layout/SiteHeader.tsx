@@ -38,6 +38,12 @@ export function SiteHeader() {
       active: pathname === "/sessions",
     },
     {
+      href: "/sessions/user",
+      label: "Your Sessions",
+      icon: <Sword className="h-4 w-4 mr-2" />,
+      active: pathname === "/sessions/user",
+    },
+    {
       href: "/leaderboard",
       label: "Leaderboard",
       icon: <Trophy className="h-4 w-4 mr-2" />,

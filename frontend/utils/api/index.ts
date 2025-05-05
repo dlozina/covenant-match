@@ -15,7 +15,8 @@ export { StatisticsService } from './statistics-service';
 
 // Import the SessionService class and types needed for our helper functions
 import { SessionService } from './session-service';
-import { Session, MinimalSession} from './types';
+import { Session, MinimalSession, UserSessionsResponse } from './types';
+import { httpClient } from './http-client';
 
 /**
  * Fetch sessions with authentication-aware behavior
@@ -103,8 +104,21 @@ export const fetchFriendSessions = async (
   }
 };
 
+/**
+ * Fetch user's current and previous sessions
+ * @returns Object containing current and previous session data
+ */
+export const fetchUserSessions = async (): Promise<UserSessionsResponse> => {
+  try {
+    return await httpClient.get<UserSessionsResponse>('/api/v1/users/sessions', true);
+  } catch (error) {
+    console.error('Error fetching user sessions:', error);
+    throw error;
+  }
+};
+
 // Session Management
-export const createSession = async (sessionData: any) => {
+export const createSession = async (sessionData: Record<string, unknown>) => {
   const res = await fetch('/api/v1/sessions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

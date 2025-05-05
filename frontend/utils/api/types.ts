@@ -210,6 +210,123 @@ export interface SessionDetailResponse {
   data: SessionDetail;
 }
 
+// User sessions response type for the GET /api/v1/users/sessions endpoint
+export interface UserSessionsResponse {
+  previousSession: {
+    id: string;
+    name: string;
+    hostId: string;
+    region: string;
+    platform: string;
+    password: string;
+    isPrivate: boolean;
+    isFriendsOnly: boolean;
+    nightLord: string;
+    status: string;
+    joinedPlayers: Array<{
+      userId: string;
+      username: string;
+      nightfarer: string;
+      covenantName: string;
+      region: string;
+      platform: string;
+      experience: string;
+      joinedAt: {
+        $date: {
+          $numberLong: string;
+        }
+      };
+    }>;
+    results: Array<{
+      userId: string;
+      result: string;
+      rating: number;
+      feedback: string;
+      submittedAt: {
+        $date: {
+          $numberLong: string;
+        }
+      };
+    }>;
+    ratings: any[];
+    createdAt: {
+      $date: {
+        $numberLong: string;
+      }
+    };
+    updatedAt: {
+      $date: {
+        $numberLong: string;
+      }
+    };
+    startedAt: {
+      $date: {
+        $numberLong: string;
+      }
+    } | null;
+    completedAt: {
+      $date: {
+        $numberLong: string;
+      }
+    } | null;
+    statsUpdated: boolean;
+    newSessionCreated: boolean;
+    newSessionCreatedId: string | null;
+  } | null;
+  
+  currentSession: {
+    id: string;
+    name: string;
+    hostId: string;
+    region: string;
+    platform: string;
+    password: string;
+    isPrivate: boolean;
+    isFriendsOnly: boolean;
+    nightLord: string;
+    status: string;
+    joinedPlayers: Array<{
+      userId: string;
+      username: string;
+      nightfarer: string;
+      covenantName: string;
+      region: string;
+      platform: string;
+      experience: string;
+      joinedAt: {
+        $date: {
+          $numberLong: string;
+        }
+      };
+    }>;
+    results: any[];
+    ratings: any[];
+    createdAt: {
+      $date: {
+        $numberLong: string;
+      }
+    };
+    updatedAt: {
+      $date: {
+        $numberLong: string;
+      }
+    };
+    startedAt: {
+      $date: {
+        $numberLong: string;
+      }
+    } | null;
+    completedAt: {
+      $date: {
+        $numberLong: string;
+      }
+    } | null;
+    statsUpdated: boolean;
+    newSessionCreated: boolean;
+    newSessionCreatedId: string | null;
+  } | null;
+}
+
 // Pagination types
 export interface PaginationInfo {
   page: number;

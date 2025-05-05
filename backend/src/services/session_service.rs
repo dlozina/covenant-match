@@ -1,8 +1,9 @@
 use crate::models::error::AppError;
 use crate::models::session::{
     CovenantStats, CovenantStatsResponse, CreateSessionDto, GameResult, GameSession,
-    JoinSessionDto, MinimalSessionDto, PlayerInfo, RateSessionDto, SessionResponseDto,
-    SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto,
+    GameSessionDto, JoinSessionDto, MinimalSessionDto, PlayerInfo, RateSessionDto,
+    SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto,
+    UserSessionHelper, UserSessionResponseDto,
 };
 use crate::repository::{session_repository, statistics_repository, user_repository};
 use crate::sse::messages::{BroadcastMessage, ServerMessage as SseServerMessage};
@@ -1470,6 +1471,42 @@ pub async fn kick_player(
 
     // Return success
     Ok(())
+}
+
+/// Get current user session and one previous session
+pub async fn get_user_sessions(
+    db: &Database,
+    user_id: &str,
+) -> Result<UserSessionResponseDto, AppError> {
+    // Get sessions from repository - returns Vec<GameSession>
+    let sessions = session_repository::get_user_sessions(db, user_id).await?;
+
+    // Check if we have any sessions
+    if sessions.is_empty() {
+        return Err(AppError::BadRequest(
+            "No sessions found for user".to_string(),
+        ));
+    }
+
+    // Repository returns sessions in this order:
+    // - First position (0): Previous session (Completed) if exists
+    // - Second position (1): Current session (Open/Full/InProgress) if exists
+
+    // Get previous session (index 0)
+    let previous_session = Some(sessions[0].clone());
+
+    // Get current session (index 1) if exists
+    let current_session = if sessions.len() > 1 {
+        Some(sessions[1].clone())
+    } else {
+        None
+    };
+
+    // Use our helper to convert from GameSession to GameSessionDto
+    Ok(UserSessionHelper::from_game_sessions(
+        previous_session,
+        current_session,
+    ))
 }
 
 #[cfg(test)]

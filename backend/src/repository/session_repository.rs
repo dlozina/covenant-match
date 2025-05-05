@@ -1,6 +1,7 @@
 use crate::models::error::AppError;
 use crate::models::session::{GameSession, SessionStatus};
 use futures::TryStreamExt;
+use mongodb::options::FindOptions;
 use mongodb::{
     bson::{doc, oid::ObjectId, to_bson},
     Collection, Database,
@@ -17,10 +18,7 @@ pub async fn create_session(db: &Database, session: &GameSession) -> Result<(), 
 
 pub async fn find_by_id(db: &Database, id: &str) -> Result<Option<GameSession>, AppError> {
     // Convert string ID to ObjectId
-    let object_id = ObjectId::parse_str(id).map_err(|e| {
-        log::error!("Invalid ObjectId format: {:?}", e);
-        AppError::InvalidId
-    })?;
+    let object_id = ObjectId::parse_str(id).map_err(|e| AppError::InvalidId)?;
 
     let session = get_collection(db)
         .find_one(doc! { "_id": object_id })
@@ -177,7 +175,6 @@ pub async fn find_active_sessions_for_user(
     user_id: &str,
 ) -> Result<Vec<GameSession>, AppError> {
     // Log the user ID being used for query
-    log::info!("Finding active sessions for user ID: {}", user_id);
 
     // Use the user_id directly as a string for comparison
     let filter = doc! {
@@ -192,6 +189,7 @@ pub async fn find_active_sessions_for_user(
                 "status": {
                     "$in": [
                         to_bson(&SessionStatus::Open)?,
+                        to_bson(&SessionStatus::Full)?,
                         to_bson(&SessionStatus::InProgress)?
                     ]
                 }
@@ -302,6 +300,50 @@ pub async fn find_friends_sessions(
         if sessions.len() > limit_size {
             sessions.truncate(limit_size);
         }
+    }
+
+    Ok(sessions)
+}
+
+/// Get current user session and one previous session
+pub async fn get_user_sessions(db: &Database, user_id: &str) -> Result<Vec<GameSession>, AppError> {
+    // 1. Get current active session (Open, Full, or InProgress)
+    let current_session = get_collection(db)
+        .find_one(doc! {
+            "joined_players.user_id": user_id,
+            "status": {
+                "$in": [
+                    to_bson(&SessionStatus::Open)?,
+                    to_bson(&SessionStatus::Full)?,
+                    to_bson(&SessionStatus::InProgress)?
+                ]
+            }
+        })
+        .await?;
+
+    // 2. Get most recent completed session
+    let mut cursor = get_collection(db)
+        .find(doc! {
+            "joined_players.user_id": user_id,
+            "status": to_bson(&SessionStatus::Completed)?,
+        })
+        .sort(doc! { "completed_at": -1 })
+        .limit(1)
+        .await?;
+
+    let previous_session = cursor.try_next().await?;
+
+    // Create result vector with existing sessions
+    let mut sessions = Vec::new();
+
+    // Add previous session first (if exists)
+    if let Some(prev) = previous_session {
+        sessions.push(prev);
+    }
+
+    // Add current session second (if exists)
+    if let Some(current) = current_session {
+        sessions.push(current);
     }
 
     Ok(sessions)
