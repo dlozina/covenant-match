@@ -12,6 +12,7 @@ import { UserSessionsResponse } from "@/utils/api/types";
 import { formatDate } from "@/lib/utils";
 import { UserCircle2, Shield, Users, Clock, ArrowRight } from "lucide-react";
 import { httpClient } from "@/utils/api/http-client";
+import { useQueryClient } from "@tanstack/react-query";
 
 // Static green badge for active sessions
 const ActiveSessionBadge = () => (
@@ -27,6 +28,7 @@ const ActiveSessionBadge = () => (
 const ContinueButton = memo(function ContinueButton({ sessionId }: { sessionId: string }) {
   const [isBlinking, setIsBlinking] = useState<boolean>(true);
   const router = useRouter();
+  const queryClient = useQueryClient();
   
   useEffect(() => {
     const blinkInterval = setInterval(() => {
@@ -36,10 +38,22 @@ const ContinueButton = memo(function ContinueButton({ sessionId }: { sessionId: 
     return () => clearInterval(blinkInterval);
   }, []);
   
+  // Function to handle session continuation with fresh data
+  const handleContinueSession = () => {
+    // Invalidate the session query to force a fresh fetch
+    // This matches the query key structure used in useSessionData
+    queryClient.invalidateQueries({
+      queryKey: ['sessions', 'detail', sessionId]
+    });
+    
+    // Navigate to the session page
+    router.push(`/sessions/run?id=${sessionId}`);
+  };
+  
   return (
     <Button 
       className={`w-full mt-2 ${isBlinking ? 'bg-green-600 hover:bg-green-700' : ''}`}
-      onClick={() => router.push(`/sessions/run?id=${sessionId}`)}
+      onClick={handleContinueSession}
     >
       Continue Session
       <ArrowRight className="ml-2 h-4 w-4" />
