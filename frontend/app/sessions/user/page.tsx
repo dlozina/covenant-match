@@ -188,9 +188,12 @@ function CurrentSessionSection() {
                 </h4>
                 <div className="space-y-2">
                   {currentSession.joinedPlayers.map((player) => (
-                    <div key={player.username} className="flex items-center justify-between text-sm">
+                    <div key={player.username} className="flex items-center gap-3 p-1.5 px-2 rounded-md bg-card/30 border border-purple-900/10 text-sm">
                       <span>{player.username}</span>
-                      <span className="text-muted-foreground">{player.nightfarer}</span>
+                      <span className="text-muted-foreground border-l border-purple-900/10 pl-2">{player.nightfarer}</span>
+                      {player.userId === currentSession.hostId && (
+                        <Badge variant="outline" className="ml-auto text-xs bg-blue-500/10 text-blue-400">Host</Badge>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -261,11 +264,11 @@ function PreviousSessionSection() {
   const userId = userData?.id;
   
   const userResult = previousSession.results.find(result => 
-    result.userId === userId)?.result.toLowerCase() || 'unknown';
+    result.userId === userId)?.result || 'Unknown';
   
-  const isWin = userResult === 'win';
-  const isLoss = userResult === 'loss';
-  const isDisconnect = userResult === 'disconnect';
+  const isWin = userResult === 'Win';
+  const isLoss = userResult === 'Loss';
+  const isDisconnect = userResult === 'Disconnect';
 
   // Format the session date and duration
   const startDate = previousSession.startedAt ? 
@@ -294,11 +297,11 @@ function PreviousSessionSection() {
               <span>{previousSession.name}</span>
             </div>
             {isWin ? (
-              <Badge variant="outline" className="bg-green-500/20 text-green-400">Winner</Badge>
+              <Badge variant="outline" className="bg-green-500/20 text-green-400">Win</Badge>
             ) : isLoss ? (
-              <Badge variant="outline" className="bg-red-500/20 text-red-400">Defeated</Badge>
+              <Badge variant="outline" className="bg-red-500/20 text-red-400">Loss</Badge>
             ) : isDisconnect ? (
-              <Badge variant="outline" className="bg-yellow-500/20 text-yellow-400">Disconnected</Badge>
+              <Badge variant="outline" className="bg-yellow-500/20 text-yellow-400">Disconnect</Badge>
             ) : (
               <Badge variant="outline" className="bg-blue-500/20 text-blue-400">Unknown</Badge>
             )}
@@ -377,17 +380,18 @@ function PreviousSessionSection() {
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          {playerResult?.result.toLowerCase() === 'win' ? (
-                            <Badge className="bg-green-500/20 text-green-400 border-0">Winner</Badge>
-                          ) : playerResult?.result.toLowerCase() === 'loss' ? (
-                            <Badge className="bg-red-500/20 text-red-400 border-0">Defeated</Badge>
-                          ) : playerResult?.result.toLowerCase() === 'disconnect' ? (
-                            <Badge className="bg-yellow-500/20 text-yellow-400 border-0">Disconnected</Badge>
+                          {playerResult?.result === 'Win' ? (
+                            <Badge className="bg-green-500/20 text-green-400 border-0">Win</Badge>
+                          ) : playerResult?.result === 'Loss' ? (
+                            <Badge className="bg-red-500/20 text-red-400 border-0">Loss</Badge>
+                          ) : playerResult?.result === 'Disconnect' ? (
+                            <Badge className="bg-yellow-500/20 text-yellow-400 border-0">Disconnect</Badge>
                           ) : null}
                         </div>
                       </div>
                       
-                      <div className="text-xs grid grid-cols-2 gap-x-6 gap-y-1 mt-1">
+                      {/* Desktop view - Two column grid */}
+                      <div className="hidden sm:grid grid-cols-2 gap-x-6 gap-y-1 mt-1 text-xs">
                         <div className="flex items-center">
                           <p className="text-muted-foreground w-24">Nightfarer:</p>
                           <p>{player.nightfarer}</p>
@@ -403,6 +407,30 @@ function PreviousSessionSection() {
                         {playerResult && (
                           <div className="flex items-center">
                             <p className="text-muted-foreground w-24">Rating:</p>
+                            <p>{playerResult.rating}/5</p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Mobile view - Single column with more compact layout */}
+                      <div className="sm:hidden space-y-1 mt-1 text-xs">
+                        <div className="flex items-center gap-2">
+                          <p className="text-muted-foreground">Nightfarer:</p>
+                          <p>{player.nightfarer}</p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-3">
+                          <div className="flex items-center gap-1">
+                            <p className="text-muted-foreground">Covenant:</p>
+                            <p className="truncate max-w-[120px]">{player.covenantName}</p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <p className="text-muted-foreground">Exp:</p>
+                            <p>{player.experience}</p>
+                          </div>
+                        </div>
+                        {playerResult && (
+                          <div className="flex items-center gap-1">
+                            <p className="text-muted-foreground">Rating:</p>
                             <p>{playerResult.rating}/5</p>
                           </div>
                         )}
