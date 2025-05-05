@@ -40,7 +40,7 @@ const ContinueButton = memo(function ContinueButton({ sessionId }: { sessionId: 
   
   // Function to handle session continuation with fresh data
   const handleContinueSession = () => {
-    // Invalidate the session query to force a fresh fetch
+    // Invalidate the session query to force a fresh fetch -> Nice feature!
     // This matches the query key structure used in useSessionData
     queryClient.invalidateQueries({
       queryKey: ['sessions', 'detail', sessionId]
@@ -277,12 +277,28 @@ function PreviousSessionSection() {
   // Get the current user's result from the previous session
   const userId = userData?.id;
   
-  const userResult = previousSession.results.find(result => 
-    result.userId === userId)?.result || 'Unknown';
+  // Calculate majority result
+  const resultCounts = previousSession.results.reduce((acc, result) => {
+    const resultType = result.result || 'Unknown';
+    acc[resultType] = (acc[resultType] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
   
-  const isWin = userResult === 'Win';
-  const isLoss = userResult === 'Loss';
-  const isDisconnect = userResult === 'Disconnect';
+  // Find the result with the highest count
+  let majorityResult = 'Unknown';
+  let maxCount = 0;
+  
+  Object.entries(resultCounts).forEach(([result, count]) => {
+    if (count > maxCount) {
+      majorityResult = result;
+      maxCount = count;
+    }
+  });
+  
+  // Determine badge styling based on majority result
+  const isWin = majorityResult === 'Win';
+  const isLoss = majorityResult === 'Loss';
+  const isDisconnect = majorityResult === 'Disconnect';
 
   // Format the session date and duration
   const startDate = previousSession.startedAt ? 
@@ -317,7 +333,7 @@ function PreviousSessionSection() {
             ) : isDisconnect ? (
               <Badge variant="outline" className="bg-yellow-500/20 text-yellow-400">Disconnect</Badge>
             ) : (
-              <Badge variant="outline" className="bg-blue-500/20 text-blue-400">Unknown</Badge>
+              <Badge variant="outline" className="bg-blue-500/20 text-blue-400">{majorityResult}</Badge>
             )}
           </CardTitle>
         </CardHeader>
@@ -400,7 +416,9 @@ function PreviousSessionSection() {
                             <Badge className="bg-red-500/20 text-red-400 border-0">Loss</Badge>
                           ) : playerResult?.result === 'Disconnect' ? (
                             <Badge className="bg-yellow-500/20 text-yellow-400 border-0">Disconnect</Badge>
-                          ) : null}
+                          ) : (
+                            <Badge className="bg-blue-500/20 text-blue-400 border-0">Unknown</Badge>
+                          )}
                         </div>
                       </div>
                       
