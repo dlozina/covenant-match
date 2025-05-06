@@ -67,6 +67,9 @@ services:
     build: 
       context: ./mongodb-backup  # folder containing backup Dockerfile and scripts
       dockerfile: Dockerfile
+    environment:
+      - BACKUP_SCHEDULE=0 6 * * *  # Run at 6:00 AM every day
+      - BACKUP_RETENTION_DAYS=1    # Keep backups for 1 days (default)
     volumes:
       - mongodb_backup_data:/backups  # Persistent volume for backups
     depends_on:
