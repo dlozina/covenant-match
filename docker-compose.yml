@@ -77,6 +77,18 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+  
+  mongodb-backup:
+    image: ghcr.io/dlozina/covenant-match-mongodb-backup:latest
+    environment:
+      - BACKUP_SCHEDULE=0 6 * * *  # Run at 6:00 AM every day
+      - BACKUP_RETENTION_DAYS=7    # Keep backups for 7 days (default)
+    volumes:
+      - mongodb_backup_data:/backups  # Persistent volume for backups
+    depends_on:
+      - mongodb
+    networks:
+      - covenant-network
 
   nginx:
     image: ghcr.io/dlozina/covenant-match-nginx:latest
@@ -103,7 +115,7 @@ networks:
 volumes:
   mongodb_data:
   uploads_data:
-
+  mongodb_backup_data:
 secrets:
   mongodb_uri:
     external: true
