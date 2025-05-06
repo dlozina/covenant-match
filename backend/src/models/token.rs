@@ -18,12 +18,37 @@ impl ToString for TokenPurpose {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct StoredToken {
+pub struct StoredTokenMetadata {
     #[serde(rename = "_id")]
     pub id: ObjectId,
     pub user_id: ObjectId,
-    pub token: String,
-    pub purpose: TokenPurpose,
+    pub token_jti: String,
+    pub purpose: String,
     pub expires_at: DateTime,
     pub created_at: DateTime,
+}
+
+impl StoredTokenMetadata {
+    /// Create a new token metadata from a JWT token's claims
+    pub fn from_claims(
+        user_id: ObjectId,
+        token_jti: String,
+        purpose: String,
+        exp_seconds: usize,
+    ) -> Self {
+        let now = mongodb::bson::DateTime::now();
+
+        // Convert expiration timestamp from seconds to milliseconds for MongoDB DateTime
+        let exp_millis = (exp_seconds as i64) * 1000;
+        let expires_at = mongodb::bson::DateTime::from_millis(exp_millis);
+
+        Self {
+            id: ObjectId::new(),
+            user_id,
+            token_jti,
+            purpose,
+            expires_at,
+            created_at: now,
+        }
+    }
 }

@@ -86,7 +86,6 @@ pub struct ChatHistoryParams {
     pub limit: Option<i64>,
 }
 
-
 #[derive(Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatMessageResponseDto {

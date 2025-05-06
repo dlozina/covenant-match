@@ -1,75 +1,63 @@
 use crate::models::error::AppError;
-use crate::models::token::{StoredToken, TokenPurpose};
-use bcrypt::{hash, verify, DEFAULT_COST};
-use futures::stream::TryStreamExt;
+use crate::models::token::{StoredTokenMetadata, TokenPurpose};
+use crate::utils::jwt;
 use log::{error, info, warn};
 use mongodb::{
     bson::{doc, oid::ObjectId},
-    Collection, Database,
+    options::IndexOptions,
+    Collection, Database, IndexModel,
 };
+use std::time::Duration;
 
 const COLLECTION_NAME: &str = "tokens";
 
-/// Hashes a token for secure storage in the database
-fn hash_token(token: &str) -> Result<String, AppError> {
-    hash(token, DEFAULT_COST).map_err(|e| {
-        error!("Error hashing token: {:?}", e);
-        AppError::InternalError(e.to_string())
-    })
-}
-
-fn get_collection(db: &Database) -> Collection<StoredToken> {
-    db.collection::<StoredToken>(COLLECTION_NAME)
+fn get_collection(db: &Database) -> Collection<StoredTokenMetadata> {
+    db.collection::<StoredTokenMetadata>(COLLECTION_NAME)
 }
 
 /// Create a new token in the database
-pub async fn create_token(
-    db: &Database,
-    user_id: &str,
-    token: &str,
-    purpose: TokenPurpose,
-    expiry_hours: i64,
-) -> Result<StoredToken, AppError> {
+pub async fn create_token(db: &Database, token: &str) -> Result<StoredTokenMetadata, AppError> {
     let collection = get_collection(db);
 
-    // Convert string ID to ObjectId
-    let user_object_id = ObjectId::parse_str(user_id).map_err(|e| {
-        error!("Invalid ObjectId format: {:?}", e);
-        AppError::InvalidId
-    })?;
+    // Try to decode the token as email verification token first
+    let token_doc = match jwt::validate_email_verification_token(token) {
+        Ok(claims) => {
+            // Convert string ID to ObjectId
+            let user_object_id = ObjectId::parse_str(&claims.sub).map_err(|e| {
+                error!("Invalid ObjectId format in email token: {:?}", e);
+                AppError::InvalidId
+            })?;
 
-    let now = mongodb::bson::DateTime::now();
+            // Create token metadata using the helper method
+            StoredTokenMetadata::from_claims(user_object_id, claims.jti, claims.purpose, claims.exp)
+        }
+        // If not an email token, try as password reset token
+        Err(_) => match jwt::validate_reset_password_token(token) {
+            Ok(reset_claims) => {
+                // Convert string ID to ObjectId
+                let user_object_id = ObjectId::parse_str(&reset_claims.sub).map_err(|e| {
+                    error!("Invalid ObjectId format in reset token: {:?}", e);
+                    AppError::InvalidId
+                })?;
 
-    // Calculate expiry time
-    let expire_time = {
-        let now_millis = now.timestamp_millis();
-        let expiry_millis = now_millis + (expiry_hours * 3600 * 1000);
-        mongodb::bson::DateTime::from_millis(expiry_millis)
-    };
+                info!(
+                    "Creating password reset token for user: {}",
+                    reset_claims.sub
+                );
 
-    // Format token with user ID prefix for easier lookups
-    // Only if the token doesn't already have this format
-    let formatted_token = if !token.contains(':') {
-        format!("{}:{}", user_id, token)
-    } else {
-        token.to_string()
-    };
-
-    // Original formatted token for client use
-    let plain_token = formatted_token.clone();
-
-    // Create hashed token for storage
-    let hashed_token = hash_token(&formatted_token)?;
-
-    // Create the token document
-    // MongoDB will automatically assign _id when inserted
-    let token_doc = StoredToken {
-        id: ObjectId::new(), // This will be set as _id in MongoDB
-        user_id: user_object_id,
-        token: hashed_token,
-        purpose,
-        expires_at: expire_time,
-        created_at: now,
+                // Create token metadata using the helper method
+                StoredTokenMetadata::from_claims(
+                    user_object_id,
+                    reset_claims.jti,
+                    reset_claims.purpose,
+                    reset_claims.exp,
+                )
+            }
+            Err(e) => {
+                error!("Invalid JWT token: {:?}", e);
+                return Err(AppError::InvalidToken);
+            }
+        },
     };
 
     collection.insert_one(&token_doc).await.map_err(|e| {
@@ -77,187 +65,97 @@ pub async fn create_token(
         AppError::DatabaseError(e)
     })?;
 
-    // Return with original plain token for client use
-    Ok(StoredToken {
-        token: plain_token,
-        ..token_doc
-    })
+    Ok(token_doc)
 }
 
-/// Find a token by its value
-pub async fn find_by_token(db: &Database, token: &str) -> Result<Option<StoredToken>, AppError> {
-    // Token format could be like "{userId}:{random}" to help with lookup
-    // If your tokens follow this format, extract the user ID first
-    let parts: Vec<&str> = token.split(':').collect();
+/// Find a token by its JWT token value
+pub async fn find_by_token(
+    db: &Database,
+    token: &str,
+) -> Result<Option<StoredTokenMetadata>, AppError> {
     let collection = get_collection(db);
 
-    let filter = if parts.len() > 1 && ObjectId::parse_str(parts[0]).is_ok() {
-        // If token contains user ID as first part, only search that user's tokens
-        let user_id = ObjectId::parse_str(parts[0]).unwrap();
-        doc! { "user_id": user_id }
-    } else {
-        // Otherwise, we have to search all tokens
-        doc! {}
-    };
+    // First attempt to validate as email verification token (which has JTI)
+    match jwt::validate_email_verification_token(token) {
+        Ok(claims) => {
+            // Extract user ID from the token
+            let user_id = ObjectId::parse_str(&claims.sub).map_err(|e| {
+                error!("Invalid ObjectId format: {:?}", e);
+                AppError::InvalidId
+            })?;
 
-    let cursor = collection.find(filter).await.map_err(|e| {
-        error!("Database error finding tokens: {:?}", e);
-        AppError::DatabaseError(e)
-    })?;
+            // Email verification tokens have JTI
+            find_token_basic(&collection, user_id, claims.purpose, Some(claims.jti)).await
+        }
+        Err(_) => {
+            // Try as password reset token
+            match jwt::validate_reset_password_token(token) {
+                Ok(reset_claims) => {
+                    let user_id = ObjectId::parse_str(&reset_claims.sub).map_err(|e| {
+                        error!("Invalid ObjectId format: {:?}", e);
+                        AppError::InvalidId
+                    })?;
 
-    let tokens = cursor
-        .try_collect::<Vec<StoredToken>>()
-        .await
-        .map_err(|e| {
-            error!("Database error collecting tokens: {:?}", e);
-            AppError::DatabaseError(e)
-        })?;
-
-    for db_token in tokens {
-        // Verify if the provided token matches the stored hash
-        if verify(token, &db_token.token).map_err(|e| {
-            error!("Error verifying token: {:?}", e);
-            AppError::InternalError(e.to_string())
-        })? {
-            // Return with original plain token
-            return Ok(Some(StoredToken {
-                token: token.to_string(),
-                ..db_token
-            }));
+                    // Password reset tokens now have JTI
+                    find_token_basic(
+                        &collection,
+                        user_id,
+                        reset_claims.purpose,
+                        Some(reset_claims.jti),
+                    )
+                    .await
+                }
+                Err(e) => {
+                    warn!("Invalid JWT token: {:?}", e);
+                    Ok(None)
+                }
+            }
         }
     }
-
-    Ok(None)
 }
 
-/// Delete a token by its value
-pub async fn delete_token(db: &Database, token: &str) -> Result<bool, AppError> {
-    // Log the token attempt for debugging (only showing first few chars for security)
-    let safe_token_prefix = if token.len() > 8 { &token[0..8] } else { token };
-    info!(
-        "Attempting to delete token starting with: {}...",
-        safe_token_prefix
-    );
+/// Delete a token by its JWT token value
+pub async fn delete_token(db: &Database, token: &str) -> Result<String, AppError> {
+    let collection = get_collection(db);
 
-    // Find the token first (which verifies the hash)
-    let token_doc = find_by_token(db, token).await?;
-
-    if let Some(token_doc) = token_doc {
-        // Delete using the token's ID
-        let collection = get_collection(db);
-        let token_id = token_doc.id;
-
-        info!("Found token with ID: {}, deleting by id", token_id);
-
-        // Use just id - because of the #[serde(rename = "_id")] in the model
-        // this will automatically map to MongoDB's _id field
-        let filter = doc! { "_id": token_id };
-
-        let result = collection.delete_one(filter).await.map_err(|e| {
-            error!("Database error deleting token: {:?}", e);
-            AppError::DatabaseError(e)
-        })?;
-
-        if result.deleted_count == 0 {
-            // If that didn't work, try by user_id and purpose
-            let user_id = token_doc.user_id;
-            let purpose = token_doc.purpose.to_string();
-
-            info!(
-                "Failed to delete by ID, trying by user_id: {} and purpose: {}",
-                user_id, purpose
-            );
-
-            let filter = doc! {
-                "user_id": user_id,
-                "purpose": purpose
-            };
-
-            let result = collection.delete_one(filter).await.map_err(|e| {
-                error!(
-                    "Database error deleting token by user_id and purpose: {:?}",
-                    e
-                );
-                AppError::DatabaseError(e)
+    // First try as email verification token
+    match jwt::validate_email_verification_token(token) {
+        Ok(claims) => {
+            let user_id = ObjectId::parse_str(&claims.sub).map_err(|e| {
+                error!("Invalid ObjectId format: {:?}", e);
+                AppError::InvalidId
             })?;
 
-            if result.deleted_count > 0 {
-                info!("Successfully deleted token by user_id and purpose");
-            } else {
-                warn!("Failed to delete token by any method");
-            }
+            // Use the module-level delete function
+            delete_token_from_db(&collection, user_id, claims.purpose, Some(claims.jti)).await?;
 
-            Ok(result.deleted_count > 0)
-        } else {
-            info!("Successfully deleted token by ID");
-            Ok(true)
+            Ok(claims.sub)
         }
-    } else {
-        // Try to delete by user_id and purpose if we can extract user_id from token
-        let parts: Vec<&str> = token.split(':').collect();
-        if parts.len() > 1 && ObjectId::parse_str(parts[0]).is_ok() {
-            let user_id = ObjectId::parse_str(parts[0]).unwrap();
-            let collection = get_collection(db);
+        Err(_) => {
+            // Try as password reset token
+            match jwt::validate_reset_password_token(token) {
+                Ok(reset_claims) => {
+                    let user_id = ObjectId::parse_str(&reset_claims.sub).map_err(|e| {
+                        error!("Invalid ObjectId format: {:?}", e);
+                        AppError::InvalidId
+                    })?;
 
-            info!(
-                "Token not found by hash verification, trying to delete by user_id: {}",
-                user_id
-            );
+                    // Password reset tokens now have JTI
+                    delete_token_from_db(
+                        &collection,
+                        user_id,
+                        reset_claims.purpose,
+                        Some(reset_claims.jti),
+                    )
+                    .await?;
 
-            // Try both possible purposes
-            // Try EmailVerification first
-            let filter = doc! {
-                "user_id": user_id,
-                "purpose": TokenPurpose::EmailVerification.to_string()
-            };
-
-            let email_result = collection.delete_many(filter).await.map_err(|e| {
-                error!(
-                    "Database error deleting email verification token by user_id: {:?}",
-                    e
-                );
-                AppError::DatabaseError(e)
-            })?;
-
-            if email_result.deleted_count > 0 {
-                info!(
-                    "Deleted {} email verification token(s)",
-                    email_result.deleted_count
-                );
-                return Ok(true);
+                    Ok(reset_claims.sub)
+                }
+                Err(e) => {
+                    warn!("Invalid JWT token: {:?}", e);
+                    Err(AppError::InvalidOrExpiredToken)
+                }
             }
-
-            // Try PasswordReset next
-            let filter = doc! {
-                "user_id": user_id,
-                "purpose": TokenPurpose::PasswordReset.to_string()
-            };
-
-            let reset_result = collection.delete_many(filter).await.map_err(|e| {
-                error!(
-                    "Database error deleting password reset token by user_id: {:?}",
-                    e
-                );
-                AppError::DatabaseError(e)
-            })?;
-
-            if reset_result.deleted_count > 0 {
-                info!(
-                    "Deleted {} password reset token(s)",
-                    reset_result.deleted_count
-                );
-                return Ok(true);
-            }
-
-            warn!("Could not delete any tokens for user: {}", user_id);
-            Ok(false)
-        } else {
-            // Token not found and couldn't extract user_id
-            error!(
-                "Token not found for deletion and couldn't extract user_id from token: {}",
-                safe_token_prefix
-            );
-            Ok(false)
         }
     }
 }
@@ -294,6 +192,8 @@ pub async fn delete_expired_tokens(db: &Database) -> Result<u64, AppError> {
     let collection = get_collection(db);
     let now = mongodb::bson::DateTime::now();
 
+    info!("Deleting expired tokens. Current time: {}", now);
+
     let filter = doc! { "expires_at": { "$lt": now } };
 
     let result = collection.delete_many(filter).await.map_err(|e| {
@@ -301,6 +201,7 @@ pub async fn delete_expired_tokens(db: &Database) -> Result<u64, AppError> {
         AppError::DatabaseError(e)
     })?;
 
+    info!("Deleted {} expired tokens", result.deleted_count);
     Ok(result.deleted_count)
 }
 
@@ -308,53 +209,145 @@ pub async fn delete_expired_tokens(db: &Database) -> Result<u64, AppError> {
 pub async fn validate_token(
     db: &Database,
     token: &str,
-    purpose: TokenPurpose,
-) -> Result<Option<StoredToken>, AppError> {
+) -> Result<Option<StoredTokenMetadata>, AppError> {
     let collection = get_collection(db);
     let now = mongodb::bson::DateTime::now();
 
-    // Token format could be like "{userId}:{random}" to help with lookup
-    // If your tokens follow this format, extract the user ID first
-    let parts: Vec<&str> = token.split(':').collect();
+    // First try decoding as an email verification token
+    match jwt::validate_email_verification_token(token) {
+        Ok(claims) => {
+            let user_id = ObjectId::parse_str(&claims.sub).map_err(|e| {
+                error!("Invalid ObjectId format in email token: {:?}", e);
+                AppError::InvalidId
+            })?;
 
-    // Build the filter based on purpose, expiration, and user ID if available
-    let mut filter_doc = doc! {
-        "purpose": purpose.to_string(),
-        "expires_at": { "$gt": now }
+            find_token_in_db(&collection, user_id, claims.purpose, Some(claims.jti), now).await
+        }
+        // If not an email token, try as password reset token
+        Err(_) => {
+            // Try as password reset token
+            match jwt::validate_reset_password_token(token) {
+                Ok(reset_claims) => {
+                    let user_id = ObjectId::parse_str(&reset_claims.sub).map_err(|e| {
+                        error!("Invalid ObjectId format in reset token: {:?}", e);
+                        AppError::InvalidId
+                    })?;
+
+                    find_token_in_db(
+                        &collection,
+                        user_id,
+                        reset_claims.purpose,
+                        Some(reset_claims.jti),
+                        now,
+                    )
+                    .await
+                }
+                Err(e) => {
+                    warn!("Invalid JWT token: {:?}", e);
+                    Ok(None)
+                }
+            }
+        }
+    }
+}
+
+// Common function to search for token by user_id, purpose, and optional JTI
+async fn find_token_in_db(
+    collection: &Collection<StoredTokenMetadata>,
+    user_id: ObjectId,
+    purpose: String,
+    token_jti: Option<String>,
+    now: mongodb::bson::DateTime,
+) -> Result<Option<StoredTokenMetadata>, AppError> {
+    // Build filter based on whether we have a JTI or not
+    let filter = if let Some(jti) = token_jti {
+        doc! {
+            "user_id": user_id,
+            "token_jti": jti,
+            "purpose": purpose,
+            "expires_at": { "$gt": now }
+        }
+    } else {
+        doc! {
+            "user_id": user_id,
+            "purpose": purpose,
+            "expires_at": { "$gt": now }
+        }
     };
 
-    // If token contains user ID as first part, only search that user's tokens
-    if parts.len() > 1 && ObjectId::parse_str(parts[0]).is_ok() {
-        let user_id = ObjectId::parse_str(parts[0]).expect("Invalid ObjectId format");
-        filter_doc.insert("user_id", user_id);
-    }
-
-    let cursor = collection.find(filter_doc).await.map_err(|e| {
-        error!("Database error finding tokens: {:?}", e);
+    let result = collection.find_one(filter).await.map_err(|e| {
+        error!("Database error finding token: {:?}", e);
         AppError::DatabaseError(e)
     })?;
 
-    let tokens = cursor
-        .try_collect::<Vec<StoredToken>>()
-        .await
-        .map_err(|e| {
-            error!("Database error collecting tokens: {:?}", e);
+    Ok(result)
+}
+
+// Helper function to search for token without expiration check
+async fn find_token_basic(
+    collection: &Collection<StoredTokenMetadata>,
+    user_id: ObjectId,
+    purpose: String,
+    token_jti: Option<String>,
+) -> Result<Option<StoredTokenMetadata>, AppError> {
+    // Build filter based on whether we have a JTI or not
+    let filter = if let Some(jti) = token_jti {
+        doc! {
+            "user_id": user_id,
+            "token_jti": jti,
+            "purpose": purpose
+        }
+    } else {
+        doc! {
+            "user_id": user_id,
+            "purpose": purpose
+        }
+    };
+
+    collection.find_one(filter).await.map_err(|e| {
+        error!("Database error finding token: {:?}", e);
+        AppError::DatabaseError(e)
+    })
+}
+
+// Common function to delete token by user_id, purpose, and optional JTI
+async fn delete_token_from_db(
+    collection: &Collection<StoredTokenMetadata>,
+    user_id: ObjectId,
+    purpose: String,
+    token_jti: Option<String>,
+) -> Result<bool, AppError> {
+    // Try to delete with the most specific criteria first
+    if let Some(jti) = token_jti {
+        let filter = doc! {
+            "user_id": user_id,
+            "token_jti": jti,
+            "purpose": purpose.clone() // Clone to avoid the moved value error
+        };
+
+        let result = collection.delete_one(filter).await.map_err(|e| {
+            error!("Database error deleting token: {:?}", e);
             AppError::DatabaseError(e)
         })?;
 
-    for db_token in tokens {
-        // Verify if the provided token matches the stored hash
-        if verify(token, &db_token.token).map_err(|e| {
-            error!("Error verifying token: {:?}", e);
-            AppError::InternalError(e.to_string())
-        })? {
-            // Return with original plain token
-            return Ok(Some(StoredToken {
-                token: token.to_string(),
-                ..db_token
-            }));
+        if result.deleted_count > 0 {
+            return Ok(true);
         }
     }
 
-    Ok(None)
+    // If precise lookup failed, delete by user_id and purpose as fallback
+    let filter = doc! {
+        "user_id": user_id,
+        "purpose": purpose
+    };
+
+    let result = collection.delete_many(filter).await.map_err(|e| {
+        error!(
+            "Database error deleting tokens by user_id and purpose: {:?}",
+            e
+        );
+        AppError::DatabaseError(e)
+    })?;
+
+    Ok(result.deleted_count > 0)
 }

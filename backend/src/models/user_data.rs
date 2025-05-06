@@ -1,9 +1,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-
 use super::geo_location::GeoLocationDataDto;
-
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]

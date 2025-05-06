@@ -1,6 +1,7 @@
 use crate::models::error::AppError;
 use crate::models::user::{
-    AddFriendDto, CreateUserDto, FriendListResponse, GetUsersQuery, LoginUserDto, NewPasswordDto, ResetPasswordDto, UpdateUserProfileDto
+    AddFriendDto, CreateUserDto, FriendListResponse, GetUsersQuery, LoginUserDto, NewPasswordDto,
+    ResetPasswordDto, UpdateUserProfileDto,
 };
 use crate::services::{auth_service, session_service, user_service};
 use crate::utils::{email, geo_location, ip_address, jwt, request};
@@ -66,8 +67,7 @@ async fn create_user(
 /// Verify new user
 #[utoipa::path(
     post,
-    path = "/api/v1/verify-email",
-    request_body = String,
+    path = "/api/v1/verify-email/{token}",
     responses(
         (status = 200, description = "Email verified successfully"),
         (status = 400, description = "Invalid input"),
@@ -76,11 +76,11 @@ async fn create_user(
     ),
     tag = "users"
 )]
-#[post("/api/v1/verify-email")]
-async fn verify_email(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
-    let token = req.query_string();
+#[post("/api/v1/verify-email/{token}")]
+async fn verify_email(db: web::Data<Database>, path: web::Path<String>) -> impl Responder {
+    let token = path.into_inner();
 
-    match user_service::verify_user_email(&db, token).await {
+    match user_service::verify_user_email(&db, &token).await {
         Ok(()) => HttpResponse::Ok().json(serde_json::json!({
             "status": "success",
             "message": "Email verified successfully"
@@ -137,7 +137,7 @@ async fn reset_password_email(
 /// Reset password endpoint
 #[utoipa::path(
     post,
-    path = "/api/v1/reset-password",
+    path = "/api/v1/reset-password/{token}",
     request_body = NewPasswordDto,
     responses(
         (status = 200, description = "Password reset successfully"),
@@ -147,25 +147,16 @@ async fn reset_password_email(
     ),
     tag = "users"
 )]
-#[post("/api/v1/reset-password")]
+#[post("/api/v1/reset-password/{token}")]
 async fn reset_password(
     db: web::Data<Database>,
     new_password_data: web::Json<NewPasswordDto>,
-    req: HttpRequest,
+    path: web::Path<String>,
 ) -> impl Responder {
-    let token = req.query_string();
-
-    // First validate the JWT to ensure proper format
-    let token_data = jwt::validate_reset_password_token(token);
-    if token_data.is_err() {
-        return HttpResponse::BadRequest().json(serde_json::json!({
-            "status": "error",
-            "message": "Invalid token format"
-        }));
-    }
+    let token = path.into_inner();
 
     // Then use the token repository to reset password with token validation
-    match user_service::reset_password_with_token(&db, token, &new_password_data.password).await {
+    match user_service::reset_password_with_token(&db, &token, &new_password_data.password).await {
         Ok(()) => HttpResponse::Ok().json(serde_json::json!({
             "status": "success",
             "message": "Password reset successfully"
@@ -204,7 +195,6 @@ async fn login(
     // Get the client region
     let client_region = geo_location::get_client_region(&req);
 
-    log::info!("Turnstile token: {:?}", login_data.turnstile_token);
     // Verify the turnstile token
     if let Err(e) = auth_service::verify_turnstile_token(
         &db,
@@ -273,7 +263,6 @@ async fn login(
             .await
             {
                 log::error!("Failed to record failed login attempt: {:?}", record_err);
-                // Continue with normal error response
             }
 
             log::error!("Login error for user {}: {:?}", &login_data.username, e);
@@ -1001,15 +990,14 @@ async fn remove_friend(
     tag = "users"
 )]
 #[get("/api/v1/users/sessions")]
-async fn get_user_sessions(
-    db: web::Data<Database>,
-    req: HttpRequest,
-) -> impl Responder {
-    // Get claims from request extensions (set by middleware)   
-    let claims = request::get_claims(&req)
-        .ok_or(actix_web::error::ErrorUnauthorized("Unauthorized"));
+async fn get_user_sessions(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
+    // Get claims from request extensions (set by middleware)
+    let claims =
+        request::get_claims(&req).ok_or(actix_web::error::ErrorUnauthorized("Unauthorized"));
 
-    let user_id = claims.expect("JWT claims not found in request extensions").sub;
+    let user_id = claims
+        .expect("JWT claims not found in request extensions")
+        .sub;
 
     let sessions = session_service::get_user_sessions(&db, &user_id).await;
 
@@ -1021,7 +1009,6 @@ async fn get_user_sessions(
         }
     }
 }
-
 
 pub fn config(cfg: &mut web::ServiceConfig) {
     log::info!("Configuring user routes");

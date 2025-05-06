@@ -197,7 +197,10 @@ impl Config {
                 secret: env_or_default("JWT_SECRET", "malenia_is_the_best_girl_in_the_world"),
                 expires_in: env_or_default("JWT_EXPIRES_IN", "12h"),
                 email_secret: env_or_default("EMAIL_SECRET", "promised_consort_radahn"),
-                reset_password_secret: env_or_default("RESET_PASSWORD_SECRET", "dancing_lion_in_the_wind"),
+                reset_password_secret: env_or_default(
+                    "RESET_PASSWORD_SECRET",
+                    "dancing_lion_in_the_wind",
+                ),
             },
             server: ServerConfig {
                 port: env_or_default_parse("PORT", 8080),
@@ -222,7 +225,10 @@ impl Config {
                 frontend_url: env_or_default("FRONTEND_URL", "http://localhost"),
                 from_email: std::env::var("EMAIL_FROM").ok(),
                 from_name: std::env::var("EMAIL_SENDER_NAME").ok(),
-                mailersend_url: env_or_default("MAILERSEND_URL", "https://api.mailersend.com/v1/email" ),
+                mailersend_url: env_or_default(
+                    "MAILERSEND_URL",
+                    "https://api.mailersend.com/v1/email",
+                ),
             },
             auth: create_default_auth_config(),
         }

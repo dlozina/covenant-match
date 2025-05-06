@@ -243,3 +243,23 @@ h1, h2, h3, h4, h5, h6 {
     margin-bottom: 1rem;
   }
 }
+
+.gothic-card-no-hover {
+  position: relative;
+  background-color: rgba(23, 21, 29, 0.8);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(88, 28, 135, 0.2);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.gothic-card-no-hover::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom right, rgba(167, 139, 250, 0.05), rgba(99, 102, 241, 0.05));
+  opacity: 0;
+  pointer-events: none;
+}

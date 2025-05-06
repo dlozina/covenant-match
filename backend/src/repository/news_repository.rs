@@ -108,7 +108,7 @@ pub async fn find_news_paginated(
 
     // Apply pagination manually
     let start = std::cmp::min(skip as usize, news.len());
-    let end = std::cmp::min(start + limit as usize, news.len());  
+    let end = std::cmp::min(start + limit as usize, news.len());
 
     Ok(news[start..end].to_vec())
 }

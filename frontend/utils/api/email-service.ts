@@ -30,7 +30,7 @@ export class EmailService {
   async resetPassword(password: string, token: string): Promise<void> {
     try {
       await this.client.post<void>(
-        `/api/v1/reset-password?${token}`,
+        `/api/v1/reset-password/${token}`,
         { password },
         false
       );
@@ -71,7 +71,7 @@ export class EmailService {
   static async resetPassword(password: string, token: string): Promise<void> {
     try {
       await httpClient.post<void>(
-        `/api/v1/reset-password?${token}`,
+        `/api/v1/reset-password/${token}`,
         { password },
         false
       );

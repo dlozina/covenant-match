@@ -175,7 +175,10 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
     let default_experiences = vec![
         ("Beginner", "Newly risen from the embers, seeking purpose."),
         ("Mid", "Tempered by trials, unshaken in the storm."),
-        ("Veteran", "A relic of countless battles, a legend in flesh."),
+        (
+            "Veteran",
+            "A relic of countless battles, a legend in flesh.",
+        ),
     ];
 
     // Seed experiences collection
@@ -283,6 +286,29 @@ async fn update_schemas(db: &Database) -> Result<(), Error> {
         .await?;
 
     info!("Created TTL index on login_attempts collection");
+
+    // Create TTL index on tokens collection if it exists
+    if db
+        .list_collection_names()
+        .await?
+        .contains(&"tokens".to_string())
+    {
+        // TTL index for tokens collection - auto expiration
+        let tokens_index = IndexModel::builder()
+            .keys(doc! { "expires_at": 1 })
+            .options(
+                IndexOptions::builder()
+                    .expire_after(std::time::Duration::from_secs(0)) // 0 seconds means delete when expires_at is reached
+                    .build(),
+            )
+            .build();
+
+        db.collection::<Document>("tokens")
+            .create_index(tokens_index)
+            .await?;
+
+        info!("Created TTL index on tokens collection");
+    }
 
     Ok(())
 }

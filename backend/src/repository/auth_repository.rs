@@ -58,29 +58,6 @@ pub async fn count_recent_failed_attempts(
     Ok(count as usize)
 }
 
-/// Clean up old login attempts beyond retention period
-pub async fn cleanup_old_attempts(db: &Database, retention_days: i64) -> Result<u64, AppError> {
-    let collection = get_collection(db);
-
-    // Calculate retention cutoff date
-    let cutoff_date = Utc::now() - Duration::days(retention_days);
-    // Convert to MongoDB DateTime
-    let cutoff_date_bson = DateTime::from_millis(cutoff_date.timestamp_millis());
-
-    // Create filter for old records
-    let filter = doc! {
-        "created_at": { "$lt": cutoff_date_bson }
-    };
-
-    // Delete old records
-    let result = collection.delete_many(filter).await.map_err(|e| {
-        error!("Database error cleaning up login attempts: {:?}", e);
-        AppError::DatabaseError(e)
-    })?;
-
-    Ok(result.deleted_count)
-}
-
 /// Get recent login attempts for an admin dashboard
 pub async fn get_recent_attempts(db: &Database, limit: i64) -> Result<Vec<LoginAttempt>, AppError> {
     let collection = get_collection(db);
@@ -104,7 +81,7 @@ pub async fn get_recent_attempts(db: &Database, limit: i64) -> Result<Vec<LoginA
     attempts.sort_by(|a, b| b.created_at.cmp(&a.created_at));
 
     // Limit the results
-    if attempts.len() > limit as usize { 
+    if attempts.len() > limit as usize {
         attempts.truncate(limit as usize);
     }
 

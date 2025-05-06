@@ -185,13 +185,13 @@ export class UserService {
   }
 
   /**
- * Vefify email
- * @param token Token to verify
- * @returns Verified email
- */
+   * Vefify email
+   * @param token Token to verify
+   * @returns Verified email
+   */
   static async verifyEmail(token: string): Promise<VerifyEmailResponse> {
     try {
-     return await httpClient.post<VerifyEmailResponse>(`/api/v1/verify-email?${token}`);
+     return await httpClient.post<VerifyEmailResponse>(`/api/v1/verify-email/${token}`);
     } catch (error) {
       throw error;
     }

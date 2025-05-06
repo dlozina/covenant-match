@@ -4,8 +4,8 @@ use crate::models::token::TokenPurpose;
 use crate::models::user::{
     CreateUserDto, Experience, FriendDto, LoginUserDto, UpdateUserProfileDto, User, UserResponse,
 };
-use crate::repository::{session_repository, token_repository};
 use crate::repository::user_repository;
+use crate::repository::{session_repository, token_repository};
 use crate::services::email_service;
 use crate::utils::jwt;
 use bcrypt::{hash, verify, DEFAULT_COST};
@@ -83,14 +83,7 @@ pub async fn create_user(
             .map_err(|e| AppError::InternalError(e.to_string()))?;
 
     // Store the email verification token in the database
-    token_repository::create_token(
-        db,
-        &created_user.id.to_string(),
-        &email_verification_token,
-        TokenPurpose::EmailVerification,
-        jwt::EXPIRY_HOURS_FOR_EMAIL_VERIFICATION,
-    )
-    .await?;
+    token_repository::create_token(db, &email_verification_token).await?;
 
     // Send email verification email
     email_service::send_verification_email(&created_user.email, &email_verification_token)
@@ -210,15 +203,7 @@ pub async fn send_reset_password_email(db: &Database, email: &str) -> Result<(),
     .await?;
 
     // Store the token in the database
-    // The token will be formatted with userId prefix inside create_token
-    token_repository::create_token(
-        db,
-        &user.id.to_string(),
-        &reset_password_token,
-        TokenPurpose::PasswordReset,
-        jwt::EXPIRY_HOURS_FOR_PASSWORD_RESET,
-    )
-    .await?;
+    token_repository::create_token(db, &reset_password_token).await?;
 
     // Send the JWT token in email (not the reformatted token)
     // We're sending the original JWT token because that's what the endpoint expects
@@ -233,54 +218,24 @@ pub async fn reset_password_with_token(
     token: &str,
     new_password: &str,
 ) -> Result<(), AppError> {
-    // First, validate the JWT token structure
-    let jwt_claims = jwt::validate_reset_password_token(token)?;
-    let user_id = &jwt_claims.sub;
-    info!("JWT token validated for user: {}", user_id);
-
-    // Check if the token purpose is for password reset
-    if jwt_claims.purpose != "password_reset" && jwt_claims.purpose != "PasswordReset" {
-        warn!("Invalid token purpose: {}", jwt_claims.purpose);
-        return Err(AppError::InvalidToken);
-    }
-
-    // Get user id from token and add it to the token
-    let new_token = format!("{user_id}:{token}");
-    info!("Processing password reset for user: {}", user_id);
-
-    // Then validate the token in our database
     // This checks if it exists, hasn't expired, and hasn't been used
-    let token_doc =
-        token_repository::validate_token(db, &new_token, TokenPurpose::PasswordReset).await?;
+    let validated_token = token_repository::validate_token(db, token).await?;
 
-    if token_doc.is_none() {
+    if validated_token.is_none() {
         warn!("Token not found in database or expired");
         return Err(AppError::InvalidOrExpiredToken);
     }
 
-    let token_doc = token_doc.expect("Token document not found");
-
-    // Double check user ID matches
-    if token_doc.user_id.to_hex() != user_id.as_str() {
-        warn!(
-            "Token user ID mismatch: {} vs {}",
-            token_doc.user_id.to_hex(),
-            user_id
-        );
-        return Err(AppError::InvalidToken);
-    }
-
-    info!("Found valid password reset token, will delete after use");
-
     // Reset the password
-    let result = reset_password(db, user_id, new_password).await;
+    let result = reset_password(db, &validated_token.unwrap().user_id.to_hex(), new_password).await;
 
     // Delete the used token regardless of password reset result
     // This is to prevent token reuse even if there's an error later
-    info!("Deleting password reset token after use");
-    match token_repository::delete_token(db, &new_token).await {
-        Ok(true) => info!("Successfully deleted password reset token"),
-        Ok(false) => warn!("Token deletion reported success but no tokens were deleted"),
+    match token_repository::delete_token(db, token).await {
+        Ok(user_id) => info!(
+            "Successfully deleted password reset token for user: {}",
+            user_id
+        ),
         Err(e) => error!("Failed to delete token: {:?}", e),
     }
 
@@ -621,43 +576,30 @@ pub async fn update_user_email_verified(
 
 /// Verify a user's email using the verification token
 pub async fn verify_user_email(db: &Database, token: &str) -> Result<(), AppError> {
-    // First validate the JWT structure
-    let token_data = jwt::validate_email_verification_token(token)?;
-    info!("JWT token validated for user: {}", token_data.sub);
-
-    // Check if the token purpose is for email verification
-    // The purpose is a custom claim field, not the standard JWT purpose field
-    if token_data.purpose != "email_verification" && token_data.purpose != "EmailVerification" {
-        warn!("Invalid token purpose: {}", token_data.purpose);
-        return Err(AppError::InvalidToken);
-    }
-
-    // Get user id from token and add it to the token
-    let new_token = format!("{}:{}", token_data.sub, token);
-    info!("Processing email verification for user: {}", token_data.sub);
+    info!("Verifying email with token: {}", token);
 
     // Then validate the token in our database
-    let token_doc =
-        token_repository::validate_token(db, &new_token, TokenPurpose::EmailVerification).await?;
+    let token_doc = token_repository::validate_token(db, token).await?;
 
     if token_doc.is_none() {
-        warn!("Token not found in database or expired");
+        warn!("Token validation failed - token not found in database or expired");
         return Err(AppError::InvalidOrExpiredToken);
     }
 
-    info!("Found valid email verification token, deleting it");
-
     // Delete the used token to prevent reuse
-    match token_repository::delete_token(db, &new_token).await {
-        Ok(true) => info!("Successfully deleted email verification token"),
-        Ok(false) => warn!("Token deletion reported success but no tokens were deleted"),
-        Err(e) => error!("Failed to delete token: {:?}", e),
-    }
+    let user_id = match token_repository::delete_token(db, token).await {
+        Ok(user_id) => {
+            if user_id.is_empty() {
+                warn!("Received empty user_id from token deletion");
+                return Err(AppError::InvalidOrExpiredToken);
+            }
+            user_id
+        }
+        Err(e) => {
+            error!("Failed to delete token: {:?}", e);
+            return Err(e);
+        }
+    };
 
-    // Update user email verified status
-    info!(
-        "Setting email verified status to true for user: {}",
-        token_data.sub
-    );
-    update_user_email_verified(db, &token_data.sub, true).await
+    update_user_email_verified(db, &user_id, true).await
 }

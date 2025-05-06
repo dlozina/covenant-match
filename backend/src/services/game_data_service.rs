@@ -1,6 +1,7 @@
 use crate::models::error::AppError;
 use crate::models::game_data::{
-    CovenantResponse, ExperienceResponse, GameDataResponse, NightLordResponse, NightfarerResponse, PlatformResponse, RegionResponse
+    CovenantResponse, ExperienceResponse, GameDataResponse, NightLordResponse, NightfarerResponse,
+    PlatformResponse, RegionResponse,
 };
 use crate::repository::game_data_repository;
 use mongodb::Database;
@@ -14,7 +15,7 @@ pub async fn get_all_game_data(db: &Database) -> Result<GameDataResponse, AppErr
     let nightfarers_future = game_data_repository::get_all_nightfarers(db);
     let nightlords_future = game_data_repository::get_all_nightlords(db);
     let experiences_future = game_data_repository::get_all_experiences(db);
-    
+
     // Using futures::join! to run futures concurrently
     let (platforms, regions, covenants, nightfarers, nightlords, experiences) = futures::try_join!(
         platforms_future,
@@ -105,6 +106,9 @@ pub async fn get_all_nightlords(db: &Database) -> Result<Vec<NightLordResponse>,
 /// Get all experiences
 pub async fn get_all_experiences(db: &Database) -> Result<Vec<ExperienceResponse>, AppError> {
     let experiences = game_data_repository::get_all_experiences(db).await?;
-    let experience_responses = experiences.into_iter().map(ExperienceResponse::from).collect();
+    let experience_responses = experiences
+        .into_iter()
+        .map(ExperienceResponse::from)
+        .collect();
     Ok(experience_responses)
 }

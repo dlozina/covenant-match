@@ -1,7 +1,7 @@
 use crate::models::chat::ChatMessageResponseDto;
-use crate::{models::chat::ChatHistoryParams, services::chat_service::ChatService};
 use crate::services::user_service;
 use crate::utils::jwt;
+use crate::{models::chat::ChatHistoryParams, services::chat_service::ChatService};
 use actix_web::{get, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use log::debug;
 use mongodb::Database;

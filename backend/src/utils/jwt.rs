@@ -2,6 +2,7 @@ use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::config::get_config;
 use crate::models::error::AppError;
@@ -29,6 +30,7 @@ pub struct EmailVerificationClaims {
     pub email: String,   // Email address
     pub exp: usize,      // Expiration time (as UTC timestamp)
     pub purpose: String, // Purpose of the token
+    pub jti: String,     // JWT ID
     pub iat: usize,      // Issued at (as UTC timestamp)
 }
 
@@ -43,12 +45,14 @@ impl EmailVerificationClaims {
             .unwrap_or(usize::MAX);
 
         let issued_at = Utc::now().timestamp().max(0).try_into().unwrap_or(0);
+        let jti = Uuid::new_v4().to_string();
 
         Self {
             sub: user_id.to_string(),
             email: email.to_string(),
             exp: expiration,
             purpose: TokenPurpose::EmailVerification.to_string(),
+            jti,
             iat: issued_at,
         }
     }
@@ -61,6 +65,7 @@ pub struct ResetPasswordClaims {
     pub email: String,   // Email address
     pub exp: usize,      // Expiration time (as UTC timestamp)
     pub purpose: String, // Purpose of the token
+    pub jti: String,     // JWT ID
     pub iat: usize,      // Issued at (as UTC timestamp)
 }
 
@@ -75,12 +80,13 @@ impl ResetPasswordClaims {
             .unwrap_or(usize::MAX);
 
         let issued_at = Utc::now().timestamp().max(0).try_into().unwrap_or(0);
-
+        let jti = Uuid::new_v4().to_string();
         Self {
             sub: user_id.to_string(),
             email: email.to_string(),
             exp: expiration,
             purpose: TokenPurpose::PasswordReset.to_string(),
+            jti,
             iat: issued_at,
         }
     }
@@ -105,16 +111,30 @@ pub fn validate_email_verification_token(token: &str) -> Result<EmailVerificatio
     let config = get_config();
     let jwt_secret = config.email_secret();
 
-    decode::<EmailVerificationClaims>(
+    log::info!("Validating email verification token: {}", token);
+
+    let result = decode::<EmailVerificationClaims>(
         token,
         &DecodingKey::from_secret(jwt_secret.as_bytes()),
         &Validation::default(),
-    )
-    .map(|token_data| token_data.claims)
-    .map_err(|e| match e.kind() {
-        jsonwebtoken::errors::ErrorKind::ExpiredSignature => AppError::TokenExpired,
-        _ => AppError::InvalidToken,
-    })
+    );
+
+    match &result {
+        Ok(token_data) => {
+            log::info!("Successfully decoded email verification token with claims: sub={}, email={}, purpose={}, jti={}", 
+                       token_data.claims.sub, token_data.claims.email, token_data.claims.purpose, token_data.claims.jti);
+        }
+        Err(e) => {
+            log::warn!("Failed to decode email verification token: {:?}", e);
+        }
+    }
+
+    result
+        .map(|token_data| token_data.claims)
+        .map_err(|e| match e.kind() {
+            jsonwebtoken::errors::ErrorKind::ExpiredSignature => AppError::TokenExpired,
+            _ => AppError::InvalidToken,
+        })
 }
 
 /// Generate a JWT for forget password
@@ -136,16 +156,30 @@ pub fn validate_reset_password_token(token: &str) -> Result<ResetPasswordClaims,
     let config = get_config();
     let jwt_secret = config.reset_password_secret();
 
-    decode::<ResetPasswordClaims>(
+    log::info!("Validating reset password token: {}", token);
+
+    let result = decode::<ResetPasswordClaims>(
         token,
         &DecodingKey::from_secret(jwt_secret.as_bytes()),
         &Validation::default(),
-    )
-    .map(|token_data| token_data.claims)
-    .map_err(|e| match e.kind() {
-        jsonwebtoken::errors::ErrorKind::ExpiredSignature => AppError::TokenExpired,
-        _ => AppError::InvalidToken,
-    })
+    );
+
+    match &result {
+        Ok(token_data) => {
+            log::info!("Successfully decoded reset password token with claims: sub={}, email={}, purpose={}, jti={}", 
+                       token_data.claims.sub, token_data.claims.email, token_data.claims.purpose, token_data.claims.jti);
+        }
+        Err(e) => {
+            log::warn!("Failed to decode reset password token: {:?}", e);
+        }
+    }
+
+    result
+        .map(|token_data| token_data.claims)
+        .map_err(|e| match e.kind() {
+            jsonwebtoken::errors::ErrorKind::ExpiredSignature => AppError::TokenExpired,
+            _ => AppError::InvalidToken,
+        })
 }
 
 /// Alias for validate_reset_password_token for backward compatibility -> good example of how to handle backward compatibility

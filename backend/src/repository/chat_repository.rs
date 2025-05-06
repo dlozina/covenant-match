@@ -486,9 +486,8 @@ pub async fn cleanup_inactive_sessions(
             }
             // Try as i64 (timestamp)
             else if let Ok(timestamp) = session_doc.get_i64("last_activity") {
-                last_activity_chrono = Some(
-                    chrono::DateTime::from_timestamp(timestamp, 0).unwrap_or_else(Utc::now),
-                );
+                last_activity_chrono =
+                    Some(chrono::DateTime::from_timestamp(timestamp, 0).unwrap_or_else(Utc::now));
                 log::debug!(
                     "Successfully converted last_activity from i64 timestamp: {}",
                     timestamp

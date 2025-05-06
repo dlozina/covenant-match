@@ -50,7 +50,7 @@ export default function SendResetEmailPage() {
         </p>
       </div>
 
-      <div className="gothic-card p-8 relative overflow-hidden">
+      <div className="gothic-card-no-hover p-8 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-700 via-indigo-500 to-purple-700 opacity-70"></div>
         <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-purple-700 via-indigo-500 to-purple-700 opacity-70"></div>
         
