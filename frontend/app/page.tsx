@@ -213,6 +213,11 @@ export default function Home() {
         <div className="text-xs text-center text-muted-foreground">
           Players looking for groups now
         </div>
+        <div className="mt-4 text-center">
+          <Link href="/sessions" className="text-sm text-emerald-400 hover:text-emerald-300 hover:underline">
+            View all sessions
+          </Link>
+        </div>
       </div>
     </div>
   );
