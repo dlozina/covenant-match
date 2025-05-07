@@ -12,10 +12,8 @@ import {
   KickPlayerDialog
 } from "@/components/session";
 import {
-  friendStatusReducer,
   dialogReducer,
   resultReducer,
-  FriendState,
   DialogState
 } from "@/components/session/SessionReducers";
 import { cancelSession } from "@/utils/api";
@@ -50,7 +48,6 @@ export function SessionHost() {
   const [isCreatingNewSession, setIsCreatingNewSession] = useState<boolean>(false);
   
   // Reducers for UI state
-  const [friendState, dispatchFriend] = useReducer(friendStatusReducer, {} as FriendState);
   const [dialogState, dispatchDialog] = useReducer(dialogReducer, {
     showConfirmDialog: false,
     showWarningDialog: false,
@@ -84,11 +81,6 @@ export function SessionHost() {
   // Function to clear notification
   const clearNotification = useCallback(() => {
     setNotification(null);
-  }, []);
-  
-  // Add friend
-  const addFriend = useCallback((playerId: string) => {
-    dispatchFriend({ type: 'ADD_FRIEND', payload: playerId });
   }, []);
   
   // Handle kick player dialog

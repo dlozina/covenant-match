@@ -9,10 +9,8 @@ import {
   ResultReportingSection,
   WarningDialog,
   NewSessionDialog,
-  friendStatusReducer,
   dialogReducer,
   resultReducer,
-  FriendState,
   DialogState
 } from "@/components/session";
 import { leaveSession } from "@/utils/api";
@@ -40,7 +38,6 @@ export function SessionParticipant() {
   const [notification, setNotification] = useState<NotificationType | null>(null);
   
   // Reducers for UI state
-  const [friendState, dispatchFriend] = useReducer(friendStatusReducer, {} as FriendState);
   const [dialogState, dispatchDialog] = useReducer(dialogReducer, {
     showConfirmDialog: false,
     showWarningDialog: false,
@@ -125,11 +122,6 @@ export function SessionParticipant() {
       sessionStorage.removeItem('cancelledSessionId');
     }
   }, [showNotification, sessionData, hasShownCancelNotification]);
-  
-  // Add friend
-  const addFriend = useCallback((playerId: string) => {
-    dispatchFriend({ type: 'ADD_FRIEND', payload: playerId });
-  }, []);
   
   // Handle dialog actions for new session
   const handleCloseNewSessionDialog = useCallback(() => {
