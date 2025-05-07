@@ -12,10 +12,6 @@ import { UserStats, fetchUserStats } from '@/utils/api';
 
 interface PlayerSectionProps {
   sessionState: SessionState;
-  friendState: {
-    [playerId: string]: boolean;
-  };
-  addFriend: (playerId: string) => void;
   sessionData?: SessionData;
   currentUserId?: string;
   isHostView?: boolean;
@@ -28,14 +24,11 @@ interface PlayerRowProps {
   isHost: boolean;
   isCurrentUser: boolean;
   sessionState: SessionState;
-  friendState: {
-    [playerId: string]: boolean;
-  };
-  addFriend: (playerId: string) => void;
   userStats?: UserStats;
   isHostView?: boolean;
   onKickPlayer?: (playerId: string, playerName: string) => void;
   sessionData?: SessionData;
+  currentUserId?: string;
 }
 
 const PlayerRowComponent = ({ 
@@ -43,13 +36,12 @@ const PlayerRowComponent = ({
   index, 
   isHost, 
   isCurrentUser, 
-  sessionState, 
-  friendState, 
-  addFriend,
+  sessionState,
   userStats,
   isHostView,
   onKickPlayer,
-  sessionData
+  sessionData,
+  currentUserId
 }: PlayerRowProps) => {
   const playerStatus = usePlayerStatus(isHost, sessionState);
   
@@ -69,11 +61,11 @@ const PlayerRowComponent = ({
         </div>
         <div className="flex items-center gap-2 ml-auto">
           {/* Show friend button only if session is finished and this is not the current user */}
-          {sessionState.isSessionFinished && !isCurrentUser && (
+          {sessionState.isSessionFinished && !isCurrentUser && currentUserId && sessionData && (
             <FriendButton 
-              playerId={player.userId} 
-              isFriend={friendState[player.userId]} 
-              onAddFriend={addFriend} 
+              playerId={player.userId}
+              sessionId={sessionData.id}
+              currentUserId={currentUserId}
             />
           )}
           
@@ -148,8 +140,6 @@ const EmptyPlayerSlot = memo(EmptyPlayerSlotComponent);
 
 const PlayerSectionComponent = ({ 
   sessionState, 
-  friendState, 
-  addFriend, 
   sessionData,
   currentUserId,
   isHostView,
@@ -209,12 +199,11 @@ const PlayerSectionComponent = ({
               isHost={isPlayerHost(player.userId)}
               isCurrentUser={isCurrentUser(player.userId)}
               sessionState={sessionState}
-              friendState={friendState}
-              addFriend={addFriend}
               userStats={userStats[player.userId]}
               isHostView={isHostView}
               onKickPlayer={onKickPlayer}
               sessionData={sessionData}
+              currentUserId={currentUserId}
             />
             {/* Add divider after each player except the last one */}
             {index < sessionData.joinedPlayers.length - 1 && (

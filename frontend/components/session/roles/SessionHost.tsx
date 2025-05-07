@@ -307,9 +307,7 @@ export function SessionHost() {
           {/* Players Section */}
           <div className="mb-6">
             <PlayerSection 
-              sessionState={sessionState} 
-              friendState={friendState} 
-              addFriend={addFriend}
+              sessionState={sessionState}
               sessionData={sessionData}
               currentUserId={userData?.id}
               isHostView={true}

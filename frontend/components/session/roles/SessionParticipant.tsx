@@ -377,8 +377,6 @@ export function SessionParticipant() {
           <div className="mb-6">
             <PlayerSection 
               sessionState={sessionState} 
-              friendState={friendState} 
-              addFriend={addFriend}
               sessionData={sessionData}
               currentUserId={userData?.id}
             />
