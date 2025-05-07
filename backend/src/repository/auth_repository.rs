@@ -87,3 +87,62 @@ pub async fn get_recent_attempts(db: &Database, limit: i64) -> Result<Vec<LoginA
 
     Ok(attempts)
 }
+
+/// Get paginated login attempts with optional filters
+pub async fn get_login_attempts_paginated(
+    db: &Database,
+    page: u64,
+    limit: u64,
+    username: Option<String>,
+    status: Option<bool>,
+) -> Result<(Vec<LoginAttempt>, u64), AppError> {
+    let collection = get_collection(db);
+
+    // Build filter
+    let mut filter = doc! {};
+
+    // Add username filter if provided
+    if let Some(username) = username {
+        filter.insert("username", username);
+    }
+
+    // Add status filter if provided
+    if let Some(status) = status {
+        filter.insert("successful", status);
+    }
+
+    // Count total matching documents for pagination
+    let total = collection
+        .count_documents(filter.clone())
+        .await
+        .map_err(|e| {
+            error!("Database error counting login attempts: {:?}", e);
+            AppError::DatabaseError(e)
+        })? as u64;
+
+    // Calculate skip value for pagination
+    let skip = (page - 1) * limit;
+
+    // Perform the query with pagination using the fluent API
+    let mut cursor = collection
+        .find(filter)
+        .sort(doc! { "created_at": -1 })
+        .skip(skip)
+        .limit(limit as i64)
+        .await
+        .map_err(|e| {
+            error!("Database error fetching login attempts: {:?}", e);
+            AppError::DatabaseError(e)
+        })?;
+
+    // Convert cursor to vector of LoginAttempt
+    let mut attempts = Vec::new();
+    while let Some(attempt) = cursor.try_next().await.map_err(|e| {
+        error!("Database error iterating login attempts: {:?}", e);
+        AppError::DatabaseError(e)
+    })? {
+        attempts.push(attempt);
+    }
+
+    Ok((attempts, total))
+}

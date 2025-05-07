@@ -4,7 +4,6 @@ import {
   AdminSessionDto, 
   AdminSessionsResponseDto, 
   AdminSessionResponseDto,
-  SessionStatus
 } from '@/utils/dto/admin-session.dto';
 
 // Define the frontend response types

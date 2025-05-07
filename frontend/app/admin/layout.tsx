@@ -15,7 +15,8 @@ import {
   Menu,
   X,
   Activity,
-  Bug
+  Bug,
+  Key
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
@@ -86,6 +87,7 @@ export default function AdminLayout({
     { href: "/admin/users", icon: <Users size={18} />, label: "Users" },
     { href: "/admin/sessions", icon: <Database size={18} />, label: "Sessions" },
     { href: "/admin/chat", icon: <MessageSquare size={18} />, label: "Chat Logs" },
+    { href: "/admin/login-attempts", icon: <Key size={18} />, label: "Login Attempts" },
     { href: "/admin/realtime", icon: <Activity size={18} />, label: "Realtime Monitor" },
     { href: "/admin/bugs", icon: <Bug size={18} />, label: "Bug Reports" },
     { href: "/admin/settings", icon: <Settings size={18} />, label: "Settings" },

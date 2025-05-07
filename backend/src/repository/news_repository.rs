@@ -1,5 +1,5 @@
 use crate::models::error::AppError;
-use crate::models::news::{Announcement, News, NewsResponse};
+use crate::models::news::{Announcement, News};
 use futures::StreamExt;
 use log::error;
 use mongodb::{

@@ -1,11 +1,5 @@
 use crate::models::admin::{
-    ActorMailboxResponse, AdminChatResponse, AdminDashboardStats, AdminSessionResponse,
-    AdminSessionsData, AdminSessionsPaginationResponse, AdminSessionsResponse,
-    ConnectionStatsResponse, ConnectionsPerHourResponse, CreateFeatureFlagDto,
-    DashboardStatsResponse, FeatureFlag, FeatureFlagApiResponse, FeatureFlagResponse,
-    FeatureFlagsData, FeatureFlagsResponse, MemoryUsage, PatchFeatureFlagDto,
-    SessionConnectionResponse, SystemInfo, SystemStatusResponse, WebSocketStatsData,
-    WebSocketStatsResponse,
+    ActorMailboxResponse, AdminChatResponse, AdminDashboardStats, AdminSessionResponse, AdminSessionsData, AdminSessionsPaginationResponse, AdminSessionsResponse, ConnectionStatsResponse, ConnectionsPerHourResponse, CreateFeatureFlagDto, DashboardStatsResponse, FeatureFlag, FeatureFlagApiResponse, FeatureFlagResponse, FeatureFlagsData, FeatureFlagsResponse, LoginAttemptDTO, LoginAttemptsData, LoginAttemptsResponse, MemoryUsage, PatchFeatureFlagDto, SessionConnectionResponse, SystemInfo, SystemStatusResponse, WebSocketStatsData, WebSocketStatsResponse
 };
 use crate::models::bug::{
     BugReport, BugReportData, BugReportResponse, BugReportResponseDto, BugReportsData,
@@ -100,6 +94,7 @@ use utoipa::{
         delete_admin_session,
         get_admin_chat_history,
         delete_admin_chat_messages,
+        get_login_attempts,
         // Feature Flag endpoints
         get_feature_flags,
         get_feature_flag,
@@ -282,6 +277,9 @@ use utoipa::{
             AdminSessionsPaginationResponse,
             AdminSessionsData,
             AdminChatResponse,
+            LoginAttemptsResponse,
+            LoginAttemptsData,
+            LoginAttemptDTO,
             // WebSocket Stats models
             WebSocketStatsResponse,
             WebSocketStatsData,
