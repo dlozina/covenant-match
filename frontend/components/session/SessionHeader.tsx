@@ -28,12 +28,12 @@ export function SessionHeader({ title }: SessionHeaderProps) {
   
   // For the display name, prioritize the actual session name from data, not from title
   // (title is just "Session #123" format which duplicates the ID)
-  const displayName = sessionData?.name || 'Loading Session...';
+  const sessionDisplayName = sessionData?.name || 'Loading Session...';
   
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 bg-secondary/30 p-3 rounded-md">
       <div className="flex flex-col">
-        <h1 className="text-2xl font-bold">{displayName}</h1>
+        <h1 className="text-2xl font-bold">{sessionDisplayName}</h1>
         <div className="flex items-center gap-1 text-sm text-muted-foreground">
           <span>Session ID: {sessionId.substring(0, 8)}</span>
         </div>

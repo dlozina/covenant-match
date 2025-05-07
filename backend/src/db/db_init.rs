@@ -148,10 +148,9 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
         users
             .insert_one(doc! {
                 "_id": admin_id,
-                "username": "admin",
-                "email": "akri@gmail.com",
+                "username": "akri",
+                "email": "akri@covenant-match.com",
                 "password_hash": password_hash,
-                "display_name": "Akri",
                 "region": "Europe",
                 "auto_region": true,
                 "cm_region": "Europe",

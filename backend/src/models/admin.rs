@@ -132,7 +132,6 @@ pub struct ChatMessageResponseDto {
 #[serde(rename_all = "camelCase")]
 pub struct UserInfoDto {
     pub username: Option<String>,
-    pub display_name: Option<String>,
     pub email: Option<String>,
     pub role: Option<String>,
     pub avatar_url: Option<String>,

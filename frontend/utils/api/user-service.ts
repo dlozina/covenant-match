@@ -209,7 +209,6 @@ export interface AdminUser {
   id: string;
   username: string;
   email: string;
-  displayName: string;
   role: string;
   createdAt: string | { $date: { $numberLong: string } };
   updatedAt: string | { $date: { $numberLong: string } };
@@ -245,7 +244,6 @@ export interface GetUsersResponse {
 export interface CreateAdminUserParams {
   username: string;
   email: string;
-  displayName: string;
   password: string;
   region?: string;
   platform?: string;
@@ -258,6 +256,5 @@ export interface CreateAdminUserParams {
 
 export interface UpdateUserParams {
   email?: string;
-  displayName?: string;
   disabled?: boolean;
 } 

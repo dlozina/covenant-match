@@ -306,7 +306,10 @@ pub async fn find_friends_sessions(
 }
 
 /// Get current user session and one previous session
-pub async fn get_user_sessions(db: &Database, user_id: &str) -> Result<Vec<GameSession>, AppError> {
+pub async fn get_user_sessions(
+    db: &Database,
+    user_id: &str,
+) -> Result<(Option<GameSession>, Option<GameSession>), AppError> {
     // 1. Get current active session (Open, Full, or InProgress)
     let current_session = get_collection(db)
         .find_one(doc! {
@@ -333,18 +336,6 @@ pub async fn get_user_sessions(db: &Database, user_id: &str) -> Result<Vec<GameS
 
     let previous_session = cursor.try_next().await?;
 
-    // Create result vector with existing sessions
-    let mut sessions = Vec::new();
-
-    // Add previous session first (if exists)
-    if let Some(prev) = previous_session {
-        sessions.push(prev);
-    }
-
-    // Add current session second (if exists)
-    if let Some(current) = current_session {
-        sessions.push(current);
-    }
-
-    Ok(sessions)
+    // Return tuple of (previous_session, current_session)
+    Ok((previous_session, current_session))
 }

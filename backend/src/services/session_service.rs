@@ -215,7 +215,7 @@ pub async fn create_session(
             region: session_data.region,
             platform: user.platform,
             experience: user.experience.to_string(),
-            username: user.display_name.unwrap_or(user.username),
+            username: user.username,
             nightfarer: session_data.nightfarer,
             covenant_name: user.covenant_name,
             joined_at: now,
@@ -1069,7 +1069,7 @@ pub async fn recreate_session(
             user_id: user_id.to_string(),
             region: original_session.region.clone(),
             platform: original_session.platform.clone(),
-            username: host_user.display_name.unwrap_or(host_user.username),
+            username: host_user.username,
             nightfarer: host_nightfarer,
             covenant_name: host_user.covenant_name.clone(),
             experience: host_user.experience.to_string(),
@@ -1478,29 +1478,16 @@ pub async fn get_user_sessions(
     db: &Database,
     user_id: &str,
 ) -> Result<UserSessionResponseDto, AppError> {
-    // Get sessions from repository - returns Vec<GameSession>
-    let sessions = session_repository::get_user_sessions(db, user_id).await?;
+    // Get sessions from repository - returns (Option<GameSession>, Option<GameSession>)
+    let (previous_session, current_session) =
+        session_repository::get_user_sessions(db, user_id).await?;
 
     // Check if we have any sessions
-    if sessions.is_empty() {
+    if previous_session.is_none() && current_session.is_none() {
         return Err(AppError::BadRequest(
             "No sessions found for user".to_string(),
         ));
     }
-
-    // Repository returns sessions in this order:
-    // - First position (0): Previous session (Completed) if exists
-    // - Second position (1): Current session (Open/Full/InProgress) if exists
-
-    // Get previous session (index 0)
-    let previous_session = Some(sessions[0].clone());
-
-    // Get current session (index 1) if exists
-    let current_session = if sessions.len() > 1 {
-        Some(sessions[1].clone())
-    } else {
-        None
-    };
 
     // Use our helper to convert from GameSession to GameSessionDto
     Ok(UserSessionHelper::from_game_sessions(

@@ -62,7 +62,6 @@ export interface RegisterParams {
   username: string;
   email: string;
   password: string;
-  displayName: string;
   region: string;
   platform: string;
   autoRegion: boolean;
@@ -73,7 +72,6 @@ export interface RegisterParams {
 export interface UpdateProfileParams {
   username?: string;
   email?: string;
-  displayName?: string;
   region?: string;
   platform?: string;
   autoRegion?: boolean;
@@ -88,7 +86,6 @@ export interface UserProfile {
   id: string;
   username: string;
   email: string;
-  displayName: string;
   region: string;
   platform: string;
   autoRegion: boolean;
@@ -398,7 +395,6 @@ export interface UserSessionResult {
 export interface Friend {
   id: string;
   username: string;
-  displayName?: string;
   avatarUrl?: string;
   covenantName: string;
   platform: string;
@@ -428,7 +424,6 @@ export type SessionResponse = Session;
 
 export interface UserStats {
   userId: string;
-  displayName: string;
   platform: string;
   experience: string;
   covenantName: string;

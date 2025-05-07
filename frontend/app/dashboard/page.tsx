@@ -777,7 +777,7 @@ function DashboardContent() {
       <h1 className="text-2xl md:text-3xl font-bold mb-4 md:mb-6">Dashboard</h1>
       
       <div className="bg-card/50 border border-purple-900/20 rounded-lg p-4 md:p-6 backdrop-blur-sm">
-        <h2 className="text-lg md:text-xl font-semibold mb-2 md:mb-4">Welcome, {userData?.displayName || userData?.username || 'Ashen One'}</h2>
+        <h2 className="text-lg md:text-xl font-semibold mb-2 md:mb-4">Welcome, {userData?.username || 'Tarnished'}</h2>
         <p className="text-muted-foreground mb-4 md:mb-6 text-sm md:text-base">
           This is your personal dashboard where you can track your game statistics.
         </p>

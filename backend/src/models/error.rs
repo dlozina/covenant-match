@@ -67,9 +67,6 @@ pub enum AppError {
     #[error("Email already in use")]
     EmailAlreadyInUse,
 
-    #[error("Display name already in use")]
-    DisplayNameAlreadyInUse,
-
     // Added variants that are used in session_service.rs
     #[error("Bad request: {0}")]
     BadRequest(String),
@@ -151,7 +148,6 @@ impl ResponseError for AppError {
             AppError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
 
             AppError::EmailAlreadyInUse => StatusCode::CONFLICT,
-            AppError::DisplayNameAlreadyInUse => StatusCode::CONFLICT,
 
             AppError::CaptchaVerificationFailed(_) => StatusCode::BAD_REQUEST,
             AppError::CaptchaRequired(_) => StatusCode::BAD_REQUEST,

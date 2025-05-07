@@ -604,9 +604,6 @@ async fn get_multiple_users_statistics(
                     Ok(Some(user)) => {
                         stats_collection.push(UserStatsResponse {
                             user_id,
-                            display_name: user
-                                .display_name
-                                .unwrap_or_else(|| user.username.clone()),
                             platform: user.platform,
                             experience: user.experience.to_string(),
                             covenant_name: user.covenant_name,
@@ -621,7 +618,6 @@ async fn get_multiple_users_statistics(
                         // User not found in users collection but has stats
                         stats_collection.push(UserStatsResponse {
                             user_id: user_id.clone(),
-                            display_name: stats.username,
                             platform: "Unknown".to_string(),
                             experience: "Unknown".to_string(),
                             covenant_name: "Unknown".to_string(),
@@ -676,7 +672,6 @@ async fn get_multiple_users_statistics(
 #[serde(rename_all = "camelCase")]
 pub struct UserStatsResponse {
     pub user_id: String,
-    pub display_name: String,
     pub platform: String,
     pub experience: String,
     pub covenant_name: String,

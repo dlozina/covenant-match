@@ -190,18 +190,6 @@ pub async fn update_user_password(
     Ok(())
 }
 
-pub async fn find_by_display_name(
-    db: &Database,
-    display_name: &str,
-) -> Result<Option<User>, AppError> {
-    let collection = db.collection::<User>("users");
-    let filter = doc! { "display_name": display_name };
-
-    collection
-        .find_one(filter)
-        .await
-        .map_err(AppError::DatabaseError)
-}
 
 /// Find users by role with pagination
 pub async fn find_users_by_role_paginated(

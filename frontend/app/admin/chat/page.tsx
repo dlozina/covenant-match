@@ -73,7 +73,6 @@ interface ChatMessage {
   sessionId: string;
   user?: {
     username?: string;
-    displayName?: string;
     email?: string;
     role?: string;
     avatarUrl?: string;
@@ -526,9 +525,9 @@ export default function AdminChatPage() {
                             <div className="flex items-center gap-1 cursor-help">
                               <User className="h-4 w-4 opacity-70" />
                               <span>
-                                {message.user?.displayName || message.senderName || "Unknown User"}
+                                {message.senderName || "Unknown User"}
                               </span>
-                              {message.senderName && message.user?.displayName && message.senderName !== message.user.displayName && (
+                              {message.senderName && message.user?.username && message.senderName !== message.user.username && (
                                 <Badge variant="outline" className="ml-1 text-xs">
                                   {message.senderName}
                                 </Badge>

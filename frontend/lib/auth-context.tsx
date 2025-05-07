@@ -10,7 +10,6 @@ export const TOKEN_REFRESH_INTERVAL = 60 * 60 * 1000; // 1 hour in milliseconds 
 type UserData = {
   id: string;
   username: string;
-  displayName: string;
   email: string;
   region?: string;
   platform?: string;
@@ -110,7 +109,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         id: data.id,
         username: data.username,
         email: data.email,
-        displayName: data.displayName,
         region: data.region,
         platform: data.platform,
         autoRegion: data.autoRegion,

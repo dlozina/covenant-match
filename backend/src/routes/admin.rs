@@ -292,7 +292,6 @@ async fn get_admin_chat_history(
                             sender_id,
                             UserInfoDto {
                                 username: Some(user.username),
-                                display_name: user.display_name,
                                 email: Some(user.email),
                                 role: Some(user.role),
                                 avatar_url: user.avatar_url,

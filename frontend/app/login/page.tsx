@@ -203,9 +203,9 @@ export default function LoginPage() {
       <div className="container flex items-center justify-center min-h-[80vh] px-4 py-6 md:py-8">
         <Card className="w-full max-w-sm mx-auto">
           <CardHeader className="space-y-1 px-4 sm:px-6">
-            <CardTitle className="text-xl sm:text-2xl font-bold">Login</CardTitle>
+            <CardTitle className="text-xl sm:text-2xl font-bold">Roundtable Hold Key</CardTitle>
             <CardDescription className="text-sm">
-              Enter your credentials to access your account
+              Enter your credentials to access your covenant
             </CardDescription>
           </CardHeader>
           <CardContent className="px-4 sm:px-6">
@@ -216,10 +216,10 @@ export default function LoginPage() {
                   name="username"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm">Username</FormLabel>
+                      <FormLabel className="text-sm">Nightfarer Name</FormLabel>
                       <FormControl>
                         <Input 
-                          placeholder="username" 
+                          placeholder="name" 
                           {...field} 
                           className="h-10 text-base"
                           onChange={(e) => {
@@ -287,7 +287,7 @@ export default function LoginPage() {
           </CardContent>
           <CardFooter className="flex flex-col items-center justify-center space-y-2 px-4 sm:px-6 pb-6">
             <div className="text-xs sm:text-sm text-muted-foreground">
-              Don&apos;t have an account?{" "}
+              Don&apos;t have a key?{" "}
               <Link href="/profile/create" className="text-primary hover:underline">
                 Create one
               </Link>

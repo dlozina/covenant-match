@@ -42,17 +42,17 @@ export const PlayerHoverCard: React.FC<PlayerHoverCardProps> = ({
         </DialogTrigger>
       </div>
       <DialogTitle className="sr-only">
-        {userStats.displayName}
+        {userStats.username}
       </DialogTitle>
       <DialogDescription className="sr-only">
-        Player stats for {userStats.displayName}
+        Player stats for {userStats.username}
       </DialogDescription>
       <DialogContent className="sm:max-w-[425px] p-0">
         <Card className="border-0 shadow-none w-full">
           <CardContent className="p-4 space-y-3">
             <div className="flex items-center justify-between pt-2">
               <div>
-                <h3 className="font-bold text-lg">{userStats.displayName}</h3>
+                <h3 className="font-bold text-lg">{userStats.username}</h3>
                 <p className="text-sm text-muted-foreground">{userStats.covenantName}</p>
               </div>
               <div className="bg-primary/10 text-primary px-2 py-1 rounded text-xs">

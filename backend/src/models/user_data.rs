@@ -11,7 +11,6 @@ pub struct UserDataResponseDto {
     pub email: Option<String>,
     #[schema(format = "password")]
     pub password: Option<String>,
-    pub display_name: Option<String>,
     pub region: Option<String>,
     pub auto_region: Option<bool>,
     pub platform: Option<String>,

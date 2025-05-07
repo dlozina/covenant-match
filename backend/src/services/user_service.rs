@@ -5,7 +5,7 @@ use crate::models::user::{
     CreateUserDto, Experience, FriendDto, LoginUserDto, UpdateUserProfileDto, User, UserResponse,
 };
 use crate::repository::user_repository;
-use crate::repository::{session_repository, token_repository};
+use crate::repository::token_repository;
 use crate::services::email_service;
 use crate::utils::jwt;
 use bcrypt::{hash, verify, DEFAULT_COST};
@@ -27,16 +27,6 @@ pub async fn create_user(
         return Err(AppError::UserAlreadyExists);
     }
 
-    // Check if display name already exists (if provided)
-    if let Some(display_name) = &user_data.display_name {
-        if user_repository::find_by_display_name(db, display_name)
-            .await?
-            .is_some()
-        {
-            return Err(AppError::DisplayNameAlreadyInUse);
-        }
-    }
-
     // Hash the password
     let password_hash = hash(&user_data.password, DEFAULT_COST)
         .map_err(|e| AppError::InternalError(e.to_string()))?;
@@ -55,7 +45,6 @@ pub async fn create_user(
         username: user_data.username,
         email: user_data.email,
         password_hash,
-        display_name: user_data.display_name,
         avatar_url: None,
         region: user_data.region,
         platform: user_data.platform,
@@ -94,7 +83,6 @@ pub async fn create_user(
         id: user.id.to_hex(),
         username: user.username,
         email: user.email,
-        display_name: user.display_name,
         avatar_url: user.avatar_url,
         region: user.region,
         cm_region: user.cm_region,
@@ -140,7 +128,6 @@ pub async fn login_user(
         id: user.id.to_hex(),
         username: user.username,
         email: user.email,
-        display_name: user.display_name,
         avatar_url: user.avatar_url,
         region: user.region,
         auto_region: user.auto_region,
@@ -250,7 +237,6 @@ pub async fn get_user_by_id(db: &Database, user_id: &str) -> Result<UserResponse
             id: user.id.to_hex(),
             username: user.username,
             email: user.email,
-            display_name: user.display_name,
             avatar_url: user.avatar_url,
             region: user.region,
             auto_region: user.auto_region,
@@ -285,20 +271,19 @@ pub async fn ensure_admin_exists(db: &Database) -> Result<(), AppError> {
     } else {
         // Get admin credentials from environment
         let admin_username =
-            std::env::var("ADMIN_USERNAME").unwrap_or_else(|_| "admin".to_string());
+            std::env::var("ADMIN_USERNAME").unwrap_or_else(|_| "akri".to_string());
         let admin_password = std::env::var("ADMIN_PASSWORD").unwrap_or_else(|_| {
             warn!("ADMIN_PASSWORD not set! Using default password - change this in production!");
             "changeme123#".to_string()
         });
         let admin_email =
-            std::env::var("ADMIN_EMAIL").unwrap_or_else(|_| "admin@covenantmatch.com".to_string());
+            std::env::var("ADMIN_EMAIL").unwrap_or_else(|_| "akri@covenant-match.com".to_string());
 
         // Create admin user
         let admin_data = CreateUserDto {
             username: admin_username,
             email: admin_email,
             password: admin_password,
-            display_name: Some("Akri".to_string()),
             region: "EU".to_string(),
             auto_region: true,
             platform: "PlayStation".to_string(),
@@ -358,16 +343,6 @@ pub async fn update_user_profile(
         }
     }
 
-    // Check if display name is being updated and if it's already in use
-    if let Some(display_name) = &update_data.display_name {
-        if let Some(existing_user) = user_repository::find_by_display_name(db, display_name).await?
-        {
-            if existing_user.id != object_id {
-                return Err(AppError::DisplayNameAlreadyInUse);
-            }
-        }
-    }
-
     // Get the current timestamp as MongoDB DateTime
     let now = mongodb::bson::DateTime::now();
 
@@ -376,9 +351,6 @@ pub async fn update_user_profile(
 
     if let Some(email) = update_data.email.clone() {
         update_doc.insert("email", email);
-    }
-    if let Some(display_name) = update_data.display_name.clone() {
-        update_doc.insert("display_name", display_name);
     }
     if let Some(avatar_url) = update_data.avatar_url.clone() {
         update_doc.insert("avatar_url", avatar_url);
@@ -537,7 +509,6 @@ pub async fn get_friend_list(db: &Database, user_id: &str) -> Result<Vec<FriendD
         .map(|friend| FriendDto {
             id: friend.id.to_hex(),
             username: friend.username,
-            display_name: friend.display_name,
             avatar_url: friend.avatar_url,
             covenant_name: friend.covenant_name,
             platform: friend.platform,

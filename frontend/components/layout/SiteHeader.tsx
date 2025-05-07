@@ -112,10 +112,10 @@ export function SiteHeader() {
                       >
                         <Avatar className="h-8 w-8">
                           <AvatarFallback className="bg-gradient-to-br from-purple-700 to-indigo-900 text-white text-xs">
-                            {userData.displayName?.substring(0, 2) || userData.username?.substring(0, 2)}
+                            {userData.username?.substring(0, 2)}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="hidden sm:inline font-medium">{userData.displayName || userData.username}</span>
+                        <span className="hidden sm:inline font-medium">{userData.username}</span>
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-[200px]">

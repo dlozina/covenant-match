@@ -187,7 +187,7 @@ export interface NewsItem {
 // Types for user statistics
 export interface UserStats {
   userId: string;
-  displayName: string;
+  username: string;
   platform: string;
   covenantName: string;
   experience: string;
@@ -804,7 +804,7 @@ export interface RegisterParams {
   username: string;
   email: string;
   password: string;
-  displayName: string;
+
   region: string;
   platform: string;
   autoRegion: boolean;
@@ -815,7 +815,6 @@ export interface RegisterParams {
 export interface UpdateProfileParams {
   username?: string;
   email?: string;
-  displayName?: string;
   region?: string;
   platform?: string;
   autoRegion?: boolean;

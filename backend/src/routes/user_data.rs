@@ -51,7 +51,6 @@ async fn get_current_user_data(db: web::Data<Database>, req: HttpRequest) -> imp
                 geo_location_data,
                 email: Some(user.email),
                 password: None,
-                display_name: user.display_name,
                 region: Some(user.region),
                 auto_region: Some(user.auto_region),
                 platform: Some(user.platform),
