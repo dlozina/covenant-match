@@ -368,6 +368,34 @@ export class SessionService {
       throw new ApiError('Failed to kick player', 500);
     }
   }
+
+  /**
+   * Get friendship matrix for a session
+   * @param sessionId Session ID
+   * @returns Friendship matrix data showing friend relationships between players
+   */
+  static async getFriendshipMatrix(sessionId: string): Promise<{
+    players: Array<{
+      id: string;
+      username: string;
+      isFriendsWith: string[];
+    }>
+  }> {
+    try {
+      return await httpClient.get<{
+        players: Array<{
+          id: string;
+          username: string;
+          isFriendsWith: string[];
+        }>
+      }>(`/api/v1/sessions/${sessionId}/friendship-matrix`, true);
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw error;
+      }
+      throw new ApiError('Failed to fetch friendship matrix', 500);
+    }
+  }
 }
 
 // Export a singleton instance

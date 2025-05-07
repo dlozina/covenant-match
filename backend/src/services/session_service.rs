@@ -1,9 +1,9 @@
 use crate::models::error::AppError;
 use crate::models::session::{
-    CovenantStats, CovenantStatsResponse, CreateSessionDto, GameResult, GameSession,
-    GameSessionDto, JoinSessionDto, MinimalSessionDto, PlayerInfo, RateSessionDto,
-    SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto,
-    UserSessionHelper, UserSessionResponseDto,
+    CovenantStats, CovenantStatsResponse, CreateSessionDto, FriendshipMatrix, FriendshipPlayer,
+    GameResult, GameSession, GameSessionDto, JoinSessionDto, MinimalSessionDto, PlayerInfo,
+    RateSessionDto, SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto,
+    UpdateSessionDto, UserSessionHelper, UserSessionResponseDto,
 };
 use crate::repository::{session_repository, statistics_repository, user_repository};
 use crate::sse::messages::{BroadcastMessage, ServerMessage as SseServerMessage};
@@ -1494,6 +1494,71 @@ pub async fn get_user_sessions(
         previous_session,
         current_session,
     ))
+}
+
+pub async fn get_friendship_matrix(
+    db: &Database,
+    session_id: &str,
+) -> Result<FriendshipMatrix, AppError> {
+    // 1. Get the session
+    let session = session_repository::find_by_id(db, session_id)
+        .await?
+        .ok_or(AppError::SessionNotFound)?;
+
+    // 2. If no players, return empty response
+    if session.joined_players.is_empty() {
+        return Ok(FriendshipMatrix { players: vec![] });
+    }
+
+    // 3. Extract user IDs for all players in the session
+    let user_ids: Vec<String> = session
+        .joined_players
+        .iter()
+        .map(|player| player.user_id.clone())
+        .collect();
+
+    // 4. Get all user documents in one query for efficiency
+    let users = user_repository::find_users_by_ids(db, &user_ids).await?;
+
+    // 5. Construct the response with friendship information
+    let players = session
+        .joined_players
+        .iter()
+        .map(|session_player| {
+            // For each player in the session
+            let mut is_friends_with = Vec::new();
+
+            // Find this player's user document
+            if let Some(user) = users
+                .iter()
+                .find(|u| u.id.to_hex() == session_player.user_id)
+            {
+                // Check which other session players are in this user's friends list
+                for other_player in &session.joined_players {
+                    // Skip checking against self
+                    if other_player.user_id == session_player.user_id {
+                        continue;
+                    }
+
+                    // Try to convert other player's ID to ObjectId for comparison
+                    if let Ok(other_id) = ObjectId::parse_str(&other_player.user_id) {
+                        // If this user has the other player in their friend list
+                        if user.friend_list.contains(&other_id) {
+                            is_friends_with.push(other_player.user_id.clone());
+                        }
+                    }
+                }
+            }
+
+            FriendshipPlayer {
+                id: session_player.user_id.clone(),
+                username: session_player.username.clone(),
+                is_friends_with,
+            }
+        })
+        .collect();
+
+    Ok(FriendshipMatrix { players })
 }
 
 #[cfg(test)]

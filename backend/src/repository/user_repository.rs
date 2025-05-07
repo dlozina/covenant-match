@@ -190,7 +190,6 @@ pub async fn update_user_password(
     Ok(())
 }
 
-
 /// Find users by role with pagination
 pub async fn find_users_by_role_paginated(
     db: &Database,
@@ -371,4 +370,31 @@ pub async fn get_friend_list_details(db: &Database, user_id: &str) -> Result<Vec
     })?;
 
     Ok(friends_list)
+}
+
+/// Find multiple users by their IDs in a single query
+pub async fn find_users_by_ids(db: &Database, user_ids: &[String]) -> Result<Vec<User>, AppError> {
+    let collection = db.collection::<User>(COLLECTION_NAME);
+
+    // Convert string IDs to ObjectIds
+    let object_ids = user_ids
+        .iter()
+        .filter_map(|id| ObjectId::parse_str(id).ok())
+        .collect::<Vec<ObjectId>>();
+
+    if object_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let filter = doc! { "_id": { "$in": object_ids } };
+
+    let cursor = collection.find(filter).await.map_err(|e| {
+        error!("Database error finding users by ids: {:?}", e);
+        AppError::DatabaseError(e)
+    })?;
+
+    cursor.try_collect().await.map_err(|e| {
+        error!("Database error collecting users by ids: {:?}", e);
+        AppError::DatabaseError(e)
+    })
 }

@@ -1,3 +1,4 @@
+use crate::models::error::AppError;
 use crate::models::session::{CreateSessionDto, JoinSessionDto, SubmitResultDto, UpdateSessionDto};
 use crate::services::session_service;
 use crate::utils::jwt;
@@ -839,6 +840,47 @@ async fn kick_player(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/api/v1/sessions/{id}/friendship-matrix",
+    params(
+        ("id" = String, Path, description = "Session ID")
+    ),
+    responses(
+        (status = 200, description = "Friendship matrix retrieved successfully", body = FriendshipMatrix),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Session not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "sessions"
+)]
+#[get("/api/v1/sessions/{id}/friendship-matrix")]
+async fn get_friendship_matrix(db: web::Data<Database>, path: web::Path<String>) -> impl Responder {
+    match session_service::get_friendship_matrix(&db, &path.into_inner()).await {
+        Ok(matrix) => HttpResponse::Ok().json(matrix),
+        Err(e) => {
+            log::error!("Error getting friendship matrix: {:?}", e);
+            match e {
+                AppError::SessionNotFound => HttpResponse::NotFound().json(serde_json::json!({
+                    "status": "error",
+                    "message": "Session not found"
+                })),
+                AppError::InvalidId => HttpResponse::BadRequest().json(serde_json::json!({
+                    "status": "error",
+                    "message": "Invalid session ID format"
+                })),
+                _ => HttpResponse::InternalServerError().json(serde_json::json!({
+                    "status": "error",
+                    "message": "Internal server error"
+                })),
+            }
+        }
+    }
+}
+
 /// Get sessions created by friends
 pub fn config(cfg: &mut web::ServiceConfig) {
     // Register paths from most specific to most general
@@ -861,5 +903,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         .service(submit_result)
         .service(get_results)
         .service(reset_session_flags)
-        .service(kick_player);
+        .service(kick_player)
+        .service(get_friendship_matrix);
 }

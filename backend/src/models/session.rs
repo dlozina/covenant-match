@@ -389,3 +389,19 @@ impl UserSessionHelper {
         }
     }
 }
+
+/// Player information for the friendship matrix
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FriendshipPlayer {
+    pub id: String,
+    pub username: String,
+    pub is_friends_with: Vec<String>,
+}
+
+/// Response model for the friendship matrix
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FriendshipMatrix {
+    pub players: Vec<FriendshipPlayer>,
+}
