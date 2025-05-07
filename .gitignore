@@ -58,3 +58,4 @@ nginx/.htpasswd
 
 # Uploads
 uploads/
+**/.claude/settings.local.json

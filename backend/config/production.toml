@@ -7,7 +7,7 @@ url = "mongodb://mongodb:27017"
 [server]
 port = 8080       # Default port, can be overridden by env vars
 host = "0.0.0.0"  # Listen on all interfaces
-workers = 4       # More workers for production
+workers = 2       # More workers for production
 
 [auth]
 # Auth config is inherited from default.toml 

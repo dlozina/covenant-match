@@ -60,6 +60,7 @@ services:
     volumes:
       - ./mongodb/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
       - mongodb_data_dev:/data/db
+    command: mongod --wiredTigerCacheSizeGB 1 --wiredTigerCollectionBlockCompressor=zlib --wiredTigerJournalCompressor=snappy --wiredTigerIndexPrefixCompression=true
     networks:
       - covenant-network-dev
   
