@@ -242,11 +242,11 @@ function FriendsContent() {
                           {friend.stats ? (
                             <div className="flex items-center gap-2 mt-1">
                               <div className="flex items-center text-xs text-amber-500">
-                                <Trophy size={12} className="mr-0.5" />
+                                <Swords size={12} className="mr-0.5" />
                                 <span>{friend.stats.totalGames}</span>
                               </div>
                               <div className="flex items-center text-xs text-green-500">
-                                <Swords size={12} className="mr-0.5" />
+                                <Trophy size={12} className="mr-0.5" />
                                 <span>{friend.stats.wins}</span>
                               </div>
                               <div className="flex items-center text-xs text-red-500">
