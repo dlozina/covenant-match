@@ -51,13 +51,77 @@ async fn ensure_collections_exist(db: &Database) -> Result<(), Error> {
 
 async fn create_indexes(db: &Database) -> Result<(), Error> {
     // Creating an index is idempotent - won't error if it already exists
-    let index = IndexModel::builder()
+
+    // Username index for users collection
+    let username_index = IndexModel::builder()
         .keys(doc! { "username": 1 })
         .options(IndexOptions::builder().unique(true).build())
         .build();
 
     db.collection::<Document>("users")
-        .create_index(index)
+        .create_index(username_index)
+        .await?;
+
+    // Session ID index for sessions collection
+    let session_id_index = IndexModel::builder().keys(doc! { "session_id": 1 }).build();
+
+    db.collection::<Document>("sessions")
+        .create_index(session_id_index)
+        .await?;
+
+    // User ID index for sessions collection
+    let user_id_index = IndexModel::builder().keys(doc! { "user_id": 1 }).build();
+
+    db.collection::<Document>("sessions")
+        .create_index(user_id_index)
+        .await?;
+
+    // Host ID index for sessions collection
+    let host_id_index = IndexModel::builder().keys(doc! { "host_id": 1 }).build();
+
+    db.collection::<Document>("sessions")
+        .create_index(host_id_index)
+        .await?;
+
+    // Joined players user_id index for sessions collection
+    let joined_players_user_id_index = IndexModel::builder()
+        .keys(doc! { "joined_players.user_id": 1 })
+        .build();
+
+    db.collection::<Document>("sessions")
+        .create_index(joined_players_user_id_index)
+        .await?;
+
+    // Joined players userId index for sessions collection (looks like we have both formats)
+    let joined_players_user_id_index = IndexModel::builder()
+        .keys(doc! { "joined_players.userId": 1 })
+        .build();
+
+    db.collection::<Document>("sessions")
+        .create_index(joined_players_user_id_index)
+        .await?;
+
+    // Status index for sessions collection
+    let status_index = IndexModel::builder().keys(doc! { "status": 1 }).build();
+
+    db.collection::<Document>("sessions")
+        .create_index(status_index)
+        .await?;
+
+    // Compound index for common session queries
+    let status_private_index = IndexModel::builder()
+        .keys(doc! { "status": 1, "is_private": 1 })
+        .build();
+
+    db.collection::<Document>("sessions")
+        .create_index(status_private_index)
+        .await?;
+
+    // Session ID index for messages collection
+    let messages_session_id_index = IndexModel::builder().keys(doc! { "session_id": 1 }).build();
+
+    db.collection::<Document>("messages")
+        .create_index(messages_session_id_index)
         .await?;
 
     Ok(())
