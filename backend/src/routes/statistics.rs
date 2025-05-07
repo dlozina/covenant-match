@@ -1,6 +1,6 @@
 use crate::models::statistics::{
-    NightLordStatsResponse, PaginatedSessionData, PaginatedSessionResponse, PaginationInfo,
-    PaginationQuery, SessionHistoryResponse,
+    BatchUserStatsResponse, NightLordStatsResponse, PaginatedSessionData, PaginatedSessionResponse,
+    PaginationInfo, PaginationQuery, SessionHistoryResponse,
 };
 use crate::services::statistics_service;
 use crate::utils::jwt;
@@ -591,106 +591,47 @@ async fn get_multiple_users_statistics(
         }
     };
 
-    // Collect statistics for each user
-    let mut stats_collection = Vec::new();
-    let mut not_found_users = Vec::new();
-
-    for user_id in user_ids {
-        // Get user statistics
-        match statistics_service::get_user_statistics(&db, &user_id).await {
-            Ok(Some(stats)) => {
-                // Get user details for additional info
-                match user_repository::find_user_by_id(&db, &user_id).await {
-                    Ok(Some(user)) => {
-                        stats_collection.push(UserStatsResponse {
-                            user_id,
-                            username: user.username,
-                            platform: user.platform,
-                            experience: user.experience.to_string(),
-                            covenant_name: user.covenant_name,
-                            total_games: stats.total_games,
-                            wins: stats.wins,
-                            losses: stats.losses,
-                            win_rate: stats.win_rate,
-                            score: stats.score,
-                        });
-                    }
-                    Ok(None) => {
-                        // User not found in users collection but has stats
-                        stats_collection.push(UserStatsResponse {
-                            user_id: user_id.clone(),
-                            username: "Unknown".to_string(),
-                            platform: "Unknown".to_string(),
-                            experience: "Unknown".to_string(),
-                            covenant_name: "Unknown".to_string(),
-                            total_games: stats.total_games,
-                            wins: stats.wins,
-                            losses: stats.losses,
-                            win_rate: stats.win_rate,
-                            score: stats.reputation_score,
-                        });
-                    }
-                    Err(e) => {
-                        log::error!("Error fetching user details: {:?}", e);
-                        not_found_users.push(user_id.clone());
-                    }
-                }
-            }
-            Ok(None) => {
-                not_found_users.push(user_id);
-            }
-            Err(e) => {
-                log::error!("Error fetching user statistics: {:?}", e);
-                return HttpResponse::InternalServerError().json(serde_json::json!({
+    match statistics_service::get_batch_user_stats(&db, &user_ids).await {
+        Ok(stats_collection) => {
+            // If we found no stats for any users
+            if stats_collection.is_empty() {
+                return HttpResponse::NotFound().json(serde_json::json!({
                     "status": "error",
-                    "message": e.to_string()
+                    "message": "Statistics not found for any of the specified users"
                 }));
             }
+
+            // Create a list of users for which stats were not found
+            let found_user_ids: Vec<String> = stats_collection
+                .iter()
+                .map(|stat| stat.user_id.clone())
+                .collect();
+
+            let not_found_users: Vec<String> = user_ids
+                .iter()
+                .filter(|id| !found_user_ids.contains(id))
+                .cloned()
+                .collect();
+
+            // Return successful response
+            HttpResponse::Ok().json(BatchUserStatsResponse {
+                status: "success".to_string(),
+                data: stats_collection,
+                not_found_users: if not_found_users.is_empty() {
+                    None
+                } else {
+                    Some(not_found_users)
+                },
+            })
+        }
+        Err(e) => {
+            log::error!("Error fetching batch user statistics: {:?}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": "error",
+                "message": e.to_string()
+            }))
         }
     }
-
-    // If we found no stats for any users
-    if stats_collection.is_empty() {
-        return HttpResponse::NotFound().json(serde_json::json!({
-            "status": "error",
-            "message": "Statistics not found for any of the specified users",
-            "notFoundUsers": not_found_users
-        }));
-    }
-
-    // Return successful response
-    HttpResponse::Ok().json(BatchUserStatsResponse {
-        status: "success".to_string(),
-        data: stats_collection,
-        not_found_users: if not_found_users.is_empty() {
-            None
-        } else {
-            Some(not_found_users)
-        },
-    })
-}
-
-#[derive(Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct UserStatsResponse {
-    pub user_id: String,
-    pub username: String,
-    pub platform: String,
-    pub experience: String,
-    pub covenant_name: String,
-    pub total_games: i32,
-    pub wins: i32,
-    pub losses: i32,
-    pub win_rate: f64,
-    pub score: f64,
-}
-
-#[derive(Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct BatchUserStatsResponse {
-    pub status: String,
-    pub data: Vec<UserStatsResponse>,
-    pub not_found_users: Option<Vec<String>>,
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {

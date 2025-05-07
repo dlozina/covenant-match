@@ -24,8 +24,7 @@ use crate::models::session::{
     SubmitResultDto, UpdateSessionDto, UserSessionResponseDto,
 };
 use crate::models::statistics::{
-    LeaderboardEntryResponseDto, NightLordStatsResponse, PaginatedSessionData,
-    PaginatedSessionResponse, SessionHistoryResponse, Stats, UserStatistics,
+    BatchUserStatsResponse, LeaderboardEntryResponseDto, NightLordStatsResponse, PaginatedSessionData, PaginatedSessionResponse, SessionHistoryResponse, Stats, UserStatistics, UserStatsResponse
 };
 use crate::models::user::{
     AddFriendDto, AuthResponse, CreateUserDto, FriendDto, FriendListResponse, GetUsersQuery,

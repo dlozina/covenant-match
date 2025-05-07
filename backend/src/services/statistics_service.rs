@@ -1,7 +1,7 @@
 use crate::models::error::AppError;
-use crate::models::statistics::{LeaderboardEntryResponseDto, UserStatistics};
-use crate::repository::session_repository;
+use crate::models::statistics::{LeaderboardEntryResponseDto, UserStatistics, UserStatsResponse};
 use crate::repository::statistics_repository;
+use crate::repository::{session_repository, user_repository};
 use crate::routes::statistics::{PlayerDetail, SessionDetail};
 use mongodb::{bson::oid::ObjectId, Database};
 use serde::{Deserialize, Serialize};
@@ -234,4 +234,63 @@ pub async fn get_session_details(
     };
 
     Ok(Some(session_detail))
+}
+
+pub async fn get_batch_user_stats(
+    db: &Database,
+    user_ids: &[String],
+) -> Result<Vec<UserStatsResponse>, AppError> {
+    // Collect statistics for each user
+    let mut stats_collection = Vec::new();
+
+    for user_id in user_ids {
+        // Get user statistics
+        match get_user_statistics(&db, user_id).await {
+            Ok(Some(stats)) => {
+                // Get user details for additional info
+                match user_repository::find_user_by_id(&db, user_id).await {
+                    Ok(Some(user)) => {
+                        stats_collection.push(UserStatsResponse {
+                            user_id: user_id.clone(),
+                            username: user.username,
+                            platform: user.platform,
+                            experience: user.experience.to_string(),
+                            covenant_name: user.covenant_name,
+                            total_games: stats.total_games,
+                            wins: stats.wins,
+                            losses: stats.losses,
+                            win_rate: stats.win_rate,
+                            score: stats.reputation_score,
+                        });
+                    }
+                    Ok(None) => {
+                        // User not found in users collection but has stats
+                        stats_collection.push(UserStatsResponse {
+                            user_id: user_id.clone(),
+                            username: "Unknown".to_string(),
+                            platform: "Unknown".to_string(),
+                            experience: "Unknown".to_string(),
+                            covenant_name: "Unknown".to_string(),
+                            total_games: stats.total_games,
+                            wins: stats.wins,
+                            losses: stats.losses,
+                            win_rate: stats.win_rate,
+                            score: stats.reputation_score,
+                        });
+                    }
+                    Err(e) => {
+                        log::error!("Error fetching user details: {:?}", e);
+                    }
+                }
+            }
+            Ok(None) => {
+                log::debug!("No statistics found for user: {}", user_id);
+            }
+            Err(e) => {
+                log::error!("Error fetching user statistics: {:?}", e);
+            }
+        }
+    }
+
+    Ok(stats_collection)
 }
