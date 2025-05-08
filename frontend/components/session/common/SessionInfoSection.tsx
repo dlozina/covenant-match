@@ -1,8 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { SessionState } from '@/components/session/SessionReducers';
 import { SessionData } from './types';
 import { formatDistanceToNow } from 'date-fns';
+import { Button } from "@/components/ui/button";
+import { Share2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface SessionInfoSectionProps {
   sessionState: SessionState;
@@ -15,6 +18,25 @@ const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({
   sessionState, 
   sessionData
 }) => {
+  const [showCopied, setShowCopied] = useState(false);
+
+  // Function to handle copying the session link to clipboard
+  const handleCopyLink = () => {
+    if (sessionData?.id) {
+      const url = `${window.location.origin}/sessions/join?id=${sessionData.id}`;
+      navigator.clipboard.writeText(url)
+        .then(() => {
+          setShowCopied(true);
+          setTimeout(() => {
+            setShowCopied(false);
+          }, 2000);
+        })
+        .catch(err => {
+          console.error('Error copying to clipboard:', err);
+        });
+    }
+  };
+
   // Memoize the relative time display to prevent unnecessary rerenders
   const relativeTime = useMemo(() => {
     // If session hasn't started yet according to state
@@ -109,6 +131,30 @@ const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({
             {relativeTime}
           </span>
         </div>
+
+        {/* Share session link button - only show when session is in "open" state */}
+        {sessionData?.id && !sessionState.isSessionStarted && (
+          <div className="flex justify-center mt-2">
+            <TooltipProvider>
+              <Tooltip open={showCopied}>
+                <TooltipTrigger asChild>
+                  <Button 
+                    onClick={handleCopyLink} 
+                    variant="default" 
+                    size="sm" 
+                    className="w-full order-1 sm:order-2 bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-700 hover:to-indigo-600"
+                  >
+                    <Share2 size={16} />
+                    Share Session Link
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Link copied to clipboard!</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

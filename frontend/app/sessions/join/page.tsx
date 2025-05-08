@@ -424,7 +424,7 @@ function JoinSessionContent() {
 
               <div className="pt-4">
                 <Button 
-                  className="w-full h-10" 
+                  className="w-full h-10 bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-700 hover:to-indigo-600" 
                   onClick={handleJoinSession}
                   disabled={isLoading}
                 >

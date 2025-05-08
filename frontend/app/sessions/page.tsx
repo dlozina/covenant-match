@@ -439,7 +439,7 @@ export default function SessionsPage() {
               {(isLoading || isLoadingFriends) ? "Refreshing..." : "Refresh"}
             </Button>
             <Button 
-              className="w-full sm:w-auto order-1 sm:order-2 bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-700 hover:to-indigo-600" 
+              className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-700 hover:to-indigo-600" 
               asChild
             >
               <Link href={isLoggedIn ? "/sessions/create" : "/login?redirect=/sessions/create"}>Create Session</Link>

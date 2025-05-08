@@ -82,7 +82,7 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
               <div className="flex">
                 <Button 
                   size="lg" 
-                  className="w-full h-14 text-lg"
+                  className="w-full h-14 text-lg bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-700 hover:to-indigo-600"
                   onClick={onRecreateSession}
                   disabled={newSessionButtonDisabled}
                 >
@@ -145,7 +145,7 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
                 <div className="flex-1 flex flex-col">
                   <Button 
                     size="lg" 
-                    className="h-14 text-lg w-full"
+                    className="h-14 text-lg w-full bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-700 hover:to-indigo-600"
                     onClick={startSession}
                     disabled={startButtonDisabled}
                   >
