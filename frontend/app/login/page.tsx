@@ -23,6 +23,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { AlertCircle } from "lucide-react"
 import { login as apiLogin, LoginParams } from "@/utils/api"
 import { Turnstile } from "next-turnstile";
+import { getAndClearRedirectUrl } from "@/utils/auth-redirect"
 
 // Username validation regex - must match the one used in profile creation
 const usernameRegex = /^[a-zA-Z0-9_.-]+$/;
@@ -165,7 +166,14 @@ export default function LoginPage() {
         
         // Wait a moment to show success message before redirecting
         setTimeout(() => {
-          router.push('/');
+          // Check if there's a redirect URL stored from a shared session link
+          const redirectUrl = getAndClearRedirectUrl();
+          if (redirectUrl) {
+            router.push(redirectUrl);
+          } else {
+            // Default redirect to home page
+            router.push('/');
+          }
         }, 500);
       } catch (loginError) {
         // Clear the password field on error

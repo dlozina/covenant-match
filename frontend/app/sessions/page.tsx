@@ -53,6 +53,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown } from "lucide-react";
+import { saveRedirectUrl } from "@/utils/auth-redirect";
 
 const MAX_PLAYERS = 3;
 
@@ -382,6 +383,9 @@ export default function SessionsPage() {
   async function handleJoinSession(sessionId: string) {
     // Require authentication to join a session
     if (!isLoggedIn) {
+      // Save the URL to redirect to after login
+      const joinUrl = `/sessions/join?id=${sessionId}`;
+      saveRedirectUrl(joinUrl);
       router.push('/login');
       return;
     }
@@ -406,6 +410,14 @@ export default function SessionsPage() {
     const host = session.joinedPlayers.find(player => player.userId === session.hostId);
     return host ? host.username : 'Unknown';
   }
+
+  // Add handler for login to join buttons
+  const handleLoginToJoin = (sessionId: string, e: React.MouseEvent) => {
+    console.error("Mouse event error:", e);
+    // Save the URL to redirect to after login
+    const joinUrl = `/sessions/join?id=${sessionId}`;
+    saveRedirectUrl(joinUrl);
+  };
 
   return (
     <MainLayout footer={<Footer />}>
@@ -667,7 +679,7 @@ export default function SessionsPage() {
                                   className="border-purple-600/40"
                                   asChild
                                 >
-                                  <Link href="/login">Login to Join</Link>
+                                  <Link href="/login" onClick={(e) => handleLoginToJoin(session.id, e)}>Login to Join</Link>
                                 </Button>
                               </TableCell>
                             </TableRow>
@@ -751,7 +763,7 @@ export default function SessionsPage() {
                               className="w-full border-purple-600/40"
                               asChild
                             >
-                              <Link href="/login">Login to Join</Link>
+                              <Link href="/login" onClick={(e) => handleLoginToJoin(session.id, e)}>Login to Join</Link>
                             </Button>
                           </div>
                         </div>

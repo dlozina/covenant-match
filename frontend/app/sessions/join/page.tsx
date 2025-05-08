@@ -20,6 +20,7 @@ import {
 import { sessionService } from "@/utils/api/session-service";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { saveRedirectUrl } from "@/utils/auth-redirect";
 import {
   Command,
   CommandEmpty,
@@ -43,6 +44,35 @@ interface JwtClaims {
 }
 
 export default function JoinSessionPage() {
+  const { isLoggedIn, isLoading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const sessionId = searchParams?.get('id');
+  
+  // If user is not logged in, save the current URL and redirect to login
+  useEffect(() => {
+    if (!isLoading && !isLoggedIn && sessionId) {
+      // Save current URL for redirect after login
+      const currentUrl = window.location.pathname + window.location.search;
+      saveRedirectUrl(currentUrl);
+      router.push('/login');
+    }
+  }, [isLoggedIn, isLoading, router, sessionId]);
+
+  // Show loader while checking auth status
+  if (isLoading) {
+    return (
+      <MainLayout footer={<Footer />}>
+        <div className="container max-w-2xl py-6 md:py-10 px-4 mx-auto flex items-center justify-center">
+          <div className="animate-pulse flex flex-col items-center">
+            <div className="h-12 w-12 rounded-full bg-gradient-to-br from-purple-700 to-indigo-900"></div>
+            <div className="mt-4 text-sm text-muted-foreground">Loading...</div>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
     <ProtectedRoute>
       <JoinSessionContent />

@@ -7,6 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Share2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
+// Function to generate session join URL
+export const getSessionJoinUrl = (sessionId: string): string => {
+  return `${window.location.origin}/sessions/join?id=${sessionId}`;
+};
+
 interface SessionInfoSectionProps {
   sessionState: SessionState;
   sessionData?: SessionData;
@@ -23,7 +28,7 @@ const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({
   // Function to handle copying the session link to clipboard
   const handleCopyLink = () => {
     if (sessionData?.id) {
-      const url = `${window.location.origin}/sessions/join?id=${sessionData.id}`;
+      const url = getSessionJoinUrl(sessionData.id);
       navigator.clipboard.writeText(url)
         .then(() => {
           setShowCopied(true);

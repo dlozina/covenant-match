@@ -38,6 +38,7 @@ type AuthContextType = {
   refreshToken: () => Promise<boolean>;
   fetchWithAuth: <T = unknown>(url: string, options?: RequestInit) => Promise<T>;
   getAuthHeaders: () => Promise<HeadersInit>;
+  saveRedirectUrl: (url: string) => void;
 };
 
 // Create the auth context with default values
@@ -50,7 +51,8 @@ const AuthContext = createContext<AuthContextType>({
   refreshUserData: async () => {},
   refreshToken: async () => false,
   fetchWithAuth: async <T = unknown>(): Promise<T> => { throw new Error('Not implemented'); },
-  getAuthHeaders: async (): Promise<HeadersInit> => { throw new Error('Not implemented'); }
+  getAuthHeaders: async (): Promise<HeadersInit> => { throw new Error('Not implemented'); },
+  saveRedirectUrl: () => {},
 });
 
 // Custom hook to use the auth context
@@ -202,53 +204,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [fetchUserData]);
 
-  // Login function
-  const login = useCallback(async (token: string) => {
-    try {
-      // First, check if the account is disabled
-      const userData = await fetchUserData(token);
-
-      if (!userData?.emailVerified) {
-        // Account is not verified - throw a specific error for not verified accounts
-        const notVerifiedError = new Error('Your account has not been verified. Please check your email for verification instructions.');
-        // Add property to identify this is a not verified account error
-        Object.defineProperty(notVerifiedError, 'isNotVerifiedAccount', { value: true });
-        throw notVerifiedError;
-      }
-      
-      if (userData?.disabled) {
-        // Account is disabled - throw a specific error for disabled accounts
-        const disabledError = new Error('Your account has been disabled. Please contact support for assistance.');
-        // Add property to identify this is a disabled account error
-        Object.defineProperty(disabledError, 'isDisabledAccount', { value: true });
-        throw disabledError;
-      }
-      
-      // Store the token directly without Next.js caching
-      localStorage.setItem('token', token);
-      
-      // Get actual expiration time from the token
-      const now = Date.now();
-      const expiry = getTokenExpiry(token);
-      const expiresIn = expiry - now;
-      console.log(`Login successful. Token expires in ${Math.floor(expiresIn / 3600000)}h ${Math.floor((expiresIn % 3600000) / 60000)}m`);
-      
-      setIsLoggedIn(true);
-      setLastTokenRefresh(now);
-      
-      // If we already fetched user data, set it directly to avoid a second API call
-      if (userData) {
-        setUserData(userData);
-      } else {
-        refreshUserData();
-      }
-      
-      return userData; // Return the user data
-    } catch (error) {
-      // Don't store the token if there was an error
-      localStorage.removeItem('token');
-      throw error; // Re-throw the error to be handled by the login page
+  // Function to save the redirect URL when user isn't logged in
+  const saveRedirectUrl = useCallback((url: string) => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('redirectAfterLogin', url);
     }
+  }, []);
+
+  // Login function with redirect handling
+  const login = useCallback(async (token: string, userData?: UserData | null): Promise<UserData | null> => {
+    // Store the token in localStorage for persistent auth
+    localStorage.setItem('token', token);
+    
+    // Get current timestamp
+    const now = Date.now();
+    
+    const expiry = getTokenExpiry(token);
+    const expiresIn = expiry - now;
+    console.log(`Login successful. Token expires in ${Math.floor(expiresIn / 3600000)}h ${Math.floor((expiresIn % 3600000) / 60000)}m`);
+    
+    setIsLoggedIn(true);
+    setLastTokenRefresh(now);
+    
+    // If we already fetched user data, set it directly to avoid a second API call
+    if (userData) {
+      setUserData(userData);
+    } else {
+      refreshUserData();
+    }
+    
+    return userData || null; // Return the user data or null
   }, [fetchUserData, getTokenExpiry, refreshUserData]);
 
   // Logout function
@@ -544,7 +529,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refreshUserData,
         refreshToken,
         fetchWithAuth,
-        getAuthHeaders
+        getAuthHeaders,
+        saveRedirectUrl
       }}
     >
       {children}
