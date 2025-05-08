@@ -4,7 +4,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/lib/auth-context";
@@ -43,22 +43,56 @@ interface JwtClaims {
   iat: number;
 }
 
-export default function JoinSessionPage() {
+// Save the session ID immediately on page load
+// This script runs as soon as the page is loaded, before any React components
+if (typeof window !== 'undefined') {
+  const urlParams = new URLSearchParams(window.location.search);
+  const sessionId = urlParams.get('id');
+  
+  if (sessionId) {
+    const currentUrl = window.location.pathname + window.location.search;
+    localStorage.setItem('redirectAfterLogin', currentUrl);
+  }
+}
+
+// Client-side redirect handler that runs before the Suspense boundary
+function ClientRedirectHandler() {
   const { isLoggedIn, isLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const sessionId = searchParams?.get('id');
-  
+  const sessionId = searchParams.get('id');
+
   // If user is not logged in, save the current URL and redirect to login
   useEffect(() => {
     if (!isLoading && !isLoggedIn && sessionId) {
       // Save current URL for redirect after login
       const currentUrl = window.location.pathname + window.location.search;
+      console.log('Saving redirect URL:', currentUrl);
+      
+      // Try both methods to ensure it's saved
+      // First, use the utility function
       saveRedirectUrl(currentUrl);
+      
+      // Also directly save to localStorage as a backup
+      if (typeof localStorage !== 'undefined') {
+        console.log('Directly saving to localStorage');
+        localStorage.setItem('redirectAfterLogin', currentUrl);
+      }
+      
+      // Log what's in localStorage after saving
+      const savedUrl = localStorage.getItem('redirectAfterLogin');
+      console.log('Verified saved URL:', savedUrl);
+      
       router.push('/login');
     }
   }, [isLoggedIn, isLoading, router, sessionId]);
 
+  return null;
+}
+
+export default function JoinSessionPage() {
+  const { isLoading } = useAuth();
+  
   // Show loader while checking auth status
   if (isLoading) {
     return (
@@ -75,7 +109,19 @@ export default function JoinSessionPage() {
 
   return (
     <ProtectedRoute>
-      <JoinSessionContent />
+      <Suspense fallback={
+        <MainLayout footer={<Footer />}>
+          <div className="container max-w-2xl py-6 md:py-10 px-4 mx-auto flex items-center justify-center">
+            <div className="animate-pulse flex flex-col items-center">
+              <div className="h-12 w-12 rounded-full bg-gradient-to-br from-purple-700 to-indigo-900"></div>
+              <div className="mt-4 text-sm text-muted-foreground">Loading session details...</div>
+            </div>
+          </div>
+        </MainLayout>
+      }>
+        <ClientRedirectHandler />
+        <JoinSessionContent />
+      </Suspense>
     </ProtectedRoute>
   );
 }
