@@ -70,7 +70,7 @@ const sessionFormSchema = z.object({
     .min(1, { message: "Password is required" })
     .max(6, { message: "Password must not be longer than 6 characters" })
     .trim(),
-  sessionType: z.enum(["regular", "friends-only"])
+  sessionType: z.enum(["regular", "friends-only", "private"])
 });
 
 type SessionFormValues = z.infer<typeof sessionFormSchema>;
@@ -295,7 +295,7 @@ function CreateSessionContent() {
         name: data.sessionName.trim(),
         nightLord: selectedLord,
         nightfarer: selectedFarer,
-        isPrivate: false,
+        isPrivate: data.sessionType === "private",
         isFriendsOnly: data.sessionType === "friends-only",
         region: userRegion,
         platform: userPlatform
@@ -438,12 +438,15 @@ function CreateSessionContent() {
                           <SelectContent>
                             <SelectItem value="regular">Regular Session</SelectItem>
                             <SelectItem value="friends-only">Friends Only</SelectItem>
+                            <SelectItem value="private">Private Session</SelectItem>
                           </SelectContent>
                         </Select>
                         <p className="text-xs mt-1 text-muted-foreground">
                           {field.value === "friends-only" 
                             ? "Friends Only: Your session will only be visible to your friends in the Friends tab."
-                            : "Regular: Your session will be visible to all players in the general sessions list."}
+                            : field.value === "private"
+                              ? "Private: Your session will be visible only to you. Share the session link with your friends to join."
+                              : "Regular: Your session will be visible to all players in the general sessions list."}
                         </p>
                         <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
                       </FormItem>
