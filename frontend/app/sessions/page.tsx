@@ -462,16 +462,15 @@ export default function SessionsPage() {
           <div>
             <span className="text-muted-foreground">Host:</span> {hostName}
           </div>
-          <div>
-            <span className="text-muted-foreground">Experience:</span> 
-            <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-sm text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+          <div className="flex justify-end">
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
               {hostExperience || "Unknown"}
             </span>
           </div>
           <div>
             <span className="text-muted-foreground">Status:</span> {session.status}
           </div>
-          <div>
+          <div className="flex justify-end">
             <span className="text-muted-foreground">Players:</span> {playerCount}/{MAX_PLAYERS}
           </div>
         </div>

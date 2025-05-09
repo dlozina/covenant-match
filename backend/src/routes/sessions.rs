@@ -17,10 +17,12 @@ use mongodb::Database;
         ("offset" = Option<u64>, Query, description = "Offset for pagination (default: 0)"),
         ("isPrivate" = Option<bool>, Query, description = "Filter sessions by private status (default: false)"),
         ("region" = Option<String>, Query, description = "Filter sessions by player region"),
-        ("platform" = Option<String>, Query, description = "Filter sessions by player platform")
+        ("platform" = Option<String>, Query, description = "Filter sessions by player platform"),
+        ("nightLord" = Option<String>, Query, description = "Filter sessions by night lord"),
+        ("hostExperience" = Option<String>, Query, description = "Filter sessions by host experience")
     ),
     responses(
-        (status = 200, description = "List of sessions retrieved successfully", body = Vec<PaginatedSessionsResponse>),
+        (status = 200, description = "List of sessions retrieved successfully", body = PaginatedSessionsResponse<SessionResponseDto>),
         (status = 500, description = "Internal server error")
     ),
     tag = "sessions"
@@ -46,9 +48,6 @@ async fn get_sessions(
     // Add new filter parameters
     let night_lord = query.get("nightLord").cloned();
     let host_experience = query.get("hostExperience").cloned();
-
-    // Calculate page number from offset and limit (1-indexed for response)
-    let page = (offset / limit) + 1;
 
     match session_service::get_sessions_with_pagination(
         &db,

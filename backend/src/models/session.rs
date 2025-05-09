@@ -461,6 +461,7 @@ pub struct PaginationMetadata {
     pub per_page: u64,
 }
 
+//todo: openapi.rs is does not know how to handle this
 // Define paginated response structure
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 #[serde(rename_all = "camelCase")]

@@ -1,5 +1,11 @@
 use crate::models::admin::{
-    ActorMailboxResponse, AdminChatResponse, AdminDashboardStats, AdminSessionResponse, AdminSessionsData, AdminSessionsPaginationResponse, AdminSessionsResponse, ConnectionStatsResponse, ConnectionsPerHourResponse, CreateFeatureFlagDto, DashboardStatsResponse, FeatureFlag, FeatureFlagApiResponse, FeatureFlagResponse, FeatureFlagsData, FeatureFlagsResponse, LoginAttemptDTO, LoginAttemptsData, LoginAttemptsResponse, MemoryUsage, PatchFeatureFlagDto, SessionConnectionResponse, SystemInfo, SystemStatusResponse, WebSocketStatsData, WebSocketStatsResponse
+    ActorMailboxResponse, AdminChatResponse, AdminDashboardStats, AdminSessionResponse,
+    AdminSessionsData, AdminSessionsPaginationResponse, AdminSessionsResponse,
+    ConnectionStatsResponse, ConnectionsPerHourResponse, CreateFeatureFlagDto,
+    DashboardStatsResponse, FeatureFlag, FeatureFlagApiResponse, FeatureFlagResponse,
+    FeatureFlagsData, FeatureFlagsResponse, LoginAttemptDTO, LoginAttemptsData,
+    LoginAttemptsResponse, MemoryUsage, PatchFeatureFlagDto, SessionConnectionResponse, SystemInfo,
+    SystemStatusResponse, WebSocketStatsData, WebSocketStatsResponse,
 };
 use crate::models::bug::{
     BugReport, BugReportData, BugReportResponse, BugReportResponseDto, BugReportsData,
@@ -18,10 +24,16 @@ use crate::models::news::{
     NewsResponse, UpdateAnnouncementDto, UpdateNewsDto,
 };
 use crate::models::session::{
-    CovenantStats, CovenantStatsResponse, CreateSessionDto, FriendshipMatrix, FriendshipPlayer, GameResult, GameSessionDto, JoinSessionDto, MinimalSessionDto, PaginatedSessionsResponse, PaginationMetadata, PlayerInfo, PlayerInfoResponseDto, RateSessionDto, ResultsResponseDto, SessionResponseDto, SessionResult, SessionResultResponseDto, SessionStatus, SubmitResultDto, UpdateSessionDto, UserSessionResponseDto
+    CovenantStats, CovenantStatsResponse, CreateSessionDto, FriendshipMatrix, FriendshipPlayer,
+    GameResult, GameSessionDto, JoinSessionDto, MinimalSessionDto, PaginatedSessionsResponse,
+    PaginationMetadata, PlayerInfo, PlayerInfoResponseDto, RateSessionDto, ResultsResponseDto,
+    SessionResponseDto, SessionResult, SessionResultResponseDto, SessionStatus, SubmitResultDto,
+    UpdateSessionDto, UserSessionResponseDto,
 };
 use crate::models::statistics::{
-    BatchUserStatsResponse, LeaderboardEntryResponseDto, NightLordStatsResponse, PaginatedSessionData, PaginatedSessionResponse, SessionHistoryResponse, Stats, UserStatistics, UserStatsResponse
+    BatchUserStatsResponse, LeaderboardEntryResponseDto, NightLordStatsResponse,
+    PaginatedSessionData, PaginatedSessionResponse, SessionHistoryResponse, Stats, UserStatistics,
+    UserStatsResponse,
 };
 use crate::models::user::{
     AddFriendDto, AuthResponse, CreateUserDto, FriendDto, FriendListResponse, GetUsersQuery,
@@ -208,7 +220,7 @@ use utoipa::{
             FriendshipMatrix,
             FriendshipPlayer,
             PaginationMetadata,
-            //PaginatedSessionsResponse,
+            PaginatedSessionsResponse<SessionResponseDto>,
             // Covenant statistics models
             CovenantStats,
             CovenantStatsResponse,
