@@ -285,7 +285,7 @@ export default function LoginPage() {
                 />
                 <Button 
                   type="submit" 
-                  className="w-full h-10 text-sm sm:text-base" 
+                  className="w-full h-10 text-sm sm:text-base bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-700 hover:to-indigo-600" 
                   disabled={isLoading || isLocked}
                 >
                   {isLoading ? "Logging in..." : isLocked ? "Temporarily locked" : "Login"}

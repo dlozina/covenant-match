@@ -54,7 +54,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown } from "lucide-react";
 import { saveRedirectUrl } from "@/utils/auth-redirect";
-import { hostname } from "os";
 
 const MAX_PLAYERS = 3;
 
@@ -476,10 +475,10 @@ export default function SessionsPage() {
                         handleFriendsNightLordFilterChange(value);
                       }
                     }}
-                    disabled={isLoadingNightLords || (activeTab === "general" ? isLoading : isLoadingFriends)}
+                    disabled={isLoadingNightLords || (activeTab === "general" ? isLoading : isLoadingFriends) || !isLoggedIn}
                   >
-                    <SelectTrigger className="h-9 bg-background">
-                      <SelectValue placeholder="Select Night Lord" />
+                    <SelectTrigger className={`h-9 bg-background ${!isLoggedIn ? "opacity-60" : ""}`}>
+                      <SelectValue placeholder={!isLoggedIn ? "Login to filter" : "Select Night Lord"} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="All">All Night Lords</SelectItem>
@@ -500,10 +499,10 @@ export default function SessionsPage() {
                         handleFriendsExperienceFilterChange(value);
                       }
                     }}
-                    disabled={activeTab === "general" ? isLoading : isLoadingFriends}
+                    disabled={(activeTab === "general" ? isLoading : isLoadingFriends) || !isLoggedIn}
                   >
-                    <SelectTrigger className="h-9 bg-background">
-                      <SelectValue placeholder="Select Experience" />
+                    <SelectTrigger className={`h-9 bg-background ${!isLoggedIn ? "opacity-60" : ""}`}>
+                      <SelectValue placeholder={!isLoggedIn ? "Login to filter" : "Select Experience"} />
                     </SelectTrigger>
                     <SelectContent>
                       {EXPERIENCE_OPTIONS.map(exp => (
