@@ -20,7 +20,7 @@ use mongodb::Database;
         ("platform" = Option<String>, Query, description = "Filter sessions by player platform")
     ),
     responses(
-        (status = 200, description = "List of sessions retrieved successfully", body = Vec<SessionResponseDto>),
+        (status = 200, description = "List of sessions retrieved successfully", body = Vec<PaginatedSessionsResponse>),
         (status = 500, description = "Internal server error")
     ),
     tag = "sessions"
@@ -31,16 +31,39 @@ async fn get_sessions(
     query: web::Query<std::collections::HashMap<String, String>>,
 ) -> impl Responder {
     let status = query.get("status").cloned();
-    let limit = query.get("limit").and_then(|v| v.parse::<u64>().ok());
-    let offset = query.get("offset").and_then(|v| v.parse::<u64>().ok());
+    let limit = query
+        .get("limit")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(10);
+    let offset = query
+        .get("offset")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
     let is_private = query.get("isPrivate").and_then(|v| v.parse::<bool>().ok());
     let region = query.get("region").cloned();
     let platform = query.get("platform").cloned();
 
-    match session_service::get_sessions(&db, status, limit, offset, is_private, region, platform)
-        .await
+    // Add new filter parameters
+    let night_lord = query.get("nightLord").cloned();
+    let host_experience = query.get("hostExperience").cloned();
+
+    // Calculate page number from offset and limit (1-indexed for response)
+    let page = (offset / limit) + 1;
+
+    match session_service::get_sessions_with_pagination(
+        &db,
+        status,
+        Some(limit),
+        Some(offset),
+        is_private,
+        region,
+        platform,
+        night_lord,
+        host_experience,
+    )
+    .await
     {
-        Ok(sessions) => HttpResponse::Ok().json(sessions),
+        Ok(pagination_response) => HttpResponse::Ok().json(pagination_response),
         Err(e) => {
             log::error!("Error fetching sessions: {:?}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
@@ -607,14 +630,37 @@ async fn get_public_sessions(
     query: web::Query<std::collections::HashMap<String, String>>,
 ) -> impl Responder {
     let status = query.get("status").cloned();
-    let limit = query.get("limit").and_then(|v| v.parse::<u64>().ok());
-    let offset = query.get("offset").and_then(|v| v.parse::<u64>().ok());
+    let limit = query
+        .get("limit")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(10);
+    let offset = query
+        .get("offset")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
     let region = query.get("region").cloned();
     let platform = query.get("platform").cloned();
 
-    match session_service::get_minimal_sessions(&db, status, limit, offset, region, platform).await
+    // Add new filter parameters
+    let night_lord = query.get("nightLord").cloned();
+    let host_experience = query.get("hostExperience").cloned();
+
+    // Calculate page number from offset and limit (1-indexed for response)
+    let page = (offset / limit) + 1;
+
+    match session_service::get_minimal_sessions_with_pagination(
+        &db,
+        status,
+        Some(limit),
+        Some(offset),
+        region,
+        platform,
+        night_lord,
+        host_experience,
+    )
+    .await
     {
-        Ok(sessions) => HttpResponse::Ok().json(sessions),
+        Ok(pagination_response) => HttpResponse::Ok().json(pagination_response),
         Err(e) => {
             log::error!("Error fetching public sessions: {:?}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
@@ -768,7 +814,11 @@ async fn get_friends_sessions(
     let region = query.get("region").cloned();
     let platform = query.get("platform").cloned();
 
-    match session_service::get_friends_sessions(
+    // Add new filter parameters
+    let night_lord = query.get("nightLord").cloned();
+    let host_experience = query.get("hostExperience").cloned();
+
+    match session_service::get_friends_sessions_with_pagination(
         &db,
         &claims.sub,
         status,
@@ -777,10 +827,12 @@ async fn get_friends_sessions(
         is_private,
         region,
         platform,
+        night_lord,
+        host_experience,
     )
     .await
     {
-        Ok(sessions) => HttpResponse::Ok().json(sessions),
+        Ok(pagination_response) => HttpResponse::Ok().json(pagination_response),
         Err(e) => {
             log::error!("Error getting friends' sessions: {:?}", e);
             e.error_response()

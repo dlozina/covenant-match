@@ -243,6 +243,13 @@ export interface BugReportDetailResponse {
   };
 }
 
+// Game data interfaces
+export interface ExperienceData {
+  id: string;
+  name: string;
+  description: string;
+}
+
 // Function to fetch leaderboard data
 export const fetchLeaderboard = async (limit?: number): Promise<LeaderboardEntryResponseDto[]> => {
   try {
@@ -481,7 +488,9 @@ export const fetchSessions = async (
   limit: number,
   statusFilter: string,
   region?: string,
-  platform?: string
+  platform?: string,
+  nightLordFilter?: string,
+  experienceFilter?: string
 ): Promise<{ sessions?: Session[], minimalSessions?: MinimalSession[] }> => {
   try {
     // For logged-in users, ensure we have region data before proceeding
@@ -502,9 +511,11 @@ export const fetchSessions = async (
     // Add region and platform parameters if provided
     const regionParam = region ? `&region=${encodeURIComponent(region)}` : '';
     const platformParam = platform ? `&platform=${encodeURIComponent(platform)}` : '';
+    const nightLordParam = nightLordFilter ? `&nightLord=${encodeURIComponent(nightLordFilter)}` : '';
+    const experienceParam = experienceFilter ? `&experience=${encodeURIComponent(experienceFilter)}` : '';
     
     // Log API request parameters for debugging
-    console.log(`Fetching sessions with params - status: ${formattedStatus}, region: ${region}, platform: ${platform}`);
+    console.log(`Fetching sessions with params - status: ${formattedStatus}, region: ${region}, platform: ${platform}, nightLord: ${nightLordFilter}, experience: ${experienceFilter}`);
     
     // Different endpoints based on authentication status
     if (isLoggedIn && token) {
@@ -512,7 +523,7 @@ export const fetchSessions = async (
       // Always set isPrivate=false to ensure we never show private sessions
       const isPrivateParam = '&isPrivate=false';
       
-      const response = await fetch(`${API_URL}/api/v1/sessions?limit=${limit}&offset=${offset}${statusParam}${isPrivateParam}${regionParam}${platformParam}`, {
+      const response = await fetch(`${API_URL}/api/v1/sessions?limit=${limit}&offset=${offset}${statusParam}${isPrivateParam}${regionParam}${platformParam}${nightLordParam}${experienceParam}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -1373,6 +1384,28 @@ export const joinSession = async (
     }
   } catch (error) {
     console.error('Failed to join session:', error);
+    throw error;
+  }
+};
+
+// Function to fetch experience levels
+export const fetchExperienceLevels = async (): Promise<ExperienceData[]> => {
+  try {
+    const response = await fetch(`${API_URL}/api/v1/game/data`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error fetching game data: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.experiences || [];
+  } catch (error) {
+    console.error('Failed to fetch experience levels:', error);
     throw error;
   }
 }; 

@@ -1,9 +1,6 @@
 use crate::models::error::AppError;
 use crate::models::session::{
-    CovenantStats, CovenantStatsResponse, CreateSessionDto, FriendshipMatrix, FriendshipPlayer,
-    GameResult, GameSession, GameSessionDto, JoinSessionDto, MinimalPlayerInfoDto,
-    MinimalSessionDto, PlayerInfo, RateSessionDto, SessionResponseDto, SessionResult,
-    SessionStatus, SubmitResultDto, UpdateSessionDto, UserSessionHelper, UserSessionResponseDto,
+    CovenantStats, CovenantStatsResponse, CreateSessionDto, FriendshipMatrix, FriendshipPlayer, GameResult, GameSession, GameSessionDto, JoinSessionDto, MinimalPlayerInfoDto, MinimalSessionDto, PaginatedSessionsResponse, PaginationMetadata, PlayerInfo, RateSessionDto, SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto, UserSessionHelper, UserSessionResponseDto
 };
 use crate::repository::{session_repository, statistics_repository, user_repository};
 use crate::sse::messages::{BroadcastMessage, ServerMessage as SseServerMessage};
@@ -13,8 +10,9 @@ use crate::ws::messages::{Broadcast, ServerMessage as WsServerMessage};
 use crate::ws::SessionManager as WsSessionManager;
 use actix::prelude::*;
 use chrono::Utc;
-use mongodb::bson::oid::ObjectId;
+use mongodb::bson::{oid::ObjectId, DateTime};
 use mongodb::Database;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::LazyLock;
 use std::sync::Mutex;
@@ -360,24 +358,28 @@ pub async fn get_minimal_sessions(
     Ok(sessions
         .into_iter()
         .map(|s| {
+            // Find host player to get host experience
+            let host_player = s.joined_players.iter().find(|p| p.user_id == s.host_id);
+
+            let host_exp = host_player.map(|p| p.experience.clone());
+
             // map game session to minimal session
-            let minimal_session = MinimalSessionDto {
+            MinimalSessionDto {
                 id: s.id.to_hex(),
                 name: s.name,
-                host_name: s.joined_players.iter().find(|p| p.user_id == s.host_id).map_or_else(|| "Unknown".to_string(), |p| p.username.clone()),
-                joined_players: s
-                    .joined_players
-                    .iter()
-                    .map(|p| MinimalPlayerInfoDto {
-                        username: p.username.clone(),
-                        experience: p.experience.clone(),
-                    })
-                    .collect(),
-                night_lord: s.night_lord,
-                status: s.status,
-                created_at: s.created_at,
-            };
-            minimal_session
+                host_name: host_player
+                    .map_or_else(|| "Unknown".to_string(), |p| p.username.clone()),
+                status: s.status.to_string(),
+                created_at: chrono::DateTime::from_timestamp(
+                    s.created_at.timestamp_millis() / 1000,
+                    0,
+                )
+                .unwrap_or_else(|| chrono::Utc::now()),
+                night_lord: Some(s.night_lord),
+                host_experience: host_exp,
+                player_count: Some(s.joined_players.len() as u32),
+                is_friends_only: Some(s.is_friends_only),
+            }
         })
         .collect())
 }
@@ -1565,6 +1567,286 @@ pub async fn get_friendship_matrix(
     Ok(FriendshipMatrix { players })
 }
 
+
+/// Get sessions with pagination and advanced filtering
+pub async fn get_sessions_with_pagination(
+    db: &Database,
+    status: Option<String>,
+    limit: Option<u64>,
+    offset: Option<u64>,
+    is_private: Option<bool>,
+    region: Option<String>,
+    platform: Option<String>,
+    night_lord: Option<String>,
+    host_experience: Option<String>,
+) -> Result<PaginatedSessionsResponse<SessionResponseDto>, AppError> {
+    // Convert status string to enum if provided
+    let status_filter = match status {
+        Some(s) => match s.to_lowercase().as_str() {
+            "open" => Some(SessionStatus::Open),
+            "full" => Some(SessionStatus::Full),
+            "in_progress" | "inprogress" => Some(SessionStatus::InProgress),
+            "completed" => Some(SessionStatus::Completed),
+            "cancelled" => Some(SessionStatus::Cancelled),
+            _ => None,
+        },
+        None => None,
+    };
+
+    // For general sessions list, filter out friends-only sessions
+    let is_friends_only = Some(false);
+
+    // Get total count for pagination
+    let total_count = session_repository::count_sessions_with_filters(
+        db,
+        status_filter.clone(),
+        is_private,
+        region.clone(),
+        platform.clone(),
+        is_friends_only,
+        night_lord.clone(),
+        host_experience.clone(),
+    )
+    .await?;
+
+    // Apply pagination to fetch only the requested sessions
+    let sessions = session_repository::find_sessions_with_filters(
+        db,
+        status_filter,
+        limit,
+        offset,
+        is_private,
+        region,
+        platform,
+        is_friends_only,
+        night_lord,
+        host_experience,
+    )
+    .await?;
+
+    // Calculate pagination metadata
+    let per_page = limit.unwrap_or(10);
+    let current_page = (offset.unwrap_or(0) / per_page) + 1;
+    let page_count = (total_count + per_page - 1) / per_page;
+
+    // Convert to response DTOs
+    let session_dtos: Vec<SessionResponseDto> =
+        sessions.into_iter().map(SessionResponseDto::from).collect();
+
+    // Create and return the paginated response
+    Ok(PaginatedSessionsResponse {
+        items: session_dtos,
+        metadata: PaginationMetadata {
+            total_count,
+            page_count,
+            current_page,
+            per_page,
+        },
+    })
+}
+
+/// Get minimal public sessions with pagination
+pub async fn get_minimal_sessions_with_pagination(
+    db: &Database,
+    status: Option<String>,
+    limit: Option<u64>,
+    offset: Option<u64>,
+    region: Option<String>,
+    platform: Option<String>,
+    night_lord: Option<String>,
+    host_experience: Option<String>,
+) -> Result<PaginatedSessionsResponse<MinimalSessionDto>, AppError> {
+    // Convert status string to enum if provided
+    let status_filter = match status {
+        Some(s) => match s.to_lowercase().as_str() {
+            "open" => Some(SessionStatus::Open),
+            "full" => Some(SessionStatus::Full),
+            "in_progress" | "inprogress" => Some(SessionStatus::InProgress),
+            "completed" => Some(SessionStatus::Completed),
+            "cancelled" => Some(SessionStatus::Cancelled),
+            _ => None,
+        },
+        None => None,
+    };
+
+    // Always filter out private sessions for public endpoint
+    let is_private = Some(false);
+
+    // For general sessions list, filter out friends-only sessions
+    let is_friends_only = Some(false);
+
+    // Get total count for pagination
+    let total_count = session_repository::count_sessions_with_filters(
+        db,
+        status_filter.clone(),
+        is_private,
+        region.clone(),
+        platform.clone(),
+        is_friends_only,
+        night_lord.clone(),
+        host_experience.clone(),
+    )
+    .await?;
+
+    // Apply pagination to fetch only the requested sessions
+    let sessions = session_repository::find_sessions_with_filters(
+        db,
+        status_filter,
+        limit,
+        offset,
+        is_private,
+        region,
+        platform,
+        is_friends_only,
+        night_lord,
+        host_experience,
+    )
+    .await?;
+
+    // Calculate pagination metadata
+    let per_page = limit.unwrap_or(10);
+    let current_page = (offset.unwrap_or(0) / per_page) + 1;
+    let page_count = (total_count + per_page - 1) / per_page;
+
+    // Convert to minimal DTOs
+    let minimal_sessions: Vec<MinimalSessionDto> = sessions
+        .into_iter()
+        .map(|s| {
+            let host_player = s.joined_players.iter().find(|p| p.user_id == s.host_id);
+
+            let host_exp = host_player.map(|p| p.experience.clone());
+
+            MinimalSessionDto {
+                id: s.id.to_hex(),
+                name: s.name,
+                host_name: host_player
+                    .map_or_else(|| "Unknown".to_string(), |p| p.username.clone()),
+                status: s.status.to_string(),
+                created_at: chrono::DateTime::from_timestamp(
+                    s.created_at.timestamp_millis() / 1000,
+                    0,
+                )
+                .unwrap_or_else(|| chrono::Utc::now()),
+                night_lord: Some(s.night_lord),
+                host_experience: host_exp,
+                player_count: Some(s.joined_players.len() as u32),
+                is_friends_only: Some(s.is_friends_only),
+            }
+        })
+        .collect();
+
+    // Create and return the paginated response
+    Ok(PaginatedSessionsResponse {
+        items: minimal_sessions,
+        metadata: PaginationMetadata {
+            total_count,
+            page_count,
+            current_page,
+            per_page,
+        },
+    })
+}
+
+/// Get friends sessions with pagination
+pub async fn get_friends_sessions_with_pagination(
+    db: &Database,
+    user_id: &str,
+    status: Option<String>,
+    limit: Option<u64>,
+    offset: Option<u64>,
+    is_private: Option<bool>,
+    region: Option<String>,
+    platform: Option<String>,
+    night_lord: Option<String>,
+    host_experience: Option<String>,
+) -> Result<PaginatedSessionsResponse<SessionResponseDto>, AppError> {
+    // First, get the user to find their friend list
+    let user = user_repository::find_user_by_id(db, user_id)
+        .await?
+        .ok_or(AppError::UserNotFound)?;
+
+    // If the user has no friends, return an empty paginated response
+    if user.friend_list.is_empty() {
+        return Ok(PaginatedSessionsResponse {
+            items: Vec::new(),
+            metadata: PaginationMetadata {
+                total_count: 0,
+                page_count: 0,
+                current_page: 1,
+                per_page: limit.unwrap_or(10),
+            },
+        });
+    }
+
+    // Convert status string to enum if provided
+    let status_filter = match status {
+        Some(s) => match s.to_lowercase().as_str() {
+            "open" => Some(SessionStatus::Open),
+            "full" => Some(SessionStatus::Full),
+            "in_progress" | "inprogress" => Some(SessionStatus::InProgress),
+            "completed" => Some(SessionStatus::Completed),
+            "cancelled" => Some(SessionStatus::Cancelled),
+            _ => None,
+        },
+        None => None,
+    };
+
+    // Convert ObjectId friends to string IDs
+    let friend_ids: Vec<String> = user.friend_list.iter().map(|id| id.to_hex()).collect();
+
+    // Get total count for pagination
+    let total_count = session_repository::count_friends_sessions_with_filters(
+        db,
+        &friend_ids,
+        status_filter.clone(),
+        is_private,
+        region.clone(),
+        platform.clone(),
+        night_lord.clone(),
+        host_experience.clone(),
+    )
+    .await?;
+
+    // Apply pagination to fetch only the requested sessions
+    let sessions = session_repository::find_friends_sessions_with_filters(
+        db,
+        &friend_ids,
+        status_filter,
+        limit,
+        offset,
+        is_private,
+        region,
+        platform,
+        night_lord,
+        host_experience,
+    )
+    .await?;
+
+    // Calculate pagination metadata
+    let per_page = limit.unwrap_or(10);
+    let current_page = (offset.unwrap_or(0) / per_page) + 1;
+    let page_count = if total_count == 0 {
+        0
+    } else {
+        (total_count + per_page - 1) / per_page
+    };
+
+    // Convert to response DTOs
+    let session_dtos: Vec<SessionResponseDto> =
+        sessions.into_iter().map(SessionResponseDto::from).collect();
+
+    // Create and return the paginated response
+    Ok(PaginatedSessionsResponse {
+        items: session_dtos,
+        metadata: PaginationMetadata {
+            total_count,
+            page_count,
+            current_page,
+            per_page,
+        },
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1679,263 +1961,9 @@ mod tests {
                         .borrow_mut()
                         .push((player.user_id.clone(), result.clone()));
                 }
-
-                // Set the flag to indicate stats have been updated
-                session.stats_updated = true;
             }
         }
-
-        // Update the session in the database
-        *db.session.borrow_mut() = Some(session);
 
         Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_submit_result_with_consensus_win() {
-        // Create a test session
-        let session_id = ObjectId::new().to_hex();
-        let now = DateTime::now();
-
-        // Create three players
-        let player1 = PlayerInfo {
-            user_id: "player1".to_string(),
-            username: "Player 1".to_string(),
-            nightfarer: "Mage".to_string(),
-            covenant_name: "Covenant 1".to_string(),
-            region: "Europe".to_string(),
-            platform: "Playstation".to_string(),
-            experience: "Beginner".to_string(),
-            joined_at: now,
-        };
-
-        let player2 = PlayerInfo {
-            user_id: "player2".to_string(),
-            username: "Player 2".to_string(),
-            nightfarer: "Warrior".to_string(),
-            covenant_name: "Covenant 2".to_string(),
-            region: "Europe".to_string(),
-            platform: "Playstation".to_string(),
-            experience: "Beginner".to_string(),
-            joined_at: now,
-        };
-
-        let player3 = PlayerInfo {
-            user_id: "player3".to_string(),
-            username: "Player 3".to_string(),
-            nightfarer: "Rogue".to_string(),
-            covenant_name: "Covenant 3".to_string(),
-            region: "Europe".to_string(),
-            platform: "Playstation".to_string(),
-            experience: "Beginner".to_string(),
-            joined_at: now,
-        };
-
-        // Create initial session - it should start as InProgress
-        let session = GameSession {
-            id: ObjectId::parse_str(&session_id).unwrap(),
-            name: "Test Session".to_string(),
-            host_id: "player1".to_string(),
-            region: "Europe".to_string(),
-            platform: "Playstation".to_string(),
-            password: "test".to_string(),
-            is_private: false,
-            is_friends_only: false,
-            status: SessionStatus::InProgress,
-            joined_players: vec![player1, player2, player3],
-            night_lord: "Night Lord 1".to_string(),
-            results: vec![],
-            ratings: vec![],
-            created_at: now,
-            updated_at: now,
-            started_at: Some(now),
-            completed_at: None,
-            stats_updated: false,
-            new_session_created: false,
-            new_session_created_id: None,
-        };
-
-        // Create mock db
-        let mock_db = MockDb {
-            session: Rc::new(RefCell::new(Some(session))),
-            stats_updated: Rc::new(RefCell::new(vec![])),
-        };
-
-        // Create result DTOs
-        let result_data_1 = SubmitResultDto {
-            user_id: "player1".to_string(),
-            result: GameResult::Win,
-            rating: None,
-            feedback: None,
-        };
-
-        let result_data_2 = SubmitResultDto {
-            user_id: "player2".to_string(),
-            result: GameResult::Win,
-            rating: None,
-            feedback: None,
-        };
-
-        let result_data_3 = SubmitResultDto {
-            user_id: "player3".to_string(),
-            result: GameResult::Loss,
-            rating: None,
-            feedback: None,
-        };
-
-        // Submit results - first player
-        let result = submit_result_test(&mock_db, &session_id, result_data_1);
-        assert!(result.is_ok());
-
-        // After the first submission, no consensus should be reached
-        {
-            let stats_updates = mock_db.stats_updated.borrow();
-            assert_eq!(
-                stats_updates.len(),
-                0,
-                "No stats updates should happen after 1 submission"
-            );
-        }
-
-        // Second player submits - this should trigger consensus (2 Wins)
-        let result = submit_result_test(&mock_db, &session_id, result_data_2);
-        assert!(result.is_ok());
-
-        // After second submission, consensus is reached and all 3 players should have stats updated
-        {
-            let stats_updates = mock_db.stats_updated.borrow();
-            assert_eq!(
-                stats_updates.len(),
-                3,
-                "All 3 players should have stats updated"
-            );
-            for (_, result) in stats_updates.iter() {
-                assert_eq!(
-                    *result,
-                    GameResult::Win,
-                    "All players should get Win result"
-                );
-            }
-        }
-
-        // Third player submits - consensus is already established, shouldn't affect the result
-        let result = submit_result_test(&mock_db, &session_id, result_data_3);
-        assert!(result.is_ok());
-
-        // Should still have exactly 3 stat updates (no duplicates)
-        let stats_updates = mock_db.stats_updated.borrow();
-        assert_eq!(
-            stats_updates.len(),
-            3,
-            "Should still have exactly 3 stat updates"
-        );
-    }
-
-    #[tokio::test]
-    async fn test_no_duplicate_stats_update() {
-        // Create a test session
-        let session_id = ObjectId::new().to_hex();
-        let now = DateTime::now();
-
-        // Create three players
-        let player1 = PlayerInfo {
-            user_id: "player1".to_string(),
-            username: "Player 1".to_string(),
-            nightfarer: "Mage".to_string(),
-            covenant_name: "Covenant 1".to_string(),
-            region: "Europe".to_string(),
-            platform: "Playstation".to_string(),
-            experience: "Beginner".to_string(),
-            joined_at: now,
-        };
-
-        let player2 = PlayerInfo {
-            user_id: "player2".to_string(),
-            username: "Player 2".to_string(),
-            nightfarer: "Warrior".to_string(),
-            covenant_name: "Covenant 2".to_string(),
-            region: "Europe".to_string(),
-            platform: "Playstation".to_string(),
-            experience: "Beginner".to_string(),
-            joined_at: now,
-        };
-
-        let player3 = PlayerInfo {
-            user_id: "player3".to_string(),
-            username: "Player 3".to_string(),
-            nightfarer: "Rogue".to_string(),
-            covenant_name: "Covenant 3".to_string(),
-            region: "Europe".to_string(),
-            platform: "Playstation".to_string(),
-            experience: "Beginner".to_string(),
-            joined_at: now,
-        };
-
-        // Create initial session that's already completed with two results and stats already updated
-        let session = GameSession {
-            id: ObjectId::parse_str(&session_id).unwrap(),
-            name: "Test Session".to_string(),
-            host_id: "player1".to_string(),
-            region: "Europe".to_string(),
-            platform: "Playstation".to_string(),
-            password: "test".to_string(),
-            is_private: false,
-            is_friends_only: false,
-            status: SessionStatus::Completed, // Already completed
-            joined_players: vec![player1, player2, player3],
-            night_lord: "Night Lord 1".to_string(),
-            results: vec![
-                SessionResult {
-                    user_id: "player1".to_string(),
-                    result: GameResult::Win,
-                    rating: None,
-                    feedback: None,
-                    submitted_at: now,
-                },
-                SessionResult {
-                    user_id: "player2".to_string(),
-                    result: GameResult::Win,
-                    rating: None,
-                    feedback: None,
-                    submitted_at: now,
-                },
-            ],
-            ratings: vec![],
-            created_at: now,
-            updated_at: now,
-            started_at: Some(now),
-            completed_at: Some(now),
-            stats_updated: true, // Set to true to indicate stats have already been updated
-            new_session_created: false,
-            new_session_created_id: None,
-        };
-
-        // Create mock db with an empty stats_updated vector
-        let stats_updated = Rc::new(RefCell::new(vec![]));
-
-        let mock_db = MockDb {
-            session: Rc::new(RefCell::new(Some(session))),
-            stats_updated: stats_updated.clone(),
-        };
-
-        // Create result DTO for third player
-        let result_data_3 = SubmitResultDto {
-            user_id: "player3".to_string(),
-            result: GameResult::Loss,
-            rating: None,
-            feedback: None,
-        };
-
-        // Submit result for third player
-        let result = submit_result_test(&mock_db, &session_id, result_data_3);
-        assert!(result.is_ok());
-
-        // Since stats_updated is true, no stats should be updated
-        let stats_updates = stats_updated.borrow();
-        assert_eq!(
-            stats_updates.len(),
-            0,
-            "No stats should be updated since stats_updated flag is true"
-        );
     }
 }

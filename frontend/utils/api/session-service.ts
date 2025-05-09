@@ -7,7 +7,8 @@ import {
   JoinSessionParams,
   UserSessionResult,
   SessionFilterOptions,
-  SessionResponse
+  //SessionResponse,
+  PaginatedSessionsResponse
 } from './types';
 import { ApiError } from './errors';
 
@@ -250,11 +251,11 @@ export class SessionService {
   }
 
   /**
-   * Get sessions created by friends
+   * Get friends sessions
    * @param options Optional filter parameters 
-   * @returns List of sessions
+   * @returns List of session objects with pagination metadata
    */
-  static async getFriendSessions(options: SessionFilterOptions = {}): Promise<SessionResponse[]> {
+  static async getFriendSessions(options: SessionFilterOptions = {}): Promise<PaginatedSessionsResponse<Session>> {
     try {
       const queryParams = new URLSearchParams();
       if (options.status) queryParams.append('status', options.status);
@@ -263,9 +264,11 @@ export class SessionService {
       if (options.isPrivate !== undefined) queryParams.append('isPrivate', options.isPrivate.toString());
       if (options.region) queryParams.append('region', options.region);
       if (options.platform) queryParams.append('platform', options.platform);
+      if (options.nightLord && options.nightLord !== 'All') queryParams.append('nightLord', options.nightLord);
+      if (options.hostExperience && options.hostExperience !== 'All') queryParams.append('hostExperience', options.hostExperience);
 
       const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
-      return await httpClient.get<SessionResponse[]>(`/api/v1/sessions/friends${query}`, true);
+      return await httpClient.get<PaginatedSessionsResponse<Session>>(`/api/v1/sessions/friends${query}`, true);
     } catch (error) {
       throw error;
     }
@@ -274,9 +277,9 @@ export class SessionService {
   /**
    * Get sessions for authenticated users
    * @param options Optional filter parameters 
-   * @returns List of full session objects
+   * @returns List of full session objects with pagination metadata
    */
-  static async getSessions(options: SessionFilterOptions = {}): Promise<Session[]> {
+  static async getSessions(options: SessionFilterOptions = {}): Promise<PaginatedSessionsResponse<Session>> {
     try {
       const queryParams = new URLSearchParams();
       if (options.status) queryParams.append('status', options.status);
@@ -285,9 +288,11 @@ export class SessionService {
       if (options.isPrivate !== undefined) queryParams.append('isPrivate', options.isPrivate.toString());
       if (options.region) queryParams.append('region', options.region);
       if (options.platform) queryParams.append('platform', options.platform);
+      if (options.nightLord && options.nightLord !== 'All') queryParams.append('nightLord', options.nightLord);
+      if (options.hostExperience && options.hostExperience !== 'All') queryParams.append('hostExperience', options.hostExperience);
 
       const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
-      return await httpClient.get<Session[]>(`/api/v1/sessions${query}`, true);
+      return await httpClient.get<PaginatedSessionsResponse<Session>>(`/api/v1/sessions${query}`, true);
     } catch (error) {
       throw error;
     }
@@ -296,9 +301,9 @@ export class SessionService {
   /**
    * Get sessions for unauthenticated users (public view with limited data)
    * @param options Optional filter parameters 
-   * @returns List of minimal session objects
+   * @returns List of minimal session objects with pagination metadata
    */
-  static async getPublicSessions(options: SessionFilterOptions = {}): Promise<MinimalSession[]> {
+  static async getPublicSessions(options: SessionFilterOptions = {}): Promise<PaginatedSessionsResponse<MinimalSession>> {
     try {
       const queryParams = new URLSearchParams();
       if (options.status) queryParams.append('status', options.status);
@@ -307,9 +312,11 @@ export class SessionService {
       if (options.isPrivate !== undefined) queryParams.append('isPrivate', options.isPrivate.toString());
       if (options.region) queryParams.append('region', options.region);
       if (options.platform) queryParams.append('platform', options.platform);
+      if (options.nightLord && options.nightLord !== 'All') queryParams.append('nightLord', options.nightLord);
+      if (options.hostExperience && options.hostExperience !== 'All') queryParams.append('hostExperience', options.hostExperience);
 
       const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
-      return await httpClient.get<MinimalSession[]>(`/api/v1/sessions/public${query}`, false);
+      return await httpClient.get<PaginatedSessionsResponse<MinimalSession>>(`/api/v1/public/sessions${query}`, false);
     } catch (error) {
       throw error;
     }

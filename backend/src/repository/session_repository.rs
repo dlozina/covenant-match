@@ -339,3 +339,394 @@ pub async fn get_user_sessions(
     // Return tuple of (previous_session, current_session)
     Ok((previous_session, current_session))
 }
+
+/// Count sessions with all filter parameters including Night Lord and host experience
+pub async fn count_sessions_with_filters(
+    db: &Database,
+    status: Option<SessionStatus>,
+    is_private: Option<bool>,
+    region: Option<String>,
+    platform: Option<String>,
+    is_friends_only: Option<bool>,
+    night_lord: Option<String>,
+    host_experience: Option<String>,
+) -> Result<u64, AppError> {
+    // Create the base filter for status
+    let mut filter = match status {
+        Some(status) => doc! { "status": to_bson(&status)? },
+        None => doc! {},
+    };
+
+    // Add private filter if provided
+    if let Some(is_private_val) = is_private {
+        filter = doc! { "$and": [filter, doc! { "is_private": is_private_val }] };
+    }
+
+    // Add region filter if provided
+    if let Some(region_val) = region {
+        filter = doc! { "$and": [filter, doc! { "region": region_val }] };
+    }
+
+    // Add platform filter if provided
+    if let Some(platform_val) = platform {
+        filter = doc! { "$and": [filter, doc! { "platform": platform_val }] };
+    }
+
+    // Add friends-only filter if provided
+    if let Some(is_friends_only_val) = is_friends_only {
+        filter = doc! { "$and": [filter, doc! { "is_friends_only": is_friends_only_val }] };
+    }
+
+    // Add Night Lord filter if provided
+    if let Some(night_lord_val) = night_lord {
+        filter = doc! { "$and": [filter, doc! { "night_lord": night_lord_val }] };
+    }
+
+    // Add host experience filter if provided - this is a complex filter that needs to be handled in-memory
+    // for MongoDB 3.2.3 since it's older and doesn't fully support complex aggregation pipelines with $expr
+
+    // Count the sessions that match the filter
+    let count = get_collection(db).count_documents(filter.clone()).await?;
+
+    // If host experience filter is provided, we need to filter in-memory
+    if let Some(experience_val) = host_experience {
+        // Find all sessions matching the base filters
+        let cursor = get_collection(db).find(filter).await?;
+        let sessions: Vec<GameSession> = cursor.try_collect().await?;
+
+        // Count only sessions where host has the specified experience
+        let filtered_count = sessions
+            .iter()
+            .filter(|session| {
+                let host = session
+                    .joined_players
+                    .iter()
+                    .find(|player| player.user_id == session.host_id);
+
+                if let Some(host_player) = host {
+                    return host_player.experience == experience_val;
+                }
+                false
+            })
+            .count() as u64;
+
+        return Ok(filtered_count);
+    }
+
+    Ok(count)
+}
+
+/// Find sessions with all filter parameters including Night Lord and host experience
+pub async fn find_sessions_with_filters(
+    db: &Database,
+    status: Option<SessionStatus>,
+    limit: Option<u64>,
+    offset: Option<u64>,
+    is_private: Option<bool>,
+    region: Option<String>,
+    platform: Option<String>,
+    is_friends_only: Option<bool>,
+    night_lord: Option<String>,
+    host_experience: Option<String>,
+) -> Result<Vec<GameSession>, AppError> {
+    // Create the base filter for status
+    let mut filter = match status {
+        Some(status) => doc! { "status": to_bson(&status)? },
+        None => doc! {},
+    };
+
+    // Add private filter if provided
+    if let Some(is_private_val) = is_private {
+        filter = doc! { "$and": [filter, doc! { "is_private": is_private_val }] };
+    }
+
+    // Add region filter if provided
+    if let Some(region_val) = region {
+        filter = doc! { "$and": [filter, doc! { "region": region_val }] };
+    }
+
+    // Add platform filter if provided
+    if let Some(platform_val) = platform {
+        filter = doc! { "$and": [filter, doc! { "platform": platform_val }] };
+    }
+
+    // Add friends-only filter if provided
+    if let Some(is_friends_only_val) = is_friends_only {
+        filter = doc! { "$and": [filter, doc! { "is_friends_only": is_friends_only_val }] };
+    }
+
+    // Add Night Lord filter if provided
+    if let Some(night_lord_val) = night_lord {
+        filter = doc! { "$and": [filter, doc! { "night_lord": night_lord_val }] };
+    }
+
+    // Add host experience filter if provided - this needs to be handled after the query
+    let host_exp_filter = host_experience.clone();
+
+    // Get all sessions matching the filter
+    let cursor = get_collection(db).find(filter).await?;
+    let mut sessions: Vec<GameSession> = cursor.try_collect().await?;
+
+    // Sort by most recent first
+    sessions.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+    // Apply host experience filter if provided (done in memory because it's complex to do in MongoDB)
+    if let Some(exp_value) = host_exp_filter {
+        sessions = sessions
+            .into_iter()
+            .filter(|session| {
+                // Find the host player
+                let host = session
+                    .joined_players
+                    .iter()
+                    .find(|player| player.user_id == session.host_id);
+
+                // Check if host has the required experience
+                if let Some(host_player) = host {
+                    return host_player.experience == exp_value;
+                }
+                false
+            })
+            .collect();
+    }
+
+    // Apply pagination manually
+    if let Some(offset_val) = offset {
+        let offset_idx = offset_val as usize;
+        if offset_idx < sessions.len() {
+            sessions = sessions.into_iter().skip(offset_idx).collect();
+        } else {
+            sessions.clear();
+        }
+    }
+
+    if let Some(limit_val) = limit {
+        let limit_size = limit_val as usize;
+        if sessions.len() > limit_size {
+            sessions.truncate(limit_size);
+        }
+    }
+
+    Ok(sessions)
+}
+
+/// Count sessions created by friends with filtering
+pub async fn count_friends_sessions_with_filters(
+    db: &Database,
+    friend_ids: &[String],
+    status: Option<SessionStatus>,
+    is_private: Option<bool>,
+    region: Option<String>,
+    platform: Option<String>,
+    night_lord: Option<String>,
+    host_experience: Option<String>,
+) -> Result<u64, AppError> {
+    // Create base filter for friends' sessions
+    let mut filter = match friend_ids.len() {
+        0 => doc! {}, // This will return no results (empty friends list)
+        _ => doc! {
+            "host_id": { "$in": friend_ids }
+        },
+    };
+
+    // Add status filter if provided
+    if let Some(status_val) = status {
+        filter = doc! {
+            "$and": [
+                filter,
+                { "status": to_bson(&status_val)? }
+            ]
+        };
+    }
+
+    // Add private filter if provided
+    if let Some(is_private_val) = is_private {
+        filter = doc! {
+            "$and": [
+                filter,
+                { "is_private": is_private_val }
+            ]
+        };
+    }
+
+    // Add region filter if provided
+    if let Some(region_val) = region {
+        filter = doc! {
+            "$and": [
+                filter,
+                { "region": region_val }
+            ]
+        };
+    }
+
+    // Add platform filter if provided
+    if let Some(platform_val) = platform {
+        filter = doc! {
+            "$and": [
+                filter,
+                { "platform": platform_val }
+            ]
+        };
+    }
+
+    // Add Night Lord filter if provided
+    if let Some(night_lord_val) = night_lord {
+        filter = doc! {
+            "$and": [
+                filter,
+                { "night_lord": night_lord_val }
+            ]
+        };
+    }
+
+    // Count sessions that match the filter
+    let count = get_collection(db).count_documents(filter.clone()).await?;
+
+    // If host experience filter is provided, we need to filter in-memory
+    if let Some(experience_val) = host_experience {
+        // Find all sessions matching the base filters
+        let cursor = get_collection(db).find(filter).await?;
+        let sessions: Vec<GameSession> = cursor.try_collect().await?;
+
+        // Count only sessions where host has the specified experience
+        let filtered_count = sessions
+            .iter()
+            .filter(|session| {
+                let host = session
+                    .joined_players
+                    .iter()
+                    .find(|player| player.user_id == session.host_id);
+
+                if let Some(host_player) = host {
+                    return host_player.experience == experience_val;
+                }
+                false
+            })
+            .count() as u64;
+
+        return Ok(filtered_count);
+    }
+
+    Ok(count)
+}
+
+/// Find sessions created by friends with filtering and pagination
+pub async fn find_friends_sessions_with_filters(
+    db: &Database,
+    friend_ids: &[String],
+    status: Option<SessionStatus>,
+    limit: Option<u64>,
+    offset: Option<u64>,
+    is_private: Option<bool>,
+    region: Option<String>,
+    platform: Option<String>,
+    night_lord: Option<String>,
+    host_experience: Option<String>,
+) -> Result<Vec<GameSession>, AppError> {
+    // Create base filter for friends' sessions
+    let mut filter = match friend_ids.len() {
+        0 => doc! {}, // This will return no results (empty friends list)
+        _ => doc! {
+            "host_id": { "$in": friend_ids }
+        },
+    };
+
+    // Add status filter if provided
+    if let Some(status_val) = status {
+        filter = doc! {
+            "$and": [
+                filter,
+                { "status": to_bson(&status_val)? }
+            ]
+        };
+    }
+
+    // Add private filter if provided
+    if let Some(is_private_val) = is_private {
+        filter = doc! {
+            "$and": [
+                filter,
+                { "is_private": is_private_val }
+            ]
+        };
+    }
+
+    // Add region filter if provided
+    if let Some(region_val) = region {
+        filter = doc! {
+            "$and": [
+                filter,
+                { "region": region_val }
+            ]
+        };
+    }
+
+    // Add platform filter if provided
+    if let Some(platform_val) = platform {
+        filter = doc! {
+            "$and": [
+                filter,
+                { "platform": platform_val }
+            ]
+        };
+    }
+
+    // Add Night Lord filter if provided
+    if let Some(night_lord_val) = night_lord {
+        filter = doc! {
+            "$and": [
+                filter,
+                { "night_lord": night_lord_val }
+            ]
+        };
+    }
+
+    // Add host experience filter if provided - this needs to be handled after the query
+    let host_exp_filter = host_experience.clone();
+
+    // Find matching sessions
+    let cursor = get_collection(db).find(filter).await?;
+    let mut sessions: Vec<GameSession> = cursor.try_collect().await?;
+
+    // Sort by most recent first
+    sessions.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+    // Apply host experience filter if provided (done in memory for complex filtering)
+    if let Some(exp_value) = host_exp_filter {
+        sessions = sessions
+            .into_iter()
+            .filter(|session| {
+                // Find the host player
+                let host = session
+                    .joined_players
+                    .iter()
+                    .find(|player| player.user_id == session.host_id);
+
+                // Check if host has the required experience
+                if let Some(host_player) = host {
+                    return host_player.experience == exp_value;
+                }
+                false
+            })
+            .collect();
+    }
+
+    // Apply pagination manually
+    if let Some(offset_val) = offset {
+        let offset_idx = offset_val as usize;
+        if offset_idx < sessions.len() {
+            sessions = sessions.into_iter().skip(offset_idx).collect();
+        } else {
+            sessions.clear();
+        }
+    }
+
+    if let Some(limit_val) = limit {
+        let limit_size = limit_val as usize;
+        if sessions.len() > limit_size {
+            sessions.truncate(limit_size);
+        }
+    }
+
+    Ok(sessions)
+}

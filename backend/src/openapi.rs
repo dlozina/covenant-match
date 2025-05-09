@@ -18,7 +18,7 @@ use crate::models::news::{
     NewsResponse, UpdateAnnouncementDto, UpdateNewsDto,
 };
 use crate::models::session::{
-    CovenantStats, CovenantStatsResponse, CreateSessionDto, FriendshipMatrix, FriendshipPlayer, GameResult, GameSessionDto, JoinSessionDto, MinimalSessionDto, PlayerInfo, PlayerInfoResponseDto, RateSessionDto, ResultsResponseDto, SessionResponseDto, SessionResult, SessionResultResponseDto, SessionStatus, SubmitResultDto, UpdateSessionDto, UserSessionResponseDto
+    CovenantStats, CovenantStatsResponse, CreateSessionDto, FriendshipMatrix, FriendshipPlayer, GameResult, GameSessionDto, JoinSessionDto, MinimalSessionDto, PaginatedSessionsResponse, PaginationMetadata, PlayerInfo, PlayerInfoResponseDto, RateSessionDto, ResultsResponseDto, SessionResponseDto, SessionResult, SessionResultResponseDto, SessionStatus, SubmitResultDto, UpdateSessionDto, UserSessionResponseDto
 };
 use crate::models::statistics::{
     BatchUserStatsResponse, LeaderboardEntryResponseDto, NightLordStatsResponse, PaginatedSessionData, PaginatedSessionResponse, SessionHistoryResponse, Stats, UserStatistics, UserStatsResponse
@@ -207,6 +207,8 @@ use utoipa::{
             SessionResultResponseDto,
             FriendshipMatrix,
             FriendshipPlayer,
+            PaginationMetadata,
+            //PaginatedSessionsResponse,
             // Covenant statistics models
             CovenantStats,
             CovenantStatsResponse,

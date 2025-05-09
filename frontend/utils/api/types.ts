@@ -30,6 +30,9 @@ export interface MinimalSession {
   status: "Open" | "InProgress" | "Completed";
   createdAt: string;
   nightLord?: string;
+  hostExperience?: string;
+  playerCount?: number;
+  isFriendsOnly?: boolean;
 }
 
 export interface SessionDetails {
@@ -417,6 +420,8 @@ export interface SessionFilterOptions {
   isPrivate?: boolean;
   region?: string;
   platform?: string;
+  nightLord?: string;
+  hostExperience?: string;
 }
 
 // Use existing Session type as SessionResponse
@@ -432,4 +437,15 @@ export interface UserStats {
   losses: number;
   winRate: number;
   score: number;
+}
+
+// Add new pagination response type for sessions
+export interface PaginatedSessionsResponse<T> {
+  items: T[];
+  metadata: {
+    totalCount: number;
+    pageCount: number;
+    currentPage: number;
+    perPage: number;
+  }
 } 

@@ -15,7 +15,12 @@ export { StatisticsService } from './statistics-service';
 
 // Import the SessionService class and types needed for our helper functions
 import { SessionService } from './session-service';
-import { Session, MinimalSession, UserSessionsResponse } from './types';
+import { 
+  Session, 
+  MinimalSession, 
+  UserSessionsResponse,
+  PaginatedSessionsResponse
+} from './types';
 import { httpClient } from './http-client';
 
 /**
@@ -26,7 +31,9 @@ import { httpClient } from './http-client';
  * @param statusFilter Filter by session status
  * @param region Filter by region
  * @param platform Filter by platform
- * @returns List of sessions or minimal sessions for unauthenticated users
+ * @param nightLordFilter Filter by Night Lord (optional)
+ * @param hostExperienceFilter Filter by host experience level (optional)
+ * @returns Paginated list of sessions with metadata
  */
 export const fetchSessions = async (
   isLoggedIn: boolean,
@@ -34,34 +41,65 @@ export const fetchSessions = async (
   limit: number = 10,
   statusFilter: string = 'All',
   region?: string,
-  platform?: string
-): Promise<{ sessions?: Session[], minimalSessions?: MinimalSession[] }> => {
+  platform?: string,
+  nightLordFilter?: string,
+  hostExperienceFilter?: string
+): Promise<{
+  sessions?: Session[],
+  minimalSessions?: MinimalSession[],
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+  }
+}> => {
   try {
     const offset = (currentPage - 1) * limit;
     const status = statusFilter === 'All' ? undefined : statusFilter;
     
     if (isLoggedIn) {
       // Fetch full session data for authenticated users
-      const sessions = await SessionService.getSessions({
+      const response = await SessionService.getSessions({
         status,
         limit,
         offset,
         region,
-        platform
+        platform,
+        nightLord: nightLordFilter,
+        hostExperience: hostExperienceFilter
       });
       
-      return { sessions };
+      return { 
+        sessions: response.items,
+        pagination: {
+          currentPage: response.metadata.current_page,
+          totalPages: response.metadata.page_count,
+          totalItems: response.metadata.totalCount,
+          itemsPerPage: response.metadata.per_page
+        }
+      };
     } else {
       // Fetch minimal session data for unauthenticated users
-      const minimalSessions = await SessionService.getPublicSessions({
+      const response = await SessionService.getPublicSessions({
         status,
         limit,
         offset,
         region,
-        platform
+        platform,
+        nightLord: nightLordFilter,
+        hostExperience: hostExperienceFilter
       });
       
-      return { minimalSessions };
+      return { 
+        minimalSessions: response.items,
+        pagination: {
+          currentPage: response.metadata.current_page,
+          totalPages: response.metadata.page_count,
+          totalItems: response.metadata.totalCount,
+          itemsPerPage: response.metadata.per_page
+        }
+      };
     }
   } catch (error) {
     console.error('Error fetching sessions:', error);
@@ -76,28 +114,47 @@ export const fetchSessions = async (
  * @param statusFilter Filter by session status
  * @param region Filter by region
  * @param platform Filter by platform
- * @returns List of sessions created by friends
+ * @param nightLordFilter Filter by Night Lord (optional)
+ * @param hostExperienceFilter Filter by host experience level (optional)
+ * @returns Paginated list of sessions created by friends with metadata
  */
 export const fetchFriendSessions = async (
   currentPage: number = 1,
   limit: number = 10,
   statusFilter: string = 'All',
   region?: string,
-  platform?: string
-): Promise<{ sessions: Session[] }> => {
+  platform?: string,
+  nightLordFilter?: string,
+  hostExperienceFilter?: string
+): Promise<{
+  sessions: Session[],
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  }
+}> => {
   try {
     const offset = (currentPage - 1) * limit;
     const status = statusFilter === 'All' ? undefined : statusFilter;
     
-    const sessions = await SessionService.getFriendSessions({
+    const response = await SessionService.getFriendSessions({
       status,
       limit,
       offset,
       region,
-      platform
+      platform,
+      nightLord: nightLordFilter,
+      hostExperience: hostExperienceFilter
     });
     
-    return { sessions };
+    return { 
+      sessions: response.data,
+      pagination: response.pagination
+    };
   } catch (error) {
     console.error('Error fetching friend sessions:', error);
     throw error;
