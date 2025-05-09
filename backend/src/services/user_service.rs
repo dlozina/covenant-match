@@ -4,8 +4,8 @@ use crate::models::token::TokenPurpose;
 use crate::models::user::{
     CreateUserDto, Experience, FriendDto, LoginUserDto, UpdateUserProfileDto, User, UserResponse,
 };
-use crate::repository::user_repository;
 use crate::repository::token_repository;
+use crate::repository::user_repository;
 use crate::services::email_service;
 use crate::utils::jwt;
 use bcrypt::{hash, verify, DEFAULT_COST};
@@ -118,6 +118,16 @@ pub async fn login_user(
 
     if !password_matches {
         return Err(AppError::InvalidCredentials);
+    }
+
+    // Check if the user's email is verified
+    if !user.email_verified {
+        return Err(AppError::EmailNotVerified);
+    }
+
+    // Check if the account is disabled
+    if user.disabled {
+        return Err(AppError::AccountDisabled);
     }
 
     // Generate JWT token with the user's role
@@ -270,8 +280,7 @@ pub async fn ensure_admin_exists(db: &Database) -> Result<(), AppError> {
         Ok(())
     } else {
         // Get admin credentials from environment
-        let admin_username =
-            std::env::var("ADMIN_USERNAME").unwrap_or_else(|_| "akri".to_string());
+        let admin_username = std::env::var("ADMIN_USERNAME").unwrap_or_else(|_| "akri".to_string());
         let admin_password = std::env::var("ADMIN_PASSWORD").unwrap_or_else(|_| {
             warn!("ADMIN_PASSWORD not set! Using default password - change this in production!");
             "changeme123#".to_string()

@@ -105,6 +105,14 @@ pub enum AppError {
 
     #[error("Invalid or expired token")]
     InvalidOrExpiredToken,
+
+    // Email verification error
+    #[error("Email not verified. Please check your email for a verification link.")]
+    EmailNotVerified,
+
+    // Account disabled error
+    #[error("Account has been disabled. Please contact support for assistance.")]
+    AccountDisabled,
 }
 
 impl ResponseError for AppError {
@@ -163,6 +171,10 @@ impl ResponseError for AppError {
             AppError::SystemInfoError(_) => StatusCode::INTERNAL_SERVER_ERROR,
 
             AppError::InvalidOrExpiredToken => StatusCode::UNAUTHORIZED,
+
+            AppError::EmailNotVerified => StatusCode::BAD_REQUEST,
+
+            AppError::AccountDisabled => StatusCode::FORBIDDEN,
         }
     }
 }

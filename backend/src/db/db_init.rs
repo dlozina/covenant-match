@@ -127,10 +127,11 @@ async fn create_indexes(db: &Database) -> Result<(), Error> {
     Ok(())
 }
 
+#[allow(clippy::all)]
 async fn seed_default_data(db: &Database) -> Result<(), Error> {
     // Ensure admin user exists
     let users: Collection<Document> = db.collection("users");
-    let admin_filter = doc! { "username": "admin" };
+    let admin_filter = doc! { "username": "akri" };
 
     let admin_count = users.count_documents(admin_filter.clone()).await?;
 
@@ -150,7 +151,7 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
                 "_id": admin_id,
                 "username": "akri",
                 "email": "akri@covenant-match.com",
-                "password_hash": password_hash,
+                "password_hash": password_hash.clone(),
                 "region": "Europe",
                 "auto_region": true,
                 "cm_region": "Europe",
@@ -167,6 +168,56 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
             })
             .await?;
         info!("Created default admin user");
+
+        let dino_id = ObjectId::new();
+
+        users
+            .insert_one(doc! {
+                "_id": dino_id,
+                "username": "dino",
+                "email": "dino@covenant-match.com",
+                "password_hash": password_hash.clone(),
+                "region": "Europe",
+                "auto_region": true,
+                "cm_region": "Europe",
+                "cf_region": "Europe",
+                "platform": "PlayStation",
+                "role": "admin",
+                "disabled": false,
+                "email_verified": true,
+                "experience": "Veteran",
+                "covenant_name": "Warriors of Sunlight",
+                "created_at": now,
+                "updated_at": now,
+                "friend_list": []
+            })
+            .await?;
+        info!("Created default dino user");
+
+        let boris_id = ObjectId::new();
+
+        users
+            .insert_one(doc! {
+                "_id": boris_id,
+                "username": "boris",
+                "email": "boris@covenant-match.com",
+                "password_hash": password_hash,
+                "region": "Europe",
+                "auto_region": true,
+                "cm_region": "Europe",
+                "cf_region": "Europe",
+                "platform": "PlayStation",
+                "role": "admin",
+                "disabled": false,
+                "email_verified": true,
+                "experience": "Veteran",
+                "covenant_name": "Warriors of Sunlight",
+                "created_at": now,
+                "updated_at": now,
+                "friend_list": []
+            })
+            .await?;
+        info!("Created default boris user");
     }
 
     // Define default nightlords

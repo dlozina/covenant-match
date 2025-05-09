@@ -213,27 +213,56 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Login function with redirect handling
   const login = useCallback(async (token: string, userData?: UserData | null): Promise<UserData | null> => {
-    // Store the token in localStorage for persistent auth
-    localStorage.setItem('token', token);
-    
-    // Get current timestamp
-    const now = Date.now();
-    
-    const expiry = getTokenExpiry(token);
-    const expiresIn = expiry - now;
-    console.log(`Login successful. Token expires in ${Math.floor(expiresIn / 3600000)}h ${Math.floor((expiresIn % 3600000) / 60000)}m`);
-    
-    setIsLoggedIn(true);
-    setLastTokenRefresh(now);
-    
-    // If we already fetched user data, set it directly to avoid a second API call
-    if (userData) {
-      setUserData(userData);
-    } else {
-      refreshUserData();
+    try {
+      // Fetch user data if not provided
+      const data = userData || await fetchUserData(token);
+      
+      // Check if account is not verified
+      if (data && !data.emailVerified) {
+        // Account is not verified - throw a specific error for not verified accounts
+        const notVerifiedError = new Error('Your account has not been verified. Please check your email for verification instructions.');
+        // Add property to identify this is a not verified account error
+        Object.defineProperty(notVerifiedError, 'isNotVerifiedAccount', { value: true });
+        throw notVerifiedError;
+      }
+      
+      // Check if account is disabled
+      if (data && data.disabled) {
+        // Account is disabled - throw a specific error for disabled accounts
+        const disabledError = new Error('Your account has been disabled. Please contact support for assistance.');
+        // Add property to identify this is a disabled account error
+        Object.defineProperty(disabledError, 'isDisabledAccount', { value: true });
+        throw disabledError;
+      }
+      
+      // Store the token in localStorage for persistent auth
+      localStorage.setItem('token', token);
+      
+      // Get current timestamp
+      const now = Date.now();
+      
+      const expiry = getTokenExpiry(token);
+      const expiresIn = expiry - now;
+      console.log(`Login successful. Token expires in ${Math.floor(expiresIn / 3600000)}h ${Math.floor((expiresIn % 3600000) / 60000)}m`);
+      
+      setIsLoggedIn(true);
+      setLastTokenRefresh(now);
+      
+      // If we already have user data, set it directly to avoid a second API call
+      if (data) {
+        setUserData(data);
+      } else {
+        refreshUserData();
+      }
+      
+      return data || null; // Return the user data or null
+    } catch (error) {
+      // Don't store token or set logged in state if there's an error
+      localStorage.removeItem('token');
+      setIsLoggedIn(false);
+      setUserData(null);
+      throw error;
     }
-    
-    return userData || null; // Return the user data or null
   }, [fetchUserData, getTokenExpiry, refreshUserData]);
 
   // Logout function
@@ -276,15 +305,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       if (data) {
-        // Check if the account is disabled
-        if (data.disabled) {
+        // First check if email is verified
+        if (!data.emailVerified) {
+          // Email not verified - clear token and log out
+          localStorage.removeItem('token');
+          setIsLoggedIn(false);
+          setUserData(null);
+          console.warn('User logged out: Email not verified');
+        }
+        // Then check if the account is disabled
+        else if (data.disabled) {
           // Account is disabled - logout and clear token
           localStorage.removeItem('token');
           setIsLoggedIn(false);
           setUserData(null);
-          // User will need to log in again where they'll see the disabled message
+          console.warn('User logged out: Account is disabled');
         } else {
-          // Account is active - proceed normally
+          // Account is active and verified - proceed normally
           setUserData(data);
           setIsLoggedIn(true);
         }
@@ -304,12 +341,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const token = localStorage.getItem('token');
           const data = await fetchUserData(token!);
           if (data) {
-            // Check if account is disabled before proceeding
-            if (data.disabled) {
+            // First check if email is verified
+            if (!data.emailVerified) {
+              // Email not verified - clear token and log out
               localStorage.removeItem('token');
               setIsLoggedIn(false);
               setUserData(null);
-              // User will need to log in again where they'll see the disabled message
+              console.warn('User logged out after refresh: Email not verified');
+            }
+            // Then check if account is disabled
+            else if (data.disabled) {
+              localStorage.removeItem('token');
+              setIsLoggedIn(false);
+              setUserData(null);
+              console.warn('User logged out after refresh: Account is disabled');
             } else {
               setUserData(data);
               setIsLoggedIn(true);
@@ -327,7 +372,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [fetchUserData, refreshToken, router]);
+  }, [fetchUserData, refreshToken]);
 
   // Check authentication status on initial load and when pathname changes
   useEffect(() => {
