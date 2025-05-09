@@ -115,9 +115,8 @@ export default function SessionsPage() {
   const [shouldFetch, setShouldFetch] = useState(false);
   const [notification, setNotification] = useState<NotificationType | null>(null);
   const [activeTab, setActiveTab] = useState<SessionTab>("general");
-  const [pageSize, setPageSize] = useState(10);
-  const [friendsPageSize, setFriendsPageSize] = useState(10);
-  const pageSizeOptions = [5, 10, 20, 50];
+  const pageSize = 10; // Fixed page size
+  const friendsPageSize = 10; // Fixed page size for friends tab
   
   // Get user region and platform data for API calls
   const userRegion = userData?.autoRegion ? userData.cmRegion : userData?.region;
@@ -311,18 +310,6 @@ export default function SessionsPage() {
       fetchFriendsSessions();
     }
   }, [friendsCurrentPage, friendsPageSize, activeTab, shouldFetch, fetchFriendsSessions, isLoggedIn, friendsNightLordFilter, friendsExperienceFilter]);
-
-  // Handler for page size change for general tab
-  const handlePageSizeChange = (value: string) => {
-    setPageSize(Number(value));
-    setCurrentPage(1); // Reset to first page when changing page size
-  };
-
-  // Handler for page size change for friends tab
-  const handleFriendsPageSizeChange = (value: string) => {
-    setFriendsPageSize(Number(value));
-    setFriendsCurrentPage(1); // Reset to first page when changing page size
-  };
 
   // Night Lord filter change handler for general tab
   const handleNightLordFilterChange = (value: string) => {
@@ -629,29 +616,6 @@ export default function SessionsPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            
-            {/* Page size dropdown */}
-            <div>
-              <Select
-                value={activeTab === "general" ? pageSize.toString() : friendsPageSize.toString()}
-                onValueChange={
-                  activeTab === "general" 
-                    ? handlePageSizeChange 
-                    : handleFriendsPageSizeChange
-                }
-              >
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Items per page" />
-                </SelectTrigger>
-                <SelectContent>
-                  {pageSizeOptions.map((size) => (
-                    <SelectItem key={size} value={size.toString()}>
-                      {size} sessions
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
           </div>
 
@@ -1053,6 +1017,11 @@ export default function SessionsPage() {
                                   <div className="flex items-center gap-2">
                                     <div className={`w-2 h-2 rounded-full ${isFullSession ? 'bg-yellow-500' : 'bg-green-500'}`}></div>
                                     {session.name}
+                                     {session.isFriendsOnly && (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
+                                        Friends
+                                      </span>
+                                    )}
                                   </div>
                                 </TableCell>
                                 <TableCell>
@@ -1065,11 +1034,6 @@ export default function SessionsPage() {
                                     <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
                                       {session.nightLord}
                                     </span>
-                                    {session.isFriendsOnly && (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
-                                        Friends
-                                      </span>
-                                    )}
                                   </div>
                                 </TableCell>
                                 <TableCell>
