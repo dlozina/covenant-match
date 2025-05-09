@@ -1,9 +1,9 @@
 use crate::models::error::AppError;
 use crate::models::session::{
     CovenantStats, CovenantStatsResponse, CreateSessionDto, FriendshipMatrix, FriendshipPlayer,
-    GameResult, GameSession, GameSessionDto, JoinSessionDto, MinimalSessionDto, PlayerInfo,
-    RateSessionDto, SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto,
-    UpdateSessionDto, UserSessionHelper, UserSessionResponseDto,
+    GameResult, GameSession, GameSessionDto, JoinSessionDto, MinimalPlayerInfoDto,
+    MinimalSessionDto, PlayerInfo, RateSessionDto, SessionResponseDto, SessionResult,
+    SessionStatus, SubmitResultDto, UpdateSessionDto, UserSessionHelper, UserSessionResponseDto,
 };
 use crate::repository::{session_repository, statistics_repository, user_repository};
 use crate::sse::messages::{BroadcastMessage, ServerMessage as SseServerMessage};
@@ -360,20 +360,24 @@ pub async fn get_minimal_sessions(
     Ok(sessions
         .into_iter()
         .map(|s| {
-            // Find the host in the joined players
-            let host_name = s
-                .joined_players
-                .iter()
-                .find(|p| p.user_id == s.host_id)
-                .map_or_else(|| "Unknown".to_string(), |p| p.username.clone());
-
-            MinimalSessionDto {
+            // map game session to minimal session
+            let minimal_session = MinimalSessionDto {
                 id: s.id.to_hex(),
                 name: s.name,
-                host_name,
+                host_name: s.joined_players.iter().find(|p| p.user_id == s.host_id).map_or_else(|| "Unknown".to_string(), |p| p.username.clone()),
+                joined_players: s
+                    .joined_players
+                    .iter()
+                    .map(|p| MinimalPlayerInfoDto {
+                        username: p.username.clone(),
+                        experience: p.experience.clone(),
+                    })
+                    .collect(),
+                night_lord: s.night_lord,
                 status: s.status,
                 created_at: s.created_at,
-            }
+            };
+            minimal_session
         })
         .collect())
 }

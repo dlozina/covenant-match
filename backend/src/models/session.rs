@@ -266,8 +266,17 @@ pub struct MinimalSessionDto {
     pub id: String,
     pub name: String,
     pub host_name: String,
+    pub night_lord: String,
+    pub joined_players: Vec<MinimalPlayerInfoDto>,
     pub status: SessionStatus,
     pub created_at: DateTime,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MinimalPlayerInfoDto {
+    pub username: String,
+    pub experience: String,
 }
 
 /// Statistics by covenant

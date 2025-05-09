@@ -53,6 +53,7 @@ export interface MinimalSession {
   hostName: string;
   status: "Open" | "InProgress" | "Completed";
   createdAt: string;
+  joinedPlayers: { username: string; experience: string }[];
 }
 
 // Types for leaderboard

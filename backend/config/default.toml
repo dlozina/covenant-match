@@ -44,10 +44,13 @@ exclude_patterns = [
     { path = "/api/docs/.*", method = "GET", is_regex = true },
     { path = "/api-docs/.*", method = "GET", is_regex = true },
     { path = "/api/v1/game-data", method = "GET", is_regex = false },
+    # statistics
     { path = "/api/v1/statistics/sessions-stats", method = "GET", is_regex = false },
     { path = "/api/v1/statistics/leaderboard", method = "GET", is_regex = false },
     { path = "/api/v1/statistics/covenants", method = "GET", is_regex = false },
     { path = "/api/v1/public/sessions", method = "GET", is_regex = false },
+    # Dropdown data
+    { path = "/api/v1/night-lords", method = "GET", is_regex = false },
     # Verify email
     { path = "/api/v1/verify-email", method = "POST", is_regex = false },
     # Reset password

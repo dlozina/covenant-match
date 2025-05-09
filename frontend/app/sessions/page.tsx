@@ -54,6 +54,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown } from "lucide-react";
 import { saveRedirectUrl } from "@/utils/auth-redirect";
+import { hostname } from "os";
 
 const MAX_PLAYERS = 3;
 
@@ -666,11 +667,11 @@ export default function SessionsPage() {
                               </TableCell>
                               <TableCell>
                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">
-                                  {(session as { hostExperience?: string }).hostExperience || "Unknown"}
+                                  {session.joinedPlayers.find(player => player.username === session.hostName)?.experience || "Unknown"}
                                 </span>
                               </TableCell>
                               <TableCell>
-                                {(session as { playerCount?: number }).playerCount || 1}/{MAX_PLAYERS}
+                                {session.joinedPlayers.length}/{MAX_PLAYERS}
                               </TableCell>
                               <TableCell className="text-right">
                                 <Button 

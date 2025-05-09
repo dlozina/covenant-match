@@ -172,12 +172,12 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
     // Define default nightlords
     let default_nightlords = vec![
         ("Tricephalos", "Nightlords are the guardians of the realm, they are the ones who protect the realm from the darkness."),
-        ("PCR", "PCR is the Covenant of the Pact, they are the ones who protect the realm from the darkness."),
+        ("Libra", "PCR is the Covenant of the Pact, they are the ones who protect the realm from the darkness."),
         ("Malenia, Blade of Miquella", "PCR is the Covenant of the Pact, they are the ones who protect the realm from the darkness."),
         ("Maliketh", "Maliketh is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
         ("Mohg", "Mohg is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
         ("Midra", "Midra is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
-        ("Bayle", "Bayle is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
+        ("PCR", "Bayle is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
         ("Messmer", "Messmer is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
     ];
 
@@ -192,8 +192,8 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
         ("Duchess", "Dexterity build"),
         ("Ironeye", "Dexterity build with long range"),
         ("Rider", "Strength build"),
-        ("Igon", "Balance build"),
-        ("Alexander", "Strength build"),
+        ("Executor", "Sekiro build"),
+        ("Revenant", "Summoner build"),
     ];
 
     // Seed nightfarers collection
