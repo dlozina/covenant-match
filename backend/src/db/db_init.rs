@@ -167,7 +167,7 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
                 "friend_list": []
             })
             .await?;
-        info!("Created default admin user");
+        info!("Created default akri user");
 
         let dino_id = ObjectId::new();
 
@@ -178,7 +178,7 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
                 "email": "dino@covenant-match.com",
                 "password_hash": password_hash.clone(),
                 "region": "Europe",
-                "auto_region": true,
+                "auto_region": false,
                 "cm_region": "Europe",
                 "cf_region": "Europe",
                 "platform": "PlayStation",
@@ -203,7 +203,7 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
                 "email": "boris@covenant-match.com",
                 "password_hash": password_hash,
                 "region": "Europe",
-                "auto_region": true,
+                "auto_region": false,
                 "cm_region": "Europe",
                 "cf_region": "Europe",
                 "platform": "PlayStation",

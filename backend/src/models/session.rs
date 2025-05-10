@@ -189,6 +189,9 @@ pub struct SessionResponseDto {
     pub host_experience: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub player_count: Option<u32>,
+    pub new_session_created: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub new_session_created_id: Option<ObjectId>,
 }
 
 impl From<GameSession> for SessionResponseDto {
@@ -260,6 +263,8 @@ impl From<GameSession> for SessionResponseDto {
             has_password: !session.password.is_empty(),
             host_experience: None,
             player_count: Some(player_count),
+            new_session_created: session.new_session_created,
+            new_session_created_id: session.new_session_created_id,
         }
     }
 }
