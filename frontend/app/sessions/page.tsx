@@ -199,6 +199,7 @@ export default function SessionsPage() {
       const response = await SessionService.getFriendSessions({
         status: "Open", // Only show Open sessions
         limit: friendsPageSize,
+        isPrivate: false,
         offset: (friendsCurrentPage - 1) * friendsPageSize,
         region: userRegion,
         platform: userPlatform,
@@ -246,6 +247,7 @@ export default function SessionsPage() {
         const response = await SessionService.getSessions({
           status: "Open",
           limit: pageSize,
+          isPrivate: false,
           offset: (currentPage - 1) * pageSize,
           region: userRegion,
           platform: userPlatform,
