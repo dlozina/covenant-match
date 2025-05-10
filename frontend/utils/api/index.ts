@@ -19,7 +19,7 @@ import {
   Session, 
   MinimalSession, 
   UserSessionsResponse,
-  PaginatedSessionsResponse
+  // PaginatedSessionsResponse -> todo: we should use the types from the SessionService
 } from './types';
 import { httpClient } from './http-client';
 
@@ -73,10 +73,10 @@ export const fetchSessions = async (
       return { 
         sessions: response.items,
         pagination: {
-          currentPage: response.metadata.current_page,
-          totalPages: response.metadata.page_count,
+          currentPage: response.metadata.currentPage,
+          totalPages: response.metadata.pageCount,
           totalItems: response.metadata.totalCount,
-          itemsPerPage: response.metadata.per_page
+          itemsPerPage: response.metadata.perPage
         }
       };
     } else {
@@ -94,10 +94,10 @@ export const fetchSessions = async (
       return { 
         minimalSessions: response.items,
         pagination: {
-          currentPage: response.metadata.current_page,
-          totalPages: response.metadata.page_count,
+          currentPage: response.metadata.currentPage,
+          totalPages: response.metadata.pageCount,
           totalItems: response.metadata.totalCount,
-          itemsPerPage: response.metadata.per_page
+          itemsPerPage: response.metadata.perPage
         }
       };
     }
@@ -107,59 +107,60 @@ export const fetchSessions = async (
   }
 };
 
-/**
- * Fetch sessions created by friends
- * @param currentPage Current page number
- * @param limit Number of sessions per page
- * @param statusFilter Filter by session status
- * @param region Filter by region
- * @param platform Filter by platform
- * @param nightLordFilter Filter by Night Lord (optional)
- * @param hostExperienceFilter Filter by host experience level (optional)
- * @returns Paginated list of sessions created by friends with metadata
- */
-export const fetchFriendSessions = async (
-  currentPage: number = 1,
-  limit: number = 10,
-  statusFilter: string = 'All',
-  region?: string,
-  platform?: string,
-  nightLordFilter?: string,
-  hostExperienceFilter?: string
-): Promise<{
-  sessions: Session[],
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalItems: number;
-    itemsPerPage: number;
-    hasNextPage: boolean;
-    hasPreviousPage: boolean;
-  }
-}> => {
-  try {
-    const offset = (currentPage - 1) * limit;
-    const status = statusFilter === 'All' ? undefined : statusFilter;
+// todo: not needed, we should use the SessionService.getFriendSessions instead
+// /**
+//  * Fetch sessions created by friends
+//  * @param currentPage Current page number
+//  * @param limit Number of sessions per page
+//  * @param statusFilter Filter by session status
+//  * @param region Filter by region
+//  * @param platform Filter by platform
+//  * @param nightLordFilter Filter by Night Lord (optional)
+//  * @param hostExperienceFilter Filter by host experience level (optional)
+//  * @returns Paginated list of sessions created by friends with metadata
+//  */
+// export const fetchFriendSessions = async (
+//   currentPage: number = 1,
+//   limit: number = 10,
+//   statusFilter: string = 'All',
+//   region?: string,
+//   platform?: string,
+//   nightLordFilter?: string,
+//   hostExperienceFilter?: string
+// ): Promise<{
+//   sessions: Session[],
+//   pagination: {
+//     currentPage: number;
+//     totalPages: number;
+//     totalItems: number;
+//     itemsPerPage: number;
+//     hasNextPage: boolean;
+//     hasPreviousPage: boolean;
+//   }
+// }> => {
+//   try {
+//     const offset = (currentPage - 1) * limit;
+//     const status = statusFilter === 'All' ? undefined : statusFilter;
     
-    const response = await SessionService.getFriendSessions({
-      status,
-      limit,
-      offset,
-      region,
-      platform,
-      nightLord: nightLordFilter,
-      hostExperience: hostExperienceFilter
-    });
+//     const response = await SessionService.getFriendSessions({
+//       status,
+//       limit,
+//       offset,
+//       region,
+//       platform,
+//       nightLord: nightLordFilter,
+//       hostExperience: hostExperienceFilter
+//     });
     
-    return { 
-      sessions: response.data,
-      pagination: response.pagination
-    };
-  } catch (error) {
-    console.error('Error fetching friend sessions:', error);
-    throw error;
-  }
-};
+//     return { 
+//       sessions: response.data,
+//       pagination: response.pagination
+//     };
+//   } catch (error) {
+//     console.error('Error fetching friend sessions:', error);
+//     throw error;
+//   }
+// };
 
 /**
  * Fetch user's current and previous sessions
