@@ -9,6 +9,7 @@ import { MainLayout } from "@/components/layout"
 import { Footer } from "@/components/layout/Footer"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
+import { Info } from "lucide-react"
 import {
   Form,
   FormControl,
@@ -574,7 +575,14 @@ export default function CreateProfilePage() {
                   notification={notification} 
                   onDismiss={clearNotification}
                 />
-
+                <div className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm bg-muted/50">
+                  <div className="flex items-center space-x-3">
+                    <Info className="text-primary h-5 w-5" />
+                    <div className="text-sm text-muted-foreground">
+                      After creating your profile, you will receive an email to verify your account. Please check your spam folder if you do not see it in your inbox.
+                    </div>
+                  </div>
+                </div>
                 <Button 
                   type="submit" 
                   disabled={isLoading}
