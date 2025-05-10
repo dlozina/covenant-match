@@ -50,8 +50,15 @@ if (typeof window !== 'undefined') {
   const sessionId = urlParams.get('id');
   
   if (sessionId) {
-    const currentUrl = window.location.pathname + window.location.search;
-    localStorage.setItem('redirectAfterLogin', currentUrl);
+    // Check if user is logged in before saving redirect URL
+    const token = localStorage.getItem('token');
+    const isLoggedIn = !!token; // Simple check for token existence
+    
+    // Only save redirect URL if user is not logged in
+    if (!isLoggedIn) {
+      const currentUrl = window.location.pathname + window.location.search;
+      localStorage.setItem('redirectAfterLogin', currentUrl);
+    }
   }
 }
 

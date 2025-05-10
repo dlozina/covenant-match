@@ -94,27 +94,20 @@ async fn create_indexes(db: &Database) -> Result<(), Error> {
 
     // Joined players userId index for sessions collection (looks like we have both formats)
     let joined_players_user_id_index = IndexModel::builder()
-        .keys(doc! { "joined_players.userId": 1 })
+        .keys(doc! { "joined_players.user_id": 1 })
         .build();
 
     db.collection::<Document>("sessions")
         .create_index(joined_players_user_id_index)
         .await?;
 
-    // Status index for sessions collection
-    let status_index = IndexModel::builder().keys(doc! { "status": 1 }).build();
-
-    db.collection::<Document>("sessions")
-        .create_index(status_index)
-        .await?;
-
     // Compound index for common session queries
-    let status_private_index = IndexModel::builder()
-        .keys(doc! { "status": 1, "is_private": 1 })
+    let search_sessions_index = IndexModel::builder()
+        .keys(doc! { "region": 1, "platform": 1, "status": 1, "is_private": 1, "is_friends_only": 1, "host_experience": 1 , "night_lord":1})
         .build();
 
     db.collection::<Document>("sessions")
-        .create_index(status_private_index)
+        .create_index(search_sessions_index)
         .await?;
 
     // Session ID index for messages collection

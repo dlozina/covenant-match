@@ -82,13 +82,14 @@ pub enum SessionStatus {
     Cancelled,
 }
 
+// todo: dangerous, we should use a enum for this
 // Implement Display for SessionStatus
 impl fmt::Display for SessionStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             SessionStatus::Open => write!(f, "Open"),
             SessionStatus::Full => write!(f, "Full"),
-            SessionStatus::InProgress => write!(f, "In Progress"),
+            SessionStatus::InProgress => write!(f, "InProgress"),
             SessionStatus::Completed => write!(f, "Completed"),
             SessionStatus::Cancelled => write!(f, "Cancelled"),
         }
@@ -101,6 +102,7 @@ pub struct GameSession {
     pub id: ObjectId,
     pub name: String,
     pub host_id: String,
+    pub host_experience: String,
     pub region: String,
     pub platform: String,
     pub password: String,
@@ -168,6 +170,7 @@ pub struct SessionResponseDto {
     pub name: String,
     pub host_id: String,
     pub host_name: String,
+    pub host_experience: String,
     pub status: String,
     pub is_private: bool,
     pub is_friends_only: bool,
@@ -185,8 +188,6 @@ pub struct SessionResponseDto {
     #[schema(value_type = Option<String>)]
     pub completed_at: Option<chrono::DateTime<chrono::Utc>>,
     pub has_password: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub host_experience: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub player_count: Option<u32>,
     pub new_session_created: bool,
@@ -261,7 +262,7 @@ impl From<GameSession> for SessionResponseDto {
                     .unwrap_or_else(|| chrono::Utc::now())
             }),
             has_password: !session.password.is_empty(),
-            host_experience: None,
+            host_experience: session.host_experience,
             player_count: Some(player_count),
             new_session_created: session.new_session_created,
             new_session_created_id: session.new_session_created_id,

@@ -12,6 +12,7 @@ export interface SessionData {
   id: string;
   name: string;
   hostId: string;
+  hostExperience: string;
   status: string;
   nightLord: string;
   joinedPlayers: JoinedPlayer[];

@@ -46,17 +46,17 @@ const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({
   const relativeTime = useMemo(() => {
     // If session hasn't started yet according to state
     if (!sessionState.isSessionStarted) {
-      return 'Not started yet';
+      return 'Not started';
     }
     
     // If session is finished, just show completed
     if (sessionState.isSessionFinished) {
-      return 'Session completed';
+      return 'Completed';
     }
     
     // If no session data or startedAt is null/undefined
     if (!sessionData?.startedAt) {
-      return 'Session in progress';
+      return 'In progress';
     }
     
     try {
@@ -70,7 +70,7 @@ const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({
       
       // Verify the date is valid
       if (isNaN(startTime.getTime())) {
-        return 'Session in progress';
+        return 'In progress';
       }
       
       // Format the relative time

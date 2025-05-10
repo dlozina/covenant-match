@@ -9,6 +9,7 @@ export interface User {
 export interface GameSession {
   id: string;
   hostId: string;
+  hostExperience: string;
   password?: string;
   character: string;
   status: 'open' | 'full' | 'in_progress' | 'completed' | 'cancelled';

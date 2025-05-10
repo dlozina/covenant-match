@@ -519,6 +519,7 @@ mod tests {
             id: mongodb::bson::oid::ObjectId::new(),
             name: "Test Session".to_string(),
             host_id: "user123".to_string(),
+            host_experience: "Beginner".to_string(),
             region: "Europe".to_string(),
             platform: "PlayStation".to_string(),
             password: "test".to_string(),

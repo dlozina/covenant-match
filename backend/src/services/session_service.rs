@@ -12,7 +12,6 @@ use actix::prelude::*;
 use chrono::Utc;
 use mongodb::bson::{oid::ObjectId, DateTime};
 use mongodb::Database;
-use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::LazyLock;
 use std::sync::Mutex;
@@ -202,6 +201,7 @@ pub async fn create_session(
         id: ObjectId::new(),
         name: session_data.name,
         host_id: user_id.to_string(),
+        host_experience: user.experience.to_string(),
         region: session_data.region.clone(),
         platform: session_data.platform,
         password: session_data.game_password,
@@ -703,7 +703,7 @@ fn process_result(
     // Add the result
     let now = mongodb::bson::DateTime::now();
     session.results.push(SessionResult {
-        user_id: user_id.clone(),
+        user_id,
         result: result_data.result,
         rating: result_data.rating,
         feedback: result_data.feedback.clone(),
@@ -745,7 +745,7 @@ fn process_result(
 async fn handle_consensus(
     db: &Database,
     session: &mut GameSession,
-    session_id: &str,
+    _session_id: &str,
     consensus_result: GameResult,
 ) -> Result<(), AppError> {
     // Mark session as completed
@@ -755,10 +755,6 @@ async fn handle_consensus(
     if session.completed_at.is_none() {
         session.completed_at = Some(now);
     }
-
-    // Get the list of players who have already submitted results
-    let players_who_submitted: Vec<String> =
-        session.results.iter().map(|r| r.user_id.clone()).collect();
 
     // Check if stats have already been updated using the explicit flag
     if session.stats_updated {
@@ -1065,6 +1061,7 @@ pub async fn recreate_session(
         id: new_session_id,
         name: new_name,
         host_id: user_id.to_string(),
+        host_experience: host_user.experience.to_string(),
         region: original_session.region.clone(),
         platform: original_session.platform.clone(),
         password: original_session.password.clone(),

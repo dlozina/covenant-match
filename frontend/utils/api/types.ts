@@ -12,6 +12,7 @@ export interface Session {
   id: string;
   name: string;
   hostId: string;
+  hostExperience: string;
   status: "Open" | "InProgress" | "Completed";
   isFriendsOnly: boolean;
   nightLord: string;

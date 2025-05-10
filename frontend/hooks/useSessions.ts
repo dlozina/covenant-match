@@ -8,6 +8,7 @@ function mapSessionToGameSession(session: Session): GameSession {
   return {
     id: session.id,
     hostId: session.hostId,
+    hostExperience: session.hostExperience,
     password: session.password,
     character: session.nightLord, // Using nightLord as character
     status: session.status.toLowerCase() as 'open' | 'full' | 'in_progress' | 'completed' | 'cancelled',

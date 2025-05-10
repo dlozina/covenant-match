@@ -382,36 +382,13 @@ pub async fn count_sessions_with_filters(
         filter = doc! { "$and": [filter, doc! { "night_lord": night_lord_val }] };
     }
 
-    // Add host experience filter if provided - this is a complex filter that needs to be handled in-memory
-    // for MongoDB 3.2.3 since it's older and doesn't fully support complex aggregation pipelines with $expr
+    // Add host experience filter if provided
+    if let Some(host_experience_val) = host_experience {
+        filter = doc! { "$and": [filter, doc! { "host_experience": host_experience_val }] };
+    }
 
     // Count the sessions that match the filter
-    let count = get_collection(db).count_documents(filter.clone()).await?;
-
-    // If host experience filter is provided, we need to filter in-memory
-    if let Some(experience_val) = host_experience {
-        // Find all sessions matching the base filters
-        let cursor = get_collection(db).find(filter).await?;
-        let sessions: Vec<GameSession> = cursor.try_collect().await?;
-
-        // Count only sessions where host has the specified experience
-        let filtered_count = sessions
-            .iter()
-            .filter(|session| {
-                let host = session
-                    .joined_players
-                    .iter()
-                    .find(|player| player.user_id == session.host_id);
-
-                if let Some(host_player) = host {
-                    return host_player.experience == experience_val;
-                }
-                false
-            })
-            .count() as u64;
-
-        return Ok(filtered_count);
-    }
+    let count = get_collection(db).count_documents(filter).await?;
 
     Ok(count)
 }
@@ -460,8 +437,10 @@ pub async fn find_sessions_with_filters(
         filter = doc! { "$and": [filter, doc! { "night_lord": night_lord_val }] };
     }
 
-    // Add host experience filter if provided - this needs to be handled after the query
-    let host_exp_filter = host_experience.clone();
+    // Add host experience filter if provided
+    if let Some(host_experience_val) = host_experience {
+        filter = doc! { "$and": [filter, doc! { "host_experience": host_experience_val }] };
+    }
 
     // Get all sessions matching the filter
     let cursor = get_collection(db).find(filter).await?;
@@ -469,26 +448,6 @@ pub async fn find_sessions_with_filters(
 
     // Sort by most recent first
     sessions.sort_by(|a, b| b.created_at.cmp(&a.created_at));
-
-    // Apply host experience filter if provided (done in memory because it's complex to do in MongoDB)
-    if let Some(exp_value) = host_exp_filter {
-        sessions = sessions
-            .into_iter()
-            .filter(|session| {
-                // Find the host player
-                let host = session
-                    .joined_players
-                    .iter()
-                    .find(|player| player.user_id == session.host_id);
-
-                // Check if host has the required experience
-                if let Some(host_player) = host {
-                    return host_player.experience == exp_value;
-                }
-                false
-            })
-            .collect();
-    }
 
     // Apply pagination manually
     if let Some(offset_val) = offset {
@@ -579,33 +538,18 @@ pub async fn count_friends_sessions_with_filters(
         };
     }
 
-    // Count sessions that match the filter
-    let count = get_collection(db).count_documents(filter.clone()).await?;
-
-    // If host experience filter is provided, we need to filter in-memory
-    if let Some(experience_val) = host_experience {
-        // Find all sessions matching the base filters
-        let cursor = get_collection(db).find(filter).await?;
-        let sessions: Vec<GameSession> = cursor.try_collect().await?;
-
-        // Count only sessions where host has the specified experience
-        let filtered_count = sessions
-            .iter()
-            .filter(|session| {
-                let host = session
-                    .joined_players
-                    .iter()
-                    .find(|player| player.user_id == session.host_id);
-
-                if let Some(host_player) = host {
-                    return host_player.experience == experience_val;
-                }
-                false
-            })
-            .count() as u64;
-
-        return Ok(filtered_count);
+    // Add host experience filter if provided
+    if let Some(host_experience_val) = host_experience {
+        filter = doc! {
+            "$and": [
+                filter,
+                { "host_experience": host_experience_val }
+            ]
+        };
     }
+
+    // Count sessions that match the filter
+    let count = get_collection(db).count_documents(filter).await?;
 
     Ok(count)
 }
@@ -681,8 +625,10 @@ pub async fn find_friends_sessions_with_filters(
         };
     }
 
-    // Add host experience filter if provided - this needs to be handled after the query
-    let host_exp_filter = host_experience.clone();
+    // Add host experience filter if provided
+    if let Some(host_experience_val) = host_experience {
+        filter = doc! { "$and": [filter, doc! { "host_experience": host_experience_val }] };
+    }
 
     // Find matching sessions
     let cursor = get_collection(db).find(filter).await?;
@@ -690,26 +636,6 @@ pub async fn find_friends_sessions_with_filters(
 
     // Sort by most recent first
     sessions.sort_by(|a, b| b.created_at.cmp(&a.created_at));
-
-    // Apply host experience filter if provided (done in memory for complex filtering)
-    if let Some(exp_value) = host_exp_filter {
-        sessions = sessions
-            .into_iter()
-            .filter(|session| {
-                // Find the host player
-                let host = session
-                    .joined_players
-                    .iter()
-                    .find(|player| player.user_id == session.host_id);
-
-                // Check if host has the required experience
-                if let Some(host_player) = host {
-                    return host_player.experience == exp_value;
-                }
-                false
-            })
-            .collect();
-    }
 
     // Apply pagination manually
     if let Some(offset_val) = offset {
