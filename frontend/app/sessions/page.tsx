@@ -122,9 +122,12 @@ export default function SessionsPage() {
   const userRegion = userData?.autoRegion ? userData.cmRegion : userData?.region;
   const userPlatform = userData?.platform;
 
-  // Check for kick notification
+  // Check for kick notification or session cancelled notification
   useEffect(() => {
     const wasPlayerKicked = sessionStorage.getItem('playerKicked');
+    const wasSessionCancelled = sessionStorage.getItem('sessionCancelled');
+    
+    // Handle player kicked notification
     if (wasPlayerKicked === 'true') {
       // Get details if available
       const hostUsername = sessionStorage.getItem('kickedByHost') || 'Host';
@@ -152,6 +155,27 @@ export default function SessionsPage() {
       sessionStorage.removeItem('kickedByHost');
       sessionStorage.removeItem('kickedSessionId');
       sessionStorage.removeItem('kickTimestamp');
+    }
+
+    // Handle session cancelled notification - separate from player kicked
+    if (wasSessionCancelled === 'true') {
+      console.log('!!!Showing notification for session cancellation!!! sessions page!!!');
+      const sessionName = sessionStorage.getItem('cancelledSessionName');
+      setNotification({
+          message: `The session "${sessionName}" was cancelled`,
+          type: "warning"
+      });
+      
+      // Clear the notification after 5 seconds
+      setTimeout(() => {
+        setNotification(null);
+      }, 5000);
+      
+      // Clear session cancelled data
+      sessionStorage.removeItem('sessionCancelled');
+      sessionStorage.removeItem('cancelledSessionName');
+      sessionStorage.removeItem('cancelTimestamp');
+      sessionStorage.removeItem('cancelledSessionId');
     }
   }, []);
   

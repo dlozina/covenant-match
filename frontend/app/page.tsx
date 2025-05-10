@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { MainLayout } from "@/components/layout";
 import { Sword, Shield, Timer, Users, Trophy, Skull, ScrollText, Compass, Award, AlertCircle } from "lucide-react";
-// Use for test if css config is not working
+// Use for test if css config is not working -> good old way
 // import { TestStyled } from "@/components/ui/test-styled";
 // import { BasicTest } from "@/components/ui/basic-test";
 import { Footer } from "@/components/layout/Footer";

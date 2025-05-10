@@ -75,6 +75,7 @@ export function SessionParticipant() {
   
   // Check for session cancellation & clear old cancellation data when viewing a new valid session
   useEffect(() => {
+    //todo; not working as expected
     // Clear cancellation data if we're in a valid session that's not cancelled
     if (sessionData && sessionData.status !== 'Cancelled') {
       const cancelledSessionId = sessionStorage.getItem('cancelledSessionId');
@@ -90,7 +91,6 @@ export function SessionParticipant() {
         setHasShownCancelNotification(false);
       }
     }
-    
     // First check for recent cancellation in sessionStorage
     const wasSessionCancelled = sessionStorage.getItem('sessionCancelled');
     const cancelTimestamp = sessionStorage.getItem('cancelTimestamp');
