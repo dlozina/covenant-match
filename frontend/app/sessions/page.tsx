@@ -594,9 +594,9 @@ export default function SessionsPage() {
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden mb-8">
           {/* Filters */}
           <div className="p-4 flex flex-wrap gap-4 items-center justify-between bg-background shadow-sm rounded-lg mb-4">
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-col md:flex-row w-full md:w-auto gap-4">
               {/* Night Lord filter */}
-              <div>
+              <div className="w-full md:w-auto">
                 <Select
                   value={activeTab === "general" ? nightLordFilter : friendsNightLordFilter}
                   onValueChange={
@@ -606,7 +606,7 @@ export default function SessionsPage() {
                   }
                   disabled={isLoadingNightLords}
                 >
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full md:w-[180px]">
                     <SelectValue placeholder="Night Lord" />
                   </SelectTrigger>
                   <SelectContent>
@@ -621,7 +621,7 @@ export default function SessionsPage() {
               </div>
               
               {/* Experience filter */}
-              <div>
+              <div className="w-full md:w-auto">
                 <Select
                   value={activeTab === "general" ? experienceFilter : friendsExperienceFilter}
                   onValueChange={
@@ -630,7 +630,7 @@ export default function SessionsPage() {
                       : handleFriendsExperienceFilterChange
                   }
                 >
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full md:w-[180px]">
                     <SelectValue placeholder="Host Experience" />
                   </SelectTrigger>
                   <SelectContent>
