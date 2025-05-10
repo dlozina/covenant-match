@@ -1,5 +1,5 @@
 # Stage 1: Development environment
-FROM rust:1.81-slim as development
+FROM rust:1.82-slim as development
 
 WORKDIR /app
 
@@ -24,7 +24,7 @@ EXPOSE 8080
 CMD ["cargo", "watch", "-x", "run"]
 
 # Stage 2: Builder
-FROM rust:1.81-slim as builder
+FROM rust:1.82-slim as builder
 
 WORKDIR /app
 
