@@ -1,6 +1,34 @@
 import { httpClient } from './http-client';
 import { FriendList, UserProfile, UpdateProfileParams } from './types';
 
+// Define the types for friend requests
+export interface FriendRequestResponse {
+  id: string;
+  sender: {
+    id: string;
+    username: string;
+    platform: string;
+  };
+  receiver: {
+    id: string;
+    username: string;
+    platform: string;
+  };
+  status: string;
+  createdAt: string;
+}
+
+export interface PaginatedFriendRequests {
+  requests: FriendRequestResponse[];
+  total: number;
+  page: number;
+  per_page: number;
+}
+
+export interface PendingRequestsResponse {
+  has_pending_requests: boolean;
+}
+
 export class UserService {
   /**
    * Get the current user's profile
@@ -70,23 +98,13 @@ export class UserService {
 
   /**
    * Get the current user's friend list
-   * @returns List of friends
+   * @param page Page number (starting from 1)
+   * @param limit Number of items per page
+   * @returns List of friends with pagination
    */
-  static async getFriendList(): Promise<FriendList> {
+  static async getFriendList(page: number = 1, limit: number = 10): Promise<FriendList> {
     try {
-      return await httpClient.get<FriendList>('/api/v1/friends', true);
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Add a friend to the current user's friend list
-   * @param friendId ID of the friend to add
-   */
-  static async addFriend(friendId: string): Promise<void> {
-    try {
-      await httpClient.post<void>('/api/v1/friends', { friendId }, true);
+      return await httpClient.get<FriendList>(`/api/v1/friends?page=${page}&limit=${limit}`, true);
     } catch (error) {
       throw error;
     }
@@ -101,6 +119,142 @@ export class UserService {
       await httpClient.delete<void>(`/api/v1/friends/${friendId}`, true);
     } catch (error) {
       throw error;
+    }
+  }
+
+  /**
+   * Send a friend request to another user
+   * @param receiverId ID of the user to send the request to
+   * @returns Friend request response
+   */
+  static async sendFriendRequest(receiverId: string): Promise<FriendRequestResponse> {
+    try {
+      return await httpClient.post<FriendRequestResponse>(
+        '/api/v1/friend-requests',
+        { receiver_id: receiverId },
+        true
+      );
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get all friend requests (both incoming and outgoing)
+   * @returns Friend requests data
+   */
+  static async getAllFriendRequests(): Promise<{
+    incoming: FriendRequestResponse[];
+    outgoing: FriendRequestResponse[];
+  }> {
+    try {
+      const response = await httpClient.get<{
+        incoming: FriendRequestResponse[];
+        outgoing: FriendRequestResponse[];
+      }>('/api/v1/friend-requests', true);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get incoming friend requests with pagination
+   * @param page Page number (starting from 1)
+   * @param limit Number of items per page
+   * @returns Paginated incoming friend requests
+   */
+  static async getIncomingFriendRequests(
+    page: number = 1,
+    limit: number = 10
+  ): Promise<PaginatedFriendRequests> {
+    try {
+      return await httpClient.get<PaginatedFriendRequests>(
+        `/api/v1/friend-requests/incoming?page=${page}&limit=${limit}`,
+        true
+      );
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Get outgoing friend requests with pagination
+   * @param page Page number (starting from 1)
+   * @param limit Number of items per page
+   * @returns Paginated outgoing friend requests
+   */
+  static async getOutgoingFriendRequests(
+    page: number = 1,
+    limit: number = 10
+  ): Promise<PaginatedFriendRequests> {
+    try {
+      return await httpClient.get<PaginatedFriendRequests>(
+        `/api/v1/friend-requests/outgoing?page=${page}&limit=${limit}`,
+        true
+      );
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Accept a friend request
+   * @param requestId ID of the friend request to accept
+   * @returns Accepted friend request data
+   */
+  static async acceptFriendRequest(requestId: string): Promise<FriendRequestResponse> {
+    try {
+      return await httpClient.put<FriendRequestResponse>(
+        `/api/v1/friend-requests/${requestId}/accept`,
+        {},
+        true
+      );
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Reject a friend request
+   * @param requestId ID of the friend request to reject
+   * @returns Rejected friend request data
+   */
+  static async rejectFriendRequest(requestId: string): Promise<FriendRequestResponse> {
+    try {
+      return await httpClient.put<FriendRequestResponse>(
+        `/api/v1/friend-requests/${requestId}/reject`,
+        {},
+        true
+      );
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Check if the user has any pending friend requests
+   * @returns Whether the user has any pending friend requests
+   */
+  static async hasPendingFriendRequests(): Promise<boolean> {
+    try {
+      // The API returns a nested structure like { has_pending_requests: { has_pending_requests: boolean } }
+      // This happens because the backend wraps the result twice
+      const response = await httpClient.get<{ has_pending_requests: boolean }>(
+        '/api/v1/friend-requests/has-pending',
+        true
+      );
+      
+      if (typeof response?.has_pending_requests === 'boolean') {
+        return response.has_pending_requests;
+      }
+      
+      // Default to false if the structure is unexpected
+      console.error('Unexpected response structure from has-pending endpoint:', response);
+      return false;
+    } catch (error) {
+      console.error('Error checking pending friend requests:', error);
+      return false; // Default to false if there's an error
     }
   }
 
@@ -196,20 +350,6 @@ export class UserService {
       throw error;
     }
   }
-
-  /**
-   * Check if the user has any pending friend requests
-   * @returns Whether the user has any pending friend requests
-   */
-  static async hasPendingFriendRequests(): Promise<boolean> {
-    try {
-      const response = await httpClient.get<{ has_pending_requests: boolean }>('/api/v1/friend-requests/has-pending', true);
-      return response.has_pending_requests;
-    } catch (error) {
-      console.error('Error checking pending friend requests:', error);
-      return false; // Default to false if there's an error
-    }
-  }
 }
 
 export interface VerifyEmailResponse {
@@ -248,7 +388,6 @@ export interface UsersPaginationResponse {
 }
 
 export interface GetUsersResponse {
-  status: string;
   data: {
     users: AdminUser[];
     pagination: UsersPaginationResponse;

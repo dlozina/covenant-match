@@ -27,10 +27,12 @@ export function usePendingFriendRequests(
 
     try {
       setIsLoading(true);
+      // The hasPendingFriendRequests function now returns a simple boolean
       const hasPending = await UserService.hasPendingFriendRequests();
       setHasPendingRequests(hasPending);
     } catch (error) {
       console.error('Error checking pending friend requests:', error);
+      setHasPendingRequests(false);
     } finally {
       setIsLoading(false);
     }

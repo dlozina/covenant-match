@@ -449,9 +449,9 @@ async fn has_pending_friend_requests(db: web::Data<Database>, req: HttpRequest) 
     };
 
     match friends_service::has_pending_friend_requests(&db, &user_id).await {
-        Ok(has_pending) => HttpResponse::Ok().json(serde_json::json!({
-            "has_pending_requests": has_pending
-        })),
+        Ok(has_pending) => HttpResponse::Ok().json(
+            has_pending
+        ),
         Err(e) => {
             log::error!("Error checking pending friend requests: {:?}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
