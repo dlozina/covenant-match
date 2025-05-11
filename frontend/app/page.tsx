@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
 import { MainLayout } from "@/components/layout";
-import { Sword, Shield, Timer, Users, Trophy, Skull, ScrollText, Compass, Award, AlertCircle } from "lucide-react";
+import { Sword, Shield, Timer, Users, Trophy, Skull, ScrollText, Compass, Award, AlertCircle, UserPlus } from "lucide-react";
 // Use for test if css config is not working -> good old way
 // import { TestStyled } from "@/components/ui/test-styled";
 // import { BasicTest } from "@/components/ui/basic-test";
@@ -22,9 +22,12 @@ import {
   fetchRecentNews,
   fetchAnnouncement 
 } from "@/utils/api";
+import { usePendingFriendRequests } from "@/hooks/usePendingFriendRequests";
+import { Notification } from "@/components/ui/notification";
 
 export default function Home() {
   const { isLoggedIn, isLoading } = useAuth();
+  const { hasPendingRequests } = usePendingFriendRequests(isLoggedIn);
   const [topPlayers, setTopPlayers] = useState<LeaderboardEntryResponseDto[]>([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(true);
   const [activeSessions, setActiveSessions] = useState<number>(0);
@@ -299,6 +302,31 @@ export default function Home() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+      
+      {/* Friend Request Notification */}
+      {isLoggedIn && hasPendingRequests && (
+        <div className="my-4 lg:my-6">
+          <Notification 
+            notification={{
+              type: "success",
+              message: (
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2">
+                    <UserPlus className="h-4 w-4" />
+                    <span>You have pending friend requests</span>
+                  </div>
+                  <Link 
+                    href="/friends"
+                    className="text-xs bg-green-200 hover:bg-green-300 text-green-800 px-2 py-1 rounded-sm transition-colors ml-4"
+                  >
+                    View Requests
+                  </Link>
+                </div>
+              )
+            }}
+          />
         </div>
       )}
 
