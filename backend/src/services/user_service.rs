@@ -2,7 +2,7 @@ use crate::models::error::AppError;
 use crate::models::geo_location::GeoLocation;
 use crate::models::token::TokenPurpose;
 use crate::models::user::{
-    CreateUserDto, Experience, FriendDto, LoginUserDto, UpdateUserProfileDto, User, UserResponse,
+    CreateUserDto, Experience, LoginUserDto, UpdateUserProfileDto, User, UserResponse,
 };
 use crate::repository::token_repository;
 use crate::repository::user_repository;
@@ -506,26 +506,6 @@ pub async fn add_friend(db: &Database, user_id: &str, friend_id: &str) -> Result
 /// Remove a friend from the user's friend list
 pub async fn remove_friend(db: &Database, user_id: &str, friend_id: &str) -> Result<(), AppError> {
     user_repository::remove_friend(db, user_id, friend_id).await
-}
-
-/// Get the user's friend list with detailed information
-pub async fn get_friend_list(db: &Database, user_id: &str) -> Result<Vec<FriendDto>, AppError> {
-    let friends = user_repository::get_friend_list_details(db, user_id).await?;
-
-    // Convert to FriendDto objects
-    let friend_dtos = friends
-        .into_iter()
-        .map(|friend| FriendDto {
-            id: friend.id.to_hex(),
-            username: friend.username,
-            avatar_url: friend.avatar_url,
-            covenant_name: friend.covenant_name,
-            platform: friend.platform,
-            region: friend.region,
-        })
-        .collect();
-
-    Ok(friend_dtos)
 }
 
 pub async fn update_user_email_verified(

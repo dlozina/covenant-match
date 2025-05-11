@@ -13,6 +13,9 @@ use crate::models::bug::{
 };
 use crate::models::chat::ChatMessageResponseDto;
 use crate::models::common::{LimitQuery, PaginationQuery};
+use crate::models::friends::{
+    AddFriendDto, CreateFriendRequestDto, FriendDto, FriendListResponse, FriendRequestResponse, FriendRequestResponseDto, FriendRequestStatus, FriendRequestsResponse, RemoveFriendDto
+};
 use crate::models::game_data::{
     Covenant, CovenantResponse, Experience, ExperienceResponse, GameDataResponse, NightLord,
     NightLordResponse, Nightfarer, NightfarerResponse, Platform, PlatformResponse, Region,
@@ -36,8 +39,8 @@ use crate::models::statistics::{
     UserStatsResponse,
 };
 use crate::models::user::{
-    AddFriendDto, AuthResponse, CreateUserDto, FriendDto, FriendListResponse, GetUsersQuery,
-    LoginUserDto, PaginationInfo, RefreshTokenResponse, RemoveFriendDto, UpdateUserDto,
+    AuthResponse, CreateUserDto, GetUsersQuery,
+    LoginUserDto, PaginationInfo, RefreshTokenResponse, UpdateUserDto,
     UpdateUserProfileDto, User, UserResponse, UsersListData, UsersListResponse,
 };
 use crate::models::user_data::UserDataResponseDto;
@@ -46,7 +49,7 @@ use crate::sse::messages::{ServerMessage, SessionInfo, SseSessionStatus};
 
 use crate::routes::{
     admin::*, bug::*, chat::*, game_data::*, health::*, news::*, sessions::*, sse::*,
-    statistics::*, user_data::*, users::*, ws::*,
+    statistics::*, user_data::*, users::*, ws::*, friends::*,
 };
 
 // Import SSE models
@@ -84,9 +87,12 @@ use utoipa::{
         reset_password_email,
         reset_password,
         get_user_sessions,
-        // Friend routes
-        get_friend_list,
-        add_friend,
+        // Friend routes        
+        send_friend_request,
+        get_friend_requests,
+        accept_friend_request,
+        reject_friend_request,
+        get_friends,
         remove_friend,
         // Admin routes
         get_all_users,
@@ -198,6 +204,12 @@ use utoipa::{
             RemoveFriendDto,
             FriendDto,
             FriendListResponse,
+            // Friend request models
+            CreateFriendRequestDto,
+            FriendRequestResponseDto,
+            FriendRequestResponse,
+            FriendRequestsResponse,
+            FriendRequestStatus,
             // User data models
             UserDataResponseDto,
             GeoLocationDataDto,
@@ -325,6 +337,7 @@ use utoipa::{
         (name = "realtime", description = "Real-time communication endpoints"),
         (name = "news", description = "News and announcements management endpoints"),
         (name = "feature-flags", description = "Feature flag management endpoints"),
+        (name = "friends", description = "Friend management and friend requests endpoints"),
     ),
     modifiers(&SecurityAddon),
 )]

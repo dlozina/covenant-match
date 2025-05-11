@@ -113,6 +113,19 @@ pub enum AppError {
     // Account disabled error
     #[error("Account has been disabled. Please contact support for assistance.")]
     AccountDisabled,
+
+    // Friend-related errors
+    #[error("Friend request not found")]
+    RequestNotFound,
+
+    #[error("Friendship already exists")]
+    FriendshipAlreadyExists,
+
+    #[error("Friend request already exists")]
+    FriendRequestAlreadyExists,
+
+    #[error("Invalid friend request: {0}")]
+    InvalidFriendRequest(String),
 }
 
 impl ResponseError for AppError {
@@ -140,16 +153,20 @@ impl ResponseError for AppError {
             AppError::NewsNotFound => StatusCode::NOT_FOUND,
             AppError::AnnouncementNotFound => StatusCode::NOT_FOUND,
             AppError::BugReportNotFound => StatusCode::NOT_FOUND,
+            AppError::RequestNotFound => StatusCode::NOT_FOUND,
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
 
             AppError::UserAlreadyExists => StatusCode::CONFLICT,
             AppError::UserAlreadyInSession => StatusCode::CONFLICT,
             AppError::SessionFull => StatusCode::CONFLICT,
             AppError::AlreadyInSession(_, _, _) => StatusCode::CONFLICT,
+            AppError::FriendshipAlreadyExists => StatusCode::CONFLICT,
+            AppError::FriendRequestAlreadyExists => StatusCode::CONFLICT,
 
             AppError::ValidationError(_) => StatusCode::BAD_REQUEST,
             AppError::InvalidSessionState => StatusCode::BAD_REQUEST,
             AppError::BadRequest(_) => StatusCode::BAD_REQUEST,
+            AppError::InvalidFriendRequest(_) => StatusCode::BAD_REQUEST,
 
             AppError::DatabaseError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::BsonError(_) => StatusCode::INTERNAL_SERVER_ERROR,

@@ -246,37 +246,6 @@ pub struct RefreshTokenResponse {
     pub token: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct AddFriendDto {
-    pub friend_id: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct RemoveFriendDto {
-    pub friend_id: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct FriendDto {
-    pub id: String,
-    pub username: String,
-    pub avatar_url: Option<String>,
-    pub covenant_name: String,
-    pub platform: String,
-    pub region: String,
-}
-
-/// Response for friend list
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct FriendListResponse {
-    pub friends: Vec<FriendDto>,
-    pub total: usize,
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewPasswordDto {
     pub password: String,
