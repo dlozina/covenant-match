@@ -2,10 +2,10 @@ use crate::models::admin::{
     ActorMailboxResponse, AdminChatResponse, AdminDashboardStats, AdminSessionResponse,
     AdminSessionsData, AdminSessionsPaginationResponse, AdminSessionsResponse,
     ConnectionStatsResponse, ConnectionsPerHourResponse, CreateFeatureFlagDto,
-    DashboardStatsResponse, FeatureFlag, FeatureFlagApiResponse, FeatureFlagData,
-    FeatureFlagResponse, FeatureFlagsData, FeatureFlagsResponse, MemoryUsage, PatchFeatureFlagDto,
-    SessionConnectionResponse, SystemInfo, SystemStatusResponse, WebSocketStatsData,
-    WebSocketStatsResponse,
+    DashboardStatsResponse, FeatureFlag, FeatureFlagApiResponse, FeatureFlagResponse,
+    FeatureFlagsData, FeatureFlagsResponse, LoginAttemptDTO, LoginAttemptsData,
+    LoginAttemptsResponse, MemoryUsage, PatchFeatureFlagDto, SessionConnectionResponse, SystemInfo,
+    SystemStatusResponse, WebSocketStatsData, WebSocketStatsResponse,
 };
 use crate::models::bug::{
     BugReport, BugReportData, BugReportResponse, BugReportResponseDto, BugReportsData,
@@ -24,14 +24,16 @@ use crate::models::news::{
     NewsResponse, UpdateAnnouncementDto, UpdateNewsDto,
 };
 use crate::models::session::{
-    CovenantStats, CovenantStatsResponse, CreateSessionDto, GameResult, JoinSessionDto,
-    MinimalSessionDto, PlayerInfo, PlayerInfoResponseDto, RateSessionDto, ResultsResponseDto,
+    CovenantStats, CovenantStatsResponse, CreateSessionDto, FriendshipMatrix, FriendshipPlayer,
+    GameResult, GameSessionDto, JoinSessionDto, MinimalSessionDto, PaginatedSessionsResponse,
+    PaginationMetadata, PlayerInfo, PlayerInfoResponseDto, RateSessionDto, ResultsResponseDto,
     SessionResponseDto, SessionResult, SessionResultResponseDto, SessionStatus, SubmitResultDto,
-    UpdateSessionDto,
+    UpdateSessionDto, UserSessionResponseDto,
 };
 use crate::models::statistics::{
-    LeaderboardEntryResponseDto, NightLordStatsResponse, PaginatedSessionData,
-    PaginatedSessionResponse, SessionHistoryResponse, Stats, UserStatistics,
+    BatchUserStatsResponse, LeaderboardEntryResponseDto, NightLordStatsResponse,
+    PaginatedSessionData, PaginatedSessionResponse, SessionHistoryResponse, Stats, UserStatistics,
+    UserStatsResponse,
 };
 use crate::models::user::{
     AddFriendDto, AuthResponse, CreateUserDto, FriendDto, FriendListResponse, GetUsersQuery,
@@ -78,6 +80,10 @@ use utoipa::{
         create_admin_user,
         update_profile,
         delete_user,
+        verify_email,
+        reset_password_email,
+        reset_password,
+        get_user_sessions,
         // Friend routes
         get_friend_list,
         add_friend,
@@ -96,6 +102,7 @@ use utoipa::{
         delete_admin_session,
         get_admin_chat_history,
         delete_admin_chat_messages,
+        get_login_attempts,
         // Feature Flag endpoints
         get_feature_flags,
         get_feature_flag,
@@ -124,6 +131,7 @@ use utoipa::{
         get_friends_sessions,
         reset_session_flags,
         kick_player,
+        get_friendship_matrix,
         // Game data routes
         get_game_data,
         get_platforms,
@@ -183,6 +191,8 @@ use utoipa::{
             PaginationInfo,
             JwtInfoDto,
             TokenInfoResponse,
+            UserSessionResponseDto,
+            GameSessionDto,
             // Friend models
             AddFriendDto,
             RemoveFriendDto,
@@ -207,6 +217,10 @@ use utoipa::{
             SessionResult,
             PlayerInfoResponseDto,
             SessionResultResponseDto,
+            FriendshipMatrix,
+            FriendshipPlayer,
+            PaginationMetadata,
+            PaginatedSessionsResponse<SessionResponseDto>,
             // Covenant statistics models
             CovenantStats,
             CovenantStatsResponse,
@@ -276,6 +290,9 @@ use utoipa::{
             AdminSessionsPaginationResponse,
             AdminSessionsData,
             AdminChatResponse,
+            LoginAttemptsResponse,
+            LoginAttemptsData,
+            LoginAttemptDTO,
             // WebSocket Stats models
             WebSocketStatsResponse,
             WebSocketStatsData,

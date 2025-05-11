@@ -31,7 +31,4 @@ export * from './SessionReducers';
 // Re-export utils
 export * from './SessionUtils';
 
-// Re-export hooks
-export * from './SessionHooks';
-
 export { SessionChat } from './SessionChat'; 

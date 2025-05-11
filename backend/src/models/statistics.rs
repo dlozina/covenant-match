@@ -90,3 +90,26 @@ pub struct PaginationQuery {
     pub page: Option<u64>,
     pub limit: Option<u64>,
 }
+
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UserStatsResponse {
+    pub user_id: String,
+    pub username: String,
+    pub platform: String,
+    pub experience: String,
+    pub covenant_name: String,
+    pub total_games: i32,
+    pub wins: i32,
+    pub losses: i32,
+    pub win_rate: f64,
+    pub score: f64,
+}
+
+#[derive(Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchUserStatsResponse {
+    pub status: String,
+    pub data: Vec<UserStatsResponse>,
+    pub not_found_users: Option<Vec<String>>,
+}

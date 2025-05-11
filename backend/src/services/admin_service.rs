@@ -1,20 +1,18 @@
 use crate::models::admin::{
-    AdminChatResponse, AdminDashboardStats, AdminSessionResponse, AdminSessionsData,
-    AdminSessionsPaginationResponse, AdminSessionsQuery, AdminSessionsResponse,
-    ChatMessageResponseDto, CreateFeatureFlagDto, DashboardStatsData, DashboardStatsResponse,
+    AdminDashboardStats, AdminSessionResponse, AdminSessionsData,
+    AdminSessionsPaginationResponse, AdminSessionsResponse, CreateFeatureFlagDto, DashboardStatsData, DashboardStatsResponse,
     FeatureFlag, FeatureFlagApiResponse, FeatureFlagData, FeatureFlagResponse, FeatureFlagsData,
-    FeatureFlagsResponse, GameSessionDTO, MemoryUsage, PatchFeatureFlagDto, SystemInfo,
-    SystemStatusData, SystemStatusResponse, UserInfoDto, WebSocketStatsData,
-    WebSocketStatsResponse,
+    FeatureFlagsResponse, GameSessionDTO, LoginAttemptDTO, LoginAttemptsData,
+    LoginAttemptsResponse, MemoryUsage, PatchFeatureFlagDto, SystemInfo, SystemStatusData,
+    SystemStatusResponse,
 };
 use crate::models::error::AppError;
 use crate::models::session::{GameSession, SessionStatus};
 use crate::repository::{
-    feature_flag_repository, news_repository, session_repository, user_repository,
+    auth_repository, feature_flag_repository, news_repository, session_repository, user_repository,
 };
-use chrono::{Duration, Utc};
 use lazy_static::lazy_static;
-use log::{debug, error, info};
+use log::{debug, error};
 use mongodb::{bson, Database};
 use std::collections::HashMap;
 use std::process::Command;
@@ -543,4 +541,61 @@ pub async fn get_feature_flag_value(db: &Database, key: &str) -> Result<bool, Ap
             Ok(false)
         }
     }
+}
+
+/// Get login attempts with pagination and filters for admin panel
+pub async fn get_login_attempts(
+    db: &Database,
+    page: u64,
+    limit: u64,
+    username: Option<String>,
+    status: Option<bool>,
+) -> Result<LoginAttemptsResponse, AppError> {
+    // Get login attempts with pagination using the repository method
+    let (attempts, total) =
+        auth_repository::get_login_attempts_paginated(db, page, limit, username, status).await?;
+
+    // Calculate total pages
+    #[allow(clippy::cast_possible_truncation)]
+    let total_pages = (total as f64 / limit as f64).ceil() as u64;
+
+    // Convert auth::LoginAttempt to admin::LoginAttemptDTO manually
+    let login_attempts: Vec<LoginAttemptDTO> = attempts
+        .into_iter()
+        .map(|attempt| {
+            // Convert ObjectId to hex string
+            let id = attempt.id.to_hex();
+
+            // Convert MongoDB DateTime to ISO string
+            let created_at =
+                chrono::DateTime::from_timestamp_millis(attempt.created_at.timestamp_millis())
+                    .unwrap_or_else(|| chrono::Utc::now())
+                    .to_rfc3339();
+
+            LoginAttemptDTO {
+                id,
+                username: attempt.username,
+                ip_address: attempt.ip_address,
+                created_at,
+                successful: attempt.successful,
+            }
+        })
+        .collect();
+
+    // Build pagination data
+    let pagination = AdminSessionsPaginationResponse {
+        total,
+        page,
+        limit,
+        total_pages,
+    };
+
+    // Return response
+    Ok(LoginAttemptsResponse {
+        status: "success".to_string(),
+        data: LoginAttemptsData {
+            login_attempts,
+            pagination,
+        },
+    })
 }

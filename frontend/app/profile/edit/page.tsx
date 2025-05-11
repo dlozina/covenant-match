@@ -90,11 +90,6 @@ const profileFormSchema = z.object({
     .string()
     .min(1, { message: "Email is required" })
     .email({ message: "Please enter a valid email address" }),
-  displayName: z
-    .string()
-    .min(3, { message: "Display name must be at least 3 characters" })
-    .max(8, { message: "Display name must not be longer than 8 characters" })
-    .trim(),
   region: z
     .string()
     .min(1, { message: "Region is required" }),
@@ -150,7 +145,6 @@ function EditProfileContent() {
   }, [userData]);
   
   // Character counter states
-  const [displayNameLength, setDisplayNameLength] = useState(0)
   const [sessionNameLength, setSessionNameLength] = useState(0)
   const [sessionPasswordLength, setSessionPasswordLength] = useState(0)
   
@@ -242,7 +236,6 @@ function EditProfileContent() {
     defaultValues: {
       username: userData?.username || "",
       email: userData?.email || "",
-      displayName: userData?.displayName || "",
       region: userData?.region || REGIONS[0],
       platform: userData?.platform || PLATFORMS[0],
       autoRegion: userData?.autoRegion !== undefined ? userData.autoRegion : true,
@@ -262,7 +255,6 @@ function EditProfileContent() {
       form.reset({
         username: userData.username || "",
         email: userData.email || "",
-        displayName: userData.displayName || "",
         region: userData.region || REGIONS[0],
         platform: userData.platform || PLATFORMS[0],
         autoRegion: userData.autoRegion !== undefined ? userData.autoRegion : true,
@@ -274,7 +266,6 @@ function EditProfileContent() {
       });
       
       // Update character counters
-      setDisplayNameLength(userData.displayName?.length || 0);
       setSessionNameLength(userData.preferredSessionName?.length || 0);
       setSessionPasswordLength(userData.preferredSessionPassword?.length || 0);
     }
@@ -294,9 +285,6 @@ function EditProfileContent() {
   // Update character counters whenever fields change
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
-      if (name === 'displayName' && value.displayName) {
-        setDisplayNameLength(value.displayName.length);
-      }
       if (name === 'preferredSessionName' && value.preferredSessionName) {
         setSessionNameLength(value.preferredSessionName.length);
       }
@@ -337,7 +325,6 @@ function EditProfileContent() {
       const sanitizedData = {
         username: data.username.trim().toLowerCase(),
         email: data.email.trim().toLowerCase(),
-        displayName: data.displayName.trim(),
         region: data.region,
         platform: data.platform,
         autoRegion: data.autoRegion,
@@ -456,12 +443,12 @@ function EditProfileContent() {
                         name="username"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-sm md:text-base">Username</FormLabel>
+                            <FormLabel className="text-sm md:text-base">Nightfarer Name</FormLabel>
                             <FormControl>
                               <Input placeholder="username" {...field} readOnly disabled className="bg-muted h-10" />
                             </FormControl>
                             <FormDescription className="text-xs md:text-sm">
-                              Your username cannot be changed.
+                              Your nightfarer name cannot be changed.
                             </FormDescription>
                             <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
                           </FormItem>
@@ -488,37 +475,6 @@ function EditProfileContent() {
                             </FormControl>
                             <FormDescription className="text-xs md:text-sm">
                               Your email address will be used for notifications and recovery.
-                            </FormDescription>
-                            <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="displayName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <div className="flex justify-between items-center">
-                              <FormLabel className="text-sm md:text-base">Display Name</FormLabel>
-                              <span className={`text-xs ${displayNameLength > 8 ? 'text-red-500' : 'text-muted-foreground'}`}>
-                                {displayNameLength} / 8
-                              </span>
-                            </div>
-                            <FormControl>
-                              <Input 
-                                placeholder="Display Name" 
-                                {...field} 
-                                className="h-10"
-                                onChange={(e) => {
-                                  field.onChange(e);
-                                  setDisplayNameLength(e.target.value.length);
-                                  debouncedValidate('displayName');
-                                }}
-                              />
-                            </FormControl>
-                            <FormDescription className="text-xs md:text-sm">
-                              3-8 characters. This is how other users will see you.
                             </FormDescription>
                             <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
                           </FormItem>

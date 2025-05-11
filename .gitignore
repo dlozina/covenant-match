@@ -44,6 +44,7 @@ nginx/ssl/*.crt
 # Secrets
 dev-secrets/
 **/dev-secrets/
+run/
 
 # IDE
 .idea/
@@ -57,3 +58,4 @@ nginx/.htpasswd
 
 # Uploads
 uploads/
+**/.claude/settings.local.json

@@ -42,20 +42,20 @@ export const PlayerHoverCard: React.FC<PlayerHoverCardProps> = ({
         </DialogTrigger>
       </div>
       <DialogTitle className="sr-only">
-        {userStats.displayName}
+        {userStats.username}
       </DialogTitle>
       <DialogDescription className="sr-only">
-        Player stats for {userStats.displayName}
+        Player stats for {userStats.username}
       </DialogDescription>
       <DialogContent className="sm:max-w-[425px] p-0">
         <Card className="border-0 shadow-none w-full">
           <CardContent className="p-4 space-y-3">
             <div className="flex items-center justify-between pt-2">
               <div>
-                <h3 className="font-bold text-lg">{userStats.displayName}</h3>
+                <h3 className="font-bold text-lg">{userStats.username}</h3>
                 <p className="text-sm text-muted-foreground">{userStats.covenantName}</p>
               </div>
-              <div className="bg-primary/10 text-primary px-2 py-1 rounded text-xs">
+              <div className="bg-primary/10 text-primary px-2 py-1 rounded text-xs mt-2">
                 {userStats.experience}
               </div>
             </div>
@@ -63,7 +63,7 @@ export const PlayerHoverCard: React.FC<PlayerHoverCardProps> = ({
             <div className="grid grid-cols-3 gap-2 pt-2">
               <div className="bg-secondary/50 rounded-md p-2 text-center">
                 <div className="flex justify-center mb-1">
-                  <Trophy size={16} className="text-amber-500" />
+                  <Swords size={16} className="text-green-500" />
                 </div>
                 <div className="text-sm font-medium">{userStats.totalGames}</div>
                 <div className="text-xs text-muted-foreground">Games</div>
@@ -71,7 +71,7 @@ export const PlayerHoverCard: React.FC<PlayerHoverCardProps> = ({
               
               <div className="bg-secondary/50 rounded-md p-2 text-center">
                 <div className="flex justify-center mb-1">
-                  <Swords size={16} className="text-green-500" />
+                  <Trophy size={16} className="text-amber-500" />
                 </div>
                 <div className="text-sm font-medium">{userStats.wins}</div>
                 <div className="text-xs text-muted-foreground">Wins</div>

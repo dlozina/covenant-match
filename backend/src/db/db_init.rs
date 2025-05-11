@@ -51,22 +51,80 @@ async fn ensure_collections_exist(db: &Database) -> Result<(), Error> {
 
 async fn create_indexes(db: &Database) -> Result<(), Error> {
     // Creating an index is idempotent - won't error if it already exists
-    let index = IndexModel::builder()
+
+    // Username index for users collection
+    let username_index = IndexModel::builder()
         .keys(doc! { "username": 1 })
         .options(IndexOptions::builder().unique(true).build())
         .build();
 
     db.collection::<Document>("users")
-        .create_index(index)
+        .create_index(username_index)
+        .await?;
+
+    // Session ID index for sessions collection
+    let session_id_index = IndexModel::builder().keys(doc! { "session_id": 1 }).build();
+
+    db.collection::<Document>("sessions")
+        .create_index(session_id_index)
+        .await?;
+
+    // User ID index for sessions collection
+    let user_id_index = IndexModel::builder().keys(doc! { "user_id": 1 }).build();
+
+    db.collection::<Document>("sessions")
+        .create_index(user_id_index)
+        .await?;
+
+    // Host ID index for sessions collection
+    let host_id_index = IndexModel::builder().keys(doc! { "host_id": 1 }).build();
+
+    db.collection::<Document>("sessions")
+        .create_index(host_id_index)
+        .await?;
+
+    // Joined players user_id index for sessions collection
+    let joined_players_user_id_index = IndexModel::builder()
+        .keys(doc! { "joined_players.user_id": 1 })
+        .build();
+
+    db.collection::<Document>("sessions")
+        .create_index(joined_players_user_id_index)
+        .await?;
+
+    // Joined players userId index for sessions collection (looks like we have both formats)
+    let joined_players_user_id_index = IndexModel::builder()
+        .keys(doc! { "joined_players.user_id": 1 })
+        .build();
+
+    db.collection::<Document>("sessions")
+        .create_index(joined_players_user_id_index)
+        .await?;
+
+    // Compound index for common session queries
+    let search_sessions_index = IndexModel::builder()
+        .keys(doc! { "region": 1, "platform": 1, "status": 1, "is_private": 1, "is_friends_only": 1, "host_experience": 1 , "night_lord":1})
+        .build();
+
+    db.collection::<Document>("sessions")
+        .create_index(search_sessions_index)
+        .await?;
+
+    // Session ID index for messages collection
+    let messages_session_id_index = IndexModel::builder().keys(doc! { "session_id": 1 }).build();
+
+    db.collection::<Document>("messages")
+        .create_index(messages_session_id_index)
         .await?;
 
     Ok(())
 }
 
+#[allow(clippy::all)]
 async fn seed_default_data(db: &Database) -> Result<(), Error> {
     // Ensure admin user exists
     let users: Collection<Document> = db.collection("users");
-    let admin_filter = doc! { "username": "admin" };
+    let admin_filter = doc! { "username": "akri" };
 
     let admin_count = users.count_documents(admin_filter.clone()).await?;
 
@@ -84,10 +142,9 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
         users
             .insert_one(doc! {
                 "_id": admin_id,
-                "username": "admin",
-                "email": "akri@gmail.com",
-                "password_hash": password_hash,
-                "display_name": "Akri",
+                "username": "akri",
+                "email": "akri@covenant-match.com",
+                "password_hash": password_hash.clone(),
                 "region": "Europe",
                 "auto_region": true,
                 "cm_region": "Europe",
@@ -95,6 +152,7 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
                 "platform": "PlayStation",
                 "role": "admin",
                 "disabled": false,
+                "email_verified": true,
                 "experience": "Veteran",
                 "covenant_name": "Warriors of Sunlight",
                 "created_at": now,
@@ -102,18 +160,68 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
                 "friend_list": []
             })
             .await?;
-        info!("Created default admin user");
+        info!("Created default akri user");
+
+        let dino_id = ObjectId::new();
+
+        users
+            .insert_one(doc! {
+                "_id": dino_id,
+                "username": "dino",
+                "email": "dino@covenant-match.com",
+                "password_hash": password_hash.clone(),
+                "region": "Europe",
+                "auto_region": false,
+                "cm_region": "Europe",
+                "cf_region": "Europe",
+                "platform": "PlayStation",
+                "role": "admin",
+                "disabled": false,
+                "email_verified": true,
+                "experience": "Veteran",
+                "covenant_name": "Warriors of Sunlight",
+                "created_at": now,
+                "updated_at": now,
+                "friend_list": []
+            })
+            .await?;
+        info!("Created default dino user");
+
+        let boris_id = ObjectId::new();
+
+        users
+            .insert_one(doc! {
+                "_id": boris_id,
+                "username": "boris",
+                "email": "boris@covenant-match.com",
+                "password_hash": password_hash,
+                "region": "Europe",
+                "auto_region": false,
+                "cm_region": "Europe",
+                "cf_region": "Europe",
+                "platform": "PlayStation",
+                "role": "admin",
+                "disabled": false,
+                "email_verified": true,
+                "experience": "Veteran",
+                "covenant_name": "Warriors of Sunlight",
+                "created_at": now,
+                "updated_at": now,
+                "friend_list": []
+            })
+            .await?;
+        info!("Created default boris user");
     }
 
     // Define default nightlords
     let default_nightlords = vec![
         ("Tricephalos", "Nightlords are the guardians of the realm, they are the ones who protect the realm from the darkness."),
-        ("PCR", "PCR is the Covenant of the Pact, they are the ones who protect the realm from the darkness."),
+        ("Libra", "PCR is the Covenant of the Pact, they are the ones who protect the realm from the darkness."),
         ("Malenia, Blade of Miquella", "PCR is the Covenant of the Pact, they are the ones who protect the realm from the darkness."),
         ("Maliketh", "Maliketh is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
         ("Mohg", "Mohg is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
         ("Midra", "Midra is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
-        ("Bayle", "Bayle is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
+        ("PCR", "Bayle is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
         ("Messmer", "Messmer is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
     ];
 
@@ -128,8 +236,8 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
         ("Duchess", "Dexterity build"),
         ("Ironeye", "Dexterity build with long range"),
         ("Rider", "Strength build"),
-        ("Igon", "Balance build"),
-        ("Alexander", "Strength build"),
+        ("Executor", "Sekiro build"),
+        ("Revenant", "Summoner build"),
     ];
 
     // Seed nightfarers collection
@@ -174,7 +282,10 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
     let default_experiences = vec![
         ("Beginner", "Newly risen from the embers, seeking purpose."),
         ("Mid", "Tempered by trials, unshaken in the storm."),
-        ("Veteran", "A relic of countless battles, a legend in flesh."),
+        (
+            "Veteran",
+            "A relic of countless battles, a legend in flesh.",
+        ),
     ];
 
     // Seed experiences collection
@@ -282,6 +393,29 @@ async fn update_schemas(db: &Database) -> Result<(), Error> {
         .await?;
 
     info!("Created TTL index on login_attempts collection");
+
+    // Create TTL index on tokens collection if it exists
+    if db
+        .list_collection_names()
+        .await?
+        .contains(&"tokens".to_string())
+    {
+        // TTL index for tokens collection - auto expiration
+        let tokens_index = IndexModel::builder()
+            .keys(doc! { "expires_at": 1 })
+            .options(
+                IndexOptions::builder()
+                    .expire_after(std::time::Duration::from_secs(0)) // 0 seconds means delete when expires_at is reached
+                    .build(),
+            )
+            .build();
+
+        db.collection::<Document>("tokens")
+            .create_index(tokens_index)
+            .await?;
+
+        info!("Created TTL index on tokens collection");
+    }
 
     Ok(())
 }

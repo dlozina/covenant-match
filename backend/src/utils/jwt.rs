@@ -1,10 +1,16 @@
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use mongodb::bson::oid::ObjectId;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::config::get_config;
 use crate::models::error::AppError;
+use crate::models::token::TokenPurpose;
+
+/// Constants for JWT token expiration times
+pub const EXPIRY_HOURS_FOR_EMAIL_VERIFICATION: i64 = 24;
+pub const EXPIRY_HOURS_FOR_PASSWORD_RESET: i64 = 1;
 
 /// Claims structure for JWT tokens
 ///
@@ -16,6 +22,170 @@ pub struct Claims {
     pub exp: usize,   // Expiration time (as UTC timestamp)
     pub iat: usize,   // Issued at (as UTC timestamp)
 }
+
+/// Claims structure for email verification
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct EmailVerificationClaims {
+    pub sub: String,     // Subject (user ID)
+    pub email: String,   // Email address
+    pub exp: usize,      // Expiration time (as UTC timestamp)
+    pub purpose: String, // Purpose of the token
+    pub jti: String,     // JWT ID
+    pub iat: usize,      // Issued at (as UTC timestamp)
+}
+
+/// Generate a JWT for email verification -> 24 hours expiration
+impl EmailVerificationClaims {
+    fn new(user_id: &str, email: &str) -> Self {
+        let expiration = Utc::now()
+            .checked_add_signed(Duration::hours(EXPIRY_HOURS_FOR_EMAIL_VERIFICATION))
+            .expect("valid timestamp")
+            .timestamp()
+            .try_into()
+            .unwrap_or(usize::MAX);
+
+        let issued_at = Utc::now().timestamp().max(0).try_into().unwrap_or(0);
+        let jti = Uuid::new_v4().to_string();
+
+        Self {
+            sub: user_id.to_string(),
+            email: email.to_string(),
+            exp: expiration,
+            purpose: TokenPurpose::EmailVerification.to_string(),
+            jti,
+            iat: issued_at,
+        }
+    }
+}
+
+/// Claims structure for forget password
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ResetPasswordClaims {
+    pub sub: String,     // Subject (user ID)
+    pub email: String,   // Email address
+    pub exp: usize,      // Expiration time (as UTC timestamp)
+    pub purpose: String, // Purpose of the token
+    pub jti: String,     // JWT ID
+    pub iat: usize,      // Issued at (as UTC timestamp)
+}
+
+/// Generate a JWT for forget password -> 1 hour expiration
+impl ResetPasswordClaims {
+    fn new(user_id: &str, email: &str) -> Self {
+        let expiration = Utc::now()
+            .checked_add_signed(Duration::hours(EXPIRY_HOURS_FOR_PASSWORD_RESET))
+            .expect("valid timestamp")
+            .timestamp()
+            .try_into()
+            .unwrap_or(usize::MAX);
+
+        let issued_at = Utc::now().timestamp().max(0).try_into().unwrap_or(0);
+        let jti = Uuid::new_v4().to_string();
+        Self {
+            sub: user_id.to_string(),
+            email: email.to_string(),
+            exp: expiration,
+            purpose: TokenPurpose::PasswordReset.to_string(),
+            jti,
+            iat: issued_at,
+        }
+    }
+}
+
+/// Generate a JWT for email verification
+pub fn generate_email_verification_token(user_id: &str, email: &str) -> Result<String, AppError> {
+    let claims = EmailVerificationClaims::new(user_id, email);
+    let config = get_config();
+    let jwt_secret = config.email_secret();
+
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(jwt_secret.as_bytes()),
+    )
+    .map_err(|e| AppError::InternalError(format!("Token generation error: {e}")))
+}
+
+/// Validate a JWT for email verification
+pub fn validate_email_verification_token(token: &str) -> Result<EmailVerificationClaims, AppError> {
+    let config = get_config();
+    let jwt_secret = config.email_secret();
+
+    log::info!("Validating email verification token: {}", token);
+
+    let result = decode::<EmailVerificationClaims>(
+        token,
+        &DecodingKey::from_secret(jwt_secret.as_bytes()),
+        &Validation::default(),
+    );
+
+    match &result {
+        Ok(token_data) => {
+            log::info!("Successfully decoded email verification token with claims: sub={}, email={}, purpose={}, jti={}", 
+                       token_data.claims.sub, token_data.claims.email, token_data.claims.purpose, token_data.claims.jti);
+        }
+        Err(e) => {
+            log::warn!("Failed to decode email verification token: {:?}", e);
+        }
+    }
+
+    result
+        .map(|token_data| token_data.claims)
+        .map_err(|e| match e.kind() {
+            jsonwebtoken::errors::ErrorKind::ExpiredSignature => AppError::TokenExpired,
+            _ => AppError::InvalidToken,
+        })
+}
+
+/// Generate a JWT for forget password
+pub fn generate_reset_password_token(user_id: &str, email: &str) -> Result<String, AppError> {
+    let claims = ResetPasswordClaims::new(user_id, email);
+    let config = get_config();
+    let jwt_secret = config.reset_password_secret();
+
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(jwt_secret.as_bytes()),
+    )
+    .map_err(|e| AppError::InternalError(format!("Token generation error: {e}")))
+}
+
+/// Validate a JWT for forget password
+pub fn validate_reset_password_token(token: &str) -> Result<ResetPasswordClaims, AppError> {
+    let config = get_config();
+    let jwt_secret = config.reset_password_secret();
+
+    log::info!("Validating reset password token: {}", token);
+
+    let result = decode::<ResetPasswordClaims>(
+        token,
+        &DecodingKey::from_secret(jwt_secret.as_bytes()),
+        &Validation::default(),
+    );
+
+    match &result {
+        Ok(token_data) => {
+            log::info!("Successfully decoded reset password token with claims: sub={}, email={}, purpose={}, jti={}", 
+                       token_data.claims.sub, token_data.claims.email, token_data.claims.purpose, token_data.claims.jti);
+        }
+        Err(e) => {
+            log::warn!("Failed to decode reset password token: {:?}", e);
+        }
+    }
+
+    result
+        .map(|token_data| token_data.claims)
+        .map_err(|e| match e.kind() {
+            jsonwebtoken::errors::ErrorKind::ExpiredSignature => AppError::TokenExpired,
+            _ => AppError::InvalidToken,
+        })
+}
+
+/// Alias for validate_reset_password_token for backward compatibility -> good example of how to handle backward compatibility
+// pub fn validate_forget_password_token(token: &str) -> Result<ResetPasswordClaims, AppError> {
+//     validate_reset_password_token(token)
+// }
 
 /// Generate a JWT for a user
 ///

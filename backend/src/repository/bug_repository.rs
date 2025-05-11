@@ -1,10 +1,9 @@
 use crate::models::bug::BugReport;
 use crate::models::error::AppError;
-use futures::{StreamExt, TryStreamExt};
+use futures::TryStreamExt;
 use log::error;
 use mongodb::{
     bson::{doc, oid::ObjectId},
-    options::FindOptions,
     Collection, Database,
 };
 

@@ -12,10 +12,8 @@ import {
   KickPlayerDialog
 } from "@/components/session";
 import {
-  friendStatusReducer,
   dialogReducer,
   resultReducer,
-  FriendState,
   DialogState
 } from "@/components/session/SessionReducers";
 import { cancelSession } from "@/utils/api";
@@ -33,13 +31,11 @@ export function SessionHost() {
     isLoading,
     error,
     isHost,
-    formatTime,
-    startSession,
     resetSession,
+    startSession,
     handleFinishSession,
-    updatePlayerReportedStatus,
-    lastHeartbeat,
-    refreshSession
+    refreshSession,
+    updatePlayerReportedStatus
   } = useSessionContext();
   
   // Get auth context - moved before conditional return
@@ -52,7 +48,6 @@ export function SessionHost() {
   const [isCreatingNewSession, setIsCreatingNewSession] = useState<boolean>(false);
   
   // Reducers for UI state
-  const [friendState, dispatchFriend] = useReducer(friendStatusReducer, {} as FriendState);
   const [dialogState, dispatchDialog] = useReducer(dialogReducer, {
     showConfirmDialog: false,
     showWarningDialog: false,
@@ -86,11 +81,6 @@ export function SessionHost() {
   // Function to clear notification
   const clearNotification = useCallback(() => {
     setNotification(null);
-  }, []);
-  
-  // Add friend
-  const addFriend = useCallback((playerId: string) => {
-    dispatchFriend({ type: 'ADD_FRIEND', payload: playerId });
   }, []);
   
   // Handle kick player dialog
@@ -256,15 +246,14 @@ export function SessionHost() {
   // Check if result state needs to be updated from server data
   useEffect(() => {
     if (sessionData && userData) {
-      // Find current user in joined players
-      const currentUserPlayer = sessionData.joinedPlayers.find(
-        player => player.userId === userData.id
+      // Check if the current user has already submitted a result in the results array
+      const userHasSubmittedResult = sessionData.results?.some(
+        (result) => result.userId === userData.id
       );
       
       // If server indicates user has reported but local state doesn't reflect it,
       // update the local state
-      if (currentUserPlayer && currentUserPlayer.hasReported && !resultSubmitted) {
-        console.log('Server indicates result was submitted, updating local state');
+      if (userHasSubmittedResult && !resultSubmitted) {
         setResultSubmitted(true);
       }
     }
@@ -310,9 +299,7 @@ export function SessionHost() {
           {/* Players Section */}
           <div className="mb-6">
             <PlayerSection 
-              sessionState={sessionState} 
-              friendState={friendState} 
-              addFriend={addFriend}
+              sessionState={sessionState}
               sessionData={sessionData}
               currentUserId={userData?.id}
               isHostView={true}
@@ -328,17 +315,15 @@ export function SessionHost() {
                 resultState={resultState}
                 dispatchResult={dispatchResult}
                 sessionState={sessionState}
-                formatTime={formatTime}
                 onSubmitResult={handleSubmitResult}
                 isSubmitted={resultSubmitted}
                 submissionError={submissionError}
+                sessionData={sessionData}
               />
             ) : (
               <SessionInfoSection
                 sessionState={sessionState}
-                formatTime={formatTime}
                 sessionData={sessionData}
-                lastHeartbeat={lastHeartbeat}
               />
             )}
           </div>
@@ -367,17 +352,15 @@ export function SessionHost() {
               resultState={resultState}
               dispatchResult={dispatchResult}
               sessionState={sessionState}
-              formatTime={formatTime}
               onSubmitResult={handleSubmitResult}
               isSubmitted={resultSubmitted}
               submissionError={submissionError}
+              sessionData={sessionData}
             />
           ) : (
             <SessionInfoSection
               sessionState={sessionState}
-              formatTime={formatTime}
               sessionData={sessionData}
-              lastHeartbeat={lastHeartbeat}
             />
           )}
         </div>

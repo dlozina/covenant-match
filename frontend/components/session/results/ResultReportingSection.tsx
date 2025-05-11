@@ -5,25 +5,24 @@ import { ResultState, ResultAction, SessionState } from '@/components/session/Se
 import { ResultButton } from './ResultButton';
 import { RatingStars } from './RatingStars';
 import { useResultReporting } from './useResultReporting';
+import { SessionData } from '../common/types';
 
 interface ResultReportingSectionProps {
   resultState: ResultState;
   dispatchResult: React.Dispatch<ResultAction>;
   sessionState: SessionState;
-  formatTime: (seconds: number) => string;
   onSubmitResult: () => Promise<void>;
   isSubmitted: boolean;
   submissionError: string | null;
+  sessionData?: SessionData;
 }
 
 const ResultReportingSectionComponent = ({ 
   resultState, 
   dispatchResult, 
-  sessionState, 
-  formatTime,
   onSubmitResult,
   isSubmitted,
-  submissionError
+  submissionError,
 }: ResultReportingSectionProps) => {
   const { isSubmitting, handleSubmitResults } = useResultReporting({
     resultState,
@@ -66,14 +65,6 @@ const ResultReportingSectionComponent = ({
                 isSelected={resultState.selectedResult === 'dc'}
                 onSelect={() => dispatchResult({ type: 'SELECT_RESULT', payload: 'dc' })}
               />
-            </div>
-
-            {/* Session Timer */}
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">Session Duration:</span>
-              <span className="text-foreground font-medium">
-                {formatTime(sessionState.finalDuration || sessionState.elapsedSeconds)}
-              </span>
             </div>
 
             {/* Rating Stars */}

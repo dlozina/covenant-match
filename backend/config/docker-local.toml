@@ -26,7 +26,14 @@ allow_local = true
 expires_in = "24h"
 
 [chat]
-cleanup_interval_seconds = 30 # 5 minutes (300 seconds)
-inactive_seconds = 30 # 5 minutes (300 seconds)
+cleanup_interval_seconds = 3600 # 1 hour (3600 seconds)
+inactive_seconds = 3600 # 1 hour (3600 seconds)
+
+[email]
+frontend_url = "http://localhost"
+mailersend_url = "https://api.mailersend.com/v1/email"
+from_email = "noreply@covenant-match.com"
+from_name = "Covenant Match"
+
 
 # The rest of the settings will be inherited from default.toml 

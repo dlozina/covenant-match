@@ -21,7 +21,8 @@ use mongodb::Database;
     ),
     security(
         ("bearer_auth" = [])
-    )
+    ),
+    tag = "bug"
 )]
 #[post("/api/v1/bugs")]
 async fn create_bug_report(
@@ -63,7 +64,8 @@ async fn create_bug_report(
     ),
     security(
         ("bearer_auth" = [])
-    )
+    ),
+    tag = "bug"
 )]
 #[get("/api/v1/bugs")]
 async fn get_all_bug_reports(
@@ -123,7 +125,8 @@ async fn get_all_bug_reports(
     ),
     security(
         ("bearer_auth" = [])
-    )
+    ),
+    tag = "bug"
 )]
 #[get("/api/v1/bugs/{id}")]
 async fn get_bug_report_by_id(

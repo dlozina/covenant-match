@@ -1,7 +1,8 @@
 use crate::middleware::auth::Auth;
 use crate::models::admin::{
     AdminChatResponse, AdminSessionsQuery, ChatHistoryParams, ChatMessageResponseDto,
-    CreateFeatureFlagDto, DeleteMessagesParams, PatchFeatureFlagDto, UserInfoDto,
+    CreateFeatureFlagDto, DeleteMessagesParams, LoginAttemptsQuery, LoginAttemptsResponse,
+    PatchFeatureFlagDto, UserInfoDto,
 };
 use crate::models::error::AppError;
 use crate::services::{admin_service, chat_service, user_service};
@@ -291,7 +292,6 @@ async fn get_admin_chat_history(
                             sender_id,
                             UserInfoDto {
                                 username: Some(user.username),
-                                display_name: user.display_name,
                                 email: Some(user.email),
                                 role: Some(user.role),
                                 avatar_url: user.avatar_url,
@@ -709,6 +709,58 @@ async fn get_websocket_stats(
     }
 }
 
+/// Get all login attempts with pagination for admin
+#[utoipa::path(
+    get,
+    path = "/api/v1/admin/login-attempts",
+    params(
+        ("page" = Option<u64>, Query, description = "Page number starting from 1"),
+        ("limit" = Option<u64>, Query, description = "Number of items per page"),
+        ("username" = Option<String>, Query, description = "Filter by username"),
+        ("status" = Option<bool>, Query, description = "Filter by login success status"),
+    ),
+    responses(
+        (status = 200, description = "Successfully retrieved login attempts", body = LoginAttemptsResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 403, description = "Forbidden - requires admin role"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "admin"
+)]
+#[get("/api/v1/admin/login-attempts")]
+async fn get_login_attempts(
+    db: web::Data<Database>,
+    query: web::Query<LoginAttemptsQuery>,
+    req: HttpRequest,
+) -> impl Responder {
+    // Check if the user is an admin
+    if !is_admin(&req) {
+        return HttpResponse::Forbidden().json(serde_json::json!({
+            "status": "error",
+            "message": "Admin role required"
+        }));
+    }
+
+    match admin_service::get_login_attempts(
+        &db,
+        query.page.unwrap_or(1),
+        query.limit.unwrap_or(20),
+        query.username.clone(),
+        query.status,
+    )
+    .await
+    {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => {
+            log::error!("Error fetching login attempts: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
 #[get("/api/v1/admin/debug/chat-sessions")]
 async fn debug_chat_sessions(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
     // Check if the user is an admin
@@ -847,19 +899,15 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(delete_admin_session);
     cfg.service(get_admin_chat_history);
     cfg.service(delete_admin_chat_messages);
-
+    cfg.service(get_login_attempts);
     // Feature flags endpoints
     cfg.service(get_feature_flags);
     cfg.service(get_feature_flag);
     cfg.service(create_feature_flag);
     cfg.service(update_feature_flag);
     cfg.service(delete_feature_flag);
-
     // Client-facing feature flag endpoint - no auth required or admin role check
     cfg.service(get_feature_flag_value);
-
-    // Add the new route
     cfg.service(get_websocket_stats);
-
     cfg.service(debug_chat_sessions);
 }

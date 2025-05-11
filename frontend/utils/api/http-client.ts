@@ -125,7 +125,7 @@ class ApiClient implements HttpClient {
     });
   }
 
-  async post<T>(endpoint: string, data: unknown, requiresAuth = false, includeCredentials = false): Promise<T> {
+  async post<T>(endpoint: string, data?: unknown, requiresAuth = false, includeCredentials = false): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'POST',
       body: data,

@@ -67,9 +67,6 @@ pub enum AppError {
     #[error("Email already in use")]
     EmailAlreadyInUse,
 
-    #[error("Display name already in use")]
-    DisplayNameAlreadyInUse,
-
     // Added variants that are used in session_service.rs
     #[error("Bad request: {0}")]
     BadRequest(String),
@@ -105,6 +102,17 @@ pub enum AppError {
 
     #[error("Not found: {0}")]
     NotFound(String),
+
+    #[error("Invalid or expired token")]
+    InvalidOrExpiredToken,
+
+    // Email verification error
+    #[error("Email not verified. Please check your email for a verification link.")]
+    EmailNotVerified,
+
+    // Account disabled error
+    #[error("Account has been disabled. Please contact support for assistance.")]
+    AccountDisabled,
 }
 
 impl ResponseError for AppError {
@@ -148,7 +156,6 @@ impl ResponseError for AppError {
             AppError::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
 
             AppError::EmailAlreadyInUse => StatusCode::CONFLICT,
-            AppError::DisplayNameAlreadyInUse => StatusCode::CONFLICT,
 
             AppError::CaptchaVerificationFailed(_) => StatusCode::BAD_REQUEST,
             AppError::CaptchaRequired(_) => StatusCode::BAD_REQUEST,
@@ -162,6 +169,12 @@ impl ResponseError for AppError {
             AppError::InvalidInput(_) => StatusCode::BAD_REQUEST,
 
             AppError::SystemInfoError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+
+            AppError::InvalidOrExpiredToken => StatusCode::UNAUTHORIZED,
+
+            AppError::EmailNotVerified => StatusCode::BAD_REQUEST,
+
+            AppError::AccountDisabled => StatusCode::FORBIDDEN,
         }
     }
 }

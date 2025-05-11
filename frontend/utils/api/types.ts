@@ -12,6 +12,7 @@ export interface Session {
   id: string;
   name: string;
   hostId: string;
+  hostExperience: string;
   status: "Open" | "InProgress" | "Completed";
   isFriendsOnly: boolean;
   nightLord: string;
@@ -30,6 +31,9 @@ export interface MinimalSession {
   status: "Open" | "InProgress" | "Completed";
   createdAt: string;
   nightLord?: string;
+  hostExperience?: string;
+  playerCount?: number;
+  isFriendsOnly?: boolean;
 }
 
 export interface SessionDetails {
@@ -62,7 +66,6 @@ export interface RegisterParams {
   username: string;
   email: string;
   password: string;
-  displayName: string;
   region: string;
   platform: string;
   autoRegion: boolean;
@@ -73,7 +76,6 @@ export interface RegisterParams {
 export interface UpdateProfileParams {
   username?: string;
   email?: string;
-  displayName?: string;
   region?: string;
   platform?: string;
   autoRegion?: boolean;
@@ -88,7 +90,6 @@ export interface UserProfile {
   id: string;
   username: string;
   email: string;
-  displayName: string;
   region: string;
   platform: string;
   autoRegion: boolean;
@@ -210,6 +211,135 @@ export interface SessionDetailResponse {
   data: SessionDetail;
 }
 
+// User sessions response type for the GET /api/v1/users/sessions endpoint
+export type SessionRating = Record<string, never>;
+
+export interface UserSessionsResponse {
+  previousSession: {
+    id: string;
+    name: string;
+    hostId: string;
+    region: string;
+    platform: string;
+    password: string;
+    isPrivate: boolean;
+    isFriendsOnly: boolean;
+    nightLord: string;
+    status: string;
+    joinedPlayers: Array<{
+      userId: string;
+      username: string;
+      nightfarer: string;
+      covenantName: string;
+      region: string;
+      platform: string;
+      experience: string;
+      joinedAt: {
+        $date: {
+          $numberLong: string;
+        }
+      };
+    }>;
+    results: Array<{
+      userId: string;
+      result: string;
+      rating: number;
+      feedback: string;
+      submittedAt: {
+        $date: {
+          $numberLong: string;
+        }
+      };
+    }>;
+    ratings: SessionRating[];
+    createdAt: {
+      $date: {
+        $numberLong: string;
+      }
+    };
+    updatedAt: {
+      $date: {
+        $numberLong: string;
+      }
+    };
+    startedAt: {
+      $date: {
+        $numberLong: string;
+      }
+    } | null;
+    completedAt: {
+      $date: {
+        $numberLong: string;
+      }
+    } | null;
+    statsUpdated: boolean;
+    newSessionCreated: boolean;
+    newSessionCreatedId: string | null;
+  } | null;
+  
+  currentSession: {
+    id: string;
+    name: string;
+    hostId: string;
+    region: string;
+    platform: string;
+    password: string;
+    isPrivate: boolean;
+    isFriendsOnly: boolean;
+    nightLord: string;
+    status: string;
+    joinedPlayers: Array<{
+      userId: string;
+      username: string;
+      nightfarer: string;
+      covenantName: string;
+      region: string;
+      platform: string;
+      experience: string;
+      joinedAt: {
+        $date: {
+          $numberLong: string;
+        }
+      };
+    }>;
+    results: Array<{
+      userId: string;
+      result: string;
+      rating: number;
+      feedback: string;
+      submittedAt: {
+        $date: {
+          $numberLong: string;
+        }
+      };
+    }>;
+    ratings: SessionRating[];
+    createdAt: {
+      $date: {
+        $numberLong: string;
+      }
+    };
+    updatedAt: {
+      $date: {
+        $numberLong: string;
+      }
+    };
+    startedAt: {
+      $date: {
+        $numberLong: string;
+      }
+    } | null;
+    completedAt: {
+      $date: {
+        $numberLong: string;
+      }
+    } | null;
+    statsUpdated: boolean;
+    newSessionCreated: boolean;
+    newSessionCreatedId: string | null;
+  } | null;
+}
+
 // Pagination types
 export interface PaginationInfo {
   page: number;
@@ -269,7 +399,6 @@ export interface UserSessionResult {
 export interface Friend {
   id: string;
   username: string;
-  displayName?: string;
   avatarUrl?: string;
   covenantName: string;
   platform: string;
@@ -292,6 +421,8 @@ export interface SessionFilterOptions {
   isPrivate?: boolean;
   region?: string;
   platform?: string;
+  nightLord?: string;
+  hostExperience?: string;
 }
 
 // Use existing Session type as SessionResponse
@@ -299,7 +430,6 @@ export type SessionResponse = Session;
 
 export interface UserStats {
   userId: string;
-  displayName: string;
   platform: string;
   experience: string;
   covenantName: string;
@@ -308,4 +438,15 @@ export interface UserStats {
   losses: number;
   winRate: number;
   score: number;
+}
+
+// Add new pagination response type for sessions
+export interface PaginatedSessionsResponse<T> {
+  items: T[];
+  metadata: {
+    totalCount: number;
+    pageCount: number;
+    currentPage: number;
+    perPage: number;
+  }
 } 

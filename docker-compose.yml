@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   frontend:
     image: ghcr.io/dlozina/covenant-match-frontend:latest
@@ -14,6 +12,10 @@ services:
         - NEXT_PUBLIC_TESTER_PASSWORD=test-covenant-45#
     deploy:
       replicas: 1
+      # resources:
+      #   limits:
+      #     cpus: '0.5'
+      #     memory: 1.5G
       restart_policy:
         condition: on-failure
     environment:
@@ -35,6 +37,10 @@ services:
       dockerfile: Dockerfile
     deploy:
       replicas: 1
+      # resources:
+      #   limits:
+      #     cpus: '2'
+      #     memory: 3G
       restart_policy:
         condition: on-failure
         delay: 5s
@@ -54,6 +60,7 @@ services:
       - mongodb_uri
       - jwt_secret
       - turnstile_secret_key
+      - mailersend_api_key
     networks:
       - covenant-network
 
@@ -61,13 +68,17 @@ services:
     image: mongo:latest
     deploy:
       replicas: 1
+      # resources:
+      #   limits:
+      #     cpus: '1'
+      #     memory: 3G
       restart_policy:
         condition: on-failure
     environment:
       - MONGO_INITDB_DATABASE=covenant-match
     volumes:
-      - ./mongodb/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
       - mongodb_data:/data/db
+    command: mongod --wiredTigerCacheSizeGB 1.5 --wiredTigerCollectionBlockCompressor=zlib --wiredTigerJournalCompressor=snappy --wiredTigerIndexPrefixCompression=true
     networks:
       - covenant-network
     healthcheck:
@@ -84,6 +95,10 @@ services:
       dockerfile: Dockerfile
     deploy:
       replicas: 1
+      # resources:
+      #   limits:
+      #     cpus: '0.5'
+      #     memory: 0.5G
       restart_policy:
         condition: on-failure
     ports:
@@ -94,6 +109,23 @@ services:
       - ./logs/nginx:/var/log/nginx
     networks:
       - covenant-network
+  
+  mongodb-backup:
+    image: ghcr.io/dlozina/covenant-match-mongodb-backup:latest
+    deploy:
+      # resources:
+      #   limits:
+      #     cpus: '0.2'
+      #     memory: 0.5G
+    environment:
+      - BACKUP_SCHEDULE=0 6 * * *  # Run at 6:00 AM every day
+      - BACKUP_RETENTION_DAYS=7    # Keep backups for 7 days (default)
+    volumes:
+      - mongodb_backup_data:/backups  # Persistent volume for backups
+    depends_on:
+      - mongodb
+    networks:
+      - covenant-network
 
 networks:
   covenant-network:
@@ -102,11 +134,13 @@ networks:
 volumes:
   mongodb_data:
   uploads_data:
-
+  mongodb_backup_data:
 secrets:
   mongodb_uri:
     external: true
   jwt_secret:
     external: true
   turnstile_secret_key:
+    external: true
+  mailersend_api_key:
     external: true

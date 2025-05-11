@@ -65,7 +65,7 @@ function ProfileContent() {
 
           <Card className="overflow-hidden">
             <CardHeader className="px-4 md:px-6 py-4 md:py-6">
-              <CardTitle className="text-lg md:text-xl">{userData.displayName}</CardTitle>
+              <CardTitle className="text-lg md:text-xl">{userData.username}</CardTitle>
               <CardDescription className="text-sm">@{userData.username}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 px-4 md:px-6 py-2 md:py-4">
@@ -88,16 +88,12 @@ function ProfileContent() {
                     
                     <div className="space-y-3">
                       <div>
-                        <h3 className="text-sm md:text-base font-medium">Username</h3>
+                        <h3 className="text-sm md:text-base font-medium">Nightfarer Name</h3>
                         <p className="text-sm md:text-base text-muted-foreground break-words">{userData.username}</p>
                       </div>
                       <div>
                         <h3 className="text-sm md:text-base font-medium">Email</h3>
                         <p className="text-sm md:text-base text-muted-foreground break-words">{userData.email}</p>
-                      </div>
-                      <div>
-                        <h3 className="text-sm md:text-base font-medium">Display Name</h3>
-                        <p className="text-sm md:text-base text-muted-foreground break-words">{userData.displayName}</p>
                       </div>
                     </div>
                   </div>

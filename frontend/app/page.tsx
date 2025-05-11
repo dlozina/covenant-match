@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { MainLayout } from "@/components/layout";
 import { Sword, Shield, Timer, Users, Trophy, Skull, ScrollText, Compass, Award, AlertCircle } from "lucide-react";
-// Use for test if css config is not working
+// Use for test if css config is not working -> good old way
 // import { TestStyled } from "@/components/ui/test-styled";
 // import { BasicTest } from "@/components/ui/basic-test";
 import { Footer } from "@/components/layout/Footer";
@@ -212,6 +212,11 @@ export default function Home() {
         </div>
         <div className="text-xs text-center text-muted-foreground">
           Players looking for groups now
+        </div>
+        <div className="mt-4 text-center">
+          <Link href="/sessions" className="text-sm text-emerald-400 hover:text-emerald-300 hover:underline">
+            View all sessions
+          </Link>
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 pub mod admin;
 pub mod auth;
+pub mod bug;
 pub mod chat;
 pub mod common;
 pub mod error;
@@ -8,6 +9,6 @@ pub mod geo_location;
 pub mod news;
 pub mod session;
 pub mod statistics;
+pub mod token;
 pub mod user;
 pub mod user_data;
-pub mod bug;

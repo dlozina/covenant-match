@@ -131,7 +131,6 @@ function FriendsContent() {
   
   // Filter friends based on search query
   const filteredFriends = friends.filter(friend => 
-    (friend.displayName?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
     friend.username.toLowerCase().includes(searchQuery.toLowerCase())
   );
   
@@ -231,11 +230,11 @@ function FriendsContent() {
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
                           <AvatarFallback className="bg-gradient-to-br from-purple-700 to-indigo-900 text-white">
-                            {friend.displayName?.substring(0, 2) || friend.username.substring(0, 2)}
+                            {friend.username.substring(0, 2)}
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <div className="font-medium">{friend.displayName || friend.username}</div>
+                          <div className="font-medium">{friend.username}</div>
                           <div className="text-sm text-muted-foreground">
                             {friend.platform} {friend.stats?.covenantName && `• ${friend.stats.covenantName}`}
                           </div>
@@ -243,11 +242,11 @@ function FriendsContent() {
                           {friend.stats ? (
                             <div className="flex items-center gap-2 mt-1">
                               <div className="flex items-center text-xs text-amber-500">
-                                <Trophy size={12} className="mr-0.5" />
+                                <Swords size={12} className="mr-0.5" />
                                 <span>{friend.stats.totalGames}</span>
                               </div>
                               <div className="flex items-center text-xs text-green-500">
-                                <Swords size={12} className="mr-0.5" />
+                                <Trophy size={12} className="mr-0.5" />
                                 <span>{friend.stats.wins}</span>
                               </div>
                               <div className="flex items-center text-xs text-red-500">

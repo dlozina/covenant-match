@@ -1,12 +1,12 @@
+pub mod admin;
+pub mod bug;
+pub mod chat;
 pub mod game_data;
 pub mod health;
+pub mod news;
 pub mod sessions;
 pub mod sse;
 pub mod statistics;
+pub mod user_data;
 pub mod users;
 pub mod ws;
-pub mod user_data;
-pub mod news;
-pub mod admin;
-pub mod chat;
-pub mod bug;

@@ -1,5 +1,5 @@
 use crate::models::error::AppError;
-use crate::models::news::{Announcement, News, NewsResponse};
+use crate::models::news::{Announcement, News};
 use futures::StreamExt;
 use log::error;
 use mongodb::{
@@ -94,7 +94,6 @@ pub async fn find_news_paginated(
     while let Some(result) = cursor.next().await {
         match result {
             Ok(item) => {
-                log::debug!("Found news item: {:?}", item.id);
                 news.push(item);
             }
             Err(e) => {
@@ -104,16 +103,12 @@ pub async fn find_news_paginated(
         }
     }
 
-    log::info!("Total news items found: {}", news.len());
-
     // Sort manually by created_at descending
     news.sort_by(|a, b| b.created_at.cmp(&a.created_at));
 
     // Apply pagination manually
     let start = std::cmp::min(skip as usize, news.len());
     let end = std::cmp::min(start + limit as usize, news.len());
-
-    log::info!("Returning news items from index {} to {}", start, end);
 
     Ok(news[start..end].to_vec())
 }

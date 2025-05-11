@@ -14,7 +14,6 @@ pub struct User {
     #[serde(skip_serializing_if = "is_api_response")]
     #[schema(write_only)]
     pub password_hash: String,
-    pub display_name: Option<String>,
     pub avatar_url: Option<String>,
     pub region: String,
     pub auto_region: bool,
@@ -30,6 +29,7 @@ pub struct User {
     pub preferred_session_name: Option<String>,
     pub preferred_session_password: Option<String>,
     pub preferred_nightfarer: Option<String>,
+    pub email_verified: bool,
     #[serde(default)]
     pub friend_list: Vec<ObjectId>,
 }
@@ -62,7 +62,6 @@ pub struct CreateUserDto {
     #[validate(length(min = 8))]
     #[schema(format = "password")]
     pub password: String,
-    pub display_name: Option<String>,
     pub region: String,
     pub auto_region: bool,
     pub platform: String,
@@ -86,7 +85,6 @@ pub struct UserResponse {
     pub id: String,
     pub username: String,
     pub email: String,
-    pub display_name: Option<String>,
     pub avatar_url: Option<String>,
     pub region: String,
     pub auto_region: bool,
@@ -96,6 +94,7 @@ pub struct UserResponse {
     pub experience: Experience,
     pub role: String,
     pub disabled: bool,
+    pub email_verified: bool,
     pub platform: String,
     pub created_at: DateTime,
     pub updated_at: DateTime,
@@ -118,7 +117,6 @@ pub struct LoginUserDto {
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct UpdateUserDto {
-    pub display_name: Option<String>,
     pub email: Option<String>,
     pub avatar_url: Option<String>,
 }
@@ -129,7 +127,6 @@ pub struct UpdateUserProfileDto {
     pub email: Option<String>,
     #[schema(format = "password")]
     pub password: Option<String>,
-    pub display_name: Option<String>,
     pub region: Option<String>,
     pub auto_region: Option<bool>,
     pub cm_region: Option<String>,
@@ -150,7 +147,6 @@ impl From<User> for UserResponse {
             id: user.id.to_hex(),
             username: user.username,
             email: user.email,
-            display_name: user.display_name,
             avatar_url: user.avatar_url,
             region: user.region,
             auto_region: user.auto_region,
@@ -160,6 +156,7 @@ impl From<User> for UserResponse {
             experience: user.experience,
             role: user.role,
             disabled: user.disabled,
+            email_verified: user.email_verified,
             platform: user.platform,
             created_at: user.created_at,
             updated_at: user.updated_at,
@@ -266,7 +263,6 @@ pub struct RemoveFriendDto {
 pub struct FriendDto {
     pub id: String,
     pub username: String,
-    pub display_name: Option<String>,
     pub avatar_url: Option<String>,
     pub covenant_name: String,
     pub platform: String,
@@ -279,4 +275,14 @@ pub struct FriendDto {
 pub struct FriendListResponse {
     pub friends: Vec<FriendDto>,
     pub total: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NewPasswordDto {
+    pub password: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ResetPasswordDto {
+    pub email: String,
 }

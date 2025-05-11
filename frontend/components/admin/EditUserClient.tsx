@@ -160,7 +160,6 @@ export function EditUserClient({ userId }: EditUserClientProps) {
       
       <Card className="overflow-hidden">
         <CardHeader>
-          <CardTitle className="text-xl">{user.displayName}</CardTitle>
           <CardDescription>
             @{user.username}
           </CardDescription>
@@ -189,10 +188,6 @@ export function EditUserClient({ userId }: EditUserClientProps) {
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Display Name</Label>
-                      <Input value={user.displayName} readOnly className="bg-muted/50 mt-2" />
-                    </div>
                     <div>
                       <Label>Email</Label>
                       <Input value={user.email} readOnly className="bg-muted/50 mt-2" />

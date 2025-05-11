@@ -13,13 +13,13 @@ fn get_collection(db: &Database) -> Collection<User> {
     db.collection::<User>(COLLECTION_NAME)
 }
 
-pub async fn create_user(db: &Database, user: &User) -> Result<(), AppError> {
+pub async fn create_user(db: &Database, user: &User) -> Result<User, AppError> {
     let collection = db.collection::<User>(COLLECTION_NAME);
     collection.insert_one(user).await.map_err(|e| {
         error!("Database error creating user: {:?}", e);
         AppError::DatabaseError(e)
     })?;
-    Ok(())
+    Ok(user.clone())
 }
 
 pub async fn find_by_username(db: &Database, username: &str) -> Result<Option<User>, AppError> {
@@ -156,17 +156,38 @@ pub async fn update_user_with_doc(
     find_user_by_id(db, user_id).await
 }
 
-pub async fn find_by_display_name(
+/// Update user's password by user ID
+pub async fn update_user_password(
     db: &Database,
-    display_name: &str,
-) -> Result<Option<User>, AppError> {
-    let collection = db.collection::<User>("users");
-    let filter = doc! { "display_name": display_name };
+    user_id: &str,
+    password_hash: String,
+) -> Result<(), AppError> {
+    let collection = db.collection::<User>(COLLECTION_NAME);
 
-    collection
-        .find_one(filter)
-        .await
-        .map_err(AppError::DatabaseError)
+    // Convert string ID to ObjectId
+    let object_id = ObjectId::parse_str(user_id).map_err(|e| {
+        error!("Invalid ObjectId format: {:?}", e);
+        AppError::InvalidId
+    })?;
+
+    let filter = doc! { "_id": object_id };
+    let update = doc! {
+        "$set": {
+            "password_hash": password_hash,
+            "updated_at": mongodb::bson::DateTime::now()
+        }
+    };
+
+    let result = collection.update_one(filter, update).await.map_err(|e| {
+        error!("Database error updating user password: {:?}", e);
+        AppError::DatabaseError(e)
+    })?;
+
+    if result.matched_count == 0 {
+        return Err(AppError::UserNotFound);
+    }
+
+    Ok(())
 }
 
 /// Find users by role with pagination
@@ -349,4 +370,31 @@ pub async fn get_friend_list_details(db: &Database, user_id: &str) -> Result<Vec
     })?;
 
     Ok(friends_list)
+}
+
+/// Find multiple users by their IDs in a single query
+pub async fn find_users_by_ids(db: &Database, user_ids: &[String]) -> Result<Vec<User>, AppError> {
+    let collection = db.collection::<User>(COLLECTION_NAME);
+
+    // Convert string IDs to ObjectIds
+    let object_ids = user_ids
+        .iter()
+        .filter_map(|id| ObjectId::parse_str(id).ok())
+        .collect::<Vec<ObjectId>>();
+
+    if object_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let filter = doc! { "_id": { "$in": object_ids } };
+
+    let cursor = collection.find(filter).await.map_err(|e| {
+        error!("Database error finding users by ids: {:?}", e);
+        AppError::DatabaseError(e)
+    })?;
+
+    cursor.try_collect().await.map_err(|e| {
+        error!("Database error collecting users by ids: {:?}", e);
+        AppError::DatabaseError(e)
+    })
 }

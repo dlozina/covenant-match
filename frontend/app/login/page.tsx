@@ -23,6 +23,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { AlertCircle } from "lucide-react"
 import { login as apiLogin, LoginParams } from "@/utils/api"
 import { Turnstile } from "next-turnstile";
+import { getAndClearRedirectUrl } from "@/utils/auth-redirect"
 
 // Username validation regex - must match the one used in profile creation
 const usernameRegex = /^[a-zA-Z0-9_.-]+$/;
@@ -165,7 +166,14 @@ export default function LoginPage() {
         
         // Wait a moment to show success message before redirecting
         setTimeout(() => {
-          router.push('/');
+          // Check if there's a redirect URL stored from a shared session link
+          const redirectUrl = getAndClearRedirectUrl();
+          if (redirectUrl) {
+            router.push(redirectUrl);
+          } else {
+            // Default redirect to home page
+            router.push('/');
+          }
         }, 500);
       } catch (loginError) {
         // Clear the password field on error
@@ -203,9 +211,9 @@ export default function LoginPage() {
       <div className="container flex items-center justify-center min-h-[80vh] px-4 py-6 md:py-8">
         <Card className="w-full max-w-sm mx-auto">
           <CardHeader className="space-y-1 px-4 sm:px-6">
-            <CardTitle className="text-xl sm:text-2xl font-bold">Login</CardTitle>
+            <CardTitle className="text-xl sm:text-2xl font-bold">Roundtable Hold Key</CardTitle>
             <CardDescription className="text-sm">
-              Enter your credentials to access your account
+              Enter your credentials to access your covenant
             </CardDescription>
           </CardHeader>
           <CardContent className="px-4 sm:px-6">
@@ -216,10 +224,10 @@ export default function LoginPage() {
                   name="username"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm">Username</FormLabel>
+                      <FormLabel className="text-sm">Nightfarer Name</FormLabel>
                       <FormControl>
                         <Input 
-                          placeholder="username" 
+                          placeholder="name" 
                           {...field} 
                           className="h-10 text-base"
                           onChange={(e) => {
@@ -272,12 +280,12 @@ export default function LoginPage() {
                 <Turnstile
                   className="flex justify-center"
                   theme="dark"
-                  siteKey="0x4AAAAAABYet9mhK3xghhXA"
+                  siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "0x4AAAAAABYet9mhK3xghhXA"}
                   onVerify={setToken}
                 />
                 <Button 
                   type="submit" 
-                  className="w-full h-10 text-sm sm:text-base" 
+                  className="w-full h-10 text-sm sm:text-base bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-700 hover:to-indigo-600" 
                   disabled={isLoading || isLocked}
                 >
                   {isLoading ? "Logging in..." : isLocked ? "Temporarily locked" : "Login"}
@@ -287,9 +295,15 @@ export default function LoginPage() {
           </CardContent>
           <CardFooter className="flex flex-col items-center justify-center space-y-2 px-4 sm:px-6 pb-6">
             <div className="text-xs sm:text-sm text-muted-foreground">
-              Don&apos;t have an account?{" "}
+              Don&apos;t have a key?{" "}
               <Link href="/profile/create" className="text-primary hover:underline">
                 Create one
+              </Link>
+            </div>
+            <div className="text-xs sm:text-sm text-muted-foreground">
+              Forgot password?{" "}
+              <Link href="/send-email" className="text-primary hover:underline">
+                Reset password
               </Link>
             </div>
           </CardFooter>

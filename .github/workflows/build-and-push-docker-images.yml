@@ -42,6 +42,19 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Build and push MongoDB Backup image
+      - name: Build and push MongoDB Backup image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./mongodb-backup
+          file: ./mongodb-backup/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/covenant-match-mongodb-backup:latest
+            ghcr.io/${{ github.repository_owner }}/covenant-match-mongodb-backup:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
       # Build and push Frontend image
       - name: Build and push Frontend image
         uses: docker/build-push-action@v4
@@ -68,19 +81,5 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/covenant-match-nginx:latest
             ghcr.io/${{ github.repository_owner }}/covenant-match-nginx:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-            
-      # Build and push Nginx Development image
-      - name: Build and push Nginx Development image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./nginx
-          file: ./nginx/Dockerfile
-          build-args: |
-            ENVIRONMENT=dev
-          push: true
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/covenant-match-nginx:dev
           cache-from: type=gha
           cache-to: type=gha,mode=max

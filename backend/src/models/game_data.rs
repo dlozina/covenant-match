@@ -178,5 +178,3 @@ impl From<Experience> for ExperienceResponse {
         }
     }
 }
-
-

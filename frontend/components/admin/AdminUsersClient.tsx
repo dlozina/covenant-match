@@ -89,7 +89,6 @@ const formatDate = (dateObj: string | { $date: { $numberLong: string } }): strin
 const adminUserSchema = z.object({
   username: z.string().min(4, "Username must be at least 4 characters"),
   email: z.string().email("Must be a valid email address"),
-  displayName: z.string().min(2, "Display name must be at least 2 characters"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   confirm_password: z.string().min(8, "Confirm password must be at least 8 characters"),
   region: z.string().optional(),
@@ -148,7 +147,6 @@ export function AdminUsersClient() {
     defaultValues: {
       username: "",
       email: "",
-      displayName: "",
       password: "",
       confirm_password: "",
       region: "",
@@ -195,8 +193,7 @@ export function AdminUsersClient() {
         if (response.status === "success") {
           const filteredUsers = response.data.users.filter(user => 
             user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            user.displayName.toLowerCase().includes(searchQuery.toLowerCase())
+            user.email.toLowerCase().includes(searchQuery.toLowerCase())
           );
           
           setUsers(filteredUsers);
@@ -291,7 +288,6 @@ export function AdminUsersClient() {
       await UserService.createAdminUser({
         username: values.username,
         email: values.email,
-        displayName: values.displayName,
         password: values.password,
         region: values.region,
         platform: values.platform,
@@ -413,7 +409,6 @@ export function AdminUsersClient() {
                 <TableRow>
                   <TableHead>Username</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Display Name</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Region</TableHead>
@@ -425,7 +420,6 @@ export function AdminUsersClient() {
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">{user.username}</TableCell>
                     <TableCell>{user.email}</TableCell>
-                    <TableCell>{user.displayName}</TableCell>
                     <TableCell>
                       <span className={`px-2 py-1 rounded-md text-xs ${
                         user.role === "admin" 
@@ -552,23 +546,6 @@ export function AdminUsersClient() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="displayName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Display Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Display Name" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Public display name for the user
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
                 <FormField
                   control={form.control}
                   name="covenantName"

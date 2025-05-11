@@ -59,9 +59,7 @@ pub async fn ws_session_route(
     tag = "realtime"
 )]
 #[get("/api/v1/ws/status")]
-pub async fn ws_status(
-    req: HttpRequest,
-) -> impl Responder {
+pub async fn ws_status(req: HttpRequest) -> impl Responder {
     // Get the user role from the request extensions
     let user_role = {
         let extensions = req.extensions();

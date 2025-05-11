@@ -4,7 +4,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/lib/auth-context";
@@ -18,6 +18,22 @@ import {
   joinSession 
 } from "@/utils/api";
 import { sessionService } from "@/utils/api/session-service";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { saveRedirectUrl } from "@/utils/auth-redirect";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 // Define JWT Claims interface
 interface JwtClaims {
@@ -27,11 +43,155 @@ interface JwtClaims {
   iat: number;
 }
 
+// Save the session ID immediately on page load
+// This script runs as soon as the page is loaded, before any React components
+if (typeof window !== 'undefined') {
+  const urlParams = new URLSearchParams(window.location.search);
+  const sessionId = urlParams.get('id');
+  
+  if (sessionId) {
+    // Check if user is logged in before saving redirect URL
+    const token = localStorage.getItem('token');
+    const isLoggedIn = !!token; // Simple check for token existence
+    
+    // Only save redirect URL if user is not logged in
+    if (!isLoggedIn) {
+      const currentUrl = window.location.pathname + window.location.search;
+      localStorage.setItem('redirectAfterLogin', currentUrl);
+    }
+  }
+}
+
+// Client-side redirect handler that runs before the Suspense boundary
+function ClientRedirectHandler() {
+  const { isLoggedIn, isLoading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const sessionId = searchParams.get('id');
+
+  // If user is not logged in, save the current URL and redirect to login
+  useEffect(() => {
+    if (!isLoading && !isLoggedIn && sessionId) {
+      // Save current URL for redirect after login
+      const currentUrl = window.location.pathname + window.location.search;
+      console.log('Saving redirect URL:', currentUrl);
+      
+      // Try both methods to ensure it's saved
+      // First, use the utility function
+      saveRedirectUrl(currentUrl);
+      
+      // Also directly save to localStorage as a backup
+      if (typeof localStorage !== 'undefined') {
+        console.log('Directly saving to localStorage');
+        localStorage.setItem('redirectAfterLogin', currentUrl);
+      }
+      
+      // Log what's in localStorage after saving
+      const savedUrl = localStorage.getItem('redirectAfterLogin');
+      console.log('Verified saved URL:', savedUrl);
+      
+      router.push('/login');
+    }
+  }, [isLoggedIn, isLoading, router, sessionId]);
+
+  return null;
+}
+
 export default function JoinSessionPage() {
+  const { isLoading } = useAuth();
+  
+  // Show loader while checking auth status
+  if (isLoading) {
+    return (
+      <MainLayout footer={<Footer />}>
+        <div className="container max-w-2xl py-6 md:py-10 px-4 mx-auto flex items-center justify-center">
+          <div className="animate-pulse flex flex-col items-center">
+            <div className="h-12 w-12 rounded-full bg-gradient-to-br from-purple-700 to-indigo-900"></div>
+            <div className="mt-4 text-sm text-muted-foreground">Loading...</div>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
     <ProtectedRoute>
-      <JoinSessionContent />
+      <Suspense fallback={
+        <MainLayout footer={<Footer />}>
+          <div className="container max-w-2xl py-6 md:py-10 px-4 mx-auto flex items-center justify-center">
+            <div className="animate-pulse flex flex-col items-center">
+              <div className="h-12 w-12 rounded-full bg-gradient-to-br from-purple-700 to-indigo-900"></div>
+              <div className="mt-4 text-sm text-muted-foreground">Loading session details...</div>
+            </div>
+          </div>
+        </MainLayout>
+      }>
+        <ClientRedirectHandler />
+        <JoinSessionContent />
+      </Suspense>
     </ProtectedRoute>
+  );
+}
+
+function CharacterComboBox({
+  characters,
+  selectedValue,
+  onSelect,
+  placeholder,
+  emptyMessage,
+}: {
+  characters: { id: string; name: string }[];
+  selectedValue: string | null;
+  onSelect: (value: string) => void;
+  placeholder: string;
+  emptyMessage: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between h-10"
+        >
+          {selectedValue
+            ? characters.find((char) => char.name === selectedValue)?.name || placeholder
+            : placeholder}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-full p-0">
+        <Command>
+          <CommandInput placeholder={`Search ${placeholder.toLowerCase()}...`} />
+          <CommandList>
+            <CommandEmpty>{emptyMessage}</CommandEmpty>
+            <CommandGroup>
+              {characters.map((character) => (
+                <CommandItem
+                  key={character.id}
+                  value={character.name}
+                  onSelect={(currentValue) => {
+                    onSelect(currentValue);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      selectedValue === character.name ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {character.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -300,7 +460,26 @@ function JoinSessionContent() {
                 </div>
               )}
 
-              <div className="space-y-2">
+              {/* Mobile: ComboBox for Nightfarer selection */}
+              <div className="space-y-2 md:hidden">
+                <label className="text-sm md:text-base font-medium">
+                  Select Nightfarer
+                </label>
+                {isLoadingCharacters ? (
+                  <div className="text-center py-4">Loading Nightfarers...</div>
+                ) : (
+                  <CharacterComboBox
+                    characters={nightfarers}
+                    selectedValue={selectedFarer}
+                    onSelect={setSelectedFarer}
+                    placeholder="Select Nightfarer..."
+                    emptyMessage="No Nightfarer found."
+                  />
+                )}
+              </div>
+
+              {/* Desktop: Grid for Nightfarer selection */}
+              <div className="space-y-2 hidden md:block">
                 <label className="text-sm md:text-base font-medium">
                   Select Nightfarer
                 </label>
@@ -328,7 +507,7 @@ function JoinSessionContent() {
 
               <div className="pt-4">
                 <Button 
-                  className="w-full h-10" 
+                  className="w-full h-10 bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-700 hover:to-indigo-600" 
                   onClick={handleJoinSession}
                   disabled={isLoading}
                 >

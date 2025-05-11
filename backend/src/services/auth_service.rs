@@ -1,10 +1,9 @@
-use crate::{models::auth::LoginAttempt, utils::secrets};
 use crate::models::error::AppError;
 use crate::repository::auth_repository;
+use crate::{models::auth::LoginAttempt, utils::secrets};
 use mongodb::Database;
 use serde::{Deserialize, Serialize};
 use std::env;
-
 
 /// Record a login attempt (successful or failed) for tracking purposes
 pub async fn record_login_attempt(
@@ -17,6 +16,10 @@ pub async fn record_login_attempt(
     auth_repository::add_login_attempt(db, &attempt).await
 }
 
+/// Get recent login attempts for admin dashboard or auditing
+pub async fn get_recent_attempts(db: &Database, limit: i64) -> Result<Vec<LoginAttempt>, AppError> {
+    auth_repository::get_recent_attempts(db, limit).await
+}
 
 #[derive(Serialize)]
 struct TurnstileRequest<'a> {
@@ -37,7 +40,10 @@ pub async fn verify_turnstile_token(
     ip_address: &str,
     turnstile_token: Option<&str>,
 ) -> Result<(), AppError> {
-    let secret_key = secrets::read_secret("turnstile_secret_key", "1x0000000000000000000000000000000AA");
+    let secret_key = secrets::read_secret(
+        "turnstile_secret_key",
+        "1x0000000000000000000000000000000AA",
+    );
 
     // If using the test key, return true for testing purposes
     if secret_key == "1x0000000000000000000000000000000AA" {
@@ -83,18 +89,3 @@ pub async fn verify_turnstile_token(
     Ok(())
 }
 
-/// Clean up old login attempt records
-pub async fn cleanup_old_attempts(db: &Database) -> Result<u64, AppError> {
-    // Default retention period is 30 days
-    let retention_days = env::var("LOGIN_ATTEMPTS_RETENTION_DAYS")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(30);
-
-    auth_repository::cleanup_old_attempts(db, retention_days).await
-}
-
-/// Get recent login attempts for admin dashboard or auditing
-pub async fn get_recent_attempts(db: &Database, limit: i64) -> Result<Vec<LoginAttempt>, AppError> {
-    auth_repository::get_recent_attempts(db, limit).await
-}

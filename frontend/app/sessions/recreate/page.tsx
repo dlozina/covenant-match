@@ -21,6 +21,21 @@ import {
   updateSessionCharacters, 
   joinSession 
 } from "@/utils/api";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 // Define JWT Claims interface
 interface JwtClaims {
@@ -28,6 +43,89 @@ interface JwtClaims {
   role: string;
   exp: number;
   iat: number;
+}
+
+// MongoDB ObjectId type
+interface MongoDBObjectId {
+  $oid: string;
+}
+
+// Helper to extract MongoDB ObjectId
+const extractMongoId = (id: string | MongoDBObjectId | Record<string, unknown> | null | undefined): string => {
+  if (!id) return '';
+  
+  if (typeof id === 'object') {
+    // Check if it's a MongoDB ObjectId format with $oid property
+    if (id !== null && '$oid' in id) {
+      return (id as MongoDBObjectId).$oid;
+    }
+    // Fall back to String() for other object types
+    return String(id);
+  }
+  
+  return id;
+};
+
+function CharacterComboBox({
+  characters,
+  selectedValue,
+  onSelect,
+  placeholder,
+  emptyMessage,
+}: {
+  characters: { id: string; name: string }[];
+  selectedValue: string | null;
+  onSelect: (value: string) => void;
+  placeholder: string;
+  emptyMessage: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between h-10"
+        >
+          {selectedValue
+            ? characters.find((char) => char.name === selectedValue)?.name || placeholder
+            : placeholder}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-full p-0">
+        <Command>
+          <CommandInput placeholder={`Search ${placeholder.toLowerCase()}...`} />
+          <CommandList>
+            <CommandEmpty>{emptyMessage}</CommandEmpty>
+            <CommandGroup>
+              {characters.map((character) => (
+                <CommandItem
+                  key={character.id}
+                  value={character.name}
+                  onSelect={(currentValue) => {
+                    onSelect(currentValue);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      selectedValue === character.name ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {character.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export default function RecreateSessionPage() {
@@ -189,16 +287,14 @@ function RecreateSessionContent() {
     setIsLoading(true);
     
     try {
-      // First, recreate the session using the API function
+      // First, recreate the session using the API function with the ORIGINAL session ID
       const recreateData = await recreateSession(originalSessionId);
-      const newSessionId = recreateData.id;
+      const newSessionId = extractMongoId(recreateData.id);
       
       // Now, update the new session with the selected characters
       await updateSessionCharacters(newSessionId, selectedLord, selectedFarer);
       
-      // Set a flag in sessionStorage so the run page knows we came from here
-      sessionStorage.setItem('fromRecreatePage', 'true');
-      
+      // Navigate to the new session
       router.push(`/sessions/run?id=${newSessionId}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
@@ -232,35 +328,41 @@ function RecreateSessionContent() {
     setIsLoading(true);
     
     try {
-      // We need to get the new session ID from sessionStorage
-      const autoJoinSessionId = sessionStorage.getItem('autoJoinSessionId');
-      
-      if (!autoJoinSessionId) {
-        throw new Error("New session ID not found");
-      }
-      
+      // Get user information first
       const userId = getUserIdFromToken();
-      
       if (!userId || !userData) {
         throw new Error("User information not available");
       }
       
       // Get region based on user settings
       const userRegion = userData.autoRegion ? userData.cmRegion : userData.region;
-      
       if (!userRegion) {
         throw new Error("User region information is missing");
       }
       
       // Get platform from user data
       const userPlatform = userData.platform;
-      
       if (!userPlatform) {
         throw new Error("User platform information is missing");
       }
-       
+      
+      // Get the new session ID from session details
+      let newSessionId = null;
+      
+      // Check if the session details contain the new session ID
+      if (sessionDetails && 'newSessionCreatedId' in sessionDetails && sessionDetails.newSessionCreatedId) {
+        // Extract the ID, handling MongoDB ObjectId format if needed
+        newSessionId = extractMongoId(sessionDetails.newSessionCreatedId as string | MongoDBObjectId | Record<string, unknown>);
+        console.log('Using newSessionId from session details:', newSessionId);
+      }
+      
+      if (!newSessionId) {
+        throw new Error("New session ID not found in session data");
+      }
+      
+      // Join the session
       await joinSession(
-        autoJoinSessionId,
+        newSessionId,
         selectedFarer,
         userId,
         userData.username,
@@ -275,15 +377,10 @@ function RecreateSessionContent() {
         message: "Successfully joined new session"
       });
       
-      // Clear the auto-join data from sessionStorage
-      sessionStorage.removeItem('autoJoinSessionId');
-      sessionStorage.removeItem('autoJoinCharacter');
-      
-      // Set a flag in sessionStorage so the run page knows we came from here
-      sessionStorage.setItem('fromRecreatePage', 'true');
-      
-      router.push(`/sessions/run?id=${autoJoinSessionId}`);
+      // Navigate to the new session
+      router.push(`/sessions/run?id=${newSessionId}`);
     } catch (error) {
+      console.error('Join session error details:', error);
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
       setNotification({
         type: 'error',
@@ -326,7 +423,27 @@ function RecreateSessionContent() {
                   {isHost ? (
                     <div className="space-y-4">
                       <p className="text-muted-foreground text-sm">The session name and in-game password will remain the same as the original session.</p>
-                      <div className="space-y-2">
+                      
+                      {/* Mobile: ComboBox for Night Lord selection */}
+                      <div className="space-y-2 md:hidden">
+                        <label className="text-sm md:text-base font-medium">
+                          Select New Night Lord
+                        </label>
+                        {isLoadingCharacters ? (
+                          <div className="text-center py-4">Loading Night Lords...</div>
+                        ) : (
+                          <CharacterComboBox
+                            characters={nightLords}
+                            selectedValue={selectedLord}
+                            onSelect={setSelectedLord}
+                            placeholder="Select Night Lord..."
+                            emptyMessage="No Night Lord found."
+                          />
+                        )}
+                      </div>
+                      
+                      {/* Desktop: Grid for Night Lord selection */}
+                      <div className="space-y-2 hidden md:block">
                         <label className="text-sm md:text-base font-medium">
                           Select New Night Lord
                         </label>
@@ -363,7 +480,26 @@ function RecreateSessionContent() {
                 </div>
               )}
 
-              <div className="space-y-2">
+              {/* Mobile: ComboBox for Nightfarer selection */}
+              <div className="space-y-2 md:hidden">
+                <label className="text-sm md:text-base font-medium">
+                  Select {isHost ? "Your New" : ""} Nightfarer
+                </label>
+                {isLoadingCharacters ? (
+                  <div className="text-center py-4">Loading Nightfarers...</div>
+                ) : (
+                  <CharacterComboBox
+                    characters={nightfarers}
+                    selectedValue={selectedFarer}
+                    onSelect={setSelectedFarer}
+                    placeholder="Select Nightfarer..."
+                    emptyMessage="No Nightfarer found."
+                  />
+                )}
+              </div>
+
+              {/* Desktop: Grid for Nightfarer selection */}
+              <div className="space-y-2 hidden md:block">
                 <label className="text-sm md:text-base font-medium">
                   Select {isHost ? "Your New" : ""} Nightfarer
                 </label>
@@ -391,7 +527,7 @@ function RecreateSessionContent() {
 
               <div className="pt-4">
                 <Button 
-                  className="w-full h-10" 
+                  className="w-full h-10 bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-700 hover:to-indigo-600" 
                   onClick={handleAction}
                   disabled={isLoading}
                 >

@@ -1,11 +1,10 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react";
-import { Button } from "@/components/ui/button";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { MainLayout } from "@/components/layout";
 import { Footer } from "@/components/layout/Footer";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
   Table,
@@ -35,15 +34,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import {
-  Session, 
-  MinimalSession, 
-  fetchSessions,
-  NightLord
-} from "@/utils/api";
-
-import { SessionService } from "@/utils/api/session-service";
-import { fetchNightLords } from "@/utils/api";
+import { Button } from "@/components/ui/button";
 import { Notification, NotificationType } from "@/components/ui/notification";
 import { FALLBACK_EXPERIENCE } from "@/lib/constants";
 import {
@@ -53,6 +44,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown } from "lucide-react";
+import { saveRedirectUrl } from "@/utils/auth-redirect";
+
+// Import types from API
+import {
+  Session, 
+  MinimalSession, 
+  NightLord
+} from "@/utils/api/types";
+
+// Import services and utils
+import { fetchNightLords } from "@/utils/api";
+import { SessionService } from "@/utils/api/session-service";
 
 const MAX_PLAYERS = 3;
 
@@ -62,13 +65,38 @@ const EXPERIENCE_OPTIONS = ["All", ...FALLBACK_EXPERIENCE];
 // Tabs type
 type SessionTab = "general" | "friends";
 
+// Update the JoinedPlayer interface to include experience
+interface ExtendedJoinedPlayer {
+  userId: string;
+  username: string;
+  nightfarer: string;
+  joinedAt: string;
+  experience?: string;
+}
+
+// Use the updated interface in the Session interface
+interface ExtendedSession extends Omit<Session, 'joinedPlayers'> {
+  joinedPlayers: ExtendedJoinedPlayer[];
+}
+
+// Fix the MinimalSession type to ensure properly extended with required data
+interface ExtendedMinimalSession extends MinimalSession {
+  joinedPlayers: {
+    userId: string;
+    username: string;
+    nightfarer: string;
+    experience?: string;
+  }[];
+  hostExperience?: string;
+  playerCount?: number;
+}
+
 export default function SessionsPage() {
   const router = useRouter();
   const { isLoggedIn, userData, isLoading: isUserLoading } = useAuth();
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [friendsSessions, setFriendsSessions] = useState<Session[]>([]);
-  const [minimalSessions, setMinimalSessions] = useState<MinimalSession[]>([]);
-  const [filteredSessions, setFilteredSessions] = useState<Session[]>([]);
+  const [sessions, setSessions] = useState<ExtendedSession[]>([]);
+  const [friendsSessions, setFriendsSessions] = useState<ExtendedSession[]>([]);
+  const [minimalSessions, setMinimalSessions] = useState<ExtendedMinimalSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingFriends, setIsLoadingFriends] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,25 +104,30 @@ export default function SessionsPage() {
   const [friendsCurrentPage, setFriendsCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [friendsTotalPages, setFriendsTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [friendsTotalItems, setFriendsTotalItems] = useState(0);
   const [nightLordFilter, setNightLordFilter] = useState<string>("All");
   const [friendsNightLordFilter, setFriendsNightLordFilter] = useState<string>("All");
   const [experienceFilter, setExperienceFilter] = useState<string>("All");
   const [friendsExperienceFilter, setFriendsExperienceFilter] = useState<string>("All");
-  const [filteredFriendsSessions, setFilteredFriendsSessions] = useState<Session[]>([]);
   const [nightLords, setNightLords] = useState<NightLord[]>([]);
   const [isLoadingNightLords, setIsLoadingNightLords] = useState(false);
   const [shouldFetch, setShouldFetch] = useState(false);
   const [notification, setNotification] = useState<NotificationType | null>(null);
   const [activeTab, setActiveTab] = useState<SessionTab>("general");
-  const limit = 10;
+  const pageSize = 10; // Fixed page size
+  const friendsPageSize = 10; // Fixed page size for friends tab
   
   // Get user region and platform data for API calls
   const userRegion = userData?.autoRegion ? userData.cmRegion : userData?.region;
   const userPlatform = userData?.platform;
 
-  // Check for kick notification
+  // Check for kick notification or session cancelled notification
   useEffect(() => {
     const wasPlayerKicked = sessionStorage.getItem('playerKicked');
+    const wasSessionCancelled = sessionStorage.getItem('sessionCancelled');
+    
+    // Handle player kicked notification
     if (wasPlayerKicked === 'true') {
       // Get details if available
       const hostUsername = sessionStorage.getItem('kickedByHost') || 'Host';
@@ -122,6 +155,27 @@ export default function SessionsPage() {
       sessionStorage.removeItem('kickedByHost');
       sessionStorage.removeItem('kickedSessionId');
       sessionStorage.removeItem('kickTimestamp');
+    }
+
+    // Handle session cancelled notification - separate from player kicked
+    if (wasSessionCancelled === 'true') {
+      console.log('!!!Showing notification for session cancellation!!! sessions page!!!');
+      const sessionName = sessionStorage.getItem('cancelledSessionName');
+      setNotification({
+          message: `The session "${sessionName}" was cancelled`,
+          type: "warning"
+      });
+      
+      // Clear the notification after 5 seconds
+      setTimeout(() => {
+        setNotification(null);
+      }, 5000);
+      
+      // Clear session cancelled data
+      sessionStorage.removeItem('sessionCancelled');
+      sessionStorage.removeItem('cancelledSessionName');
+      sessionStorage.removeItem('cancelTimestamp');
+      sessionStorage.removeItem('cancelledSessionId');
     }
   }, []);
   
@@ -156,7 +210,49 @@ export default function SessionsPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Fetch general sessions data
+  // Fetch friends sessions data (updated for SessionService direct call)
+  const fetchFriendsSessions = useCallback(async () => {
+    if (!shouldFetch || !isLoggedIn) return;
+    if (isUserLoading) return; // Wait for user data
+    
+    setIsLoadingFriends(true);
+    setError(null);
+
+    try {
+      // Use SessionService directly since fetchFriendSessions is not exported
+      const response = await SessionService.getFriendSessions({
+        status: "Open", // Only show Open sessions
+        limit: friendsPageSize,
+        isPrivate: false,
+        offset: (friendsCurrentPage - 1) * friendsPageSize,
+        region: userRegion,
+        platform: userPlatform,
+        nightLord: friendsNightLordFilter !== 'All' ? friendsNightLordFilter : undefined,
+        hostExperience: friendsExperienceFilter !== 'All' ? friendsExperienceFilter : undefined
+      });
+
+      // Cast the response data to our extended interface
+      setFriendsSessions(response.items as unknown as ExtendedSession[]);
+      setFriendsTotalPages(response.metadata.pageCount);
+      setFriendsTotalItems(response.metadata.totalCount);
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Failed to load friend sessions");
+    } finally {
+      setIsLoadingFriends(false);
+    }
+  }, [
+    isLoggedIn, 
+    friendsCurrentPage, 
+    friendsPageSize, 
+    userRegion, 
+    userPlatform, 
+    isUserLoading, 
+    shouldFetch,
+    friendsNightLordFilter,
+    friendsExperienceFilter
+  ]);
+
+  // Update the fetchGeneralSessions function
   const fetchGeneralSessions = useCallback(async () => {
     if (!shouldFetch) return;
     if (isLoggedIn && isUserLoading) return; // Wait for user data if logged in
@@ -167,171 +263,79 @@ export default function SessionsPage() {
     try {
       console.log("Fetching general sessions with region:", userRegion, 
                  "platform:", userPlatform,
-                 "nightLordFilter:", nightLordFilter);
+                 "nightLordFilter:", nightLordFilter,
+                 "experienceFilter:", experienceFilter);
       
-      // Fetch all sessions with Open status
-      const result = await fetchSessions(
-        isLoggedIn, 
-        currentPage, 
-        limit, 
-        "Open", // Only show Open sessions
-        userRegion,
-        userPlatform
-      );
-      
-      if (result.sessions) {
-        setSessions(result.sessions);
-        // We'll apply filters in the dedicated useEffect
-        setTotalPages(result.sessions.length === limit ? currentPage + 1 : currentPage);
-      } else if (result.minimalSessions) {
-        setMinimalSessions(result.minimalSessions);
-        setTotalPages(result.minimalSessions.length === limit ? currentPage + 1 : currentPage);
+      // Use the SessionService directly with updated params
+      if (isLoggedIn) {
+        const response = await SessionService.getSessions({
+          status: "Open",
+          limit: pageSize,
+          isPrivate: false,
+          offset: (currentPage - 1) * pageSize,
+          region: userRegion,
+          platform: userPlatform,
+          nightLord: nightLordFilter !== 'All' ? nightLordFilter : undefined,
+          hostExperience: experienceFilter !== 'All' ? experienceFilter : undefined
+        });
+
+        // Cast the response data to our extended interface
+        setSessions(response.items as unknown as ExtendedSession[]);
+        setTotalPages(Math.max(1, response.metadata.pageCount));
+        setTotalItems(response.metadata.totalCount);
+      } else {
+        // For non-authenticated users, don't filter by region or platform - show all available sessions
+        const response = await SessionService.getPublicSessions({
+          status: "Open",
+          limit: pageSize,
+          offset: (currentPage - 1) * pageSize,
+          // Only apply Night Lord and host experience filters
+          nightLord: nightLordFilter !== 'All' ? nightLordFilter : undefined,
+          hostExperience: experienceFilter !== 'All' ? experienceFilter : undefined
+        });
+
+        // Cast the response data to our extended interface
+        setMinimalSessions(response.items as unknown as ExtendedMinimalSession[]);
+        // Ensure totalPages is at least 1 to prevent UI issues
+        setTotalPages(Math.max(1, response.metadata.pageCount));
+        setTotalItems(response.metadata.totalCount);
       }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "Failed to load sessions");
+      // Set default values on error to prevent UI issues
+      if (!isLoggedIn) {
+        setMinimalSessions([]);
+        setTotalPages(1);
+        setTotalItems(0);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [isLoggedIn, currentPage, limit, userRegion, userPlatform, isUserLoading, shouldFetch, nightLordFilter]);
+  }, [
+    isLoggedIn, 
+    currentPage, 
+    pageSize, 
+    userRegion, 
+    userPlatform, 
+    isUserLoading, 
+    shouldFetch, 
+    nightLordFilter, 
+    experienceFilter
+  ]);
 
-  // Fetch friends sessions data
-  const fetchFriendsSessions = useCallback(async () => {
-    if (!shouldFetch || !isLoggedIn) return;
-    if (isUserLoading) return; // Wait for user data
-    
-    setIsLoadingFriends(true);
-    setError(null);
-
-    try {
-      // Fetch sessions created by friends
-      const offset = (friendsCurrentPage - 1) * limit;
-      
-      const sessions = await SessionService.getFriendSessions({
-        status: "Open", // Only show Open sessions
-        limit,
-        offset,
-        region: userRegion,
-        platform: userPlatform
-      });
-
-      // Define a type that includes the optional experience property
-      type PlayerWithOptionalExperience = {
-        userId: string;
-        username: string;
-        nightfarer: string;
-        joinedAt: string;
-        experience?: string;
-      };
-
-      // Add experience to players if missing to match expected type
-      const enhancedSessions = sessions.map(session => ({
-        ...session,
-        joinedPlayers: session.joinedPlayers.map(player => ({
-          ...player,
-          // Add experience field if missing
-          experience: (player as PlayerWithOptionalExperience).experience || "Unknown"
-        }))
-      }));
-
-      setFriendsSessions(enhancedSessions as Session[]);
-      setFilteredFriendsSessions(enhancedSessions as Session[]);
-      
-      setFriendsTotalPages(sessions.length === limit ? friendsCurrentPage + 1 : friendsCurrentPage);
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "Failed to load friend sessions");
-    } finally {
-      setIsLoadingFriends(false);
-    }
-  }, [isLoggedIn, friendsCurrentPage, limit, userRegion, userPlatform, isUserLoading, shouldFetch]);
-  
   // Effect for fetching general sessions
   useEffect(() => {
     if (activeTab === "general" || !isLoggedIn) {
       fetchGeneralSessions();
     }
-  }, [currentPage, activeTab, shouldFetch, fetchGeneralSessions]);
+  }, [currentPage, pageSize, activeTab, shouldFetch, fetchGeneralSessions, nightLordFilter, experienceFilter]);
   
   // Effect for fetching friends sessions
   useEffect(() => {
     if (activeTab === "friends" && isLoggedIn) {
       fetchFriendsSessions();
     }
-  }, [friendsCurrentPage, activeTab, shouldFetch, fetchFriendsSessions, isLoggedIn]);
-  
-  // Consolidated effect to apply all filters
-  useEffect(() => {
-    // General tab filtering
-    if (sessions.length > 0) {
-      let filtered = [...sessions];
-      
-      // Apply Night Lord filter
-      if (nightLordFilter !== 'All') {
-        console.log("Applying Night Lord filter:", nightLordFilter);
-        console.log("Original sessions:", sessions.map(s => s.nightLord));
-        filtered = filtered.filter(session => 
-          session.nightLord.toLowerCase() === nightLordFilter.toLowerCase()
-        );
-        console.log("Filtered sessions:", filtered.map(s => s.nightLord));
-      }
-      
-      // Apply Experience filter
-      if (experienceFilter !== 'All') {
-        filtered = filtered.filter(session => {
-          const host = session.joinedPlayers.find(player => player.userId === session.hostId);
-          return host?.experience === experienceFilter;
-        });
-      }
-      
-      setFilteredSessions(filtered);
-    } else {
-      setFilteredSessions([]);
-    }
-    
-    // Friends tab filtering
-    if (friendsSessions.length > 0) {
-      let filtered = [...friendsSessions];
-      
-      // Apply Night Lord filter
-      if (friendsNightLordFilter !== 'All') {
-        console.log("Applying Friends Night Lord filter:", friendsNightLordFilter);
-        filtered = filtered.filter(session => 
-          session.nightLord.toLowerCase() === friendsNightLordFilter.toLowerCase()
-        );
-      }
-      
-      // Apply Experience filter
-      if (friendsExperienceFilter !== 'All') {
-        filtered = filtered.filter(session => {
-          const host = session.joinedPlayers.find(player => player.userId === session.hostId);
-          return host?.experience === friendsExperienceFilter;
-        });
-      }
-      
-      setFilteredFriendsSessions(filtered);
-    } else {
-      setFilteredFriendsSessions([]);
-    }
-  }, [
-    sessions, 
-    friendsSessions, 
-    nightLordFilter, 
-    experienceFilter, 
-    friendsNightLordFilter, 
-    friendsExperienceFilter
-  ]);
-  
-  // Handler for refresh button
-  const handleRefresh = () => {
-    if (activeTab === "general") {
-      if (!isLoading) {
-        fetchGeneralSessions();
-      }
-    } else if (activeTab === "friends" && isLoggedIn) {
-      if (!isLoadingFriends) {
-        fetchFriendsSessions();
-      }
-    }
-  };
+  }, [friendsCurrentPage, friendsPageSize, activeTab, shouldFetch, fetchFriendsSessions, isLoggedIn, friendsNightLordFilter, friendsExperienceFilter]);
 
   // Night Lord filter change handler for general tab
   const handleNightLordFilterChange = (value: string) => {
@@ -382,13 +386,16 @@ export default function SessionsPage() {
   async function handleJoinSession(sessionId: string) {
     // Require authentication to join a session
     if (!isLoggedIn) {
+      // Save the URL to redirect to after login
+      const joinUrl = `/sessions/join?id=${sessionId}`;
+      saveRedirectUrl(joinUrl);
       router.push('/login');
       return;
     }
 
     try {
       // Get the session based on active tab
-      const currentSessions = activeTab === "general" ? filteredSessions : filteredFriendsSessions;
+      const currentSessions = activeTab === "general" ? sessions : friendsSessions;
       const session = currentSessions.find(s => s.id === sessionId);
       
       if (!session || session.status !== 'Open') {
@@ -405,6 +412,143 @@ export default function SessionsPage() {
   function getHostName(session: Session) {
     const host = session.joinedPlayers.find(player => player.userId === session.hostId);
     return host ? host.username : 'Unknown';
+  }
+
+  // Add handler for login to join buttons
+  const handleLoginToJoin = (sessionId: string, e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    const joinUrl = `/sessions/join?id=${sessionId}`;
+    saveRedirectUrl(joinUrl);
+    router.push('/login');
+  };
+
+  // Update the session card component with host experience
+  const SessionCard = ({ 
+    session, 
+    onJoin,
+    isLoginAction = false,
+  }: { 
+    session: ExtendedSession | ExtendedMinimalSession; 
+    onJoin: (id: string) => void;
+    isLoginAction?: boolean;
+  }) => {
+    const isFullSession = 'joinedPlayers' in session && Array.isArray(session.joinedPlayers) 
+      ? session.joinedPlayers.length >= MAX_PLAYERS
+      : false;
+    
+    // Calculate player count
+    const playerCount = 'playerCount' in session 
+      ? session.playerCount 
+      : ('joinedPlayers' in session && Array.isArray(session.joinedPlayers)) 
+          ? session.joinedPlayers.length 
+          : 0;
+    
+    // Extract host info
+    const hostName = 'hostName' in session 
+      ? session.hostName 
+      : getHostName(session as ExtendedSession);
+      
+    // Extract host experience
+    const hostExperience = 'hostExperience' in session 
+      ? session.hostExperience 
+      : ('joinedPlayers' in session && 'hostId' in session && Array.isArray(session.joinedPlayers))
+        ? session.joinedPlayers.find(p => p.userId === session.hostId)?.experience
+        : undefined;
+    
+    return (
+      <div className="p-4 border rounded-lg bg-card shadow-sm hover:shadow-md transition-shadow">
+        <div className="flex justify-between items-start mb-2">
+          <h3 className="font-semibold text-lg">{session.name}</h3>
+          <div className="flex flex-col items-end gap-1">
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
+              {session.nightLord || '-'}
+            </span>
+            {'isFriendsOnly' in session && session.isFriendsOnly && (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
+                Friends Only
+              </span>
+            )}
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
+          <div>
+            <span className="text-muted-foreground">Host:</span> {hostName}
+          </div>
+          <div className="flex justify-end">
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+              {hostExperience || "Unknown"}
+            </span>
+          </div>
+          <div>
+            <span className="text-muted-foreground">Status:</span> {session.status}
+          </div>
+          <div className="flex justify-end">
+            <span className="text-muted-foreground">Players:</span> {playerCount}/{MAX_PLAYERS}
+          </div>
+        </div>
+        
+        {isLoginAction ? (
+          <Button 
+            className="w-full border-purple-600/40"
+            variant="outline"
+            size="sm"
+            onClick={() => onJoin(session.id)}
+            disabled={isFullSession}
+          >
+            {isFullSession ? "Session Full" : "Login to Join"}
+          </Button>
+        ) : (
+          <Button 
+            className="w-full bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-700 hover:to-indigo-600"
+            size="sm"
+            onClick={() => onJoin(session.id)}
+            disabled={isFullSession}
+          >
+            {isFullSession ? "Session Full" : "Join Session"}
+          </Button>
+        )}
+      </div>
+    );
+  };
+
+  function getVisiblePageNumbers(currentPage: number, totalPages: number): (number | null)[] {
+    // For small number of pages, show all pages
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+
+    const result: (number | null)[] = [];
+    
+    // Always include page 1
+    result.push(1);
+    
+    // For current pages near the beginning
+    if (currentPage <= 3) {
+      result.push(2, 3, 4);
+      result.push(null); // Ellipsis
+      result.push(totalPages - 1, totalPages);
+    } 
+    // For current pages near the end
+    else if (currentPage >= totalPages - 2) {
+      result.push(null); // Ellipsis
+      result.push(totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+    } 
+    // For current pages in the middle
+    else {
+      result.push(null); // Ellipsis before current
+      result.push(currentPage - 1, currentPage, currentPage + 1);
+      result.push(null); // Ellipsis after current
+      result.push(totalPages);
+    }
+    
+    // Remove any duplicate values and nulls that are consecutive
+    return result.filter((value, index, self) => 
+      // Remove duplicate values
+      self.indexOf(value) === index ||
+      // Keep consecutive nulls as single instance
+      (value === null && self[index - 1] !== null)
+    );
   }
 
   return (
@@ -433,13 +577,13 @@ export default function SessionsPage() {
             <Button 
               variant="outline" 
               className="w-full sm:w-auto order-2 sm:order-1 border-purple-600/40"
-              onClick={handleRefresh}
+              onClick={fetchGeneralSessions}
               disabled={isLoading || isLoadingFriends}
             >
               {(isLoading || isLoadingFriends) ? "Refreshing..." : "Refresh"}
             </Button>
             <Button 
-              className="w-full sm:w-auto order-1 sm:order-2 bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-700 hover:to-indigo-600" 
+              className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-700 hover:to-indigo-600" 
               asChild
             >
               <Link href={isLoggedIn ? "/sessions/create" : "/login?redirect=/sessions/create"}>Create Session</Link>
@@ -448,57 +592,55 @@ export default function SessionsPage() {
         </div>
         
         <div className="rounded-xl border bg-card shadow-sm overflow-hidden mb-8">
-          {/* Common filters section above tabs */}
-          <div className="p-4 border-b bg-muted/10">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-              <div className="flex flex-col sm:flex-row gap-4 w-full">
-                <div className="w-full sm:max-w-xs">
-                  <label className="block text-sm font-medium mb-1">Night Lord</label>
-                  <Select
-                    value={activeTab === "general" ? nightLordFilter : friendsNightLordFilter}
-                    onValueChange={(value) => {
-                      if (activeTab === "general") {
-                        handleNightLordFilterChange(value);
-                      } else {
-                        handleFriendsNightLordFilterChange(value);
-                      }
-                    }}
-                    disabled={isLoadingNightLords || (activeTab === "general" ? isLoading : isLoadingFriends)}
-                  >
-                    <SelectTrigger className="h-9 bg-background">
-                      <SelectValue placeholder="Select Night Lord" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="All">All Night Lords</SelectItem>
-                      {nightLords.map(lord => (
-                        <SelectItem key={lord.id} value={lord.name}>{lord.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="w-full sm:max-w-xs">
-                  <label className="block text-sm font-medium mb-1">Host Experience</label>
-                  <Select
-                    value={activeTab === "general" ? experienceFilter : friendsExperienceFilter}
-                    onValueChange={(value) => {
-                      if (activeTab === "general") {
-                        handleExperienceFilterChange(value);
-                      } else {
-                        handleFriendsExperienceFilterChange(value);
-                      }
-                    }}
-                    disabled={activeTab === "general" ? isLoading : isLoadingFriends}
-                  >
-                    <SelectTrigger className="h-9 bg-background">
-                      <SelectValue placeholder="Select Experience" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {EXPERIENCE_OPTIONS.map(exp => (
-                        <SelectItem key={exp} value={exp}>{exp}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+          {/* Filters */}
+          <div className="p-4 flex flex-wrap gap-4 items-center justify-between bg-background shadow-sm rounded-lg mb-4">
+            <div className="flex flex-col md:flex-row w-full md:w-auto gap-4">
+              {/* Night Lord filter */}
+              <div className="w-full md:w-auto">
+                <Select
+                  value={activeTab === "general" ? nightLordFilter : friendsNightLordFilter}
+                  onValueChange={
+                    activeTab === "general" 
+                      ? handleNightLordFilterChange 
+                      : handleFriendsNightLordFilterChange
+                  }
+                  disabled={isLoadingNightLords}
+                >
+                  <SelectTrigger className="w-full md:w-[180px]">
+                    <SelectValue placeholder="Night Lord" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All Night Lords</SelectItem>
+                    {nightLords.map((lord) => (
+                      <SelectItem key={lord.id} value={lord.name}>
+                        {lord.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Experience filter */}
+              <div className="w-full md:w-auto">
+                <Select
+                  value={activeTab === "general" ? experienceFilter : friendsExperienceFilter}
+                  onValueChange={
+                    activeTab === "general" 
+                      ? handleExperienceFilterChange 
+                      : handleFriendsExperienceFilterChange
+                  }
+                >
+                  <SelectTrigger className="w-full md:w-[180px]">
+                    <SelectValue placeholder="Host Experience" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EXPERIENCE_OPTIONS.map((exp) => (
+                      <SelectItem key={exp} value={exp}>
+                        {exp}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>
@@ -574,7 +716,7 @@ export default function SessionsPage() {
                 <div className="p-4 m-4 border rounded-lg bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-300">
                   <p>{error}</p>
                 </div>
-              ) : filteredSessions.length === 0 && minimalSessions.length === 0 ? (
+              ) : sessions.length === 0 && minimalSessions.length === 0 ? (
                 <div className="p-6 flex flex-col items-center justify-center">
                   <div className="text-center mb-4">
                     <svg className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -610,32 +752,55 @@ export default function SessionsPage() {
                       <TableBody>
                         {isLoggedIn ? (
                           // Full data display for authenticated users
-                          filteredSessions.map((session) => {
+                          sessions.map((session) => {
                             const host = session.joinedPlayers.find(player => player.userId === session.hostId);
+                            const isFullSession = session.joinedPlayers.length >= MAX_PLAYERS;
                             return (
                               <TableRow key={session.id} className="hover:bg-muted/10 transition-colors">
-                                <TableCell className="font-medium">{session.name}</TableCell>
-                                <TableCell>{getHostName(session)}</TableCell>
-                                <TableCell>
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
-                                    {session.nightLord}
-                                  </span>
+                                <TableCell className="font-medium">
+                                  <div className="flex items-center gap-2">
+                                    <div className={`w-2 h-2 rounded-full ${isFullSession ? 'bg-yellow-500' : 'bg-green-500'}`}></div>
+                                    {session.name}
+                                  </div>
                                 </TableCell>
                                 <TableCell>
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{getHostName(session)}</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-1">
+                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                      {session.nightLord}
+                                    </span>
+                                    {session.isFriendsOnly && (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
+                                        Friends
+                                      </span>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">
                                     {host?.experience || "Unknown"}
                                   </span>
                                 </TableCell>
                                 <TableCell>
-                                  {session.joinedPlayers.length}/{MAX_PLAYERS}
+                                  <div className="flex items-center gap-1">
+                                    <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                                      <div className="bg-gradient-to-r from-purple-600 to-indigo-500 h-2.5 rounded-full" style={{ width: `${(session.joinedPlayers.length / MAX_PLAYERS) * 100}%` }}></div>
+                                    </div>
+                                    <span className="text-xs ml-2">{session.joinedPlayers.length}/{MAX_PLAYERS}</span>
+                                  </div>
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <Button 
                                     size="sm"
                                     className="bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-700 hover:to-indigo-600"
                                     onClick={() => handleJoinSession(session.id)}
+                                    disabled={isFullSession}
                                   >
-                                    Join Game
+                                    {isFullSession ? "Full" : "Join Game"}
                                   </Button>
                                 </TableCell>
                               </TableRow>
@@ -643,35 +808,55 @@ export default function SessionsPage() {
                           })
                         ) : (
                           // Minimal data display for non-authenticated users
-                          minimalSessions.map((session) => (
-                            <TableRow key={session.id} className="hover:bg-muted/10 transition-colors">
-                              <TableCell className="font-medium">{session.name}</TableCell>
-                              <TableCell>{session.hostName}</TableCell>
-                              <TableCell>
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
-                                  {(session as { nightLord?: string }).nightLord || '-'}
-                                </span>
-                              </TableCell>
-                              <TableCell>
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">
-                                  {(session as { hostExperience?: string }).hostExperience || "Unknown"}
-                                </span>
-                              </TableCell>
-                              <TableCell>
-                                {(session as { playerCount?: number }).playerCount || 1}/{MAX_PLAYERS}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <Button 
-                                  size="sm"
-                                  variant="outline"
-                                  className="border-purple-600/40"
-                                  asChild
-                                >
-                                  <Link href="/login">Login to Join</Link>
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))
+                          minimalSessions.map((session) => {
+                            const isFullSession = session.playerCount ? session.playerCount >= MAX_PLAYERS : false;
+                            return (
+                              <TableRow key={session.id} className="hover:bg-muted/10 transition-colors">
+                                <TableCell className="font-medium">
+                                  <div className="flex items-center gap-2">
+                                    <div className={`w-2 h-2 rounded-full ${isFullSession ? 'bg-yellow-500' : 'bg-green-500'}`}></div>
+                                    {session.name}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{session.hostName}</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                    {session.nightLord || '-'}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">
+                                    {session.hostExperience || "Unknown"}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-1">
+                                    <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                                      <div className="bg-gradient-to-r from-purple-600 to-indigo-500 h-2.5 rounded-full" style={{ width: `${((session.playerCount || 1) / MAX_PLAYERS) * 100}%` }}></div>
+                                    </div>
+                                    <span className="text-xs ml-2">{session.playerCount || 1}/{MAX_PLAYERS}</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button 
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-purple-600/40"
+                                    asChild
+                                    disabled={isFullSession}
+                                  >
+                                    <Link href="/login" onClick={(e) => handleLoginToJoin(session.id, e)}>
+                                      {isFullSession ? "Session Full" : "Login to Join"}
+                                    </Link>
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
                         )}
                       </TableBody>
                     </Table>
@@ -681,102 +866,57 @@ export default function SessionsPage() {
                   <div className="grid grid-cols-1 gap-4 p-4 md:hidden">
                     {isLoggedIn ? (
                       // Full data display for authenticated users
-                      filteredSessions.map((session) => {
-                        const host = session.joinedPlayers.find(player => player.userId === session.hostId);
+                      sessions.map((session) => {
                         return (
-                          <div key={session.id} className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-shadow hover:border-purple-500/30">
-                            <div className="flex justify-between items-start mb-2">
-                              <h3 className="font-medium text-base truncate">{session.name}</h3>
-                              <div className="flex flex-wrap gap-1">
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
-                                  {session.nightLord}
-                                </span>
-                                {session.isFriendsOnly && (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
-                                    Friends Only
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="text-sm text-muted-foreground mb-3">
-                              <div className="flex justify-between mb-1">
-                                <p>Host: {getHostName(session)}</p>
-                                <p>Players: {session.joinedPlayers.length}/{MAX_PLAYERS}</p>
-                              </div>
-                              <div>
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">
-                                  {host?.experience || "Unknown"}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="mt-3">
-                              <Button 
-                                size="sm"
-                                className="w-full bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-700 hover:to-indigo-600"
-                                onClick={() => handleJoinSession(session.id)}
-                              >
-                                Join Game
-                              </Button>
-                            </div>
-                          </div>
+                          <SessionCard key={session.id} session={session} onJoin={handleJoinSession} />
                         );
                       })
                     ) : (
                       // Minimal data display for non-authenticated users
                       minimalSessions.map((session) => (
-                        <div key={session.id} className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-shadow hover:border-purple-500/30">
-                          <div className="flex justify-between items-start mb-2">
-                            <h3 className="font-medium text-base truncate">{session.name}</h3>
-                            <div className="flex flex-wrap gap-1">
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
-                                {(session as { nightLord?: string }).nightLord || '-'}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="text-sm text-muted-foreground mb-3">
-                            <div className="flex justify-between mb-1">
-                              <p>Host: {session.hostName}</p>
-                              <p>Players: {(session as { playerCount?: number }).playerCount || 1}/{MAX_PLAYERS}</p>
-                            </div>
-                            <div>
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">
-                                {(session as { hostExperience?: string }).hostExperience || "Unknown"}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="mt-3 text-center">
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              className="w-full border-purple-600/40"
-                              asChild
-                            >
-                              <Link href="/login">Login to Join</Link>
-                            </Button>
-                          </div>
-                        </div>
+                        <SessionCard 
+                          key={session.id} 
+                          session={session} 
+                          onJoin={handleLoginToJoin}
+                          isLoginAction={true}
+                        />
                       ))
                     )}
                   </div>
-
-                  <div className="p-4">
-                    <Pagination>
-                      <PaginationContent>
-                        <PaginationItem>
-                          <PaginationPrevious 
-                            href="#" 
-                            size="default"
-                            onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                              e.preventDefault();
-                              if (currentPage > 1) setCurrentPage(currentPage - 1);
-                            }}
-                            className={currentPage <= 1 ? "pointer-events-none opacity-50" : ""}
-                          />
-                        </PaginationItem>
-                        
-                        {/* Hide page numbers on small screens */}
-                        <div className="hidden sm:flex">
-                          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                </>
+              )}
+              
+              {/* Show pagination if not loading and sessions data is available */}
+              {!isLoading && (
+                <div className="p-4">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          href="#" 
+                          size="default"
+                          onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                            e.preventDefault();
+                            if (currentPage > 1) setCurrentPage(currentPage - 1);
+                          }}
+                          className={currentPage <= 1 ? "pointer-events-none opacity-50" : ""}
+                        />
+                      </PaginationItem>
+                      
+                      {/* Hide page numbers on small screens */}
+                      <div className="hidden sm:flex">
+                        {getVisiblePageNumbers(currentPage, totalPages).map((page, index) => {
+                          // If the value is null, render ellipsis
+                          if (page === null) {
+                            return (
+                              <PaginationItem key={`ellipsis-${index}`}>
+                                <span className="px-4 text-gray-500">...</span>
+                              </PaginationItem>
+                            );
+                          }
+                          
+                          // Otherwise render the page number button
+                          return (
                             <PaginationItem key={page}>
                               <PaginationLink 
                                 href="#" 
@@ -790,31 +930,36 @@ export default function SessionsPage() {
                                 {page}
                               </PaginationLink>
                             </PaginationItem>
-                          ))}
-                        </div>
-                        
-                        {/* Show current page indicator on mobile */}
-                        <div className="flex sm:hidden items-center px-2">
-                          <span className="text-sm">
-                            Page {currentPage} of {totalPages}
-                          </span>
-                        </div>
-                        
-                        <PaginationItem>
-                          <PaginationNext 
-                            href="#" 
-                            size="default"
-                            onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                              e.preventDefault();
-                              if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-                            }}
-                            className={currentPage >= totalPages ? "pointer-events-none opacity-50" : ""}
-                          />
-                        </PaginationItem>
-                      </PaginationContent>
-                    </Pagination>
-                  </div>
-                </>
+                          );
+                        })}
+                      </div>
+                      
+                      {/* Show current page indicator on mobile */}
+                      <div className="flex sm:hidden items-center px-2">
+                        <span className="text-sm">
+                          Page {currentPage} of {totalPages} ({totalItems} sessions)
+                        </span>
+                      </div>
+                      
+                      {/* Show total items on desktop */}
+                      <div className="hidden sm:flex items-center px-2 text-sm text-muted-foreground">
+                        {totalItems} total sessions
+                      </div>
+                      
+                      <PaginationItem>
+                        <PaginationNext 
+                          href="#" 
+                          size="default"
+                          onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                            e.preventDefault();
+                            if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+                          }}
+                          className={currentPage >= totalPages ? "pointer-events-none opacity-50" : ""}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
               )}
             </div>
           )}
@@ -874,100 +1019,85 @@ export default function SessionsPage() {
                 </div>
               ) : (
                 <>
-                  {/* Desktop view - Table */}
-                  <div className="hidden md:block">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/20 hover:bg-muted/30">
-                          <TableHead className="w-[250px] font-semibold">Session Name</TableHead>
-                          <TableHead className="font-semibold">Friend</TableHead>
-                          <TableHead className="font-semibold">Night Lord</TableHead>
-                          <TableHead className="font-semibold">Experience</TableHead>
-                          <TableHead className="font-semibold">Players</TableHead>
-                          <TableHead className="text-right font-semibold">Action</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredFriendsSessions.map((session) => {
-                          const host = session.joinedPlayers.find(player => player.userId === session.hostId);
-                          return (
-                            <TableRow key={session.id} className="hover:bg-muted/10 transition-colors">
-                              <TableCell className="font-medium">{session.name}</TableCell>
-                              <TableCell>{getHostName(session)}</TableCell>
-                              <TableCell>
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
-                                  {session.nightLord}
-                                </span>
-                                {session.isFriendsOnly && (
-                                  <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
-                                    Friends Only
+                  {/* Friends tab table view */}
+                  {activeTab === "friends" && (
+                    <div className="hidden md:block">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/20 hover:bg-muted/30">
+                            <TableHead className="w-[250px] font-semibold">Session Name</TableHead>
+                            <TableHead className="font-semibold">Friend</TableHead>
+                            <TableHead className="font-semibold">Night Lord</TableHead>
+                            <TableHead className="font-semibold">Experience</TableHead>
+                            <TableHead className="font-semibold">Players</TableHead>
+                            <TableHead className="text-right font-semibold">Action</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {friendsSessions.map((session) => {
+                            const host = session.joinedPlayers.find(player => player.userId === session.hostId);
+                            const isFullSession = session.joinedPlayers.length >= MAX_PLAYERS;
+                            return (
+                              <TableRow key={session.id} className="hover:bg-muted/10 transition-colors">
+                                <TableCell className="font-medium">
+                                  <div className="flex items-center gap-2">
+                                    <div className={`w-2 h-2 rounded-full ${isFullSession ? 'bg-yellow-500' : 'bg-green-500'}`}></div>
+                                    {session.name}
+                                     {session.isFriendsOnly && (
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
+                                        Friends
+                                      </span>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{getHostName(session)}</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-1">
+                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                      {session.nightLord}
+                                    </span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">
+                                    {host?.experience || "Unknown"}
                                   </span>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">
-                                  {host?.experience || "Unknown"}
-                                </span>
-                              </TableCell>
-                              <TableCell>
-                                {session.joinedPlayers.length}/{MAX_PLAYERS}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <Button 
-                                  size="sm"
-                                  className="bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-700 hover:to-indigo-600"
-                                  onClick={() => handleJoinSession(session.id)}
-                                >
-                                  Join Friend
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-1">
+                                    <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                                      <div className="bg-gradient-to-r from-purple-600 to-indigo-500 h-2.5 rounded-full" style={{ width: `${(session.joinedPlayers.length / MAX_PLAYERS) * 100}%` }}></div>
+                                    </div>
+                                    <span className="text-xs ml-2">{session.joinedPlayers.length}/{MAX_PLAYERS}</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button 
+                                    size="sm"
+                                    className="bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-700 hover:to-indigo-600"
+                                    onClick={() => handleJoinSession(session.id)}
+                                    disabled={isFullSession}
+                                  >
+                                    {isFullSession ? "Full" : "Join Friend"}
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
 
                   {/* Mobile view - Cards */}
                   <div className="grid grid-cols-1 gap-4 p-4 md:hidden">
-                    {filteredFriendsSessions.map((session) => {
-                      const host = session.joinedPlayers.find(player => player.userId === session.hostId);
+                    {friendsSessions.map((session) => {
                       return (
-                        <div key={session.id} className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-shadow hover:border-purple-500/30">
-                          <div className="flex justify-between items-start mb-2">
-                            <h3 className="font-medium text-base truncate">{session.name}</h3>
-                            <div className="flex flex-wrap gap-1">
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
-                                {session.nightLord}
-                              </span>
-                              {session.isFriendsOnly && (
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
-                                  Friends Only
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="text-sm text-muted-foreground mb-3">
-                            <div className="flex justify-between mb-1">
-                              <p>Friend: {getHostName(session)}</p>
-                              <p>Players: {session.joinedPlayers.length}/{MAX_PLAYERS}</p>
-                            </div>
-                            <div>
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">
-                                {host?.experience || "Unknown"}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="mt-3">
-                            <Button 
-                              size="sm"
-                              className="w-full bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-700 hover:to-indigo-600"
-                              onClick={() => handleJoinSession(session.id)}
-                            >
-                              Join Friend
-                            </Button>
-                          </div>
-                        </div>
+                        <SessionCard key={session.id} session={session} onJoin={handleJoinSession} />
                       );
                     })}
                   </div>
@@ -990,28 +1120,45 @@ export default function SessionsPage() {
                           
                           {/* Hide page numbers on small screens */}
                           <div className="hidden sm:flex">
-                            {Array.from({ length: friendsTotalPages }, (_, i) => i + 1).map((page) => (
-                              <PaginationItem key={page}>
-                                <PaginationLink 
-                                  href="#" 
-                                  size="default"
-                                  onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                                    e.preventDefault();
-                                    setFriendsCurrentPage(page);
-                                  }}
-                                  isActive={friendsCurrentPage === page}
-                                >
-                                  {page}
-                                </PaginationLink>
-                              </PaginationItem>
-                            ))}
+                            {getVisiblePageNumbers(friendsCurrentPage, friendsTotalPages).map((page, index) => {
+                              // If the value is null, render ellipsis
+                              if (page === null) {
+                                return (
+                                  <PaginationItem key={`ellipsis-${index}`}>
+                                    <span className="px-4 text-gray-500">...</span>
+                                  </PaginationItem>
+                                );
+                              }
+                              
+                              // Otherwise render the page number button
+                              return (
+                                <PaginationItem key={page}>
+                                  <PaginationLink 
+                                    href="#" 
+                                    size="default"
+                                    onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                                      e.preventDefault();
+                                      setFriendsCurrentPage(page);
+                                    }}
+                                    isActive={friendsCurrentPage === page}
+                                  >
+                                    {page}
+                                  </PaginationLink>
+                                </PaginationItem>
+                              );
+                            })}
                           </div>
                           
                           {/* Show current page indicator on mobile */}
                           <div className="flex sm:hidden items-center px-2">
                             <span className="text-sm">
-                              Page {friendsCurrentPage} of {friendsTotalPages}
+                              Page {friendsCurrentPage} of {friendsTotalPages} ({friendsTotalItems} sessions)
                             </span>
+                          </div>
+                          
+                          {/* Show total items on desktop */}
+                          <div className="hidden sm:flex items-center px-2 text-sm text-muted-foreground">
+                            {friendsTotalItems} total friends&apos; sessions
                           </div>
                           
                           <PaginationItem>

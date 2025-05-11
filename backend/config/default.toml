@@ -5,6 +5,8 @@ url = "mongodb://localhost:27017"
 
 [jwt]
 secret = "malenia_is_the_best_girl_in_the_world"
+email_secret = "promised_consort_radahn"
+reset_password_secret = "dancing_lion_in_the_wind"
 # Duration formats:
 # - "30s" = 30 seconds
 # - "10m" = 10 minutes
@@ -15,7 +17,7 @@ expires_in = "12h"
 [server]
 port = 8080
 host = "0.0.0.0"
-workers = 1
+workers = 2
 
 [domain]
 primary = "localhost"
@@ -29,8 +31,8 @@ use_websockets = true
 session_inactive_timeout = 86400 # 24 hours
 
 [chat]
-cleanup_interval_seconds = 3600 # 1 hour (3600 seconds)
-inactive_seconds = 3600 # 1 hour (3600 seconds)
+cleanup_interval_seconds = 86400 # 1 day (86400 seconds)
+inactive_seconds = 86400 # 1 day (86400 seconds)
 
 [auth]
 # Exclude patterns format: [path, method, is_regex]
@@ -42,10 +44,18 @@ exclude_patterns = [
     { path = "/api/docs/.*", method = "GET", is_regex = true },
     { path = "/api-docs/.*", method = "GET", is_regex = true },
     { path = "/api/v1/game-data", method = "GET", is_regex = false },
+    # statistics
     { path = "/api/v1/statistics/sessions-stats", method = "GET", is_regex = false },
     { path = "/api/v1/statistics/leaderboard", method = "GET", is_regex = false },
     { path = "/api/v1/statistics/covenants", method = "GET", is_regex = false },
     { path = "/api/v1/public/sessions", method = "GET", is_regex = false },
+    # Dropdown data
+    { path = "/api/v1/night-lords", method = "GET", is_regex = false },
+    # Verify email
+    { path = "/api/v1/verify-email", method = "POST", is_regex = false },
+    # Reset password
+    { path = "/api/v1/reset-password-email", method = "POST", is_regex = false },
+    { path = "/api/v1/reset-password", method = "POST", is_regex = false },
     # Uncomment to allow WebSocket and SSE connections without auth
     # (they use token in query parameter instead)
     { path = "/api/v1/ws/.*", method = "GET", is_regex = true },
@@ -59,3 +69,10 @@ exclude_patterns = [
     { path = "/api/v1/news/.*", method = "GET", is_regex = true },
     { path = "/api/v1/announcements/current", method = "GET", is_regex = false },
 ] 
+
+[email]
+frontend_url = "http://localhost"
+# MailerSend configuration - these values should be overridden in environment-specific configs
+# mailersend_url = "https://api.mailersend.com/v1/email"
+# from_email = "noreply@covenant-match.com"
+# from_name = "Covenant Match" 

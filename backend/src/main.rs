@@ -21,44 +21,16 @@ use log::{info, warn};
 use middleware::auth::Auth;
 use mongodb::{options::ClientOptions, Client};
 use routes::{chat, game_data, sessions};
-use services::{auth_service, chat_service, session_service, user_service};
+use services::{chat_service, session_service, user_service};
 use sse::heartbeat::HeartbeatActor;
 use sse::partition::{SessionRouter, DEFAULT_PARTITION_COUNT};
 use sse::session_pruner::SessionPrunerActor;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::Mutex;
 use tokio::task;
 use utoipa_swagger_ui::SwaggerUi;
 use ws::session::SessionManager as WsSessionManager;
 
-/// Starts a background task to periodically clean up old login attempts
-fn start_login_attempts_cleanup(db: mongodb::Database) {
-    let db = Arc::new(Mutex::new(db));
-
-    task::spawn(async move {
-        let cleanup_interval_hours = std::env::var("LOGIN_ATTEMPTS_CLEANUP_INTERVAL_HOURS")
-            .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .unwrap_or(24); // Default: run once per day
-
-        loop {
-            // Sleep first to avoid cleanup immediately on startup
-            tokio::time::sleep(Duration::from_secs(cleanup_interval_hours * 60 * 60)).await;
-
-            info!("Running scheduled cleanup of old login attempts");
-            let db_lock = db.lock().await;
-
-            match auth_service::cleanup_old_attempts(&db_lock).await {
-                Ok(count) => info!("Cleaned up {} old login attempt records", count),
-                Err(e) => warn!("Failed to clean up old login attempts: {:?}", e),
-            }
-
-            // Release the lock
-            drop(db_lock);
-        }
-    });
-}
 
 /// Starts a background task to periodically clean up inactive chat sessions
 fn start_chat_cleanup(chat_service: Arc<chat_service::ChatService>) {
@@ -147,10 +119,6 @@ async fn main() -> std::io::Result<()> {
     info!("Successfully connected to MongoDB!");
 
     let db = client.database("covenant-match");
-
-    // Start the periodic cleanup of old login attempts
-    start_login_attempts_cleanup(db.clone());
-    info!("Started periodic cleanup task for login attempts");
 
     // Initialize database with error handling
     info!("About to initialize database and seed data...");

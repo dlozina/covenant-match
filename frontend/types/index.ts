@@ -2,7 +2,6 @@ export interface User {
   id: string;
   username: string;
   email: string;
-  displayName?: string;
   avatarUrl?: string;
   createdAt: string;
 }
@@ -10,6 +9,7 @@ export interface User {
 export interface GameSession {
   id: string;
   hostId: string;
+  hostExperience: string;
   password?: string;
   character: string;
   status: 'open' | 'full' | 'in_progress' | 'completed' | 'cancelled';

@@ -53,6 +53,7 @@ export interface MinimalSession {
   hostName: string;
   status: "Open" | "InProgress" | "Completed";
   createdAt: string;
+  joinedPlayers: { username: string; experience: string }[];
 }
 
 // Types for leaderboard
@@ -187,7 +188,7 @@ export interface NewsItem {
 // Types for user statistics
 export interface UserStats {
   userId: string;
-  displayName: string;
+  username: string;
   platform: string;
   covenantName: string;
   experience: string;
@@ -240,6 +241,13 @@ export interface BugReportDetailResponse {
   data: {
     bug: BugReport;
   };
+}
+
+// Game data interfaces
+export interface ExperienceData {
+  id: string;
+  name: string;
+  description: string;
 }
 
 // Function to fetch leaderboard data
@@ -480,7 +488,9 @@ export const fetchSessions = async (
   limit: number,
   statusFilter: string,
   region?: string,
-  platform?: string
+  platform?: string,
+  nightLordFilter?: string,
+  experienceFilter?: string
 ): Promise<{ sessions?: Session[], minimalSessions?: MinimalSession[] }> => {
   try {
     // For logged-in users, ensure we have region data before proceeding
@@ -501,9 +511,11 @@ export const fetchSessions = async (
     // Add region and platform parameters if provided
     const regionParam = region ? `&region=${encodeURIComponent(region)}` : '';
     const platformParam = platform ? `&platform=${encodeURIComponent(platform)}` : '';
+    const nightLordParam = nightLordFilter ? `&nightLord=${encodeURIComponent(nightLordFilter)}` : '';
+    const experienceParam = experienceFilter ? `&experience=${encodeURIComponent(experienceFilter)}` : '';
     
     // Log API request parameters for debugging
-    console.log(`Fetching sessions with params - status: ${formattedStatus}, region: ${region}, platform: ${platform}`);
+    console.log(`Fetching sessions with params - status: ${formattedStatus}, region: ${region}, platform: ${platform}, nightLord: ${nightLordFilter}, experience: ${experienceFilter}`);
     
     // Different endpoints based on authentication status
     if (isLoggedIn && token) {
@@ -511,7 +523,7 @@ export const fetchSessions = async (
       // Always set isPrivate=false to ensure we never show private sessions
       const isPrivateParam = '&isPrivate=false';
       
-      const response = await fetch(`${API_URL}/api/v1/sessions?limit=${limit}&offset=${offset}${statusParam}${isPrivateParam}${regionParam}${platformParam}`, {
+      const response = await fetch(`${API_URL}/api/v1/sessions?limit=${limit}&offset=${offset}${statusParam}${isPrivateParam}${regionParam}${platformParam}${nightLordParam}${experienceParam}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -558,8 +570,25 @@ export interface SessionDetails {
   joinedPlayers?: { userId: string; username: string; nightfarer: string; experience: string }[];
 }
 
+// Extract MongoDB ObjectId helper
+const extractMongoId = (id: string | object | null | undefined): string => {
+  if (!id) return '';
+  
+  if (typeof id === 'object') {
+    // Check if it's a MongoDB ObjectId format with $oid property
+    if (id !== null && '$oid' in id) {
+      // @ts-expect-error - We know $oid exists based on the check above
+      return id.$oid;
+    }
+    // Fall back to String() for other object types
+    return String(id);
+  }
+  
+  return id;
+};
+
 // Function to fetch detailed information about a specific session
-export const fetchSessionDetail = async (sessionId: string | null | undefined): Promise<SessionDetails> => {
+export const fetchSessionDetail = async (sessionId: string | object | null | undefined): Promise<SessionDetails> => {
   if (!sessionId) {
     throw new Error('Session ID is required');
   }
@@ -567,7 +596,11 @@ export const fetchSessionDetail = async (sessionId: string | null | undefined): 
   try {
     const token = getToken();
     
-    const response = await fetch(`${API_URL}/api/v1/sessions/${sessionId}`, {
+    // Use helper to extract MongoDB ObjectId
+    const sessionIdString = extractMongoId(sessionId);
+    console.log('Fetching session with ID:', sessionIdString);
+    
+    const response = await fetch(`${API_URL}/api/v1/sessions/${sessionIdString}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`
@@ -585,44 +618,20 @@ export const fetchSessionDetail = async (sessionId: string | null | undefined): 
   }
 };
 
-// Function to recreate a session
-export const recreateSession = async (originalSessionId: string | null | undefined): Promise<{ id: string }> => {
-  if (!originalSessionId) {
-    throw new Error('Original session ID is required');
-  }
-  
-  try {
-    const token = getToken();
-    
-    const response = await fetch(`${API_URL}/api/v1/sessions/${originalSessionId}/recreate`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
-    });
-    
-    if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.message || 'Failed to recreate session');
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Failed to recreate session:', error);
-    throw error;
-  }
-};
-
 // Function to update session characters
 export const updateSessionCharacters = async (
-  sessionId: string, 
+  sessionId: string | object, 
   nightLord: string, 
   hostNightfarer: string
 ): Promise<void> => {
   try {
     const token = getToken();
     
-    const response = await fetch(`${API_URL}/api/v1/sessions/${sessionId}`, {
+    // Use helper to extract MongoDB ObjectId
+    const sessionIdString = extractMongoId(sessionId);
+    console.log('Updating characters for session with ID:', sessionIdString);
+    
+    const response = await fetch(`${API_URL}/api/v1/sessions/${sessionIdString}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -644,53 +653,16 @@ export const updateSessionCharacters = async (
   }
 };
 
-// Function to join a session
-export const joinSession = async (
-  sessionId: string,
-  nightfarer: string,
-  userId: string,
-  username: string,
-  covenantName: string,
-  region: string,
-  platform: string,
-  experience: string,
-): Promise<void> => {
+// Function to leave a session
+export const leaveSession = async (sessionId: string | object): Promise<void> => {
   try {
     const token = getToken();
     
-    const response = await fetch(`${API_URL}/api/v1/sessions/${sessionId}/join`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        nightfarer,
-        userId,
-        username,
-        covenantName,
-        region,
-        platform,
-        experience
-      }),
-    });
+    // Use helper to extract MongoDB ObjectId
+    const sessionIdString = extractMongoId(sessionId);
+    console.log('Leaving session with ID:', sessionIdString);
     
-    if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.message || 'Failed to join session');
-    }
-  } catch (error) {
-    console.error('Failed to join session:', error);
-    throw error;
-  }
-};
-
-// Function for a player to leave a session
-export const leaveSession = async (sessionId: string): Promise<void> => {
-  try {
-    const token = getToken();
-    
-    const response = await fetch(`${API_URL}/api/v1/sessions/${sessionId}/leave`, {
+    const response = await fetch(`${API_URL}/api/v1/sessions/${sessionIdString}/leave`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`
@@ -707,12 +679,48 @@ export const leaveSession = async (sessionId: string): Promise<void> => {
   }
 };
 
-// Function for a host to cancel/delete a session
-export const cancelSession = async (sessionId: string): Promise<void> => {
+// Function to recreate a session
+export const recreateSession = async (originalSessionId: string | object | null | undefined): Promise<{ id: string }> => {
+  if (!originalSessionId) {
+    throw new Error('Original session ID is required');
+  }
+  
   try {
     const token = getToken();
     
-    const response = await fetch(`${API_URL}/api/v1/sessions/${sessionId}/cancel`, {
+    // Use helper to extract MongoDB ObjectId
+    const sessionIdString = extractMongoId(originalSessionId);
+    console.log('Recreating session with original ID:', sessionIdString);
+    
+    const response = await fetch(`${API_URL}/api/v1/sessions/${sessionIdString}/recreate`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.message || 'Failed to recreate session');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to recreate session:', error);
+    throw error;
+  }
+};
+
+// Function for a host to cancel/delete a session
+export const cancelSession = async (sessionId: string | object): Promise<void> => {
+  try {
+    const token = getToken();
+    
+    // Use helper to extract MongoDB ObjectId
+    const sessionIdString = extractMongoId(sessionId);
+    console.log('Cancelling session with ID:', sessionIdString);
+    
+    const response = await fetch(`${API_URL}/api/v1/sessions/${sessionIdString}/cancel`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`
@@ -808,7 +816,7 @@ export interface RegisterParams {
   username: string;
   email: string;
   password: string;
-  displayName: string;
+
   region: string;
   platform: string;
   autoRegion: boolean;
@@ -819,7 +827,6 @@ export interface RegisterParams {
 export interface UpdateProfileParams {
   username?: string;
   email?: string;
-  displayName?: string;
   region?: string;
   platform?: string;
   autoRegion?: boolean;
@@ -1332,6 +1339,73 @@ export const getBugReportsByUserId = async (userId: string): Promise<BugReport[]
     return data.data.bugs;
   } catch (error) {
     console.error('Failed to fetch bug reports by user ID:', error);
+    throw error;
+  }
+};
+
+// Function to join a session
+export const joinSession = async (
+  sessionId: string | object,
+  nightfarer: string,
+  userId: string,
+  username: string,
+  covenantName: string,
+  region: string,
+  platform: string,
+  experience: string,
+): Promise<void> => {
+  try {
+    const token = getToken();
+    
+    // Use helper to extract MongoDB ObjectId
+    const sessionIdString = extractMongoId(sessionId);
+    console.log('Joining session with ID:', sessionIdString);
+    
+    const response = await fetch(`${API_URL}/api/v1/sessions/${sessionIdString}/join`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        nightfarer,
+        userId,
+        username,
+        covenantName,
+        region,
+        platform,
+        experience
+      }),
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.message || 'Failed to join session');
+    }
+  } catch (error) {
+    console.error('Failed to join session:', error);
+    throw error;
+  }
+};
+
+// Function to fetch experience levels
+export const fetchExperienceLevels = async (): Promise<ExperienceData[]> => {
+  try {
+    const response = await fetch(`${API_URL}/api/v1/game/data`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error fetching game data: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.experiences || [];
+  } catch (error) {
+    console.error('Failed to fetch experience levels:', error);
     throw error;
   }
 }; 

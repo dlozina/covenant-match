@@ -9,6 +9,7 @@ import { MainLayout } from "@/components/layout"
 import { Footer } from "@/components/layout/Footer"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
+import { Info } from "lucide-react"
 import {
   Form,
   FormControl,
@@ -99,11 +100,6 @@ const profileFormSchema = z.object({
   passwordConfirm: z
     .string()
     .min(1, { message: "Password confirmation is required" }),
-  displayName: z
-    .string()
-    .min(3, { message: "Display name must be at least 3 characters" })
-    .max(8, { message: "Display name must not be longer than 8 characters" })
-    .trim(),
   region: z
     .string()
     .min(1, { message: "Region is required" }),
@@ -134,7 +130,6 @@ export default function CreateProfilePage() {
   
   // Character counter states
   const [usernameLength, setUsernameLength] = useState(0)
-  const [displayNameLength, setDisplayNameLength] = useState(0)
   
   // Debounce timer references
   const [validationTimeout, setValidationTimeout] = useState<NodeJS.Timeout | null>(null)
@@ -177,7 +172,6 @@ export default function CreateProfilePage() {
       email: "",
       password: "",
       passwordConfirm: "",
-      displayName: "",
       region: "",
       platform: "",
       autoRegion: true,
@@ -210,9 +204,6 @@ export default function CreateProfilePage() {
     const subscription = form.watch((value, { name }) => {
       if (name === 'username' && value.username) {
         setUsernameLength(value.username.length);
-      }
-      if (name === 'displayName' && value.displayName) {
-        setDisplayNameLength(value.displayName.length);
       }
     });
     
@@ -249,7 +240,6 @@ export default function CreateProfilePage() {
         username: data.username.trim().toLowerCase(),
         email: data.email.trim().toLowerCase(),
         password: data.password, // passwords should not be modified
-        displayName: data.displayName.trim(),
         region: data.region,
         platform: data.platform,
         autoRegion: data.autoRegion,
@@ -412,37 +402,6 @@ export default function CreateProfilePage() {
                         </FormControl>
                         <FormDescription className="text-xs md:text-sm">
                           Re-enter your password to confirm.
-                        </FormDescription>
-                        <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="displayName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <div className="flex justify-between items-center">
-                          <FormLabel className="text-sm md:text-base">Display Name</FormLabel>
-                          <span className={`text-xs ${displayNameLength > 8 ? 'text-red-500' : 'text-muted-foreground'}`}>
-                            {displayNameLength} / 8
-                          </span>
-                        </div>
-                        <FormControl>
-                          <Input 
-                            placeholder="Display Name" 
-                            {...field} 
-                            className="h-10"
-                            onChange={(e) => {
-                              field.onChange(e);
-                              setDisplayNameLength(e.target.value.length);
-                              debouncedValidate('displayName');
-                            }}
-                          />
-                        </FormControl>
-                        <FormDescription className="text-xs md:text-sm">
-                          3-8 characters. This is how other users will see you.
                         </FormDescription>
                         <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
                       </FormItem>
@@ -616,7 +575,14 @@ export default function CreateProfilePage() {
                   notification={notification} 
                   onDismiss={clearNotification}
                 />
-
+                <div className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm bg-muted/50">
+                  <div className="flex items-center space-x-3">
+                    <Info className="text-primary h-5 w-5" />
+                    <div className="text-sm text-muted-foreground">
+                      After creating your profile, you will receive an email to verify your account. Please check your spam folder if you do not see it in your inbox.
+                    </div>
+                  </div>
+                </div>
                 <Button 
                   type="submit" 
                   disabled={isLoading}

@@ -132,7 +132,6 @@ pub struct ChatMessageResponseDto {
 #[serde(rename_all = "camelCase")]
 pub struct UserInfoDto {
     pub username: Option<String>,
-    pub display_name: Option<String>,
     pub email: Option<String>,
     pub role: Option<String>,
     pub avatar_url: Option<String>,
@@ -520,6 +519,7 @@ mod tests {
             id: mongodb::bson::oid::ObjectId::new(),
             name: "Test Session".to_string(),
             host_id: "user123".to_string(),
+            host_experience: "Beginner".to_string(),
             region: "Europe".to_string(),
             platform: "PlayStation".to_string(),
             password: "test".to_string(),
@@ -581,5 +581,72 @@ mod tests {
         assert!(!dto.updated_at.is_empty());
         assert!(dto.started_at.is_some());
         assert!(dto.completed_at.is_some());
+    }
+}
+
+// Login Attempts models
+
+/// Parameters for login attempts query
+#[derive(serde::Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LoginAttemptsQuery {
+    pub page: Option<u64>,
+    pub limit: Option<u64>,
+    pub username: Option<String>,
+    pub status: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct LoginAttempt {
+    #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
+    pub id: Option<mongodb::bson::oid::ObjectId>,
+    pub username: String,
+    pub ip_address: String,
+    pub created_at: mongodb::bson::DateTime,
+    pub successful: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LoginAttemptDTO {
+    pub id: String,
+    pub username: String,
+    pub ip_address: String,
+    pub created_at: String,
+    pub successful: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LoginAttemptsResponse {
+    pub status: String,
+    pub data: LoginAttemptsData,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LoginAttemptsData {
+    pub login_attempts: Vec<LoginAttemptDTO>,
+    pub pagination: AdminSessionsPaginationResponse,
+}
+
+// Implement conversion from LoginAttempt to LoginAttemptDTO
+impl From<LoginAttempt> for LoginAttemptDTO {
+    fn from(attempt: LoginAttempt) -> Self {
+        let id = attempt.id.map_or_else(String::new, |oid| oid.to_hex());
+
+        // Convert MongoDB DateTime to ISO string
+        let created_at =
+            chrono::DateTime::from_timestamp_millis(attempt.created_at.timestamp_millis())
+                .unwrap_or_else(|| chrono::Utc::now())
+                .to_rfc3339();
+
+        LoginAttemptDTO {
+            id,
+            username: attempt.username,
+            ip_address: attempt.ip_address,
+            created_at,
+            successful: attempt.successful,
+        }
     }
 }

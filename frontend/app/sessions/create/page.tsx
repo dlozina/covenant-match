@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Check, ChevronsUpDown } from "lucide-react";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -37,6 +37,20 @@ import {
   CreateSessionParams
 } from "@/utils/api";
 import { sessionService } from "@/utils/api/session-service";
+import { cn } from "@/lib/utils";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 // Type for our notification state
 type NotificationType = {
@@ -56,7 +70,7 @@ const sessionFormSchema = z.object({
     .min(1, { message: "Password is required" })
     .max(6, { message: "Password must not be longer than 6 characters" })
     .trim(),
-  sessionType: z.enum(["regular", "friends-only"])
+  sessionType: z.enum(["regular", "friends-only", "private"])
 });
 
 type SessionFormValues = z.infer<typeof sessionFormSchema>;
@@ -69,19 +83,81 @@ export default function CreateSessionPage() {
   );
 }
 
+function CharacterComboBox({
+  characters,
+  selectedValue,
+  onSelect,
+  placeholder,
+  emptyMessage,
+}: {
+  characters: { id: string; name: string }[];
+  selectedValue: string | null;
+  onSelect: (value: string) => void;
+  placeholder: string;
+  emptyMessage: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between h-10"
+        >
+          {selectedValue
+            ? characters.find((char) => char.name === selectedValue)?.name || placeholder
+            : placeholder}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-full p-0">
+        <Command>
+          <CommandInput placeholder={`Search ${placeholder.toLowerCase()}...`} />
+          <CommandList>
+            <CommandEmpty>{emptyMessage}</CommandEmpty>
+            <CommandGroup>
+              {characters.map((character) => (
+                <CommandItem
+                  key={character.id}
+                  value={character.name}
+                  onSelect={(currentValue) => {
+                    onSelect(currentValue);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 h-4 w-4",
+                      selectedValue === character.name ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {character.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function CreateSessionContent() {
+  const { userData } = useAuth();
   const [selectedLord, setSelectedLord] = useState<string | null>(null);
-  const [selectedFarer, setSelectedFarer] = useState<string | null>(null);
+  const [selectedFarer, setSelectedFarer] = useState<string | null>(userData?.preferredNightfarer || null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [notification, setNotification] = useState<NotificationType | null>(null);
   const [nightLords, setNightLords] = useState<NightLord[]>([]);
   const [nightfarers, setNightfarers] = useState<Nightfarer[]>([]);
   const [isLoadingCharacters, setIsLoadingCharacters] = useState<boolean>(true);
-  const { userData } = useAuth();
   
   // Character counter states
-  const [sessionNameLength, setSessionNameLength] = useState(0);
-  const [passwordLength, setPasswordLength] = useState(0);
+  const [sessionNameLength, setSessionNameLength] = useState(userData?.preferredSessionName?.length || 0);
+  const [passwordLength, setPasswordLength] = useState(userData?.preferredSessionPassword?.length || 0);
   
   // Debounce timer reference
   const [validationTimeout, setValidationTimeout] = useState<NodeJS.Timeout | null>(null);
@@ -91,8 +167,8 @@ function CreateSessionContent() {
   const form = useForm<SessionFormValues>({
     resolver: zodResolver(sessionFormSchema),
     defaultValues: {
-      sessionName: "",
-      password: "",
+      sessionName: userData?.preferredSessionName || "",
+      password: userData?.preferredSessionPassword || "",
       sessionType: "regular"
     },
     mode: "onBlur", // Only validate on blur and submit for better UX
@@ -219,7 +295,7 @@ function CreateSessionContent() {
         name: data.sessionName.trim(),
         nightLord: selectedLord,
         nightfarer: selectedFarer,
-        isPrivate: false,
+        isPrivate: data.sessionType === "private",
         isFriendsOnly: data.sessionType === "friends-only",
         region: userRegion,
         platform: userPlatform
@@ -329,7 +405,7 @@ function CreateSessionContent() {
                         </div>
                         <FormControl>
                           <Input 
-                            placeholder="Enter an in-game password for your session" 
+                            placeholder="Enter an in-game password" 
                             className="w-full h-10"
                             {...field}
                             onChange={(e) => {
@@ -362,19 +438,44 @@ function CreateSessionContent() {
                           <SelectContent>
                             <SelectItem value="regular">Regular Session</SelectItem>
                             <SelectItem value="friends-only">Friends Only</SelectItem>
+                            <SelectItem value="private">Private Session</SelectItem>
                           </SelectContent>
                         </Select>
                         <p className="text-xs mt-1 text-muted-foreground">
                           {field.value === "friends-only" 
                             ? "Friends Only: Your session will only be visible to your friends in the Friends tab."
-                            : "Regular: Your session will be visible to all players in the general sessions list."}
+                            : field.value === "private"
+                              ? "Private: Your session will be visible only to you. Share the session link with your friends to join."
+                              : "Regular: Your session will be visible to all players in the general sessions list."}
                         </p>
                         <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
                       </FormItem>
                     )}
                   />
 
-                  <div className="space-y-2">
+                  {/* Mobile: ComboBox for Nightfarer selection */}
+                  <div className="space-y-2 md:hidden">
+                    <label className="text-sm md:text-base font-medium">
+                      Select Nightfarer
+                    </label>
+                    {isLoadingCharacters ? (
+                      <div className="text-center py-4">Loading Nightfarers...</div>
+                    ) : (
+                      <CharacterComboBox
+                        characters={nightfarers}
+                        selectedValue={selectedFarer}
+                        onSelect={setSelectedFarer}
+                        placeholder="Select Nightfarer..."
+                        emptyMessage="No Nightfarer found."
+                      />
+                    )}
+                    {!selectedFarer && form.formState.isSubmitted && (
+                      <p className="text-xs sm:text-sm text-red-600 font-medium mt-1">Please select a Nightfarer</p>
+                    )}
+                  </div>
+
+                  {/* Desktop: Grid for Nightfarer selection */}
+                  <div className="space-y-2 hidden md:block">
                     <label className="text-sm md:text-base font-medium">
                       Select Nightfarer
                     </label>
@@ -403,7 +504,29 @@ function CreateSessionContent() {
                     )}
                   </div>
 
-                  <div className="space-y-2">
+                  {/* Mobile: ComboBox for Night Lord selection */}
+                  <div className="space-y-2 md:hidden">
+                    <label className="text-sm md:text-base font-medium">
+                      Select Night Lord
+                    </label>
+                    {isLoadingCharacters ? (
+                      <div className="text-center py-4">Loading Night Lords...</div>
+                    ) : (
+                      <CharacterComboBox
+                        characters={nightLords}
+                        selectedValue={selectedLord}
+                        onSelect={setSelectedLord}
+                        placeholder="Select Night Lord..."
+                        emptyMessage="No Night Lord found."
+                      />
+                    )}
+                    {!selectedLord && form.formState.isSubmitted && (
+                      <p className="text-xs sm:text-sm text-red-600 font-medium mt-1">Please select a Night Lord</p>
+                    )}
+                  </div>
+
+                  {/* Desktop: Grid for Night Lord selection */}
+                  <div className="space-y-2 hidden md:block">
                     <label className="text-sm md:text-base font-medium">
                       Select Night Lord
                     </label>
@@ -447,7 +570,7 @@ function CreateSessionContent() {
 
                   <div className="pt-4">
                     <Button 
-                      className="w-full h-10" 
+                      className="w-full h-10 bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-700 hover:to-indigo-600" 
                       type="submit"
                       disabled={isLoading}
                     >

@@ -1,12 +1,15 @@
 use crate::models::error::AppError;
 use crate::models::geo_location::GeoLocation;
+use crate::models::token::TokenPurpose;
 use crate::models::user::{
     CreateUserDto, Experience, FriendDto, LoginUserDto, UpdateUserProfileDto, User, UserResponse,
 };
+use crate::repository::token_repository;
 use crate::repository::user_repository;
+use crate::services::email_service;
 use crate::utils::jwt;
 use bcrypt::{hash, verify, DEFAULT_COST};
-use log::{info, warn};
+use log::{error, info, warn};
 use mongodb::bson::oid::ObjectId;
 use mongodb::{bson::doc, Database};
 
@@ -22,16 +25,6 @@ pub async fn create_user(
         .is_some()
     {
         return Err(AppError::UserAlreadyExists);
-    }
-
-    // Check if display name already exists (if provided)
-    if let Some(display_name) = &user_data.display_name {
-        if user_repository::find_by_display_name(db, display_name)
-            .await?
-            .is_some()
-        {
-            return Err(AppError::DisplayNameAlreadyInUse);
-        }
     }
 
     // Hash the password
@@ -52,7 +45,6 @@ pub async fn create_user(
         username: user_data.username,
         email: user_data.email,
         password_hash,
-        display_name: user_data.display_name,
         avatar_url: None,
         region: user_data.region,
         platform: user_data.platform,
@@ -66,19 +58,31 @@ pub async fn create_user(
         preferred_nightfarer: user_data.preferred_nightfarer,
         role,
         disabled: false,
+        email_verified: false,
         created_at: now,
         updated_at: now,
         friend_list: Vec::new(),
     };
 
     // Save the user to the database
-    user_repository::create_user(db, &user).await?;
+    let created_user = user_repository::create_user(db, &user).await?;
+
+    let email_verification_token =
+        jwt::generate_email_verification_token(&created_user.id.to_string(), &created_user.email)
+            .map_err(|e| AppError::InternalError(e.to_string()))?;
+
+    // Store the email verification token in the database
+    token_repository::create_token(db, &email_verification_token).await?;
+
+    // Send email verification email
+    email_service::send_verification_email(&created_user.email, &email_verification_token)
+        .await
+        .map_err(|e| AppError::InternalError(e.to_string()))?;
 
     Ok(UserResponse {
         id: user.id.to_hex(),
         username: user.username,
         email: user.email,
-        display_name: user.display_name,
         avatar_url: user.avatar_url,
         region: user.region,
         cm_region: user.cm_region,
@@ -89,6 +93,7 @@ pub async fn create_user(
         experience: user.experience,
         role: user.role,
         disabled: user.disabled,
+        email_verified: user.email_verified,
         preferred_session_name: user.preferred_session_name,
         preferred_session_password: user.preferred_session_password,
         preferred_nightfarer: user.preferred_nightfarer,
@@ -115,6 +120,16 @@ pub async fn login_user(
         return Err(AppError::InvalidCredentials);
     }
 
+    // Check if the user's email is verified
+    if !user.email_verified {
+        return Err(AppError::EmailNotVerified);
+    }
+
+    // Check if the account is disabled
+    if user.disabled {
+        return Err(AppError::AccountDisabled);
+    }
+
     // Generate JWT token with the user's role
     let token = jwt::generate_token(&user.id, &user.role)?;
 
@@ -123,7 +138,6 @@ pub async fn login_user(
         id: user.id.to_hex(),
         username: user.username,
         email: user.email,
-        display_name: user.display_name,
         avatar_url: user.avatar_url,
         region: user.region,
         auto_region: user.auto_region,
@@ -134,6 +148,7 @@ pub async fn login_user(
         experience: user.experience,
         role: user.role,
         disabled: user.disabled,
+        email_verified: user.email_verified,
         preferred_session_name: user.preferred_session_name,
         preferred_session_password: user.preferred_session_password,
         preferred_nightfarer: user.preferred_nightfarer,
@@ -145,6 +160,85 @@ pub async fn login_user(
     Ok((token, user_response))
 }
 
+// Reset password
+pub async fn reset_password(db: &Database, user_id: &str, password: &str) -> Result<(), AppError> {
+    // Check if the user exists
+    let user = user_repository::find_user_by_id(db, user_id).await?;
+
+    if user.is_none() {
+        return Err(AppError::UserNotFound);
+    }
+
+    // Hash the password
+    let password_hash =
+        hash(password, DEFAULT_COST).map_err(|e| AppError::InternalError(e.to_string()))?;
+
+    user_repository::update_user_password(db, user_id, password_hash).await
+}
+
+// send reset password email
+pub async fn send_reset_password_email(db: &Database, email: &str) -> Result<(), AppError> {
+    let user = user_repository::find_by_email(db, email).await?;
+
+    if user.is_none() {
+        return Ok(());
+    }
+
+    let user = user.expect("User not found");
+
+    // Generate JWT token for password reset
+    let reset_password_token =
+        jwt::generate_reset_password_token(&user.id.to_string(), &user.email)
+            .map_err(|e| AppError::InternalError(e.to_string()))?;
+
+    // Delete any existing password reset tokens for this user
+    token_repository::delete_tokens_by_user_and_purpose(
+        db,
+        &user.id.to_string(),
+        TokenPurpose::PasswordReset,
+    )
+    .await?;
+
+    // Store the token in the database
+    token_repository::create_token(db, &reset_password_token).await?;
+
+    // Send the JWT token in email (not the reformatted token)
+    // We're sending the original JWT token because that's what the endpoint expects
+    email_service::send_reset_password_email(&user.email, &reset_password_token)
+        .await
+        .map_err(|e| AppError::InternalError(e.to_string()))
+}
+
+// Reset password with token validation
+pub async fn reset_password_with_token(
+    db: &Database,
+    token: &str,
+    new_password: &str,
+) -> Result<(), AppError> {
+    // This checks if it exists, hasn't expired, and hasn't been used
+    let validated_token = token_repository::validate_token(db, token).await?;
+
+    if validated_token.is_none() {
+        warn!("Token not found in database or expired");
+        return Err(AppError::InvalidOrExpiredToken);
+    }
+
+    // Reset the password
+    let result = reset_password(db, &validated_token.unwrap().user_id.to_hex(), new_password).await;
+
+    // Delete the used token regardless of password reset result
+    // This is to prevent token reuse even if there's an error later
+    match token_repository::delete_token(db, token).await {
+        Ok(user_id) => info!(
+            "Successfully deleted password reset token for user: {}",
+            user_id
+        ),
+        Err(e) => error!("Failed to delete token: {:?}", e),
+    }
+
+    result
+}
+
 pub async fn get_user_by_id(db: &Database, user_id: &str) -> Result<UserResponse, AppError> {
     let user = user_repository::find_user_by_id(db, user_id).await?;
 
@@ -153,7 +247,6 @@ pub async fn get_user_by_id(db: &Database, user_id: &str) -> Result<UserResponse
             id: user.id.to_hex(),
             username: user.username,
             email: user.email,
-            display_name: user.display_name,
             avatar_url: user.avatar_url,
             region: user.region,
             auto_region: user.auto_region,
@@ -164,6 +257,7 @@ pub async fn get_user_by_id(db: &Database, user_id: &str) -> Result<UserResponse
             experience: user.experience,
             role: user.role,
             disabled: user.disabled,
+            email_verified: user.email_verified,
             preferred_session_name: user.preferred_session_name,
             preferred_session_password: user.preferred_session_password,
             preferred_nightfarer: user.preferred_nightfarer,
@@ -186,21 +280,19 @@ pub async fn ensure_admin_exists(db: &Database) -> Result<(), AppError> {
         Ok(())
     } else {
         // Get admin credentials from environment
-        let admin_username =
-            std::env::var("ADMIN_USERNAME").unwrap_or_else(|_| "admin".to_string());
+        let admin_username = std::env::var("ADMIN_USERNAME").unwrap_or_else(|_| "akri".to_string());
         let admin_password = std::env::var("ADMIN_PASSWORD").unwrap_or_else(|_| {
             warn!("ADMIN_PASSWORD not set! Using default password - change this in production!");
             "changeme123#".to_string()
         });
         let admin_email =
-            std::env::var("ADMIN_EMAIL").unwrap_or_else(|_| "admin@covenantmatch.com".to_string());
+            std::env::var("ADMIN_EMAIL").unwrap_or_else(|_| "akri@covenant-match.com".to_string());
 
         // Create admin user
         let admin_data = CreateUserDto {
             username: admin_username,
             email: admin_email,
             password: admin_password,
-            display_name: Some("Akri".to_string()),
             region: "EU".to_string(),
             auto_region: true,
             platform: "PlayStation".to_string(),
@@ -260,16 +352,6 @@ pub async fn update_user_profile(
         }
     }
 
-    // Check if display name is being updated and if it's already in use
-    if let Some(display_name) = &update_data.display_name {
-        if let Some(existing_user) = user_repository::find_by_display_name(db, display_name).await?
-        {
-            if existing_user.id != object_id {
-                return Err(AppError::DisplayNameAlreadyInUse);
-            }
-        }
-    }
-
     // Get the current timestamp as MongoDB DateTime
     let now = mongodb::bson::DateTime::now();
 
@@ -278,9 +360,6 @@ pub async fn update_user_profile(
 
     if let Some(email) = update_data.email.clone() {
         update_doc.insert("email", email);
-    }
-    if let Some(display_name) = update_data.display_name.clone() {
-        update_doc.insert("display_name", display_name);
     }
     if let Some(avatar_url) = update_data.avatar_url.clone() {
         update_doc.insert("avatar_url", avatar_url);
@@ -439,7 +518,6 @@ pub async fn get_friend_list(db: &Database, user_id: &str) -> Result<Vec<FriendD
         .map(|friend| FriendDto {
             id: friend.id.to_hex(),
             username: friend.username,
-            display_name: friend.display_name,
             avatar_url: friend.avatar_url,
             covenant_name: friend.covenant_name,
             platform: friend.platform,
@@ -448,4 +526,60 @@ pub async fn get_friend_list(db: &Database, user_id: &str) -> Result<Vec<FriendD
         .collect();
 
     Ok(friend_dtos)
+}
+
+pub async fn update_user_email_verified(
+    db: &Database,
+    user_id: &str,
+    verified: bool,
+) -> Result<(), AppError> {
+    // Create the update document
+    let update_doc = doc! {
+        "email_verified": verified,
+        "updated_at": mongodb::bson::DateTime::now()
+    };
+
+    // Update the user
+    let result = user_repository::update_user_with_doc(db, user_id, update_doc).await?;
+
+    // Check if user was found and updated
+    if result.is_none() {
+        return Err(AppError::UserNotFound);
+    }
+
+    info!(
+        "Updated email verification status to {} for user {}",
+        verified, user_id
+    );
+    Ok(())
+}
+
+/// Verify a user's email using the verification token
+pub async fn verify_user_email(db: &Database, token: &str) -> Result<(), AppError> {
+    info!("Verifying email with token: {}", token);
+
+    // Then validate the token in our database
+    let token_doc = token_repository::validate_token(db, token).await?;
+
+    if token_doc.is_none() {
+        warn!("Token validation failed - token not found in database or expired");
+        return Err(AppError::InvalidOrExpiredToken);
+    }
+
+    // Delete the used token to prevent reuse
+    let user_id = match token_repository::delete_token(db, token).await {
+        Ok(user_id) => {
+            if user_id.is_empty() {
+                warn!("Received empty user_id from token deletion");
+                return Err(AppError::InvalidOrExpiredToken);
+            }
+            user_id
+        }
+        Err(e) => {
+            error!("Failed to delete token: {:?}", e);
+            return Err(e);
+        }
+    };
+
+    update_user_email_verified(db, &user_id, true).await
 }

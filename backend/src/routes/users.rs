@@ -1,10 +1,10 @@
 use crate::models::error::AppError;
 use crate::models::user::{
-    AddFriendDto, CreateUserDto, FriendListResponse, GetUsersQuery, LoginUserDto,
-    UpdateUserProfileDto,
+    AddFriendDto, CreateUserDto, FriendListResponse, GetUsersQuery, LoginUserDto, NewPasswordDto,
+    ResetPasswordDto, UpdateUserProfileDto,
 };
-use crate::services::{auth_service, user_service};
-use crate::utils::{geo_location, ip_address, jwt};
+use crate::services::{auth_service, session_service, user_service};
+use crate::utils::{email, geo_location, ip_address, jwt, request};
 use actix_web::{
     delete, get, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder, ResponseError,
 };
@@ -31,7 +31,7 @@ async fn create_user(
     user_data: web::Json<CreateUserDto>,
     req: HttpRequest,
 ) -> impl Responder {
-    // Check if request has authentication (for role check)
+    // Check if request has authentication (for role check) -> In order for admins to create users
     let requesting_user_role = if let Some(auth_header) = req.headers().get("Authorization") {
         let auth_str = auth_header.to_str().unwrap_or("");
         if auth_str.starts_with("Bearer ") {
@@ -64,6 +64,110 @@ async fn create_user(
     }
 }
 
+/// Verify new user
+#[utoipa::path(
+    post,
+    path = "/api/v1/verify-email/{token}",
+    responses(
+        (status = 200, description = "Email verified successfully"),
+        (status = 400, description = "Invalid input"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "users"
+)]
+#[post("/api/v1/verify-email/{token}")]
+async fn verify_email(db: web::Data<Database>, path: web::Path<String>) -> impl Responder {
+    let token = path.into_inner();
+
+    match user_service::verify_user_email(&db, &token).await {
+        Ok(()) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "message": "Email verified successfully"
+        })),
+        Err(e) => {
+            log::error!("Error verifying email: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
+/// Send reset password email
+#[utoipa::path(
+    post,
+    path = "/api/v1/reset-password-email",
+    request_body = ResetPasswordDto,
+    responses(
+        (status = 200, description = "Email sent successfully"),            
+        (status = 400, description = "Invalid input"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "users"
+)]
+#[post("/api/v1/reset-password-email")]
+async fn reset_password_email(
+    db: web::Data<Database>,
+    reset_password_data: web::Json<ResetPasswordDto>,
+) -> impl Responder {
+    // Grab the email from the request body
+    let reset_password_data = reset_password_data.into_inner();
+
+    // Define the success response once
+    let success_response = HttpResponse::Ok().json(serde_json::json!({
+        "status": "success",
+        "message": "Email sent successfully"
+    }));
+
+    // Check if the email is valid -> we always want to return ok even if the user doesn't exist - security
+    if !email::is_valid_email(&reset_password_data.email) {
+        return success_response;
+    }
+
+    // Send the reset password email -> we always want to return ok even if the user doesn't exist - security
+    match user_service::send_reset_password_email(&db, &reset_password_data.email).await {
+        Ok(()) => success_response,
+        Err(e) => {
+            log::error!("Error sending reset password email: {:?}", e);
+            success_response
+        }
+    }
+}
+
+/// Reset password endpoint
+#[utoipa::path(
+    post,
+    path = "/api/v1/reset-password/{token}",
+    request_body = NewPasswordDto,
+    responses(
+        (status = 200, description = "Password reset successfully"),
+        (status = 400, description = "Invalid input"),          
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "users"
+)]
+#[post("/api/v1/reset-password/{token}")]
+async fn reset_password(
+    db: web::Data<Database>,
+    new_password_data: web::Json<NewPasswordDto>,
+    path: web::Path<String>,
+) -> impl Responder {
+    let token = path.into_inner();
+
+    // Then use the token repository to reset password with token validation
+    match user_service::reset_password_with_token(&db, &token, &new_password_data.password).await {
+        Ok(()) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "message": "Password reset successfully"
+        })),
+        Err(e) => {
+            log::error!("Error resetting password: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
 /// Login a user
 #[utoipa::path(
     post,
@@ -91,7 +195,6 @@ async fn login(
     // Get the client region
     let client_region = geo_location::get_client_region(&req);
 
-    log::info!("Turnstile token: {:?}", login_data.turnstile_token);
     // Verify the turnstile token
     if let Err(e) = auth_service::verify_turnstile_token(
         &db,
@@ -160,7 +263,6 @@ async fn login(
             .await
             {
                 log::error!("Failed to record failed login attempt: {:?}", record_err);
-                // Continue with normal error response
             }
 
             log::error!("Login error for user {}: {:?}", &login_data.username, e);
@@ -813,7 +915,7 @@ async fn add_friend(
 
     // Add friend
     match user_service::add_friend(&db, &user_id, &friend_data.friend_id).await {
-        Ok(_) => HttpResponse::Created().json(serde_json::json!({
+        Ok(()) => HttpResponse::Created().json(serde_json::json!({
             "status": "success",
             "message": "Friend added to your list"
         })),
@@ -862,12 +964,47 @@ async fn remove_friend(
 
     // Remove friend
     match user_service::remove_friend(&db, &user_id, &friend_id).await {
-        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+        Ok(()) => HttpResponse::Ok().json(serde_json::json!({
             "status": "success",
             "message": "Friend removed from your list"
         })),
         Err(e) => {
             log::error!("Error removing friend: {:?}", e);
+            e.error_response()
+        }
+    }
+}
+
+/// Get current user session and one previous session
+#[utoipa::path(
+    get,
+    path = "/api/v1/users/sessions",
+    responses(
+        (status = 200, description = "Current and previous sessions retrieved successfully", body = UserSessionResponseDto),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "users"
+)]
+#[get("/api/v1/users/sessions")]
+async fn get_user_sessions(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
+    // Get claims from request extensions (set by middleware)
+    let claims =
+        request::get_claims(&req).ok_or(actix_web::error::ErrorUnauthorized("Unauthorized"));
+
+    let user_id = claims
+        .expect("JWT claims not found in request extensions")
+        .sub;
+
+    let sessions = session_service::get_user_sessions(&db, &user_id).await;
+
+    match sessions {
+        Ok(sessions) => HttpResponse::Ok().json(sessions),
+        Err(e) => {
+            log::error!("Error fetching user sessions: {:?}", e);
             e.error_response()
         }
     }
@@ -890,4 +1027,8 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(get_friend_list);
     cfg.service(add_friend);
     cfg.service(remove_friend);
+    cfg.service(verify_email);
+    cfg.service(reset_password);
+    cfg.service(reset_password_email);
+    cfg.service(get_user_sessions);
 }

@@ -224,8 +224,6 @@ pub async fn update_partial(
         )));
     }
 
-    let existing = existing.unwrap();
-
     // Create update document with only the fields that are provided
     let now = mongodb::bson::DateTime::now();
     let mut update_doc = doc! {};
