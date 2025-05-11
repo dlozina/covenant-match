@@ -1,14 +1,80 @@
 use crate::models::common::PaginationMetadata;
 use crate::models::error::AppError;
 use crate::models::friends::{
-    FriendDto, FriendListResponse, FriendRequest, FriendRequestResponse, FriendRequestResponseDto, FriendRequestStatus, FriendRequestsResponse, HasPendingFriendRequestsResponse, PaginatedFriendRequestsResponse, PaginatedFriendsResponse
+    FriendDto, FriendListResponse, FriendRequest, FriendRequestResponse, FriendRequestResponseDto,
+    FriendRequestStatus, FriendRequestsResponse, HasPendingFriendRequestsResponse,
+    PaginatedFriendRequestsResponse, PaginatedFriendsResponse,
 };
 use crate::models::user::User;
 use crate::repository::{friends_repository, user_repository};
 use futures::StreamExt;
 use futures_util::TryStreamExt;
+use lazy_static::lazy_static;
+use log::{debug, error};
 use mongodb::bson::{doc, oid::ObjectId};
 use mongodb::{Collection, Database};
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+
+// Pending friend requests cache with a 2-minute TTL
+lazy_static! {
+    static ref PENDING_REQUESTS_CACHE: Mutex<PendingRequestsCache> =
+        Mutex::new(PendingRequestsCache::new());
+}
+
+struct CacheEntry {
+    has_pending: bool,
+    timestamp: Instant,
+}
+
+struct PendingRequestsCache {
+    entries: HashMap<String, CacheEntry>,
+    ttl: Duration,
+}
+
+impl PendingRequestsCache {
+    fn new() -> Self {
+        PendingRequestsCache {
+            entries: HashMap::new(),
+            ttl: Duration::from_secs(120), // 2 minutes TTL
+        }
+    }
+
+    fn get(&mut self, user_id: &str) -> Option<bool> {
+        // Clean expired entries first
+        self.clean_expired();
+
+        // Return cached value if exists and is still valid
+        self.entries.get(user_id).map(|entry| entry.has_pending)
+    }
+
+    fn set(&mut self, user_id: String, has_pending: bool) {
+        self.entries.insert(
+            user_id,
+            CacheEntry {
+                has_pending,
+                timestamp: Instant::now(),
+            },
+        );
+    }
+
+    fn clean_expired(&mut self) {
+        let now = Instant::now();
+        self.entries
+            .retain(|_, entry| now.duration_since(entry.timestamp) < self.ttl);
+    }
+}
+
+/// Helper function to invalidate the pending requests cache for a user
+fn invalidate_pending_cache(user_id: &str) {
+    if let Ok(mut cache) = PENDING_REQUESTS_CACHE.try_lock() {
+        // We can either remove the entry (forcing a refresh on next check)
+        // or update it based on new known state
+        cache.entries.remove(user_id);
+        debug!("Invalidated pending requests cache for user {}", user_id);
+    }
+}
 
 pub async fn send_friend_request(
     db: &Database,
@@ -23,6 +89,10 @@ pub async fn send_friend_request(
     }
 
     let request = friends_repository::create_friend_request(db, sender_id, receiver_id).await?;
+
+    // Invalidate cache for both users
+    invalidate_pending_cache(sender_id);
+    invalidate_pending_cache(receiver_id);
 
     // Get user info to include in the response
     let users_coll: Collection<User> = db.collection("users");
@@ -388,6 +458,10 @@ pub async fn accept_friend_request(
 ) -> Result<FriendRequestResponse, AppError> {
     let request = friends_repository::accept_friend_request(db, request_id, user_id).await?;
 
+    // Invalidate cache for both users
+    invalidate_pending_cache(user_id);
+    invalidate_pending_cache(&request.sender_id.to_hex());
+
     // Get user info to include in the response
     let users_coll: Collection<User> = db.collection("users");
     let sender = users_coll
@@ -423,6 +497,10 @@ pub async fn reject_friend_request(
     user_id: &str,
 ) -> Result<FriendRequestResponse, AppError> {
     let request = friends_repository::reject_friend_request(db, request_id, user_id).await?;
+
+    // Invalidate cache for both users
+    invalidate_pending_cache(user_id);
+    invalidate_pending_cache(&request.sender_id.to_hex());
 
     // Get user info to include in the response
     let users_coll: Collection<User> = db.collection("users");
@@ -595,7 +673,34 @@ pub async fn get_friend_list(db: &Database, user_id: &str) -> Result<Vec<FriendD
 }
 
 /// Check if the user has any pending incoming friend requests
-pub async fn has_pending_friend_requests(db: &Database, user_id: &str) -> Result<HasPendingFriendRequestsResponse, AppError> {
+pub async fn has_pending_friend_requests(
+    db: &Database,
+    user_id: &str,
+) -> Result<HasPendingFriendRequestsResponse, AppError> {
+    // First try to get from cache
+    let cached_result = {
+        let cache_result = PENDING_REQUESTS_CACHE.try_lock();
+
+        match cache_result {
+            Ok(mut cache) => cache.get(user_id),
+            Err(e) => {
+                // If we can't acquire the lock, log the error and continue without cache
+                error!("Failed to acquire lock on pending requests cache: {:?}", e);
+                None
+            }
+        }
+    };
+
+    // If we have a cached result, return it
+    if let Some(has_pending) = cached_result {
+        debug!("Using cached pending requests result for user {}", user_id);
+        return Ok(HasPendingFriendRequestsResponse {
+            has_pending_requests: has_pending,
+        });
+    }
+
+    // Otherwise query the database
+    debug!("Cache miss for user {}, querying database", user_id);
     let user_oid = ObjectId::parse_str(user_id).map_err(|_| AppError::InvalidId)?;
     let requests_coll: Collection<FriendRequest> = db.collection("friend_requests");
 
@@ -606,8 +711,17 @@ pub async fn has_pending_friend_requests(db: &Database, user_id: &str) -> Result
     };
 
     let count = requests_coll.count_documents(incoming_filter).await?;
+    let has_pending = count > 0;
+
+    // Update cache
+    {
+        if let Ok(mut cache) = PENDING_REQUESTS_CACHE.try_lock() {
+            cache.set(user_id.to_string(), has_pending);
+            debug!("Updated cache for user {}", user_id);
+        }
+    }
 
     Ok(HasPendingFriendRequestsResponse {
-        has_pending_requests: count > 0,
+        has_pending_requests: has_pending,
     })
 }

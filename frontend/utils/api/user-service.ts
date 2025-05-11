@@ -196,6 +196,20 @@ export class UserService {
       throw error;
     }
   }
+
+  /**
+   * Check if the user has any pending friend requests
+   * @returns Whether the user has any pending friend requests
+   */
+  static async hasPendingFriendRequests(): Promise<boolean> {
+    try {
+      const response = await httpClient.get<{ has_pending_requests: boolean }>('/api/v1/friend-requests/has-pending', true);
+      return response.has_pending_requests;
+    } catch (error) {
+      console.error('Error checking pending friend requests:', error);
+      return false; // Default to false if there's an error
+    }
+  }
 }
 
 export interface VerifyEmailResponse {

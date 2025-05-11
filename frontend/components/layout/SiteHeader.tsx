@@ -17,11 +17,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth-context";
+import { usePendingFriendRequests } from "@/hooks/usePendingFriendRequests";
 
 export function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const { isLoggedIn, userData, logout, isLoading } = useAuth();
+  const { hasPendingRequests } = usePendingFriendRequests(isLoggedIn);
   
   const isAdmin = userData?.role === "admin";
 
@@ -91,6 +93,17 @@ export function SiteHeader() {
                   </Link>
                 </DropdownMenuItem>
               ))}
+              {isLoggedIn && (
+                <DropdownMenuItem asChild>
+                  <Link href="/friends" className="w-full flex items-center relative">
+                    <Users className="h-4 w-4 mr-2" />
+                    Friends
+                    {hasPendingRequests && (
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 h-2.5 w-2.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_4px_1px_rgba(239,68,68,0.6)]" />
+                    )}
+                  </Link>
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -164,9 +177,12 @@ export function SiteHeader() {
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link href="/friends" className="w-full flex items-center">
+                        <Link href="/friends" className="w-full flex items-center relative">
                           <Users className="h-4 w-4 mr-2" />
                           Friends
+                          {hasPendingRequests && (
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 h-2.5 w-2.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_4px_1px_rgba(239,68,68,0.6)]" />
+                          )}
                         </Link>
                       </DropdownMenuItem>
                       {isAdmin && (
