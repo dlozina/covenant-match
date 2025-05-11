@@ -63,8 +63,40 @@ export function SiteHeader() {
     <header className="sticky top-0 z-40 w-full border-b border-accent/20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       {/* Full-width flex container with height */}
       <div className="w-full flex h-16 px-4 sm:px-6 lg:px-8 justify-between items-center">
-        {/* Left section: Logo and navigation */}
-        <div className="flex items-center">
+        {/* Mobile hamburger menu - visible only on mobile */}
+        <div className="md:hidden">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                className="hover:bg-accent hover:text-accent-foreground"
+              >
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">Toggle menu</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-[200px]">
+              {routes.map((route) => (
+                <DropdownMenuItem key={route.href} asChild>
+                  <Link
+                    href={route.href}
+                    className={cn(
+                      "w-full flex items-center",
+                      route.active && "font-medium text-purple-400"
+                    )}
+                  >
+                    {route.icon}
+                    {route.label}
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Left section: Logo and navigation - desktop layout unchanged, mobile centered */}
+        <div className="flex-1 md:flex-none flex items-center justify-center md:justify-start">
           <Link href="/" className="flex items-center space-x-2 group">
             <div className="relative h-8 w-8 overflow-hidden">
               <div className="absolute inset-0 rounded-full bg-gradient-to-br from-purple-700 to-indigo-900 
@@ -200,58 +232,6 @@ export function SiteHeader() {
           )}
           {/* Change theme toggle to be on the right side of the header */}
           {/* <ThemeToggle /> */}
-          <div className="md:hidden">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  className="hover:bg-accent hover:text-accent-foreground"
-                >
-                  <Menu className="h-5 w-5" />
-                  <span className="sr-only">Toggle menu</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[200px]">
-                {routes.map((route) => (
-                  <DropdownMenuItem key={route.href} asChild>
-                    <Link
-                      href={route.href}
-                      className={cn(
-                        "w-full flex items-center",
-                        route.active && "font-medium text-purple-400"
-                      )}
-                    >
-                      {route.icon}
-                      {route.label}
-                    </Link>
-                  </DropdownMenuItem>
-                ))}
-                {!isLoggedIn && (
-                  <>
-                    <DropdownMenuItem asChild>
-                      <Link href="/login" className="w-full flex items-center">
-                        <LogIn className="h-4 w-4 mr-2" />
-                        Login
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link href="/profile/create" className="w-full flex items-center">
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        Create Profile
-                      </Link>
-                    </DropdownMenuItem>
-                  </>
-                )}
-                {isLoggedIn && (
-                  <DropdownMenuItem onClick={handleLogout} className="w-full flex items-center text-red-500 focus:text-red-500">
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Logout
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
         </div>
       </div>
     </header>
