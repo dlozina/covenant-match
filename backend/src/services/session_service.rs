@@ -1,6 +1,10 @@
 use crate::models::error::AppError;
 use crate::models::session::{
-    CovenantStats, CovenantStatsResponse, CreateSessionDto, FriendshipMatrix, FriendshipPlayer, GameResult, GameSession, GameSessionDto, JoinSessionDto, MinimalPlayerInfoDto, MinimalSessionDto, PaginatedSessionsResponse, PaginationMetadata, PlayerInfo, RateSessionDto, SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto, UserSessionHelper, UserSessionResponseDto
+    CovenantStats, CovenantStatsResponse, CreateSessionDto, FriendshipMatrix, FriendshipPlayer,
+    GameResult, GameSession, GameSessionDto, JoinSessionDto, MinimalPlayerInfoDto,
+    MinimalSessionDto, PaginatedSessionsResponse, PaginationMetadata, PlayerInfo, RateSessionDto,
+    SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto,
+    UserSessionHelper, UserSessionResponseDto,
 };
 use crate::repository::{session_repository, statistics_repository, user_repository};
 use crate::sse::messages::{BroadcastMessage, ServerMessage as SseServerMessage};
@@ -1520,41 +1524,55 @@ pub async fn get_friendship_matrix(
         .map(|player| player.user_id.clone())
         .collect();
 
-    // 4. Get all user documents in one query for efficiency
-    let users = user_repository::find_users_by_ids(db, &user_ids).await?;
+    // 4. Get all friendships for these users in one query
+    // First, prepare a hashmap to store friendships for each user
+    let mut user_friendships: std::collections::HashMap<String, Vec<String>> =
+        user_ids.iter().map(|id| (id.clone(), Vec::new())).collect();
+
+    // Access the friendships collection directly for better performance
+    let friendship_coll = db.collection::<crate::models::friends::Friendship>("friendships");
+
+    // Query all friendships where one of the session users is involved
+    let user_oids: Vec<ObjectId> = user_ids
+        .iter()
+        .filter_map(|id| ObjectId::parse_str(id).ok())
+        .collect();
+
+    // If we have valid OIDs, query the friendships
+    if !user_oids.is_empty() {
+        // Efficient query to get all relevant friendships in one go
+        let filter = mongodb::bson::doc! {
+            "user_id": { "$in": &user_oids }
+        };
+
+        // Execute the query and process results
+        let friendships = friendship_coll.find(filter).await?;
+        let friendships = futures::TryStreamExt::try_collect::<Vec<_>>(friendships).await?;
+
+        // Process the friendships into our hashmap
+        for friendship in friendships {
+            let user_id = friendship.user_id.to_hex();
+            let friend_id = friendship.friend_id.to_hex();
+
+            // Only store friendships between users in this session
+            if user_ids.contains(&friend_id) {
+                if let Some(friends) = user_friendships.get_mut(&user_id) {
+                    friends.push(friend_id);
+                }
+            }
+        }
+    }
 
     // 5. Construct the response with friendship information
     let players = session
         .joined_players
         .iter()
         .map(|session_player| {
-            // For each player in the session
-            let mut is_friends_with = Vec::new();
-
-            // Find this player's user document
-            if let Some(user) = users
-                .iter()
-                .find(|u| u.id.to_hex() == session_player.user_id)
-            {
-                // Check which other session players are in this user's friends list
-                for other_player in &session.joined_players {
-                    // Skip checking against self
-                    if other_player.user_id == session_player.user_id {
-                        continue;
-                    }
-
-                    // Try to convert other player's ID to ObjectId for comparison
-                    if let Ok(other_id) = ObjectId::parse_str(&other_player.user_id) {
-                        // If this user has the other player in their friend list
-                        if user.friend_list.contains(&other_id) {
-                            is_friends_with.push(other_player.user_id.clone());
-                        }
-                    }
-                }
-            }
+            let user_id = &session_player.user_id;
+            let is_friends_with = user_friendships.get(user_id).cloned().unwrap_or_default();
 
             FriendshipPlayer {
-                id: session_player.user_id.clone(),
+                id: user_id.clone(),
                 username: session_player.username.clone(),
                 is_friends_with,
             }
@@ -1563,7 +1581,6 @@ pub async fn get_friendship_matrix(
 
     Ok(FriendshipMatrix { players })
 }
-
 
 /// Get sessions with pagination and advanced filtering
 pub async fn get_sessions_with_pagination(
