@@ -113,6 +113,11 @@ function FriendsContent() {
   const [incomingTotalPages, setIncomingTotalPages] = useState(1);
   const [outgoingTotalPages, setOutgoingTotalPages] = useState(1);
   
+  // Total count for each tab (for pagination display)
+  const [friendsTotalCount, setFriendsTotalCount] = useState(0);
+  const [incomingTotalCount, setIncomingTotalCount] = useState(0);
+  const [outgoingTotalCount, setOutgoingTotalCount] = useState(0);
+  
   const pageSize = 10;
   
   // Check for pending requests on initial load
@@ -148,9 +153,11 @@ function FriendsContent() {
   };
   
   const fetchFriends = async (page: number) => {
+    // Ensure page is a valid number
+    const validPage = Number.isInteger(page) && page > 0 ? page : 1;
     setIsLoadingFriends(true);
     try {
-      const response = await UserService.getFriendList(page, pageSize);
+      const response = await UserService.getFriendList(validPage, pageSize);
       
       // Get all user IDs to fetch stats in batch
       const userIds = response.friends.map(friend => friend.id);
@@ -162,7 +169,11 @@ function FriendsContent() {
       }));
       
       setFriends(friendsData);
-      setFriendsTotalPages(Math.ceil(response.total / pageSize));
+      
+      // Calculate total pages - ensure at least 1 page if we have items, otherwise 0
+      const totalPages = response.total > 0 ? Math.max(1, Math.ceil(response.total / pageSize)) : 0;
+      setFriendsTotalPages(totalPages);
+      setFriendsTotalCount(response.total);
       
       // Fetch stats in batch if there are friends
       if (userIds.length > 0) {
@@ -176,29 +187,25 @@ function FriendsContent() {
         message: "Failed to load friends list. Please try again.",
         type: 'error'
       });
+      setFriendsTotalPages(0);
+      setFriendsTotalCount(0);
       setIsLoadingFriends(false);
     }
   };
   
   const fetchIncomingRequests = async (page: number) => {
+    // Ensure page is a valid number
+    const validPage = Number.isInteger(page) && page > 0 ? page : 1;
     setIsLoadingIncoming(true);
     try {
-      const response = await UserService.getIncomingFriendRequests(page, pageSize) as unknown as ActualPaginatedFriendRequests;
+      const response = await UserService.getIncomingFriendRequests(validPage, pageSize) as unknown as ActualPaginatedFriendRequests;
       
       // Check if response has the expected structure
       if (!response || !response.metadata || !response.requests) {
         console.error("Invalid response structure:", response);
         setIncomingRequests([]);
         setIncomingTotalPages(0);
-        setIsLoadingIncoming(false);
-        return;
-      }
-      
-      // Check if requests array exists and is not empty
-      if (response.requests.length === 0) {
-        // If there are no requests, set empty array and finish loading
-        setIncomingRequests([]);
-        setIncomingTotalPages(0);
+        setIncomingTotalCount(0);
         setIsLoadingIncoming(false);
         return;
       }
@@ -227,7 +234,12 @@ function FriendsContent() {
       const userIds = mappedRequests.map(request => request.sender.id);
       
       setIncomingRequests(mappedRequests);
-      setIncomingTotalPages(Math.ceil(response.metadata.totalCount / pageSize));
+      
+      // Calculate total pages - ensure at least 1 page if we have items, otherwise 0
+      const totalCount = response.metadata.totalCount || 0;
+      const totalPages = totalCount > 0 ? Math.max(1, Math.ceil(totalCount / pageSize)) : 0;
+      setIncomingTotalPages(totalPages);
+      setIncomingTotalCount(totalCount);
       
       if (userIds.length > 0) {
         fetchRequestStats(userIds, mappedRequests, setIncomingRequests, 'sender');
@@ -239,6 +251,7 @@ function FriendsContent() {
       // Set empty array on error to avoid infinite loading state
       setIncomingRequests([]);
       setIncomingTotalPages(0);
+      setIncomingTotalCount(0);
       setNotification({
         message: "Failed to load friend requests. Please try again.",
         type: 'error'
@@ -248,24 +261,18 @@ function FriendsContent() {
   };
   
   const fetchOutgoingRequests = async (page: number) => {
+    // Ensure page is a valid number
+    const validPage = Number.isInteger(page) && page > 0 ? page : 1;
     setIsLoadingOutgoing(true);
     try {
-      const response = await UserService.getOutgoingFriendRequests(page, pageSize) as unknown as ActualPaginatedFriendRequests;
+      const response = await UserService.getOutgoingFriendRequests(validPage, pageSize) as unknown as ActualPaginatedFriendRequests;
       
       // Check if response has the expected structure
       if (!response || !response.metadata || !response.requests) {
         console.error("Invalid response structure:", response);
         setOutgoingRequests([]);
         setOutgoingTotalPages(0);
-        setIsLoadingOutgoing(false);
-        return;
-      }
-      
-      // Check if requests array exists and is not empty
-      if (response.requests.length === 0) {
-        // If there are no requests, set empty array and finish loading
-        setOutgoingRequests([]);
-        setOutgoingTotalPages(0);
+        setOutgoingTotalCount(0);
         setIsLoadingOutgoing(false);
         return;
       }
@@ -294,7 +301,12 @@ function FriendsContent() {
       const userIds = mappedRequests.map(request => request.receiver.id);
       
       setOutgoingRequests(mappedRequests);
-      setOutgoingTotalPages(Math.ceil(response.metadata.totalCount / pageSize));
+      
+      // Calculate total pages - ensure at least 1 page if we have items, otherwise 0
+      const totalCount = response.metadata.totalCount || 0;
+      const totalPages = totalCount > 0 ? Math.max(1, Math.ceil(totalCount / pageSize)) : 0;
+      setOutgoingTotalPages(totalPages);
+      setOutgoingTotalCount(totalCount);
       
       if (userIds.length > 0) {
         fetchRequestStats(userIds, mappedRequests, setOutgoingRequests, 'receiver');
@@ -306,6 +318,7 @@ function FriendsContent() {
       // Set empty array on error to avoid infinite loading state
       setOutgoingRequests([]);
       setOutgoingTotalPages(0);
+      setOutgoingTotalCount(0);
       setNotification({
         message: "Failed to load friend requests. Please try again.",
         type: 'error'
@@ -426,16 +439,78 @@ function FriendsContent() {
   
   // Pagination handlers for each tab
   const handleFriendsPageChange = (page: number) => {
-    setFriendsPage(page);
+    if (Number.isInteger(page) && page > 0) {
+      setFriendsPage(page);
+    }
   };
   
   const handleIncomingPageChange = (page: number) => {
-    setIncomingPage(page);
+    if (Number.isInteger(page) && page > 0) {
+      setIncomingPage(page);
+    }
   };
   
   const handleOutgoingPageChange = (page: number) => {
-    setOutgoingPage(page);
+    if (Number.isInteger(page) && page > 0) {
+      setOutgoingPage(page);
+    }
   };
+  
+  // Function to get visible page numbers for pagination
+  function getVisiblePageNumbers(currentPage: number, totalPages: number): (number | null)[] {
+    // If no pages or only one page, return empty array
+    if (totalPages <= 1) {
+      return totalPages === 1 ? [1] : [];
+    }
+    
+    // For small number of pages, show all pages
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+
+    const result: (number | null)[] = [];
+    
+    // Always include page 1
+    result.push(1);
+    
+    // For current pages near the beginning
+    if (currentPage <= 3) {
+      result.push(2);
+      if (totalPages >= 3) result.push(3);
+      if (totalPages >= 4) result.push(4);
+      if (totalPages > 5) {
+        result.push(null); // Ellipsis
+        result.push(totalPages);
+      } else if (totalPages === 5) {
+        result.push(5);
+      }
+    } 
+    // For current pages near the end
+    else if (currentPage >= totalPages - 2) {
+      result.push(null); // Ellipsis
+      if (totalPages - 4 > 1) result.push(totalPages - 4);
+      if (totalPages - 3 > 1) result.push(totalPages - 3);
+      if (totalPages - 2 > 1) result.push(totalPages - 2);
+      if (totalPages - 1 > 1) result.push(totalPages - 1);
+      result.push(totalPages);
+    } 
+    // For current pages in the middle
+    else {
+      result.push(null); // Ellipsis before current
+      result.push(currentPage - 1);
+      result.push(currentPage);
+      result.push(currentPage + 1);
+      if (totalPages > currentPage + 1) {
+        result.push(null); // Ellipsis after current
+        result.push(totalPages);
+      }
+    }
+    
+    // Remove any duplicate values
+    return result.filter((value, index, self) => 
+      index === self.findIndex(v => v === value)
+    );
+  }
   
   // Friend action handlers
   const handleRemoveFriend = async (id: string) => {
@@ -544,9 +619,14 @@ function FriendsContent() {
   const renderPagination = (
     currentPage: number, 
     totalPages: number, 
+    totalItems: number,
     handlePageChange: (page: number) => void
   ) => {
-    if (totalPages <= 1) return null;
+    // Only show pagination if we have items and more than 1 page
+    if (totalPages <= 0 || totalItems === 0) return null;
+    
+    // Calculate visible page numbers
+    const visiblePages = getVisiblePageNumbers(currentPage, totalPages);
     
     return (
       <Pagination className="mt-6">
@@ -556,35 +636,68 @@ function FriendsContent() {
               href="#"
               onClick={(e) => {
                 e.preventDefault();
-                handlePageChange(Math.max(1, currentPage - 1));
+                if (currentPage > 1) {
+                  handlePageChange(currentPage - 1);
+                }
               }}
-              className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+              className={currentPage <= 1 ? "pointer-events-none opacity-50" : ""}
             />
           </PaginationItem>
           
-          {Array.from({ length: totalPages }).map((_, index) => (
-            <PaginationItem key={index}>
-              <PaginationLink 
-                href="#"
-                isActive={currentPage === index + 1}
-                onClick={(e) => {
-                  e.preventDefault();
-                  handlePageChange(index + 1);
-                }}
-              >
-                {index + 1}
-              </PaginationLink>
-            </PaginationItem>
-          ))}
+          {/* Hide page numbers on small screens */}
+          {visiblePages.length > 0 && (
+            <div className="hidden sm:flex">
+              {visiblePages.map((page, index) => {
+                // If the value is null, render ellipsis
+                if (page === null) {
+                  return (
+                    <PaginationItem key={`ellipsis-${index}`}>
+                      <span className="px-4 text-gray-500">...</span>
+                    </PaginationItem>
+                  );
+                }
+                
+                // Otherwise render the page number button
+                return (
+                  <PaginationItem key={`page-${page}`}>
+                    <PaginationLink 
+                      href="#"
+                      isActive={currentPage === page}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handlePageChange(page);
+                      }}
+                    >
+                      {page}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              })}
+            </div>
+          )}
+          
+          {/* Show current page indicator on mobile */}
+          <div className="flex sm:hidden items-center px-2">
+            <span className="text-sm">
+              Page {currentPage} of {totalPages || 1} ({totalItems} {totalItems === 1 ? "item" : "items"})
+            </span>
+          </div>
+          
+          {/* Show total items on desktop */}
+          <div className="hidden sm:flex items-center px-2 text-sm text-muted-foreground">
+            {totalItems} {totalItems === 1 ? "item" : "items"} total
+          </div>
           
           <PaginationItem>
             <PaginationNext 
               href="#"
               onClick={(e) => {
                 e.preventDefault();
-                handlePageChange(Math.min(totalPages, currentPage + 1));
+                if (currentPage < totalPages) {
+                  handlePageChange(currentPage + 1);
+                }
               }}
-              className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+              className={currentPage >= totalPages ? "pointer-events-none opacity-50" : ""}
             />
           </PaginationItem>
         </PaginationContent>
@@ -758,7 +871,7 @@ function FriendsContent() {
                   </div>
                   
                   {/* Pagination for friends */}
-                  {renderPagination(friendsPage, friendsTotalPages, handleFriendsPageChange)}
+                  {renderPagination(friendsPage, friendsTotalPages, friendsTotalCount, handleFriendsPageChange)}
                 </>
               )}
             </TabsContent>
@@ -830,7 +943,7 @@ function FriendsContent() {
                   </div>
                   
                   {/* Pagination for incoming */}
-                  {renderPagination(incomingPage, incomingTotalPages, handleIncomingPageChange)}
+                  {renderPagination(incomingPage, incomingTotalPages, incomingTotalCount, handleIncomingPageChange)}
                 </>
               )}
             </TabsContent>
@@ -896,7 +1009,7 @@ function FriendsContent() {
                   </div>
                   
                   {/* Pagination for outgoing */}
-                  {renderPagination(outgoingPage, outgoingTotalPages, handleOutgoingPageChange)}
+                  {renderPagination(outgoingPage, outgoingTotalPages, outgoingTotalCount, handleOutgoingPageChange)}
                 </>
               )}
             </TabsContent>
