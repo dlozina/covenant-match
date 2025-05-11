@@ -30,7 +30,7 @@ const FriendButtonComponent = ({ playerId, sessionId, currentUserId }: FriendBut
     
     setIsLoading(true);
     try {
-      await UserService.addFriend(playerId);
+      await UserService.sendFriendRequest(playerId);
       console.log('Friend added successfully, invalidating queries');
       
       // Invalidate friendship matrix query to refresh data

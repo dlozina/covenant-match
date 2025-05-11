@@ -30,6 +30,16 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 // API Response types that match the actual backend response
 interface MongoDBDate {
@@ -103,6 +113,10 @@ function FriendsContent() {
   const [friends, setFriends] = useState<FriendWithStats[]>([]);
   const [incomingRequests, setIncomingRequests] = useState<FriendRequestWithStats[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<FriendRequestWithStats[]>([]);
+  
+  // Confirmation dialog state
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [friendToRemove, setFriendToRemove] = useState<Friend | null>(null);
   
   // Pagination state for each tab
   const [friendsPage, setFriendsPage] = useState(1);
@@ -513,6 +527,11 @@ function FriendsContent() {
   }
   
   // Friend action handlers
+  const openRemoveFriendDialog = (friend: Friend) => {
+    setFriendToRemove(friend);
+    setConfirmDialogOpen(true);
+  };
+  
   const handleRemoveFriend = async (id: string) => {
     try {
       await UserService.removeFriend(id);
@@ -527,6 +546,9 @@ function FriendsContent() {
         message: "Failed to remove friend",
         type: 'error'
       });
+    } finally {
+      setConfirmDialogOpen(false);
+      setFriendToRemove(null);
     }
   };
   
@@ -830,7 +852,7 @@ function FriendsContent() {
                 <>
                   <div className="grid gap-4">
                     {filteredFriends.map((friend) => (
-                      <div key={friend.id} className="flex items-center justify-between p-4 border rounded-lg shadow-sm bg-card">
+                      <div key={friend.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg shadow-sm bg-card">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-10 w-10">
                             <AvatarFallback className="bg-gradient-to-br from-purple-700 to-indigo-900 text-white">
@@ -846,7 +868,7 @@ function FriendsContent() {
                             {renderUserStats(friend.stats)}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 mt-3 sm:mt-0 ml-12 sm:ml-0 sm:h-full">
                           {friend.stats ? (
                             <div className="bg-primary/10 text-primary px-2 py-1 rounded text-xs mr-2">
                               {friend.stats.experience}
@@ -858,11 +880,11 @@ function FriendsContent() {
                           )}
                           <Button 
                             variant="ghost" 
-                            size="sm" 
-                            onClick={() => handleRemoveFriend(friend.id)}
-                            className="text-muted-foreground hover:text-red-500"
+                            size="icon" 
+                            onClick={() => openRemoveFriendDialog(friend)}
+                            className="text-muted-foreground hover:text-red-500 h-9 w-9 sm:my-auto"
                           >
-                            <UserX className="h-4 w-4" />
+                            <UserX className="h-5 w-5" />
                             <span className="sr-only">Remove friend</span>
                           </Button>
                         </div>
@@ -902,7 +924,7 @@ function FriendsContent() {
                 <>
                   <div className="grid gap-4">
                     {filteredIncoming.map((request) => (
-                      <div key={request.id} className="flex items-center justify-between p-4 border rounded-lg shadow-sm bg-card">
+                      <div key={request.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg shadow-sm bg-card">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-10 w-10">
                             <AvatarFallback className="bg-gradient-to-br from-purple-700 to-indigo-900 text-white">
@@ -918,7 +940,7 @@ function FriendsContent() {
                             {renderUserStats(request.stats)}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 mt-3 sm:mt-0 ml-12 sm:ml-0">
                           <Button 
                             variant="default" 
                             size="sm" 
@@ -974,7 +996,7 @@ function FriendsContent() {
                 <>
                   <div className="grid gap-4">
                     {filteredOutgoing.map((request) => (
-                      <div key={request.id} className="flex items-center justify-between p-4 border rounded-lg shadow-sm bg-card">
+                      <div key={request.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg shadow-sm bg-card">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-10 w-10">
                             <AvatarFallback className="bg-gradient-to-br from-purple-700 to-indigo-900 text-white">
@@ -990,7 +1012,7 @@ function FriendsContent() {
                             {renderUserStats(request.stats)}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 mt-3 sm:mt-0 ml-12 sm:ml-0">
                           <div className="text-xs text-muted-foreground mr-2">
                             Pending...
                           </div>
@@ -1014,6 +1036,28 @@ function FriendsContent() {
               )}
             </TabsContent>
           </Tabs>
+          
+          {/* Confirmation Dialog */}
+          <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Remove Friend</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to remove <span className="font-semibold">{friendToRemove?.username}</span> from your friends list?
+                  This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setFriendToRemove(null)}>Cancel</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={() => friendToRemove && handleRemoveFriend(friendToRemove.id)}
+                  className="bg-red-500 hover:bg-red-600"
+                >
+                  Remove
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           
           {/* Notification component */}
           <Notification
