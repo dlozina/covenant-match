@@ -171,6 +171,7 @@ pub struct SessionResponseDto {
     pub host_id: String,
     pub host_name: String,
     pub host_experience: String,
+    pub password: String,
     pub status: String,
     pub is_private: bool,
     pub is_friends_only: bool,
@@ -187,7 +188,6 @@ pub struct SessionResponseDto {
     pub started_at: Option<chrono::DateTime<chrono::Utc>>,
     #[schema(value_type = Option<String>)]
     pub completed_at: Option<chrono::DateTime<chrono::Utc>>,
-    pub has_password: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub player_count: Option<u32>,
     pub new_session_created: bool,
@@ -212,6 +212,7 @@ impl From<GameSession> for SessionResponseDto {
             name: session.name,
             host_id: session.host_id.clone(),
             host_name,
+            password: session.password,
             status: session.status.to_string(),
             is_private: session.is_private,
             is_friends_only: session.is_friends_only,
@@ -247,21 +248,20 @@ impl From<GameSession> for SessionResponseDto {
                 session.created_at.timestamp_millis() / 1000,
                 0,
             )
-            .unwrap_or_else(|| chrono::Utc::now()),
+            .unwrap_or_else(chrono::Utc::now),
             updated_at: chrono::DateTime::from_timestamp(
                 session.updated_at.timestamp_millis() / 1000,
                 0,
             )
-            .unwrap_or_else(|| chrono::Utc::now()),
+            .unwrap_or_else(chrono::Utc::now),
             started_at: session.started_at.map(|dt| {
                 chrono::DateTime::from_timestamp(dt.timestamp_millis() / 1000, 0)
-                    .unwrap_or_else(|| chrono::Utc::now())
+                    .unwrap_or_else(chrono::Utc::now)
             }),
             completed_at: session.completed_at.map(|dt| {
                 chrono::DateTime::from_timestamp(dt.timestamp_millis() / 1000, 0)
-                    .unwrap_or_else(|| chrono::Utc::now())
+                    .unwrap_or_else(chrono::Utc::now)
             }),
-            has_password: !session.password.is_empty(),
             host_experience: session.host_experience,
             player_count: Some(player_count),
             new_session_created: session.new_session_created,
