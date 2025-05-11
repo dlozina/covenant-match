@@ -284,6 +284,52 @@ pub async fn get_friends(db: &Database, user_id: &str) -> Result<Vec<ObjectId>, 
     Ok(friend_ids)
 }
 
+/// Get friends with pagination
+pub async fn get_friends_paginated(
+    db: &Database,
+    user_id: &str,
+    page: u64,
+    limit: u64,
+) -> Result<Vec<ObjectId>, AppError> {
+    let user_oid = ObjectId::parse_str(user_id).map_err(|_| AppError::InvalidId)?;
+    let friendships_coll: Collection<Friendship> = db.collection("friendships");
+
+    // Calculate skip value for pagination
+    let skip = (page - 1) * limit;
+
+    // Find all friendships where the user is the user_id
+    let filter = doc! { "user_id": &user_oid };
+    let options = FindOptions::builder()
+        .sort(doc! { "created_at": -1 })
+        .skip(skip)
+        .limit(limit as i64)
+        .build();
+
+    let friendships = friendships_coll
+        .find(filter)
+        .with_options(options)
+        .await?
+        .try_collect::<Vec<Friendship>>()
+        .await?;
+
+    // Extract friend IDs
+    let friend_ids = friendships.into_iter().map(|f| f.friend_id).collect();
+
+    Ok(friend_ids)
+}
+
+/// Count total number of friends for pagination
+pub async fn count_friends(db: &Database, user_id: &str) -> Result<u64, AppError> {
+    let user_oid = ObjectId::parse_str(user_id).map_err(|_| AppError::InvalidId)?;
+    let friendships_coll: Collection<Friendship> = db.collection("friendships");
+
+    // Count all friendships where the user is the user_id
+    let filter = doc! { "user_id": &user_oid };
+    let count = friendships_coll.count_documents(filter).await?;
+
+    Ok(count)
+}
+
 pub async fn remove_friend(db: &Database, user_id: &str, friend_id: &str) -> Result<(), AppError> {
     let user_oid = ObjectId::parse_str(user_id).map_err(|_| AppError::InvalidId)?;
     let friend_oid = ObjectId::parse_str(friend_id).map_err(|_| AppError::InvalidId)?;

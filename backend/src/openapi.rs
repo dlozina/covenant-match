@@ -14,7 +14,9 @@ use crate::models::bug::{
 use crate::models::chat::ChatMessageResponseDto;
 use crate::models::common::{LimitQuery, PaginationQuery};
 use crate::models::friends::{
-    AddFriendDto, CreateFriendRequestDto, FriendDto, FriendListResponse, FriendRequestResponse, FriendRequestResponseDto, FriendRequestStatus, FriendRequestsResponse, RemoveFriendDto
+    AddFriendDto, CreateFriendRequestDto, FriendDto, FriendListResponse, FriendRequestResponse,
+    FriendRequestResponseDto, FriendRequestStatus, FriendRequestsResponse,
+    PaginatedFriendRequestsResponse, PaginatedFriendsResponse, RemoveFriendDto,
 };
 use crate::models::game_data::{
     Covenant, CovenantResponse, Experience, ExperienceResponse, GameDataResponse, NightLord,
@@ -39,17 +41,16 @@ use crate::models::statistics::{
     UserStatsResponse,
 };
 use crate::models::user::{
-    AuthResponse, CreateUserDto, GetUsersQuery,
-    LoginUserDto, PaginationInfo, RefreshTokenResponse, UpdateUserDto,
-    UpdateUserProfileDto, User, UserResponse, UsersListData, UsersListResponse,
+    AuthResponse, CreateUserDto, GetUsersQuery, LoginUserDto, PaginationInfo, RefreshTokenResponse,
+    UpdateUserDto, UpdateUserProfileDto, User, UserResponse, UsersListData, UsersListResponse,
 };
 use crate::models::user_data::UserDataResponseDto;
 use crate::routes::users::{JwtInfoDto, TokenInfoResponse};
 use crate::sse::messages::{ServerMessage, SessionInfo, SseSessionStatus};
 
 use crate::routes::{
-    admin::*, bug::*, chat::*, game_data::*, health::*, news::*, sessions::*, sse::*,
-    statistics::*, user_data::*, users::*, ws::*, friends::*,
+    admin::*, bug::*, chat::*, friends::*, game_data::*, health::*, news::*, sessions::*, sse::*,
+    statistics::*, user_data::*, users::*, ws::*,
 };
 
 // Import SSE models
@@ -90,6 +91,8 @@ use utoipa::{
         // Friend routes        
         send_friend_request,
         get_friend_requests,
+        get_incoming_friend_requests,
+        get_outgoing_friend_requests,
         accept_friend_request,
         reject_friend_request,
         get_friends,
@@ -204,11 +207,13 @@ use utoipa::{
             RemoveFriendDto,
             FriendDto,
             FriendListResponse,
+            PaginatedFriendsResponse,
             // Friend request models
             CreateFriendRequestDto,
             FriendRequestResponseDto,
             FriendRequestResponse,
             FriendRequestsResponse,
+            PaginatedFriendRequestsResponse,
             FriendRequestStatus,
             // User data models
             UserDataResponseDto,

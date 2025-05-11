@@ -4,6 +4,7 @@ use crate::services::friends_service;
 use crate::utils::jwt;
 use actix_web::{delete, get, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use mongodb::Database;
+use crate::models::common::PaginationQuery;
 
 /// Send a friend request
 #[utoipa::path(
@@ -223,8 +224,12 @@ async fn reject_friend_request(
 #[utoipa::path(
     get,
     path = "/api/v1/friends",
+    params(
+        ("page" = Option<u64>, Query, description = "Page number (default: 1)"),
+        ("limit" = Option<u64>, Query, description = "Number of items per page (default: 10)")
+    ),
     responses(
-        (status = 200, description = "Friends retrieved successfully", body = FriendListResponse),
+        (status = 200, description = "Friends retrieved successfully", body = PaginatedFriendsResponse),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error")
     ),
@@ -234,7 +239,11 @@ async fn reject_friend_request(
     tag = "friends"
 )]
 #[get("/api/v1/friends")]
-async fn get_friends(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
+async fn get_friends(
+    db: web::Data<Database>,
+    req: HttpRequest,
+    query: web::Query<PaginationQuery>,
+) -> impl Responder {
     // Extract user_id from JWT token
     let user_id = {
         let extensions = req.extensions();
@@ -244,7 +253,11 @@ async fn get_friends(db: web::Data<Database>, req: HttpRequest) -> impl Responde
         claims.sub.clone()
     };
 
-    match friends_service::get_friends(&db, &user_id).await {
+    // Set default pagination values
+    let page = query.page.unwrap_or(1);
+    let limit = query.limit.unwrap_or(10);
+
+    match friends_service::get_friends_paginated(&db, &user_id, page, limit).await {
         Ok(response) => HttpResponse::Ok().json(response),
         Err(e) => {
             log::error!("Error getting friends: {:?}", e);
@@ -312,9 +325,109 @@ async fn remove_friend(
     }
 }
 
+/// Get incoming friend requests with pagination
+#[utoipa::path(
+    get,
+    path = "/api/v1/friend-requests/incoming",
+    params(
+        ("page" = Option<u64>, Query, description = "Page number (default: 1)"),
+        ("limit" = Option<u64>, Query, description = "Number of items per page (default: 10)")
+    ),
+    responses(
+        (status = 200, description = "Incoming friend requests retrieved successfully", body = PaginatedFriendRequestsResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "friends"
+)]
+#[get("/api/v1/friend-requests/incoming")]
+async fn get_incoming_friend_requests(
+    db: web::Data<Database>,
+    req: HttpRequest,
+    query: web::Query<PaginationQuery>,
+) -> impl Responder {
+    // Extract user_id from JWT token
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
+        claims.sub.clone()
+    };
+
+    // Set default pagination values
+    let page = query.page.unwrap_or(1);
+    let limit = query.limit.unwrap_or(10);
+
+    match friends_service::get_incoming_friend_requests(&db, &user_id, page, limit).await {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => {
+            log::error!("Error getting incoming friend requests: {:?}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": "error",
+                "message": "Failed to retrieve incoming friend requests"
+            }))
+        }
+    }
+}
+
+/// Get outgoing friend requests with pagination
+#[utoipa::path(
+    get,
+    path = "/api/v1/friend-requests/outgoing",
+    params(
+        ("page" = Option<u64>, Query, description = "Page number (default: 1)"),
+        ("limit" = Option<u64>, Query, description = "Number of items per page (default: 10)")
+    ),
+    responses(
+        (status = 200, description = "Outgoing friend requests retrieved successfully", body = PaginatedFriendRequestsResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "friends"
+)]
+#[get("/api/v1/friend-requests/outgoing")]
+async fn get_outgoing_friend_requests(
+    db: web::Data<Database>,
+    req: HttpRequest,
+    query: web::Query<PaginationQuery>,
+) -> impl Responder {
+    // Extract user_id from JWT token
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
+        claims.sub.clone()
+    };
+
+    // Set default pagination values
+    let page = query.page.unwrap_or(1);
+    let limit = query.limit.unwrap_or(10);
+
+    match friends_service::get_outgoing_friend_requests(&db, &user_id, page, limit).await {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => {
+            log::error!("Error getting outgoing friend requests: {:?}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": "error",
+                "message": "Failed to retrieve outgoing friend requests"
+            }))
+        }
+    }
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(send_friend_request)
         .service(get_friend_requests)
+        .service(get_incoming_friend_requests)
+        .service(get_outgoing_friend_requests)
         .service(accept_friend_request)
         .service(reject_friend_request)
         .service(get_friends)

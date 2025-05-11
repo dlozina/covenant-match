@@ -33,7 +33,7 @@ use uuid::Uuid;
 #[get("/api/v1/news")]
 async fn get_all_news(
     db: web::Data<Database>,
-    query: web::Query<crate::models::common::PaginationQuery>,
+    query: web::Query<crate::models::common::PaginationSearchQuery>,
 ) -> impl Responder {
     // Public endpoint always uses non-admin mode (false) to only fetch published news
     match news_service::get_all_news(
@@ -554,7 +554,7 @@ async fn delete_news(db: web::Data<Database>, path: web::Path<String>) -> impl R
 #[get("/api/v1/admin/news")]
 async fn get_admin_news(
     db: web::Data<Database>,
-    query: web::Query<crate::models::common::PaginationQuery>,
+    query: web::Query<crate::models::common::PaginationSearchQuery>,
     _req: HttpRequest,
 ) -> impl Responder {
     // This endpoint always uses admin mode (true) to fetch all news including drafts

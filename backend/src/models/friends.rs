@@ -1,3 +1,4 @@
+use crate::models::common::PaginationMetadata;
 use mongodb::bson::{oid::ObjectId, DateTime};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -85,6 +86,22 @@ pub struct FriendDto {
 pub struct FriendListResponse {
     pub friends: Vec<FriendDto>,
     pub total: usize,
+}
+
+/// Response for paginated friend list
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PaginatedFriendsResponse {
+    pub friends: Vec<FriendDto>,
+    pub metadata: PaginationMetadata,
+}
+
+/// Response for paginated friend requests
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PaginatedFriendRequestsResponse {
+    pub requests: Vec<FriendRequestResponseDto>,
+    pub metadata: PaginationMetadata,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
