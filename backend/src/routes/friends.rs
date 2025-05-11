@@ -1,10 +1,10 @@
+use crate::models::common::PaginationQuery;
 use crate::models::error::AppError;
 use crate::models::friends::CreateFriendRequestDto;
 use crate::services::friends_service;
 use crate::utils::jwt;
 use actix_web::{delete, get, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use mongodb::Database;
-use crate::models::common::PaginationQuery;
 
 /// Send a friend request
 #[utoipa::path(
@@ -423,6 +423,45 @@ async fn get_outgoing_friend_requests(
     }
 }
 
+/// Check if user has any pending incoming friend requests
+#[utoipa::path(
+    get,
+    path = "/api/v1/friend-requests/has-pending",
+    responses(
+        (status = 200, description = "Check completed successfully", body = HasPendingFriendRequestsResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "friends"
+)]
+#[get("/api/v1/friend-requests/has-pending")]
+async fn has_pending_friend_requests(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
+    // Extract user_id from JWT token
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
+        claims.sub.clone()
+    };
+
+    match friends_service::has_pending_friend_requests(&db, &user_id).await {
+        Ok(has_pending) => HttpResponse::Ok().json(serde_json::json!({
+            "has_pending_requests": has_pending
+        })),
+        Err(e) => {
+            log::error!("Error checking pending friend requests: {:?}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "status": "error",
+                "message": "Failed to check pending friend requests"
+            }))
+        }
+    }
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(send_friend_request)
         .service(get_friend_requests)
@@ -431,5 +470,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         .service(accept_friend_request)
         .service(reject_friend_request)
         .service(get_friends)
-        .service(remove_friend);
+        .service(remove_friend)
+        .service(has_pending_friend_requests);
 }

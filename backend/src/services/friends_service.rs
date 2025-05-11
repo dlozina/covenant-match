@@ -1,9 +1,7 @@
 use crate::models::common::PaginationMetadata;
 use crate::models::error::AppError;
 use crate::models::friends::{
-    FriendDto, FriendListResponse, FriendRequest, FriendRequestResponse, FriendRequestResponseDto,
-    FriendRequestStatus, FriendRequestsResponse, PaginatedFriendRequestsResponse,
-    PaginatedFriendsResponse,
+    FriendDto, FriendListResponse, FriendRequest, FriendRequestResponse, FriendRequestResponseDto, FriendRequestStatus, FriendRequestsResponse, HasPendingFriendRequestsResponse, PaginatedFriendRequestsResponse, PaginatedFriendsResponse
 };
 use crate::models::user::User;
 use crate::repository::{friends_repository, user_repository};
@@ -594,4 +592,22 @@ pub async fn get_friend_list(db: &Database, user_id: &str) -> Result<Vec<FriendD
         .collect();
 
     Ok(friend_dtos)
+}
+
+/// Check if the user has any pending incoming friend requests
+pub async fn has_pending_friend_requests(db: &Database, user_id: &str) -> Result<HasPendingFriendRequestsResponse, AppError> {
+    let user_oid = ObjectId::parse_str(user_id).map_err(|_| AppError::InvalidId)?;
+    let requests_coll: Collection<FriendRequest> = db.collection("friend_requests");
+
+    // Count pending incoming requests
+    let incoming_filter = doc! {
+        "receiver_id": &user_oid,
+        "status": "Pending"
+    };
+
+    let count = requests_coll.count_documents(incoming_filter).await?;
+
+    Ok(HasPendingFriendRequestsResponse {
+        has_pending_requests: count > 0,
+    })
 }

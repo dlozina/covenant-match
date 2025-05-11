@@ -70,7 +70,6 @@ pub struct FriendRequestResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema, Clone)]
-#[serde(rename_all = "camelCase")]
 pub struct FriendDto {
     pub id: String,
     pub username: String,
@@ -82,7 +81,6 @@ pub struct FriendDto {
 
 /// Response for friend list
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct FriendListResponse {
     pub friends: Vec<FriendDto>,
     pub total: usize,
@@ -90,7 +88,6 @@ pub struct FriendListResponse {
 
 /// Response for paginated friend list
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct PaginatedFriendsResponse {
     pub friends: Vec<FriendDto>,
     pub metadata: PaginationMetadata,
@@ -98,20 +95,23 @@ pub struct PaginatedFriendsResponse {
 
 /// Response for paginated friend requests
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct PaginatedFriendRequestsResponse {
     pub requests: Vec<FriendRequestResponseDto>,
     pub metadata: PaginationMetadata,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct AddFriendDto {
     pub friend_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct RemoveFriendDto {
     pub friend_id: String,
+}
+
+// Response for the has-pending-requests endpoint
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct HasPendingFriendRequestsResponse {
+    pub has_pending_requests: bool,
 }
