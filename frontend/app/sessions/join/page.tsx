@@ -34,7 +34,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { clearFriendRequestState } from "@/utils/saveSesionState";
+
 
 // Define JWT Claims interface
 interface JwtClaims {
@@ -234,8 +234,6 @@ function JoinSessionContent() {
   
   // Fetch nightfarers on component mount
   useEffect(() => {
-    // Clear all pending friend requests from sessionStorage
-    clearFriendRequestState();
     const loadNightfarers = async () => {
       try {
         setIsLoadingCharacters(true);

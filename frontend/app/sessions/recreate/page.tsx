@@ -36,7 +36,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { clearFriendRequestState } from "@/utils/saveSesionState";
 
 // Define JWT Claims interface
 interface JwtClaims {
@@ -194,8 +193,6 @@ function RecreateSessionContent() {
   }, [originalSessionId, router]);
   
   useEffect(() => {
-    // Clear all pending friend requests from sessionStorage
-    clearFriendRequestState();
     if (!originalSessionId) {
       setNotification({
         type: 'error',

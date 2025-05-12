@@ -13,7 +13,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { useAuth } from "@/lib/auth-context";
-import { clearFriendRequestState } from "@/utils/saveSesionState";
+
 import {
   Form,
   FormControl,
@@ -177,8 +177,6 @@ function CreateSessionContent() {
 
   // Fetch nightlords and nightfarers on component mount
   useEffect(() => {
-    // Clear all pending friend requests from sessionStorage
-    clearFriendRequestState();
     const fetchData = async () => {
       try {
         setIsLoadingCharacters(true);
