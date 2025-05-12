@@ -800,7 +800,7 @@ async fn get_friends_sessions(
     };
 
     // Extract query parameters
-    let status = query.get("status").map(|s| s.to_string());
+    let status = query.get("status").map(ToString::to_string);
     let limit = query
         .get("limit")
         .and_then(|l| l.parse::<u64>().ok())

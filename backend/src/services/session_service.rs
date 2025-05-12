@@ -14,8 +14,9 @@ use crate::ws::messages::{Broadcast, ServerMessage as WsServerMessage};
 use crate::ws::SessionManager as WsSessionManager;
 use actix::prelude::*;
 use chrono::Utc;
-use mongodb::bson::{oid::ObjectId, DateTime};
-use mongodb::Database;
+use futures::TryStreamExt;
+use mongodb::bson::{doc, oid::ObjectId, DateTime};
+use mongodb::{Collection, Database};
 use serde_json::json;
 use std::sync::LazyLock;
 use std::sync::Mutex;
@@ -1318,15 +1319,24 @@ pub async fn get_friends_sessions(
     region: Option<String>,
     platform: Option<String>,
 ) -> Result<Vec<SessionResponseDto>, AppError> {
-    // First, get the user to find their friend list
-    let user = user_repository::find_user_by_id(db, user_id)
-        .await?
-        .ok_or(AppError::UserNotFound)?;
+    // Convert user_id string to ObjectId for querying the friendships collection
+    let user_oid = ObjectId::parse_str(user_id).map_err(|_| AppError::InvalidId)?;
+
+    // Get friend IDs directly from friendships collection
+    let friendships_coll: Collection<crate::models::friends::Friendship> =
+        db.collection("friendships");
+    let filter = doc! { "user_id": user_oid };
+
+    let cursor = friendships_coll.find(filter).await?;
+    let friendships: Vec<crate::models::friends::Friendship> = cursor.try_collect().await?;
 
     // If the user has no friends, return an empty list
-    if user.friend_list.is_empty() {
+    if friendships.is_empty() {
         return Ok(Vec::new());
     }
+
+    // Convert ObjectId friends to string IDs
+    let friend_ids: Vec<String> = friendships.iter().map(|f| f.friend_id.to_hex()).collect();
 
     // Convert status string to enum if provided
     let status_filter = match status {
@@ -1344,7 +1354,7 @@ pub async fn get_friends_sessions(
     // Find sessions created by friends
     let sessions = session_repository::find_friends_sessions(
         db,
-        &user.friend_list,
+        &friend_ids,
         status_filter,
         limit,
         offset,
@@ -1813,13 +1823,19 @@ pub async fn get_friends_sessions_with_pagination(
     night_lord: Option<String>,
     host_experience: Option<String>,
 ) -> Result<PaginatedSessionsResponse<SessionResponseDto>, AppError> {
-    // First, get the user to find their friend list
-    let user = user_repository::find_user_by_id(db, user_id)
-        .await?
-        .ok_or(AppError::UserNotFound)?;
+    // Convert user_id string to ObjectId for querying the friendships collection
+    let user_oid = ObjectId::parse_str(user_id).map_err(|_| AppError::InvalidId)?;
+
+    // Get friend IDs directly from friendships collection
+    let friendships_coll: Collection<crate::models::friends::Friendship> =
+        db.collection("friendships");
+    let filter = doc! { "user_id": user_oid };
+
+    let cursor = friendships_coll.find(filter).await?;
+    let friendships: Vec<crate::models::friends::Friendship> = cursor.try_collect().await?;
 
     // If the user has no friends, return an empty paginated response
-    if user.friend_list.is_empty() {
+    if friendships.is_empty() {
         return Ok(PaginatedSessionsResponse {
             items: Vec::new(),
             metadata: PaginationMetadata {
@@ -1830,6 +1846,9 @@ pub async fn get_friends_sessions_with_pagination(
             },
         });
     }
+
+    // Convert ObjectId friends to string IDs
+    let friend_ids: Vec<String> = friendships.iter().map(|f| f.friend_id.to_hex()).collect();
 
     // Convert status string to enum if provided
     let status_filter = match status {
@@ -1843,9 +1862,6 @@ pub async fn get_friends_sessions_with_pagination(
         },
         None => None,
     };
-
-    // Convert ObjectId friends to string IDs
-    let friend_ids: Vec<String> = user.friend_list.iter().map(|id| id.to_hex()).collect();
 
     // Get total count for pagination
     let total_count = session_repository::count_friends_sessions_with_filters(
