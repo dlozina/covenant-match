@@ -5,7 +5,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Cell, Label, Legend, Pie, PieChart, ResponsiveContainer, Sector, Tooltip, TooltipProps } from "recharts";
-import { Loader2, ChevronLeft, ChevronRight, Info } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Info, UserPlus, Check } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -33,6 +33,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Notification, NotificationType } from "@/components/ui/notification";
+import { UserService } from "@/utils/api/user-service";
 
 interface CharacterStats {
   played: number;
@@ -120,6 +122,20 @@ function DashboardContent() {
   const [sessionDetails, setSessionDetails] = useState<SessionDetail | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
+  
+  // Friend status tracking
+  const [friendStatus, setFriendStatus] = useState<{
+    friends: string[],
+    pendingRequests: string[],
+    loading: Record<string, boolean>
+  }>({
+    friends: [],
+    pendingRequests: [],
+    loading: {}
+  });
+  
+  // Notification state
+  const [notification, setNotification] = useState<NotificationType | null>(null);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -765,16 +781,104 @@ function DashboardContent() {
     }
   };
   
+  // Function to fetch friend status for current user
+  const fetchFriendStatus = async () => {
+    try {
+      // Get friends and friend requests
+      const [friendsResponse, requestsResponse] = await Promise.all([
+        UserService.getFriendList(),
+        UserService.getAllFriendRequests()
+      ]);
+      
+      const friendIds = friendsResponse.friends.map(friend => friend.id);
+      const pendingRequestIds = requestsResponse.outgoing.map(request => request.receiver.id);
+      
+      setFriendStatus(prev => ({
+        ...prev,
+        friends: friendIds,
+        pendingRequests: pendingRequestIds
+      }));
+    } catch (err) {
+      console.error('Error fetching friend status:', err);
+      // We don't want to break the entire dialog if friend info fails
+    }
+  };
+  
+  // Function to send a friend request
+  const sendFriendRequest = async (receiverId: string) => {
+    try {
+      // Set loading state for this specific user
+      setFriendStatus(prev => ({
+        ...prev,
+        loading: { ...prev.loading, [receiverId]: true }
+      }));
+      
+      await UserService.sendFriendRequest(receiverId);
+      
+      // Update pending requests list
+      setFriendStatus(prev => ({
+        ...prev,
+        pendingRequests: [...prev.pendingRequests, receiverId],
+        loading: { ...prev.loading, [receiverId]: false }
+      }));
+      
+      setNotification({
+        message: "Your friend request has been sent successfully.",
+        type: "success"
+      });
+      
+      // Auto clear notification after 5 seconds
+      setTimeout(() => {
+        setNotification(null);
+      }, 5000);
+    } catch (err) {
+      console.error('Error sending friend request:', err);
+      
+      let errorMessage = "Failed to send friend request.";
+      if (err instanceof Error) {
+        if (err.message.includes("already exists")) {
+          errorMessage = "Friend request already exists or you are already friends.";
+        }
+      }
+      
+      setNotification({
+        message: errorMessage,
+        type: "error"
+      });
+      
+      // Reset loading state
+      setFriendStatus(prev => ({
+        ...prev,
+        loading: { ...prev.loading, [receiverId]: false }
+      }));
+    }
+  };
+  
+  // Function to clear notification
+  const clearNotification = () => {
+    setNotification(null);
+  };
+  
   // Function to open session details dialog
   const openSessionDetails = (sessionId: string) => {
     setSelectedSessionId(sessionId);
     setIsDetailsDialogOpen(true);
     fetchDetails(sessionId);
+    fetchFriendStatus();
   };
   
   return (
     <div className="container mx-auto py-6 md:py-8 px-4 md:px-6">
       <h1 className="text-2xl md:text-3xl font-bold mb-4 md:mb-6">Dashboard</h1>
+      
+      {notification && (
+        <div className="mb-4">
+          <Notification 
+            notification={notification}
+            onDismiss={clearNotification}
+          />
+        </div>
+      )}
       
       <div className="bg-card/50 border border-purple-900/20 rounded-lg p-4 md:p-6 backdrop-blur-sm">
         <h2 className="text-lg md:text-xl font-semibold mb-2 md:mb-4">Welcome, {userData?.username || 'Tarnished'} !</h2>
@@ -1174,24 +1278,58 @@ function DashboardContent() {
                                 <th className="h-10 px-2 text-left align-middle font-medium">Player</th>
                                 <th className="h-10 px-2 text-left align-middle font-medium">Nightfarer</th>
                                 <th className="h-10 px-2 text-left align-middle font-medium">Result</th>
+                                <th className="h-10 px-2 text-left align-middle font-medium">Friend</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {sessionDetails.players.map((player) => (
-                                <tr key={player.user_id} className="border-b transition-colors hover:bg-purple-900/5">
-                                  <td className="p-2 align-middle">{player.username}</td>
-                                  <td className="p-2 align-middle">{player.nightfarer}</td>
-                                  <td className="p-2 align-middle">
-                                    {player.result ? (
-                                      <span className={getResultColor(player.result)}>
-                                        {player.result}
-                                      </span>
-                                    ) : (
-                                      <span className="text-muted-foreground text-xs">No result</span>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
+                              {sessionDetails.players.map((player) => {
+                                const isSelf = player.user_id === userData?.id;
+                                const isFriend = friendStatus.friends.includes(player.user_id);
+                                const hasPendingRequest = friendStatus.pendingRequests.includes(player.user_id);
+                                const isLoading = !!friendStatus.loading[player.user_id];
+                                
+                                return (
+                                  <tr key={player.user_id} className="border-b transition-colors hover:bg-purple-900/5">
+                                    <td className="p-2 align-middle">{player.username}</td>
+                                    <td className="p-2 align-middle">{player.nightfarer}</td>
+                                    <td className="p-2 align-middle">
+                                      {player.result ? (
+                                        <span className={getResultColor(player.result)}>
+                                          {player.result}
+                                        </span>
+                                      ) : (
+                                        <span className="text-muted-foreground text-xs">No result</span>
+                                      )}
+                                    </td>
+                                    <td className="p-2 align-middle">
+                                      {!isSelf && (
+                                        isFriend ? (
+                                          <span className="text-green-500 flex items-center gap-1 text-xs">
+                                            <Check className="h-3 w-3" /> Friends
+                                          </span>
+                                        ) : hasPendingRequest ? (
+                                          <span className="text-orange-500 text-xs">Request sent</span>
+                                        ) : (
+                                          <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            className="h-7 w-7 p-0 rounded-full"
+                                            onClick={() => sendFriendRequest(player.user_id)}
+                                            disabled={isLoading}
+                                          >
+                                            {isLoading ? (
+                                              <Loader2 className="h-3 w-3 animate-spin" />
+                                            ) : (
+                                              <UserPlus className="h-3.5 w-3.5" />
+                                            )}
+                                            <span className="sr-only">Add friend</span>
+                                          </Button>
+                                        )
+                                      )}
+                                    </td>
+                                  </tr>
+                                )
+                              })}
                             </tbody>
                           </table>
                         </div>
