@@ -54,6 +54,7 @@ export function useSessionState(sessionId: string | null) {
     try {
       await startSessionMutation.mutateAsync(sessionId);
       console.log('Session started successfully');
+      
     } catch (err) {
       console.error('Error starting session:', err);
       

@@ -73,13 +73,6 @@ interface ActualPaginatedFriendRequests {
   metadata: PaginationMetadata;
 }
 
-// Define the actual response type structure for the has-pending endpoint
-// interface NestedPendingRequestsResponse {
-//   has_pending_requests: {
-//     has_pending_requests: boolean;
-//   };
-// }
-
 export default function FriendsPage() {
   return (
     <ProtectedRoute>

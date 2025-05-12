@@ -5,7 +5,10 @@ import { useAuth } from '@/lib/auth-context';
 // Type for friendship matrix data
 type FriendshipMatrix = {
   [userId: string]: {
-    [friendId: string]: boolean;
+    [friendId: string]: {
+      isFriend: boolean;
+      isPendingRequest: boolean;
+    };
   };
 };
 
@@ -15,6 +18,7 @@ type FriendshipResponse = {
     id: string;
     username: string;
     isFriendsWith: string[];
+    friendRequestSent: string[];
   }[];
 };
 
@@ -176,7 +180,6 @@ export function useLeaveSession() {
   });
 }
 
-// todo -> move transformation to the backend
 /**
  * Hook to fetch friendship matrix for session players
  */
@@ -202,16 +205,33 @@ export function useFriendshipMatrix(sessionId: string | null) {
         // Initialize all relationships as false
         response.players.forEach(otherPlayer => {
           if (player.id !== otherPlayer.id) {
-            matrix[player.id][otherPlayer.id] = false;
+            matrix[player.id][otherPlayer.id] = { 
+              isFriend: false,
+              isPendingRequest: false
+            };
           }
         });
       });
       
       // Set true for actual friendships
       response.players.forEach(player => {
+        // Mark players as friends
         player.isFriendsWith.forEach(friendId => {
           if (matrix[player.id]) {
-            matrix[player.id][friendId] = true;
+            matrix[player.id][friendId] = { 
+              isFriend: true,
+              isPendingRequest: false
+            };
+          }
+        });
+
+        // Mark pending friend requests
+        player.friendRequestSent.forEach(friendId => {
+          if (matrix[player.id]) {
+            matrix[player.id][friendId] = { 
+              isFriend: false,
+              isPendingRequest: true
+            };
           }
         });
       });

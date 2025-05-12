@@ -386,6 +386,7 @@ export class SessionService {
       id: string;
       username: string;
       isFriendsWith: string[];
+      friendRequestSent: string[];
     }>
   }> {
     try {
@@ -394,6 +395,7 @@ export class SessionService {
           id: string;
           username: string;
           isFriendsWith: string[];
+          friendRequestSent: string[];
         }>
       }>(`/api/v1/sessions/${sessionId}/friendship-matrix`, true);
     } catch (error) {

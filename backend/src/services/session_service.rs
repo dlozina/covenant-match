@@ -1529,6 +1529,10 @@ pub async fn get_friendship_matrix(
     let mut user_friendships: std::collections::HashMap<String, Vec<String>> =
         user_ids.iter().map(|id| (id.clone(), Vec::new())).collect();
 
+    // Also prepare a hashmap to store pending friend requests
+    let mut user_friend_requests: std::collections::HashMap<String, Vec<String>> =
+        user_ids.iter().map(|id| (id.clone(), Vec::new())).collect();
+
     // Access the friendships collection directly for better performance
     let friendship_coll = db.collection::<crate::models::friends::Friendship>("friendships");
 
@@ -1563,18 +1567,53 @@ pub async fn get_friendship_matrix(
         }
     }
 
-    // 5. Construct the response with friendship information
+    // 5. Get all pending friend requests for these users
+    // Access the friend_requests collection
+    let friend_request_coll =
+        db.collection::<crate::models::friends::FriendRequest>("friend_requests");
+
+    if !user_oids.is_empty() {
+        // Query all pending friend requests where users in this session are the senders
+        let filter = mongodb::bson::doc! {
+            "sender_id": { "$in": &user_oids },
+            "receiver_id": { "$in": &user_oids },
+            "status": "Pending"
+        };
+
+        let requests = friend_request_coll.find(filter).await?;
+        let requests = futures::TryStreamExt::try_collect::<Vec<_>>(requests).await?;
+
+        // Process the requests into our hashmap
+        for request in requests {
+            let sender_id = request.sender_id.to_hex();
+            let receiver_id = request.receiver_id.to_hex();
+
+            // Only store requests between users in this session
+            if user_ids.contains(&receiver_id) {
+                if let Some(request_sent) = user_friend_requests.get_mut(&sender_id) {
+                    request_sent.push(receiver_id);
+                }
+            }
+        }
+    }
+
+    // 6. Construct the response with friendship information
     let players = session
         .joined_players
         .iter()
         .map(|session_player| {
             let user_id = &session_player.user_id;
             let is_friends_with = user_friendships.get(user_id).cloned().unwrap_or_default();
+            let friend_request_sent = user_friend_requests
+                .get(user_id)
+                .cloned()
+                .unwrap_or_default();
 
             FriendshipPlayer {
                 id: user_id.clone(),
                 username: session_player.username.clone(),
                 is_friends_with,
+                friend_request_sent,
             }
         })
         .collect();

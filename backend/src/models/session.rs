@@ -448,6 +448,7 @@ pub struct FriendshipPlayer {
     pub id: String,
     pub username: String,
     pub is_friends_with: Vec<String>,
+    pub friend_request_sent: Vec<String>,
 }
 
 /// Response model for the friendship matrix
