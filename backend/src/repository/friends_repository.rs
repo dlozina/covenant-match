@@ -366,3 +366,111 @@ pub async fn remove_friend(db: &Database, user_id: &str, friend_id: &str) -> Res
 
     Ok(())
 }
+
+pub async fn has_pending_friend_requests(db: &Database, user_id: &str) -> Result<bool, AppError> {
+    // Validate ID
+    let user_oid = ObjectId::parse_str(user_id).map_err(|_| AppError::InvalidId)?;
+
+    // Check for pending friend requests
+    let requests_coll: Collection<FriendRequest> = db.collection("friend_requests");
+    let request_count = requests_coll
+        .count_documents(doc! {
+            "receiver_id": user_oid,
+            "status": "Pending"
+        })
+        .await?;
+
+    Ok(request_count > 0)
+}
+
+pub async fn check_friend_status(
+    db: &Database,
+    user_id: &str,
+    target_user_ids: &[String],
+) -> Result<(Vec<String>, Vec<String>, Vec<String>), AppError> {
+    // Validate user ID
+    let user_oid = ObjectId::parse_str(user_id).map_err(|_| AppError::InvalidId)?;
+
+    // Convert target user IDs to ObjectIds
+    let mut target_oids = Vec::new();
+    for id in target_user_ids {
+        // Skip if the target ID is the same as the user ID (can't be friends with yourself)
+        if id == user_id {
+            continue;
+        }
+
+        match ObjectId::parse_str(id) {
+            Ok(oid) => target_oids.push(oid),
+            Err(_) => continue, // Skip invalid IDs
+        }
+    }
+
+    // If no valid target IDs, return empty results
+    if target_oids.is_empty() {
+        return Ok((Vec::new(), Vec::new(), Vec::new()));
+    }
+
+    // Check friendships
+    let friendships_coll: Collection<Friendship> = db.collection("friendships");
+    let mut friends = Vec::new();
+
+    // Find friendships where user is friends with any of the target users
+    let friendship_cursor = friendships_coll
+        .find(doc! {
+            "$or": [
+                { "user_id": &user_oid, "friend_id": { "$in": &target_oids } },
+                { "user_id": { "$in": &target_oids }, "friend_id": &user_oid }
+            ]
+        })
+        .await?;
+
+    let friendships: Vec<Friendship> = friendship_cursor.try_collect().await?;
+
+    // Extract friend IDs
+    for friendship in &friendships {
+        if friendship.user_id == user_oid {
+            friends.push(friendship.friend_id.to_hex());
+        } else {
+            friends.push(friendship.user_id.to_hex());
+        }
+    }
+
+    // Deduplicate the friends list
+    friends.sort();
+    friends.dedup();
+
+    // Check friend requests
+    let requests_coll: Collection<FriendRequest> = db.collection("friend_requests");
+
+    // Find outgoing requests (from user to target users)
+    let outgoing_cursor = requests_coll
+        .find(doc! {
+            "sender_id": &user_oid,
+            "receiver_id": { "$in": &target_oids },
+            "status": "Pending"
+        })
+        .await?;
+
+    let outgoing_requests: Vec<FriendRequest> = outgoing_cursor.try_collect().await?;
+    let outgoing_ids: Vec<String> = outgoing_requests
+        .iter()
+        .map(|req| req.receiver_id.to_hex())
+        .collect();
+
+    // Find incoming requests (from target users to user)
+    let incoming_cursor = requests_coll
+        .find(doc! {
+            "sender_id": { "$in": &target_oids },
+            "receiver_id": &user_oid,
+            "status": "Pending"
+        })
+        .await?;
+
+    let incoming_requests: Vec<FriendRequest> = incoming_cursor.try_collect().await?;
+    let incoming_ids: Vec<String> = incoming_requests
+        .iter()
+        .map(|req| req.sender_id.to_hex())
+        .collect();
+
+    Ok((friends, outgoing_ids, incoming_ids))
+}

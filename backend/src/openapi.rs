@@ -14,7 +14,10 @@ use crate::models::bug::{
 use crate::models::chat::ChatMessageResponseDto;
 use crate::models::common::{LimitQuery, PaginationQuery};
 use crate::models::friends::{
-    AddFriendDto, CreateFriendRequestDto, FriendDto, FriendListResponse, FriendRequestResponse, FriendRequestResponseDto, FriendRequestStatus, FriendRequestsResponse, HasPendingFriendRequestsResponse, PaginatedFriendRequestsResponse, PaginatedFriendsResponse, RemoveFriendDto
+    AddFriendDto, CheckFriendStatusDto, CreateFriendRequestDto, FriendDto, FriendListResponse,
+    FriendRequestResponse, FriendRequestResponseDto, FriendRequestStatus, FriendRequestsResponse,
+    FriendStatusResponse, HasPendingFriendRequestsResponse, PaginatedFriendRequestsResponse,
+    PaginatedFriendsResponse, RemoveFriendDto,
 };
 use crate::models::game_data::{
     Covenant, CovenantResponse, Experience, ExperienceResponse, GameDataResponse, NightLord,
@@ -96,6 +99,7 @@ use utoipa::{
         get_friends,
         remove_friend,
         has_pending_friend_requests,
+        check_friend_status,
         // Admin routes
         get_all_users,
         get_user_by_id_admin,
@@ -215,6 +219,8 @@ use utoipa::{
             PaginatedFriendRequestsResponse,
             FriendRequestStatus,
             HasPendingFriendRequestsResponse,
+            CheckFriendStatusDto,
+            FriendStatusResponse,
             // User data models
             UserDataResponseDto,
             GeoLocationDataDto,

@@ -115,3 +115,17 @@ pub struct RemoveFriendDto {
 pub struct HasPendingFriendRequestsResponse {
     pub has_pending_requests: bool,
 }
+
+// DTO for checking friend status
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct CheckFriendStatusDto {
+    pub user_ids: Vec<String>,
+}
+
+// Response for friend status check
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct FriendStatusResponse {
+    pub friends: Vec<String>,
+    pub outgoing_requests: Vec<String>,
+    pub incoming_requests: Vec<String>,
+}

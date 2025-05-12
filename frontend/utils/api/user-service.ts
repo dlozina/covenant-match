@@ -140,6 +140,31 @@ export class UserService {
   }
 
   /**
+   * Check friend status for multiple users at once
+   * @param userIds Array of user IDs to check
+   * @returns Friend status information
+   */
+  static async checkFriendStatus(userIds: string[]): Promise<{
+    friends: string[];
+    outgoing_requests: string[];
+    incoming_requests: string[];
+  }> {
+    try {
+      return await httpClient.post<{
+        friends: string[];
+        outgoing_requests: string[];
+        incoming_requests: string[];
+      }>(
+        '/api/v1/friends/check-status',
+        { user_ids: userIds },
+        true
+      );
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
    * Get all friend requests (both incoming and outgoing)
    * @returns Friend requests data
    */

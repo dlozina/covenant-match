@@ -784,19 +784,23 @@ function DashboardContent() {
   // Function to fetch friend status for current user
   const fetchFriendStatus = async () => {
     try {
-      // Get friends and friend requests
-      const [friendsResponse, requestsResponse] = await Promise.all([
-        UserService.getFriendList(),
-        UserService.getAllFriendRequests()
-      ]);
+      if (!sessionDetails) return;
       
-      const friendIds = friendsResponse.friends.map(friend => friend.id);
-      const pendingRequestIds = requestsResponse.outgoing.map(request => request.receiver.id);
+      // Get the list of player IDs from the session details (excluding current user)
+      const playerIds = sessionDetails.players
+        .filter(player => player.user_id !== userData?.id)
+        .map(player => player.user_id);
+        
+      if (playerIds.length === 0) return;
+      
+      // Use the new efficient endpoint
+      const statusResponse = await UserService.checkFriendStatus(playerIds);
       
       setFriendStatus(prev => ({
         ...prev,
-        friends: friendIds,
-        pendingRequests: pendingRequestIds
+        friends: statusResponse.friends,
+        pendingRequests: statusResponse.outgoing_requests,
+        loading: {}
       }));
     } catch (err) {
       console.error('Error fetching friend status:', err);
@@ -1255,10 +1259,6 @@ function DashboardContent() {
                       <div>
                         <div className="text-xs text-muted-foreground mb-1">Status</div>
                         <div className="font-medium">{sessionDetails.status}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-1">Created</div>
-                        <div className="text-sm">{formatDate(sessionDetails.created_at)}</div>
                       </div>
                       {sessionDetails.completed_at && (
                         <div>

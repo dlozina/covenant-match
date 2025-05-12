@@ -1,6 +1,6 @@
-use crate::models::common::PaginationQuery;
 use crate::models::error::AppError;
 use crate::models::friends::CreateFriendRequestDto;
+use crate::models::{common::PaginationQuery, friends::CheckFriendStatusDto};
 use crate::services::friends_service;
 use crate::utils::jwt;
 use actix_web::{delete, get, post, put, web, HttpMessage, HttpRequest, HttpResponse, Responder};
@@ -449,15 +449,62 @@ async fn has_pending_friend_requests(db: web::Data<Database>, req: HttpRequest) 
     };
 
     match friends_service::has_pending_friend_requests(&db, &user_id).await {
-        Ok(has_pending) => HttpResponse::Ok().json(
-            has_pending
-        ),
+        Ok(has_pending) => HttpResponse::Ok().json(has_pending),
         Err(e) => {
             log::error!("Error checking pending friend requests: {:?}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "status": "error",
                 "message": "Failed to check pending friend requests"
             }))
+        }
+    }
+}
+
+/// Check friend status for multiple users
+#[utoipa::path(
+    post,
+    path = "/api/v1/friends/check-status",
+    request_body = CheckFriendStatusDto,
+    responses(
+        (status = 200, description = "Friend status checked successfully", body = FriendStatusResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error")
+    ),
+    security(
+        ("bearer_auth" = [])
+    ),
+    tag = "friends"
+)]
+#[post("/api/v1/friends/check-status")]
+async fn check_friend_status(
+    db: web::Data<Database>,
+    req: HttpRequest,
+    request_data: web::Json<CheckFriendStatusDto>,
+) -> impl Responder {
+    // Extract user_id from JWT token
+    let user_id = {
+        let extensions = req.extensions();
+        let claims = extensions
+            .get::<jwt::Claims>()
+            .expect("JWT claims not found in request extensions");
+        claims.sub.clone()
+    };
+
+    match friends_service::check_friend_status(&db, &user_id, &request_data.user_ids).await {
+        Ok(response) => HttpResponse::Ok().json(response),
+        Err(e) => {
+            log::error!("Error checking friend status: {:?}", e);
+            match e {
+                AppError::InvalidId => HttpResponse::BadRequest().json(serde_json::json!({
+                    "status": "error",
+                    "message": "Invalid user ID format"
+                })),
+                _ => HttpResponse::InternalServerError().json(serde_json::json!({
+                    "status": "error",
+                    "message": "Failed to check friend status"
+                })),
+            }
         }
     }
 }
@@ -471,5 +518,6 @@ pub fn config(cfg: &mut web::ServiceConfig) {
         .service(reject_friend_request)
         .service(get_friends)
         .service(remove_friend)
-        .service(has_pending_friend_requests);
+        .service(has_pending_friend_requests)
+        .service(check_friend_status);
 }

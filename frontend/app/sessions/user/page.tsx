@@ -10,9 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth-context";
 import { UserSessionsResponse } from "@/utils/api/types";
 import { formatDate } from "@/lib/utils";
-import { UserCircle2, Shield, Users, Clock, ArrowRight } from "lucide-react";
+import { UserCircle2, Shield, Users, Clock, ArrowRight, UserPlus, Check, Loader2 } from "lucide-react";
 import { httpClient } from "@/utils/api/http-client";
 import { useQueryClient } from "@tanstack/react-query";
+import { UserService } from "@/utils/api/user-service";
+import { Notification } from "@/components/ui/notification";
 
 // Static green badge for active sessions
 const ActiveSessionBadge = () => (
@@ -227,6 +229,23 @@ function PreviousSessionSection() {
   const [previousSession, setPreviousSession] = useState<UserSessionsResponse['previousSession'] | null>(null);
   const router = useRouter();
   const { userData } = useAuth();
+  
+  // Friend status state
+  const [friendStatus, setFriendStatus] = useState<{
+    friends: string[];
+    pendingRequests: string[];
+    loading: { [key: string]: boolean };
+  }>({
+    friends: [],
+    pendingRequests: [],
+    loading: {}
+  });
+  
+  // Notification state
+  const [notification, setNotification] = useState<{
+    message: string;
+    type: 'success' | 'error' | 'warning';
+  } | null>(null);
 
   useEffect(() => {
     const fetchSession = async () => {
@@ -234,6 +253,11 @@ function PreviousSessionSection() {
         setLoading(true);
         const sessionsData = await httpClient.get<UserSessionsResponse>('/api/v1/users/sessions', true);
         setPreviousSession(sessionsData.previousSession);
+        
+        // Fetch friend status after session data is loaded
+        if (sessionsData.previousSession) {
+          fetchFriendStatus(sessionsData.previousSession);
+        }
       } catch (error) {
         console.error("Failed to fetch previous session:", error);
       } finally {
@@ -243,6 +267,86 @@ function PreviousSessionSection() {
 
     fetchSession();
   }, []);
+  
+  // Function to fetch friend status for players in the session
+  const fetchFriendStatus = async (session: UserSessionsResponse['previousSession']) => {
+    try {
+      if (!session || !userData?.id) return;
+      
+      // Get player IDs (excluding current user)
+      const playerIds = session.joinedPlayers
+        .filter(player => player.userId !== userData.id)
+        .map(player => player.userId);
+        
+      if (playerIds.length === 0) return;
+      
+      // Use the efficient endpoint to check friend status for all players at once
+      const statusResponse = await UserService.checkFriendStatus(playerIds);
+      
+      setFriendStatus({
+        friends: statusResponse.friends,
+        pendingRequests: statusResponse.outgoing_requests,
+        loading: {}
+      });
+    } catch (err) {
+      console.error('Error fetching friend status:', err);
+    }
+  };
+  
+  // Function to send a friend request
+  const sendFriendRequest = async (receiverId: string) => {
+    try {
+      // Set loading state for this specific user
+      setFriendStatus(prev => ({
+        ...prev,
+        loading: { ...prev.loading, [receiverId]: true }
+      }));
+      
+      await UserService.sendFriendRequest(receiverId);
+      
+      // Update pending requests list
+      setFriendStatus(prev => ({
+        ...prev,
+        pendingRequests: [...prev.pendingRequests, receiverId],
+        loading: { ...prev.loading, [receiverId]: false }
+      }));
+      
+      setNotification({
+        message: "Friend request sent successfully!",
+        type: "success"
+      });
+      
+      // Auto clear notification after 5 seconds
+      setTimeout(() => {
+        setNotification(null);
+      }, 5000);
+    } catch (err) {
+      console.error('Error sending friend request:', err);
+      
+      let errorMessage = "Failed to send friend request.";
+      if (err instanceof Error) {
+        if (err.message.includes("already exists")) {
+          errorMessage = "Friend request already exists or you are already friends.";
+        }
+      }
+      
+      setNotification({
+        message: errorMessage,
+        type: "error"
+      });
+      
+      // Reset loading state
+      setFriendStatus(prev => ({
+        ...prev,
+        loading: { ...prev.loading, [receiverId]: false }
+      }));
+    }
+  };
+  
+  // Function to clear notification
+  const clearNotification = () => {
+    setNotification(null);
+  };
 
   if (loading) {
     return (
@@ -318,6 +422,15 @@ function PreviousSessionSection() {
   return (
     <section>
       <h2 className="text-xl font-semibold mb-4">Previous Session</h2>
+      
+      {notification && (
+        <div className="mb-4">
+          <Notification 
+            notification={notification}
+            onDismiss={clearNotification}
+          />
+        </div>
+      )}
       
       <Card className="w-full bg-card/50 border border-purple-900/20 backdrop-blur-sm">
         <CardHeader className="pb-2">
@@ -397,6 +510,12 @@ function PreviousSessionSection() {
                     result => result.userId === player.userId
                   );
                   
+                  // Determine friend status
+                  const isSelf = player.userId === userData?.id;
+                  const isFriend = friendStatus.friends.includes(player.userId);
+                  const hasPendingRequest = friendStatus.pendingRequests.includes(player.userId);
+                  const isLoading = friendStatus.loading[player.userId] || false;
+                  
                   return (
                     <div key={player.username} className="p-2 rounded-md bg-card/30 border border-purple-900/10">
                       <div className="flex items-center justify-between mb-1">
@@ -410,6 +529,35 @@ function PreviousSessionSection() {
                           )}
                         </div>
                         <div className="flex items-center gap-2">
+                          {/* Friend status/action */}
+                          {!isSelf && (
+                            <div className="flex items-center mr-3">
+                              {isFriend ? (
+                                <span className="text-green-500 flex items-center gap-1 text-xs">
+                                  <Check className="h-3 w-3" /> Friends
+                                </span>
+                              ) : hasPendingRequest ? (
+                                <span className="text-orange-500 text-xs">Request sent</span>
+                              ) : (
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-7 w-7 p-0 rounded-full"
+                                  onClick={() => sendFriendRequest(player.userId)}
+                                  disabled={isLoading}
+                                >
+                                  {isLoading ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <UserPlus className="h-3.5 w-3.5" />
+                                  )}
+                                  <span className="sr-only">Add friend</span>
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Result badge */}
                           {playerResult?.result === 'Win' ? (
                             <Badge className="bg-green-500/20 text-green-400 border-0">Win</Badge>
                           ) : playerResult?.result === 'Loss' ? (

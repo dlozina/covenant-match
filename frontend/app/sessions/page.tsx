@@ -650,7 +650,7 @@ export default function SessionsPage() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="w-full justify-between">
-                  {activeTab === "general" ? "All Sessions" : "Friends' Sessions"}
+                  {activeTab === "general" ? "All Sessions" : "Friend's Sessions"}
                   <ChevronDown className="h-4 w-4 opacity-50" />
                 </Button>
               </DropdownMenuTrigger>
@@ -665,7 +665,7 @@ export default function SessionsPage() {
                   onClick={() => handleTabChange("friends")}
                   className={`${activeTab === "friends" ? "bg-muted/50" : ""} ${!isLoggedIn ? "opacity-50 pointer-events-none" : ""}`}
                 >
-                  Friends&apos; Sessions
+                  Friend&apos;s Sessions
                   <span className="ml-2 bg-purple-500/20 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 text-xs px-1.5 py-0.5 rounded-full">Friends</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -684,7 +684,7 @@ export default function SessionsPage() {
                   className="text-base font-medium"
                   disabled={!isLoggedIn}
                 >
-                  Friends&apos; Sessions
+                  Friend&apos;s Sessions
                   <span className="ml-2 bg-purple-500/20 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 text-xs px-2 py-0.5 rounded-full">Friends Only</span>
                 </TabsTrigger>
               </TabsList>

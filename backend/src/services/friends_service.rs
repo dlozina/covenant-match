@@ -2,8 +2,8 @@ use crate::models::common::PaginationMetadata;
 use crate::models::error::AppError;
 use crate::models::friends::{
     FriendDto, FriendListResponse, FriendRequest, FriendRequestResponse, FriendRequestResponseDto,
-    FriendRequestStatus, FriendRequestsResponse, HasPendingFriendRequestsResponse,
-    PaginatedFriendRequestsResponse, PaginatedFriendsResponse,
+    FriendRequestStatus, FriendRequestsResponse, FriendStatusResponse,
+    HasPendingFriendRequestsResponse, PaginatedFriendRequestsResponse, PaginatedFriendsResponse,
 };
 use crate::models::user::User;
 use crate::repository::{friends_repository, user_repository};
@@ -677,51 +677,35 @@ pub async fn has_pending_friend_requests(
     db: &Database,
     user_id: &str,
 ) -> Result<HasPendingFriendRequestsResponse, AppError> {
-    // First try to get from cache
-    let cached_result = {
-        let cache_result = PENDING_REQUESTS_CACHE.try_lock();
-
-        match cache_result {
-            Ok(mut cache) => cache.get(user_id),
-            Err(e) => {
-                // If we can't acquire the lock, log the error and continue without cache
-                error!("Failed to acquire lock on pending requests cache: {:?}", e);
-                None
-            }
-        }
-    };
-
-    // If we have a cached result, return it
-    if let Some(has_pending) = cached_result {
-        debug!("Using cached pending requests result for user {}", user_id);
-        return Ok(HasPendingFriendRequestsResponse {
-            has_pending_requests: has_pending,
-        });
-    }
-
-    // Otherwise query the database
-    debug!("Cache miss for user {}, querying database", user_id);
-    let user_oid = ObjectId::parse_str(user_id).map_err(|_| AppError::InvalidId)?;
-    let requests_coll: Collection<FriendRequest> = db.collection("friend_requests");
-
-    // Count pending incoming requests
-    let incoming_filter = doc! {
-        "receiver_id": &user_oid,
-        "status": "Pending"
-    };
-
-    let count = requests_coll.count_documents(incoming_filter).await?;
-    let has_pending = count > 0;
-
-    // Update cache
-    {
-        if let Ok(mut cache) = PENDING_REQUESTS_CACHE.try_lock() {
-            cache.set(user_id.to_string(), has_pending);
-            debug!("Updated cache for user {}", user_id);
-        }
-    }
+    let has_pending = friends_repository::has_pending_friend_requests(db, user_id).await?;
 
     Ok(HasPendingFriendRequestsResponse {
         has_pending_requests: has_pending,
+    })
+}
+
+/// Check friend status for a list of users
+pub async fn check_friend_status(
+    db: &Database,
+    user_id: &str,
+    target_user_ids: &[String],
+) -> Result<FriendStatusResponse, AppError> {
+    // Validate parameters
+    if target_user_ids.is_empty() {
+        return Ok(FriendStatusResponse {
+            friends: Vec::new(),
+            outgoing_requests: Vec::new(),
+            incoming_requests: Vec::new(),
+        });
+    }
+
+    // Get friend status from repository
+    let (friends, outgoing, incoming) =
+        friends_repository::check_friend_status(db, user_id, target_user_ids).await?;
+
+    Ok(FriendStatusResponse {
+        friends,
+        outgoing_requests: outgoing,
+        incoming_requests: incoming,
     })
 }
