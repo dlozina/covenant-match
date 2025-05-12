@@ -56,15 +56,6 @@ const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({
 
         {/* Add a divider for visual separation */}
         <div className="border-t border-border"></div>
-
-        <p className="text-sm text-muted-foreground mt-auto">
-          {!sessionState.isSessionStarted 
-            ? 'Waiting for the host to start the session.'
-            : 'Once the host ends the session, players can report results. When everyone’s done, the host can launch a new session with the same team.'}
-        </p>
-        
-        {/* Add a divider for visual separation */}
-        <div className="border-t border-border"></div>
         
         <div className="flex justify-between items-center">
           <span className="text-muted-foreground">Night Lord:</span>
@@ -79,6 +70,13 @@ const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({
               : 'DarkKnight'}
           </span>
         </div>
+
+        {sessionData?.id && !sessionState.isSessionStarted && (
+          <>
+            {/* Add a divider for visual separation */}
+            <div className="border-t border-border"></div>
+          </>
+        )}
 
         {/* Share session link button - only show when session is in "open" state */}
         {sessionData?.id && !sessionState.isSessionStarted && (
@@ -103,6 +101,23 @@ const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({
             </TooltipProvider>
           </div>
         )}
+
+        {/* Add a divider for visual separation */}
+        <div className="border-t border-border"></div>
+
+        <p className="text-sm text-muted-foreground mt-auto">
+          {!sessionState.isSessionStarted 
+            ? 'Waiting for the host to start the session.'
+            : (
+                <>
+                  Once the host ends the session, players can report results.
+                  <br />
+                  When everyone&apos;s done, the host can launch a new session with the same team.
+                </>
+              )
+          }
+        </p>
+
       </CardContent>
     </Card>
   );
