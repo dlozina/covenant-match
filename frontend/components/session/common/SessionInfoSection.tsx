@@ -1,8 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { SessionState } from '@/components/session/SessionReducers';
 import { SessionData } from './types';
-import { formatDistanceToNow } from 'date-fns';
 import { Button } from "@/components/ui/button";
 import { Share2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -15,10 +14,9 @@ export const getSessionJoinUrl = (sessionId: string): string => {
 interface SessionInfoSectionProps {
   sessionState: SessionState;
   sessionData?: SessionData;
-  lastHeartbeat?: number | null;
 }
 
-// Simplified session info component without complex timer logic
+// Simplified session info component
 const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({ 
   sessionState, 
   sessionData
@@ -42,49 +40,6 @@ const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({
     }
   };
 
-  // Memoize the relative time display to prevent unnecessary rerenders
-  const relativeTime = useMemo(() => {
-    // If session hasn't started yet according to state
-    if (!sessionState.isSessionStarted) {
-      return 'Not started';
-    }
-    
-    // If session is finished, just show completed
-    if (sessionState.isSessionFinished) {
-      return 'Completed';
-    }
-    
-    // If no session data or startedAt is null/undefined
-    if (!sessionData?.startedAt) {
-      return 'In progress';
-    }
-    
-    try {
-      // For proper date handling, ensure we're working with a string
-      const startTimeStr = typeof sessionData.startedAt === 'string' 
-        ? sessionData.startedAt 
-        : String(sessionData.startedAt);
-      
-      // Create a date object
-      const startTime = new Date(startTimeStr);
-      
-      // Verify the date is valid
-      if (isNaN(startTime.getTime())) {
-        return 'In progress';
-      }
-      
-      // Format the relative time
-      return `Started ${formatDistanceToNow(startTime, { addSuffix: true })}`;
-    } catch (e) {
-      // Log error in development but not in production to avoid console noise
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('Error formatting date:', e);
-      }
-      // Fallback if anything goes wrong
-      return 'Session in progress';
-    }
-  }, [sessionState.isSessionStarted, sessionState.isSessionFinished, sessionData?.startedAt]);
-
   return (
     <Card className="flex flex-col flex-grow">
       <CardHeader>
@@ -105,7 +60,7 @@ const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({
         <p className="text-sm text-muted-foreground mt-auto">
           {!sessionState.isSessionStarted 
             ? 'Waiting for the host to start the session.'
-            : 'After the host ends the session, each player can report their result.'}
+            : 'Once the host ends the session, players can report results. When everyone’s done, the host can launch a new session with the same team.'}
         </p>
         
         {/* Add a divider for visual separation */}
@@ -122,18 +77,6 @@ const SessionInfoSection: React.FC<SessionInfoSectionProps> = ({
             {sessionData && sessionData.joinedPlayers.length > 0 
               ? sessionData.joinedPlayers[0].username 
               : 'DarkKnight'}
-          </span>
-        </div>
-        
-        <div className="flex justify-between items-center">
-          <span className="text-muted-foreground">
-            Status:
-          </span>
-          <span 
-            className={`font-medium ${sessionState.isSessionStarted && !sessionState.isSessionFinished ? 'text-emerald-500 font-bold' : 'text-foreground'}`}
-            data-testid="session-timer"
-          >
-            {relativeTime}
           </span>
         </div>
 

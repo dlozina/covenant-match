@@ -67,6 +67,9 @@ const ResultReportingSectionComponent = ({
               />
             </div>
 
+            {/* Add a divider for visual separation */}
+            <div className="border-t border-border"></div>
+
             {/* Rating Stars */}
             <RatingStars 
               rating={resultState.rating} 
@@ -79,6 +82,9 @@ const ResultReportingSectionComponent = ({
                 Error: {submissionError}
               </div>
             )}
+
+            {/* Add a divider for visual separation */}
+            <div className="border-t border-border"></div>
 
             {/* Submit Button */}
             <Button 
