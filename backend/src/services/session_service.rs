@@ -251,7 +251,6 @@ pub async fn check_user_active_session(
 ) -> Result<Option<SessionResponseDto>, AppError> {
     // No need to validate the user ID format - the ID comes directly from JWT claims
     // and should be used as is
-    log::info!("Checking active sessions for user ID: {}", user_id);
 
     // Find active sessions for the user
     let active_sessions = match session_repository::find_active_sessions_for_user(db, user_id).await
