@@ -20,9 +20,12 @@ export interface FriendRequestResponse {
 
 export interface PaginatedFriendRequests {
   requests: FriendRequestResponse[];
-  total: number;
-  page: number;
-  per_page: number;
+  metadata: {
+    totalCount: number;
+    pageCount: number;
+    currentPage: number;
+    perPage: number;
+  };
 }
 
 export interface PendingRequestsResponse {

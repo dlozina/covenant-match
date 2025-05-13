@@ -177,10 +177,16 @@ function FriendsContent() {
       
       setFriends(friendsData);
       
-      // Calculate total pages - ensure at least 1 page if we have items, otherwise 0
-      const totalPages = response.total > 0 ? Math.max(1, Math.ceil(response.total / pageSize)) : 0;
-      setFriendsTotalPages(totalPages);
-      setFriendsTotalCount(response.total);
+      // Use metadata from API response for pagination
+      if (response.metadata) {
+        setFriendsTotalPages(response.metadata.pageCount || 1);
+        setFriendsTotalCount(response.metadata.totalCount || 0);
+      } else {
+        // Fallback calculation if metadata is not available
+        const totalPages = response.total > 0 ? Math.max(1, Math.ceil(response.total / pageSize)) : 0;
+        setFriendsTotalPages(totalPages);
+        setFriendsTotalCount(response.total);
+      }
       
       // Fetch stats in batch if there are friends
       if (userIds.length > 0) {
@@ -242,11 +248,9 @@ function FriendsContent() {
       
       setIncomingRequests(mappedRequests);
       
-      // Calculate total pages - ensure at least 1 page if we have items, otherwise 0
-      const totalCount = response.metadata.totalCount || 0;
-      const totalPages = totalCount > 0 ? Math.max(1, Math.ceil(totalCount / pageSize)) : 0;
-      setIncomingTotalPages(totalPages);
-      setIncomingTotalCount(totalCount);
+      // Use metadata from API response
+      setIncomingTotalPages(response.metadata.pageCount || 0);
+      setIncomingTotalCount(response.metadata.totalCount || 0);
       
       if (userIds.length > 0) {
         fetchRequestStats(userIds, mappedRequests, setIncomingRequests, 'sender');
@@ -309,11 +313,9 @@ function FriendsContent() {
       
       setOutgoingRequests(mappedRequests);
       
-      // Calculate total pages - ensure at least 1 page if we have items, otherwise 0
-      const totalCount = response.metadata.totalCount || 0;
-      const totalPages = totalCount > 0 ? Math.max(1, Math.ceil(totalCount / pageSize)) : 0;
-      setOutgoingTotalPages(totalPages);
-      setOutgoingTotalCount(totalCount);
+      // Use metadata from API response
+      setOutgoingTotalPages(response.metadata.pageCount || 0);
+      setOutgoingTotalCount(response.metadata.totalCount || 0);
       
       if (userIds.length > 0) {
         fetchRequestStats(userIds, mappedRequests, setOutgoingRequests, 'receiver');
@@ -422,26 +424,30 @@ function FriendsContent() {
     }
   };
   
-  // Filter data based on search query
-  const filteredFriends = friends.filter(friend => 
-    friend.username?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter data based on search query - IMPORTANT: Now only filter if we're not paginating on server
+  const filteredFriends = searchQuery ? 
+    friends.filter(friend => friend.username?.toLowerCase().includes(searchQuery.toLowerCase())) 
+    : friends;
   
-  const filteredIncoming = incomingRequests.filter(request => 
-    request.sender.username.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredIncoming = searchQuery ? 
+    incomingRequests.filter(request => request.sender.username.toLowerCase().includes(searchQuery.toLowerCase())) 
+    : incomingRequests;
   
-  const filteredOutgoing = outgoingRequests.filter(request => 
-    request.receiver.username.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredOutgoing = searchQuery ? 
+    outgoingRequests.filter(request => request.receiver.username.toLowerCase().includes(searchQuery.toLowerCase())) 
+    : outgoingRequests;
   
   // Handle search input
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
-    // Reset to first page when searching in current tab
-    if (activeTab === "friends") setFriendsPage(1);
-    if (activeTab === "incoming") setIncomingPage(1);
-    if (activeTab === "outgoing") setOutgoingPage(1);
+    
+    // If search is being cleared, just stay on current page
+    // If new search term, reset to first page in current tab
+    if (e.target.value && e.target.value !== searchQuery) {
+      if (activeTab === "friends") setFriendsPage(1);
+      if (activeTab === "incoming") setIncomingPage(1);
+      if (activeTab === "outgoing") setOutgoingPage(1);
+    }
   };
   
   // Pagination handlers for each tab
@@ -834,7 +840,7 @@ function FriendsContent() {
                     Play sessions to meet new nightfarers and add them as friends.
                   </p>
                 </div>
-              ) : filteredFriends.length === 0 ? (
+              ) : filteredFriends.length === 0 && searchQuery ? (
                 <div className="text-center py-10">
                   <p className="text-muted-foreground mb-4">No friends found matching &quot;{searchQuery}&quot;</p>
                   <p className="text-sm text-muted-foreground">
@@ -906,7 +912,7 @@ function FriendsContent() {
                     When someone sends you a friend request, it will appear here.
                   </p>
                 </div>
-              ) : filteredIncoming.length === 0 ? (
+              ) : filteredIncoming.length === 0 && searchQuery ? (
                 <div className="text-center py-10">
                   <p className="text-muted-foreground mb-4">No requests found matching &quot;{searchQuery}&quot;</p>
                   <p className="text-sm text-muted-foreground">
@@ -978,7 +984,7 @@ function FriendsContent() {
                     You haven&apos;t sent any friend requests yet.
                   </p>
                 </div>
-              ) : filteredOutgoing.length === 0 ? (
+              ) : filteredOutgoing.length === 0 && searchQuery ? (
                 <div className="text-center py-10">
                   <p className="text-muted-foreground mb-4">No requests found matching &quot;{searchQuery}&quot;</p>
                   <p className="text-sm text-muted-foreground">

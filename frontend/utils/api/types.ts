@@ -411,6 +411,12 @@ export interface Friend {
 export interface FriendList {
   friends: Friend[];
   total: number;
+  metadata?: {
+    totalCount: number;
+    pageCount: number;
+    currentPage: number;
+    perPage: number;
+  };
 }
 
 // Filtering options
