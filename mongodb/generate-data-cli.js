@@ -3,16 +3,18 @@
 
 // Configuration - adjust these values as needed
 const CONFIG = {
-  numUsers: 0,              // Number of users to generate
-  numSessions: 5000,           // Number of sessions to generate
-  openSessionPercentage: 40,   // Percentage of sessions that should be "Open" (1-2 players)
+  numUsers: 4000,              // Number of users to generate
+  numSessions: 10000,           // Number of sessions to generate
+  openSessionPercentage: 50,   // Percentage of sessions that should be "Open" (1-2 players)
   fullSessionPercentage: 15,   // Percentage of sessions that should be "Full" (3 players)
   inProgressPercentage: 20,    // Percentage of sessions that should be "InProgress"
-  completedPercentage: 20,     // Percentage of sessions that should be "Completed"
+  completedPercentage: 10,     // Percentage of sessions that should be "Completed"
   cancelledPercentage: 5,      // Percentage of sessions that should be "Cancelled"
   batchSize: 100,              // How many documents to insert at once
   clearExistingData: false,    // Set to false to preserve existing data
-  maxPlayersPerSession: 3      // Maximum number of players in a session
+  maxPlayersPerSession: 3,     // Maximum number of players in a session
+  avgFriendsPerUser: 20,        // Average number of friends per user
+  avgFriendRequestsPerUser: 20  // Average number of friend requests per user (includes both outgoing and incoming)
 };
 
 // Night Lord and Nightfarer names for variety
@@ -31,6 +33,7 @@ const covenants = ["Warriors of Sunlight", "Way of White", "Princess Guard", "Wa
                   "Princess Guard", "Mound-Makers", "Blade of the Darkmoon", "Watchdogs of Farron"];
 const results = ["Win", "Loss", "Disconnect"];
 const ratings = [1, 2, 3, 4, 5];
+const requestStatuses = ["Pending", "Accepted", "Rejected"];
 
 // Random selection helper
 const randomFromArray = arr => arr[Math.floor(Math.random() * arr.length)];
@@ -78,7 +81,6 @@ const generateUser = (i) => {
     covenant_name: randomFromArray(covenants),
     created_at: timestamp,
     updated_at: updateTimestamp,
-    friend_list: [], // Will be populated later
     avatar_url: Math.random() > 0.7 ? `https://example.com/avatars/avatar${Math.floor(Math.random() * 50)}.png` : null,
     preferred_nightfarer: Math.random() > 0.5 ? randomFromArray(nightfarers) : "",
     preferred_session_name: "",
@@ -87,25 +89,133 @@ const generateUser = (i) => {
   };
 };
 
-// Create friends relationships (bidirectional)
-const createFriendRelationships = (users, averageFriends = 5) => {
-  for (let i = 0; i < users.length; i++) {
-    const user = users[i];
-    // Number of friends for this user (random around the average)
-    const friendCount = Math.max(0, Math.floor(Math.random() * averageFriends * 2));
+// Generate friendship relations and requests
+const generateFriendshipsAndRequests = (users) => {
+  const friendships = [];
+  const friendRequests = [];
+  
+  // Set to track existing friendships to avoid duplicates
+  const existingFriendships = new Set();
+  const existingRequests = new Set();
+  
+  for (const user of users) {
+    if (user.disabled) continue; // Skip disabled users
     
-    for (let j = 0; j < friendCount; j++) {
-      // Find a random user to befriend
-      const friendIndex = Math.floor(Math.random() * users.length);
-      if (friendIndex !== i && !user.friend_list.some(id => id.toString() === users[friendIndex]._id.toString())) {
-        // Add friend to user's friend list
-        user.friend_list.push(users[friendIndex]._id);
-        // Add user to friend's friend list
-        users[friendIndex].friend_list.push(user._id);
+    // Determine number of friendships for this user
+    const targetFriendCount = Math.max(0, Math.floor(Math.random() * CONFIG.avgFriendsPerUser * 2));
+    let currentFriendCount = 0;
+    
+    // Determine number of friend requests for this user
+    const targetRequestCount = Math.max(0, Math.floor(Math.random() * CONFIG.avgFriendRequestsPerUser * 2));
+    let currentRequestCount = 0;
+    
+    // Try to add friendships until we reach target or run out of candidates
+    let attempts = 0;
+    while (currentFriendCount < targetFriendCount && attempts < users.length * 2) {
+      attempts++;
+      
+      // Find a potential friend
+      const friend = users[Math.floor(Math.random() * users.length)];
+      if (friend._id.toString() === user._id.toString() || friend.disabled) continue;
+      
+      // Check if this friendship already exists
+      const friendshipKey = [user._id.toString(), friend._id.toString()].sort().join('-');
+      if (existingFriendships.has(friendshipKey)) continue;
+      
+      // Create timestamp for friendship creation
+      const timestamp = randomDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), new Date());
+      
+      // Create bi-directional friendship records
+      friendships.push({
+        _id: new ObjectId(),
+        user_id: user._id,
+        friend_id: friend._id,
+        created_at: timestamp
+      });
+      
+      friendships.push({
+        _id: new ObjectId(),
+        user_id: friend._id,
+        friend_id: user._id,
+        created_at: new Date(timestamp.getTime() + 5) // Small delay for the reciprocal relationship
+      });
+      
+      existingFriendships.add(friendshipKey);
+      currentFriendCount++;
+    }
+    
+    // Generate friend requests
+    attempts = 0;
+    while (currentRequestCount < targetRequestCount && attempts < users.length * 2) {
+      attempts++;
+      
+      // Determine if user is sender or receiver
+      const isSender = Math.random() > 0.5;
+      
+      // Find a potential request partner
+      const otherUser = users[Math.floor(Math.random() * users.length)];
+      if (otherUser._id.toString() === user._id.toString() || otherUser.disabled) continue;
+      
+      // Check if this users already have a friendship
+      const friendshipKey = [user._id.toString(), otherUser._id.toString()].sort().join('-');
+      if (existingFriendships.has(friendshipKey)) continue;
+      
+      // Check if there's already a request between these users
+      const requestKey = isSender ? 
+        `${user._id.toString()}-${otherUser._id.toString()}` : 
+        `${otherUser._id.toString()}-${user._id.toString()}`;
+        
+      if (existingRequests.has(requestKey)) continue;
+      
+      // Create timestamp for request creation
+      const createdAt = randomDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), new Date());
+      
+      // Determine request status - 60% Accepted, 20% Rejected, 20% Pending
+      const rand = Math.random();
+      const status = rand < 0.6 ? "Accepted" : (rand < 0.8 ? "Rejected" : "Pending");
+      
+      // Calculate update timestamp based on status
+      const updatedAt = status !== "Pending" ? 
+        new Date(createdAt.getTime() + randomDelta(5, 1440)) : // 5 min to 24 hours for responses
+        createdAt; // No update for pending requests
+      
+      // Create friend request
+      const request = {
+        _id: new ObjectId(),
+        sender_id: isSender ? user._id : otherUser._id,
+        receiver_id: isSender ? otherUser._id : user._id,
+        status: status,
+        created_at: createdAt,
+        updated_at: updatedAt
+      };
+      
+      friendRequests.push(request);
+      existingRequests.add(requestKey);
+      currentRequestCount++;
+      
+      // If the request was accepted, also create a friendship
+      if (status === "Accepted" && !existingFriendships.has(friendshipKey)) {
+        // Create friendship entries only if they don't already exist
+        friendships.push({
+          _id: new ObjectId(),
+          user_id: request.sender_id,
+          friend_id: request.receiver_id,
+          created_at: updatedAt
+        });
+        
+        friendships.push({
+          _id: new ObjectId(),
+          user_id: request.receiver_id,
+          friend_id: request.sender_id,
+          created_at: new Date(updatedAt.getTime() + 5) // Small delay for the reciprocal relationship
+        });
+        
+        existingFriendships.add(friendshipKey);
       }
     }
   }
-  return users;
+  
+  return { friendships, friendRequests };
 };
 
 // Generate a session with players from our existing users
@@ -262,10 +372,14 @@ function generateData() {
     print('Clearing existing data...');
     db.users.deleteMany({});
     db.sessions.deleteMany({});
+    db.friendships.deleteMany({});
+    db.friend_requests.deleteMany({});
   } else {
-    print('Preserving existing data - will only clear sessions');
+    print('Preserving existing data - will only clear sessions, friendships, and friend requests');
     db.sessions.deleteMany({}); // Clear only sessions, keep users
-    print('Existing sessions cleared, but users are preserved');
+    db.friendships.deleteMany({}); // Clear friendships
+    db.friend_requests.deleteMany({}); // Clear friend requests
+    print('Existing sessions, friendships, and friend requests cleared, but users are preserved');
   }
   
   // Step 2: Generate users
@@ -282,19 +396,28 @@ function generateData() {
     }
   }
   
-  // Step 3: Create friend relationships
-  print('Creating friend relationships...');
+  // Step 3: Create friendships and friend requests
+  print('Creating friendships and friend requests...');
   const allUsers = db.users.find({}).toArray();
-  const usersWithFriends = createFriendRelationships(allUsers);
+  const { friendships, friendRequests } = generateFriendshipsAndRequests(allUsers);
   
-  // Update users with friend lists
-  usersWithFriends.forEach(user => {
-    db.users.updateOne(
-      { _id: user._id },
-      { $set: { friend_list: user.friend_list } }
-    );
-  });
-  print('Updated friend relationships');
+  // Insert friendships in batches
+  for (let i = 0; i < friendships.length; i += CONFIG.batchSize) {
+    const batch = friendships.slice(i, i + CONFIG.batchSize);
+    if (batch.length > 0) {
+      db.friendships.insertMany(batch);
+      print(`Inserted ${batch.length} friendships (${i + 1} to ${i + batch.length})`);
+    }
+  }
+  
+  // Insert friend requests in batches
+  for (let i = 0; i < friendRequests.length; i += CONFIG.batchSize) {
+    const batch = friendRequests.slice(i, i + CONFIG.batchSize);
+    if (batch.length > 0) {
+      db.friend_requests.insertMany(batch);
+      print(`Inserted ${batch.length} friend requests (${i + 1} to ${i + batch.length})`);
+    }
+  }
   
   // Step 4: Generate sessions
   print(`Generating ${CONFIG.numSessions} sessions...`);
@@ -312,7 +435,7 @@ function generateData() {
   }
   
   print('Data generation complete!');
-  print(`Generated ${allUsers.length} users and ${CONFIG.numSessions} sessions`);
+  print(`Generated ${allUsers.length} users, ${friendships.length} friendships, ${friendRequests.length} friend requests, and ${CONFIG.numSessions} sessions`);
 }
 
 // Execute the generator
