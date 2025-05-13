@@ -93,17 +93,6 @@ export function SiteHeader() {
                   </Link>
                 </DropdownMenuItem>
               ))}
-              {isLoggedIn && (
-                <DropdownMenuItem asChild>
-                  <Link href="/friends" className="w-full flex items-center relative">
-                    <Users className="h-4 w-4 mr-2" />
-                    Friends
-                    {hasPendingRequests && (
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 h-2.5 w-2.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_4px_1px_rgba(34,197,94,0.6)]" />
-                    )}
-                  </Link>
-                </DropdownMenuItem>
-              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
