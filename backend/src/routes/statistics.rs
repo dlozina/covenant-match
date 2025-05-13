@@ -5,11 +5,11 @@ use crate::models::statistics::{
 use crate::services::statistics_service;
 use crate::utils::jwt;
 use crate::{
-    repository::session_repository, repository::user_repository, services::session_service,
+    repository::session_repository, services::session_service,
 };
 use actix_web::{get, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use mongodb::Database;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::json;
 use utoipa::ToSchema;
 

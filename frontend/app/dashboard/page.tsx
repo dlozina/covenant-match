@@ -21,7 +21,9 @@ import {
   PaginationInfo,
   SessionHistoryEntry,
   SessionDetail,
-  SessionDetailResponse
+  SessionDetailResponse,
+  NightLord,
+  Nightfarer
 } from "@/utils/api";
 import { formatDistanceToNow } from 'date-fns';
 import { Button } from "@/components/ui/button";
@@ -35,6 +37,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Notification, NotificationType } from "@/components/ui/notification";
 import { UserService } from "@/utils/api/user-service";
+import { GameDataService } from "@/utils/api/game-data-service";
 
 interface CharacterStats {
   played: number;
@@ -112,9 +115,14 @@ function DashboardContent() {
   
   // Session history filters
   const [filteredHistory, setFilteredHistory] = useState<SessionHistoryEntry[]>([]);
-  const [nightLordFilter, setNightLordFilter] = useState<string>('');
-  const [nightfarerFilter, setNightfarerFilter] = useState<string>('');
-  const [resultFilter, setResultFilter] = useState<string>('');
+  const [nightLordFilter, setNightLordFilter] = useState<string>('all');
+  const [nightfarerFilter, setNightfarerFilter] = useState<string>('all');
+  const [resultFilter, setResultFilter] = useState<string>('all');
+  
+  // Character data for select dropdowns
+  const [nightLords, setNightLords] = useState<NightLord[]>([]);
+  const [nightfarers, setNightfarers] = useState<Nightfarer[]>([]);
+  const [isLoadingCharacterData, setIsLoadingCharacterData] = useState(false);
   
   // Session details dialog state
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
@@ -227,8 +235,26 @@ function DashboardContent() {
       setSessionConsensusResults(consensusResults);
     };
 
+    // Fetch character data for select dropdowns
+    const fetchCharacterData = async () => {
+      try {
+        setIsLoadingCharacterData(true);
+        const [lords, farers] = await Promise.all([
+          GameDataService.getNightLords(),
+          GameDataService.getNightfarers()
+        ]);
+        setNightLords(lords);
+        setNightfarers(farers);
+      } catch (error) {
+        console.error('Error fetching character data:', error);
+      } finally {
+        setIsLoadingCharacterData(false);
+      }
+    };
+
     fetchStats();
     fetchSessionHistory();
+    fetchCharacterData();
   }, [fetchWithAuth]);
   
   // Apply filters to session history
@@ -240,19 +266,19 @@ function DashboardContent() {
     
     let filtered = [...sessionHistory];
     
-    if (nightLordFilter) {
+    if (nightLordFilter && nightLordFilter !== 'all') {
       filtered = filtered.filter(session => 
-        session.night_lord.toLowerCase().includes(nightLordFilter.toLowerCase())
+        session.night_lord === nightLordFilter
       );
     }
     
-    if (nightfarerFilter) {
+    if (nightfarerFilter && nightfarerFilter !== 'all') {
       filtered = filtered.filter(session => 
-        session.player_nightfarer.toLowerCase().includes(nightfarerFilter.toLowerCase())
+        session.player_nightfarer === nightfarerFilter
       );
     }
     
-    if (resultFilter) {
+    if (resultFilter && resultFilter !== 'all') {
       filtered = filtered.filter(session => 
         session.player_result.toLowerCase() === resultFilter.toLowerCase()
       );
@@ -294,9 +320,9 @@ function DashboardContent() {
 
   // Reset all filters
   const resetFilters = () => {
-    setNightLordFilter('');
-    setNightfarerFilter('');
-    setResultFilter('');
+    setNightLordFilter('all');
+    setNightfarerFilter('all');
+    setResultFilter('all');
   };
 
   // Sort character data by number of games played (descending)
@@ -529,40 +555,54 @@ function DashboardContent() {
           <div className="mb-4 p-4 border border-purple-900/20 rounded-lg bg-background/50">
             <div className="flex flex-col md:flex-row gap-3 mb-3">
               <div className="flex-1">
-                <label htmlFor="night-lord-filter" className="block text-sm font-medium mb-1">Night Lord</label>
-                <input
-                  id="night-lord-filter"
-                  type="text"
-                  className="w-full p-2 rounded-md border bg-background"
-                  placeholder="Filter by Night Lord"
-                  value={nightLordFilter}
-                  onChange={(e) => setNightLordFilter(e.target.value)}
-                />
+                <label className="block text-sm font-medium mb-1">Night Lord</label>
+                <Select value={nightLordFilter} onValueChange={setNightLordFilter}>
+                  <SelectTrigger className="w-full h-10 bg-background">
+                    <SelectValue placeholder="Filter by Night Lord" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Night Lords</SelectItem>
+                    {isLoadingCharacterData ? (
+                      <SelectItem value="loading" disabled>Loading...</SelectItem>
+                    ) : (
+                      nightLords.map((lord) => (
+                        <SelectItem key={lord.id} value={lord.name}>{lord.name}</SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex-1">
-                <label htmlFor="nightfarer-filter" className="block text-sm font-medium mb-1">Nightfarer</label>
-                <input
-                  id="nightfarer-filter"
-                  type="text"
-                  className="w-full p-2 rounded-md border bg-background"
-                  placeholder="Filter by Nightfarer"
-                  value={nightfarerFilter}
-                  onChange={(e) => setNightfarerFilter(e.target.value)}
-                />
+                <label className="block text-sm font-medium mb-1">Nightfarer</label>
+                <Select value={nightfarerFilter} onValueChange={setNightfarerFilter}>
+                  <SelectTrigger className="w-full h-10 bg-background">
+                    <SelectValue placeholder="Filter by Nightfarer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Nightfarers</SelectItem>
+                    {isLoadingCharacterData ? (
+                      <SelectItem value="loading" disabled>Loading...</SelectItem>
+                    ) : (
+                      nightfarers.map((farer) => (
+                        <SelectItem key={farer.id} value={farer.name}>{farer.name}</SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex-1">
-                <label htmlFor="result-filter" className="block text-sm font-medium mb-1">Result</label>
-                <select
-                  id="result-filter"
-                  className="w-full p-2 rounded-md border bg-background"
-                  value={resultFilter}
-                  onChange={(e) => setResultFilter(e.target.value)}
-                >
-                  <option value="">All Results</option>
-                  <option value="win">Win</option>
-                  <option value="loss">Loss</option>
-                  <option value="disconnect">Disconnect</option>
-                </select>
+                <label className="block text-sm font-medium mb-1">Result</label>
+                <Select value={resultFilter} onValueChange={setResultFilter}>
+                  <SelectTrigger className="w-full h-10 bg-background">
+                    <SelectValue placeholder="Filter by Result" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Results</SelectItem>
+                    <SelectItem value="win">Win</SelectItem>
+                    <SelectItem value="loss">Loss</SelectItem>
+                    <SelectItem value="disconnect">Disconnect</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="flex justify-end">
@@ -597,40 +637,54 @@ function DashboardContent() {
         <div className="mb-4 p-4 border border-purple-900/20 rounded-lg bg-background/50">
           <div className="flex flex-col md:flex-row gap-3 mb-3">
             <div className="flex-1">
-              <label htmlFor="night-lord-filter" className="block text-sm font-medium mb-1">Night Lord</label>
-              <input
-                id="night-lord-filter"
-                type="text"
-                className="w-full p-2 rounded-md border bg-background"
-                placeholder="Filter by Night Lord"
-                value={nightLordFilter}
-                onChange={(e) => setNightLordFilter(e.target.value)}
-              />
+              <label className="block text-sm font-medium mb-1">Night Lord</label>
+              <Select value={nightLordFilter} onValueChange={setNightLordFilter}>
+                <SelectTrigger className="w-full h-10 bg-background">
+                  <SelectValue placeholder="Filter by Night Lord" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Night Lords</SelectItem>
+                  {isLoadingCharacterData ? (
+                    <SelectItem value="loading" disabled>Loading...</SelectItem>
+                  ) : (
+                    nightLords.map((lord) => (
+                      <SelectItem key={lord.id} value={lord.name}>{lord.name}</SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex-1">
-              <label htmlFor="nightfarer-filter" className="block text-sm font-medium mb-1">Nightfarer</label>
-              <input
-                id="nightfarer-filter"
-                type="text"
-                className="w-full p-2 rounded-md border bg-background"
-                placeholder="Filter by Nightfarer"
-                value={nightfarerFilter}
-                onChange={(e) => setNightfarerFilter(e.target.value)}
-              />
+              <label className="block text-sm font-medium mb-1">Nightfarer</label>
+              <Select value={nightfarerFilter} onValueChange={setNightfarerFilter}>
+                <SelectTrigger className="w-full h-10 bg-background">
+                  <SelectValue placeholder="Filter by Nightfarer" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Nightfarers</SelectItem>
+                  {isLoadingCharacterData ? (
+                    <SelectItem value="loading" disabled>Loading...</SelectItem>
+                  ) : (
+                    nightfarers.map((farer) => (
+                      <SelectItem key={farer.id} value={farer.name}>{farer.name}</SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex-1">
-              <label htmlFor="result-filter" className="block text-sm font-medium mb-1">Result</label>
-              <select
-                id="result-filter"
-                className="w-full p-2 rounded-md border bg-background"
-                value={resultFilter}
-                onChange={(e) => setResultFilter(e.target.value)}
-              >
-                <option value="">All Results</option>
-                <option value="win">Win</option>
-                <option value="loss">Loss</option>
-                <option value="disconnect">Disconnect</option>
-              </select>
+              <label className="block text-sm font-medium mb-1">Result</label>
+              <Select value={resultFilter} onValueChange={setResultFilter}>
+                <SelectTrigger className="w-full h-10 bg-background">
+                  <SelectValue placeholder="Filter by Result" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Results</SelectItem>
+                  <SelectItem value="win">Win</SelectItem>
+                  <SelectItem value="loss">Loss</SelectItem>
+                  <SelectItem value="disconnect">Disconnect</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="flex justify-end">
