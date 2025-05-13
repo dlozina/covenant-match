@@ -307,6 +307,7 @@ const generateSession = (users, index, maxPlayersPerSession = 3) => {
     _id: new ObjectId(),
     name: `session${index + 1}`,
     host_id: host._id.toString(),
+    host_experience: host.experience,
     region: host.region,
     platform: host.platform,
     password: Math.random() > 0.5 ? `pass${index + 1}` : "",
