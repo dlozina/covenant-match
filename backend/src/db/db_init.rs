@@ -33,6 +33,7 @@ async fn ensure_collections_exist(db: &Database) -> Result<(), Error> {
         "covenants",
         "regions",
         "feature_flags",
+        "friendships",
     ];
 
     // Get existing collections
@@ -115,6 +116,19 @@ async fn create_indexes(db: &Database) -> Result<(), Error> {
 
     db.collection::<Document>("messages")
         .create_index(messages_session_id_index)
+        .await?;
+
+    // Indexes for friendships collection
+    let friendship_user_id_index = IndexModel::builder().keys(doc! { "user_id": 1 }).build();
+
+    db.collection::<Document>("friendships")
+        .create_index(friendship_user_id_index)
+        .await?;
+
+    let friendship_friend_id_index = IndexModel::builder().keys(doc! { "friend_id": 1 }).build();
+
+    db.collection::<Document>("friendships")
+        .create_index(friendship_friend_id_index)
         .await?;
 
     Ok(())
