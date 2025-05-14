@@ -145,6 +145,83 @@ function DashboardContent() {
   // Notification state
   const [notification, setNotification] = useState<NotificationType | null>(null);
 
+  // Function to fetch consensus results for sessions
+  const fetchConsensusResults = async (sessions: SessionHistoryEntry[]) => {
+    // Only fetch results for completed sessions
+    const completedSessions = sessions.filter(s => s.completed_at);
+    if (completedSessions.length === 0) return;
+    
+    const consensusResults: Record<string, string> = {};
+    
+    // Get consensus results for each completed session
+    for (const session of completedSessions) {
+      try {
+        const response = await fetchWithAuth<SessionResultsResponse>(
+          `/api/v1/sessions/${session.session_id}/results`
+        );
+        
+        if (response.consensus && response.consensus.hasConsensus) {
+          consensusResults[session.session_id] = response.consensus.result || '';
+        }
+      } catch (err) {
+        console.error(`Error fetching results for session ${session.session_id}:`, err);
+        // Continue with other sessions even if one fails
+      }
+    }
+    
+    setSessionConsensusResults(consensusResults);
+  };
+
+  // Function to fetch session history with filters
+  const fetchSessionHistory = async (page: number = 1, filters?: {
+    nightLord?: string;
+    nightfarer?: string;
+    result?: string;
+  }) => {
+    try {
+      setIsLoadingHistory(true);
+      
+      // Build query parameters
+      const queryParams = new URLSearchParams();
+      queryParams.append('page', page.toString());
+      queryParams.append('limit', pagination.limit.toString());
+      
+      // Add filter parameters if they're not 'all'
+      if (filters) {
+        if (filters.nightLord && filters.nightLord !== 'all') {
+          queryParams.append('night_lord', filters.nightLord);
+        }
+        if (filters.nightfarer && filters.nightfarer !== 'all') {
+          queryParams.append('nightfarer', filters.nightfarer);
+        }
+        if (filters.result && filters.result !== 'all') {
+          queryParams.append('result', filters.result);
+        }
+      }
+      
+      const response = await fetchWithAuth<PaginatedResponse<PaginatedSessionHistory>>(
+        `/api/v1/statistics/users/me/sessions?${queryParams.toString()}`
+      );
+      
+      // Convert from 1-indexed to 0-indexed
+      if (response.data && response.data.pagination) {
+        response.data.pagination.page -= 1;
+      }
+      
+      setSessionHistory(response.data.sessions);
+      setFilteredHistory(response.data.sessions);
+      setPagination(response.data.pagination);
+      
+      // Fetch consensus results for completed sessions
+      fetchConsensusResults(response.data.sessions);
+    } catch (err) {
+      console.error('Error fetching session history:', err);
+      setHistoryError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -181,60 +258,7 @@ function DashboardContent() {
         setTimeout(() => setAnimateCharts(true), 300);
       }
     };
-
-    const fetchSessionHistory = async () => {
-      try {
-        setIsLoadingHistory(true);
-        const response = await fetchWithAuth<PaginatedResponse<PaginatedSessionHistory>>(
-          `/api/v1/statistics/users/me/sessions?page=1&limit=10`
-        );
-        
-        // Convert from 1-indexed to 0-indexed
-        if (response.data && response.data.pagination) {
-          response.data.pagination.page -= 1;
-        }
-        
-        setSessionHistory(response.data.sessions);
-        setFilteredHistory(response.data.sessions);
-        setPagination(response.data.pagination);
-        
-        // Fetch consensus results for completed sessions
-        fetchConsensusResults(response.data.sessions);
-      } catch (err) {
-        console.error('Error fetching session history:', err);
-        setHistoryError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setIsLoadingHistory(false);
-      }
-    };
     
-    // Function to fetch consensus results for sessions
-    const fetchConsensusResults = async (sessions: SessionHistoryEntry[]) => {
-      // Only fetch results for completed sessions
-      const completedSessions = sessions.filter(s => s.completed_at);
-      if (completedSessions.length === 0) return;
-      
-      const consensusResults: Record<string, string> = {};
-      
-      // Get consensus results for each completed session
-      for (const session of completedSessions) {
-        try {
-          const response = await fetchWithAuth<SessionResultsResponse>(
-            `/api/v1/sessions/${session.session_id}/results`
-          );
-          
-          if (response.consensus && response.consensus.hasConsensus) {
-            consensusResults[session.session_id] = response.consensus.result || '';
-          }
-        } catch (err) {
-          console.error(`Error fetching results for session ${session.session_id}:`, err);
-          // Continue with other sessions even if one fails
-        }
-      }
-      
-      setSessionConsensusResults(consensusResults);
-    };
-
     // Fetch character data for select dropdowns
     const fetchCharacterData = async () => {
       try {
@@ -253,68 +277,43 @@ function DashboardContent() {
     };
 
     fetchStats();
-    fetchSessionHistory();
+    fetchSessionHistory(1);
     fetchCharacterData();
   }, [fetchWithAuth]);
   
-  // Apply filters to session history
+  // Effect to fetch session history whenever filters change
   useEffect(() => {
-    if (sessionHistory.length === 0) {
-      setFilteredHistory([]);
-      return;
-    }
+    // Skip on component mount as the initial fetch is already done in the first useEffect
+    if (isLoadingHistory) return;
     
-    let filtered = [...sessionHistory];
+    fetchSessionHistory(1, {
+      nightLord: nightLordFilter,
+      nightfarer: nightfarerFilter,
+      result: resultFilter
+    });
     
-    if (nightLordFilter && nightLordFilter !== 'all') {
-      filtered = filtered.filter(session => 
-        session.night_lord === nightLordFilter
-      );
-    }
-    
-    if (nightfarerFilter && nightfarerFilter !== 'all') {
-      filtered = filtered.filter(session => 
-        session.player_nightfarer === nightfarerFilter
-      );
-    }
-    
-    if (resultFilter && resultFilter !== 'all') {
-      filtered = filtered.filter(session => 
-        session.player_result.toLowerCase() === resultFilter.toLowerCase()
-      );
-    }
-    
-    setFilteredHistory(filtered);
-  }, [sessionHistory, nightLordFilter, nightfarerFilter, resultFilter]);
-
+    // Don't include isLoadingHistory in dependencies to avoid infinite loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nightLordFilter, nightfarerFilter, resultFilter]);
+  
   // Function to handle page change
   const handlePageChange = async (newPage: number) => {
     if (newPage < 0 || newPage >= pagination.total_pages) {
       return;
     }
     
-    // Reset filters when changing pages since pagination happens at the backend
-    resetFilters();
-    
     try {
       setIsLoadingHistory(true);
-      const response = await fetchWithAuth<PaginatedResponse<PaginatedSessionHistory>>(
-        `/api/v1/statistics/users/me/sessions?page=${newPage + 1}&limit=${pagination.limit}`
-      );
       
-      // Convert from 1-indexed to 0-indexed
-      if (response.data && response.data.pagination) {
-        response.data.pagination.page -= 1;
-      }
-      
-      setSessionHistory(response.data.sessions);
-      setFilteredHistory(response.data.sessions);
-      setPagination(response.data.pagination);
+      // Pass current filter values when changing pages
+      fetchSessionHistory(newPage + 1, {
+        nightLord: nightLordFilter,
+        nightfarer: nightfarerFilter,
+        result: resultFilter
+      });
     } catch (err) {
       console.error('Error fetching session history page:', err);
       setHistoryError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setIsLoadingHistory(false);
     }
   };
 
@@ -522,6 +521,7 @@ function DashboardContent() {
 
   // Session History Section
   const renderSessionHistory = () => {
+    // Show loading state
     if (isLoadingHistory) {
       return (
         <div className="text-center py-8 flex flex-col items-center justify-center gap-4">
@@ -531,6 +531,7 @@ function DashboardContent() {
       );
     }
 
+    // Show error state
     if (historyError) {
       return (
         <div className="text-center py-4 text-destructive">
@@ -539,83 +540,90 @@ function DashboardContent() {
       );
     }
 
+    // Filters section - always shown regardless of results
+    const renderFilters = () => (
+      <div className="mb-4 p-4 border border-purple-900/20 rounded-lg bg-background/50">
+        <div className="flex flex-col md:flex-row gap-3 mb-3">
+          <div className="flex-1">
+            <label className="block text-sm font-medium mb-1">Night Lord</label>
+            <Select value={nightLordFilter} onValueChange={setNightLordFilter}>
+              <SelectTrigger className="w-full h-10 bg-background">
+                <SelectValue placeholder="Filter by Night Lord" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Night Lords</SelectItem>
+                {isLoadingCharacterData ? (
+                  <SelectItem value="loading" disabled>Loading...</SelectItem>
+                ) : (
+                  nightLords.map((lord) => (
+                    <SelectItem key={lord.id} value={lord.name}>{lord.name}</SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1">
+            <label className="block text-sm font-medium mb-1">Nightfarer</label>
+            <Select value={nightfarerFilter} onValueChange={setNightfarerFilter}>
+              <SelectTrigger className="w-full h-10 bg-background">
+                <SelectValue placeholder="Filter by Nightfarer" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Nightfarers</SelectItem>
+                {isLoadingCharacterData ? (
+                  <SelectItem value="loading" disabled>Loading...</SelectItem>
+                ) : (
+                  nightfarers.map((farer) => (
+                    <SelectItem key={farer.id} value={farer.name}>{farer.name}</SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1">
+            <label className="block text-sm font-medium mb-1">Result</label>
+            <Select value={resultFilter} onValueChange={setResultFilter}>
+              <SelectTrigger className="w-full h-10 bg-background">
+                <SelectValue placeholder="Filter by Result" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Results</SelectItem>
+                <SelectItem value="Win">Win</SelectItem>
+                <SelectItem value="Loss">Loss</SelectItem>
+                <SelectItem value="Disconnect">Disconnect</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={resetFilters}
+          >
+            Reset Filters
+          </Button>
+        </div>
+      </div>
+    );
+
+    // Show empty state - for when there's no session history at all
     if (sessionHistory.length === 0) {
       return (
-        <div className="text-center py-6 bg-background/50 border border-purple-900/20 rounded-lg">
-          <p className="text-muted-foreground">No session history available yet.</p>
+        <div>
+          {renderFilters()}
+          <div className="text-center py-6 bg-background/50 border border-purple-900/20 rounded-lg">
+            <p className="text-muted-foreground">No session history available yet.</p>
+          </div>
         </div>
       );
     }
     
-    // If we have sessions but all are filtered out
-    if (filteredHistory.length === 0 && sessionHistory.length > 0) {
+    // Show empty state when no sessions match the filter criteria
+    if (filteredHistory.length === 0) {
       return (
         <div>
-          {/* Filters */}
-          <div className="mb-4 p-4 border border-purple-900/20 rounded-lg bg-background/50">
-            <div className="flex flex-col md:flex-row gap-3 mb-3">
-              <div className="flex-1">
-                <label className="block text-sm font-medium mb-1">Night Lord</label>
-                <Select value={nightLordFilter} onValueChange={setNightLordFilter}>
-                  <SelectTrigger className="w-full h-10 bg-background">
-                    <SelectValue placeholder="Filter by Night Lord" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Night Lords</SelectItem>
-                    {isLoadingCharacterData ? (
-                      <SelectItem value="loading" disabled>Loading...</SelectItem>
-                    ) : (
-                      nightLords.map((lord) => (
-                        <SelectItem key={lord.id} value={lord.name}>{lord.name}</SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex-1">
-                <label className="block text-sm font-medium mb-1">Nightfarer</label>
-                <Select value={nightfarerFilter} onValueChange={setNightfarerFilter}>
-                  <SelectTrigger className="w-full h-10 bg-background">
-                    <SelectValue placeholder="Filter by Nightfarer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Nightfarers</SelectItem>
-                    {isLoadingCharacterData ? (
-                      <SelectItem value="loading" disabled>Loading...</SelectItem>
-                    ) : (
-                      nightfarers.map((farer) => (
-                        <SelectItem key={farer.id} value={farer.name}>{farer.name}</SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex-1">
-                <label className="block text-sm font-medium mb-1">Result</label>
-                <Select value={resultFilter} onValueChange={setResultFilter}>
-                  <SelectTrigger className="w-full h-10 bg-background">
-                    <SelectValue placeholder="Filter by Result" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Results</SelectItem>
-                    <SelectItem value="win">Win</SelectItem>
-                    <SelectItem value="loss">Loss</SelectItem>
-                    <SelectItem value="disconnect">Disconnect</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={resetFilters}
-              >
-                Reset Filters
-              </Button>
-            </div>
-          </div>
-          
+          {renderFilters()}
           <div className="text-center py-6 bg-background/50 border border-purple-900/20 rounded-lg">
             <p className="text-muted-foreground">No sessions match your filter criteria.</p>
             <Button
@@ -631,72 +639,10 @@ function DashboardContent() {
       );
     }
 
+    // Show results
     return (
       <div>
-        {/* Filters */}
-        <div className="mb-4 p-4 border border-purple-900/20 rounded-lg bg-background/50">
-          <div className="flex flex-col md:flex-row gap-3 mb-3">
-            <div className="flex-1">
-              <label className="block text-sm font-medium mb-1">Night Lord</label>
-              <Select value={nightLordFilter} onValueChange={setNightLordFilter}>
-                <SelectTrigger className="w-full h-10 bg-background">
-                  <SelectValue placeholder="Filter by Night Lord" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Night Lords</SelectItem>
-                  {isLoadingCharacterData ? (
-                    <SelectItem value="loading" disabled>Loading...</SelectItem>
-                  ) : (
-                    nightLords.map((lord) => (
-                      <SelectItem key={lord.id} value={lord.name}>{lord.name}</SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex-1">
-              <label className="block text-sm font-medium mb-1">Nightfarer</label>
-              <Select value={nightfarerFilter} onValueChange={setNightfarerFilter}>
-                <SelectTrigger className="w-full h-10 bg-background">
-                  <SelectValue placeholder="Filter by Nightfarer" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Nightfarers</SelectItem>
-                  {isLoadingCharacterData ? (
-                    <SelectItem value="loading" disabled>Loading...</SelectItem>
-                  ) : (
-                    nightfarers.map((farer) => (
-                      <SelectItem key={farer.id} value={farer.name}>{farer.name}</SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex-1">
-              <label className="block text-sm font-medium mb-1">Result</label>
-              <Select value={resultFilter} onValueChange={setResultFilter}>
-                <SelectTrigger className="w-full h-10 bg-background">
-                  <SelectValue placeholder="Filter by Result" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Results</SelectItem>
-                  <SelectItem value="win">Win</SelectItem>
-                  <SelectItem value="loss">Loss</SelectItem>
-                  <SelectItem value="disconnect">Disconnect</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="flex justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={resetFilters}
-            >
-              Reset Filters
-            </Button>
-          </div>
-        </div>
+        {renderFilters()}
         
         <div className="bg-background/50 border border-purple-900/20 rounded-lg overflow-hidden">
           {/* Desktop view - Table */}

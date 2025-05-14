@@ -4,13 +4,13 @@ use crate::models::statistics::{
 };
 use crate::services::statistics_service;
 use crate::utils::jwt;
-use crate::{
-    repository::session_repository, services::session_service,
-};
+use crate::{repository::session_repository, services::session_service};
 use actix_web::{get, web, HttpMessage, HttpRequest, HttpResponse, Responder};
 use mongodb::Database;
+use serde::Deserialize;
 use serde::Serialize;
 use serde_json::json;
+use std::collections::HashMap;
 use utoipa::ToSchema;
 
 /// Get current user's statistics
@@ -56,13 +56,45 @@ async fn get_current_user_statistics(db: web::Data<Database>, req: HttpRequest) 
     }
 }
 
+/// Query parameters for pagination with additional filters
+#[derive(Deserialize)]
+pub struct SessionHistoryQuery {
+    /// Page number (1-indexed, default: 1)
+    #[serde(default = "default_page")]
+    pub page: u64,
+
+    /// Items per page (default: 10)
+    #[serde(default = "default_limit")]
+    pub limit: u64,
+
+    /// Filter by Night Lord name
+    pub night_lord: Option<String>,
+
+    /// Filter by Nightfarer name
+    pub nightfarer: Option<String>,
+
+    /// Filter by result (win, loss, disconnect)
+    pub result: Option<String>,
+}
+
+fn default_page() -> u64 {
+    1
+}
+
+fn default_limit() -> u64 {
+    10
+}
+
 /// Get current user's session history with pagination
 #[utoipa::path(
     get,
     path = "/api/v1/statistics/users/me/sessions",
     params(
         ("page" = Option<u64>, Query, description = "Page number (1-indexed, default: 1)"),
-        ("limit" = Option<u64>, Query, description = "Items per page (default: 10)")
+        ("limit" = Option<u64>, Query, description = "Items per page (default: 10)"),
+        ("night_lord" = Option<String>, Query, description = "Filter by Night Lord name"),
+        ("nightfarer" = Option<String>, Query, description = "Filter by Nightfarer name"),
+        ("result" = Option<String>, Query, description = "Filter by result (win, loss, disconnect)")
     ),
     responses(
         (status = 200, description = "User session history retrieved successfully", body = PaginatedSessionResponse),
@@ -78,7 +110,7 @@ async fn get_current_user_statistics(db: web::Data<Database>, req: HttpRequest) 
 async fn get_current_user_session_history(
     db: web::Data<Database>,
     req: HttpRequest,
-    query: web::Query<PaginationQuery>,
+    query: web::Query<SessionHistoryQuery>,
 ) -> impl Responder {
     // Get claims from request extensions (set by middleware)
     // Extract user_id before any await points
@@ -92,10 +124,18 @@ async fn get_current_user_session_history(
 
     // Get pagination parameters with defaults
     // Convert from 1-indexed (UI) to 0-indexed (internal)
-    let page = query.page.unwrap_or(1).saturating_sub(1);
-    let limit = query.limit.unwrap_or(10);
+    let page = query.page.saturating_sub(1);
+    let limit = query.limit;
 
-    match statistics_service::get_user_session_history_paginated(&db, &user_id, page, limit).await {
+    // Create filters map
+    let mut filters = HashMap::new();
+    filters.insert("night_lord".to_string(), query.night_lord.clone());
+    filters.insert("nightfarer".to_string(), query.nightfarer.clone());
+    filters.insert("result".to_string(), query.result.clone());
+
+    match statistics_service::get_user_session_history_filtered(&db, &user_id, page, limit, filters)
+        .await
+    {
         Ok(paginated_history) => {
             // Transform to API response format
             let response = PaginatedSessionResponse {
@@ -127,7 +167,7 @@ async fn get_current_user_session_history(
             HttpResponse::Ok().json(response)
         }
         Err(e) => {
-            log::error!("Error fetching paginated user session history: {:?}", e);
+            log::error!("Error fetching filtered user session history: {:?}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "status": "error",
                 "message": e.to_string()

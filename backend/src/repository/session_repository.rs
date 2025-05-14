@@ -1,13 +1,12 @@
 use crate::models::error::AppError;
 use crate::models::session::{GameSession, SessionStatus};
 use futures::TryStreamExt;
-use mongodb::options::FindOptions;
 use mongodb::{
     bson::{doc, oid::ObjectId, to_bson},
     Collection, Database,
 };
 
-fn get_collection(db: &Database) -> Collection<GameSession> {
+pub fn get_collection(db: &Database) -> Collection<GameSession> {
     db.collection::<GameSession>("sessions")
 }
 
