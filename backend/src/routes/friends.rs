@@ -54,12 +54,6 @@ async fn send_friend_request(
                         "message": "Friendship already exists"
                     }))
                 }
-                AppError::FriendRequestAlreadyExists => {
-                    HttpResponse::BadRequest().json(serde_json::json!({
-                        "status": "error",
-                        "message": "Friend request already exists"
-                    }))
-                }
                 AppError::InvalidFriendRequest(msg) => {
                     HttpResponse::BadRequest().json(serde_json::json!({
                         "status": "error",
