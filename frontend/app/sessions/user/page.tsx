@@ -15,7 +15,7 @@ import { httpClient } from "@/utils/api/http-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { UserService } from "@/utils/api/user-service";
 import { Notification } from "@/components/ui/notification";
-
+import { Footer } from "@/components/layout/Footer";
 // Static green badge for active sessions
 const ActiveSessionBadge = () => (
   <Badge 
@@ -65,7 +65,7 @@ const ContinueButton = memo(function ContinueButton({ sessionId }: { sessionId: 
 
 export default function UserSessionsPage() {
   return (
-    <MainLayout>
+    <MainLayout footer={<Footer />}>
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold mb-6">Your Sessions</h1>
         <SessionsContent />

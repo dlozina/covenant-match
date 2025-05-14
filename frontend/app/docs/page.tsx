@@ -4,7 +4,7 @@ import Image from "next/image";
 import { MainLayout } from "@/components/layout";
 import { ScrollText, Info, AlertCircle, Users, MessageSquare, UserCircle2, ZoomIn, X, UserMinus, BarChart3, Play, Flag, CheckCircle, UserPlus, BookOpen, ArrowRight, ArrowUp } from "lucide-react";
 import { useState } from "react";
-
+import { Footer } from "@/components/layout/Footer";
 export default function DocsPage() {
   // State for image modal
   const [modalOpen, setModalOpen] = useState(false);
@@ -28,7 +28,7 @@ export default function DocsPage() {
   };
 
   return (
-    <MainLayout>
+    <MainLayout footer={<Footer />}>
       <div className="space-y-8">
         {/* Page header */}
         <div className="flex flex-col gap-2">

@@ -38,6 +38,7 @@ import {
 import { Notification, NotificationType } from "@/components/ui/notification";
 import { UserService } from "@/utils/api/user-service";
 import { GameDataService } from "@/utils/api/game-data-service";
+import { Footer } from "@/components/layout/Footer";
 
 interface CharacterStats {
   played: number;
@@ -1349,6 +1350,7 @@ function DashboardContent() {
           </AlertDialogContent>
         </AlertDialog>
       </div>
+      <Footer />
     </div>
   );
 } 
