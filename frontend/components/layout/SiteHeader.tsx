@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, UserPlus, Sword, Users, LayoutDashboard, User, LogOut, LogIn, Shield, Trophy, Bug, BookOpen } from "lucide-react";
+import { Menu, UserPlus, Sword, Users, LayoutDashboard, User, LogOut, LogIn, Shield, Trophy, Bug, BookOpen, Info } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -39,23 +39,19 @@ export function SiteHeader() {
       icon: <Users className="h-4 w-4 mr-2" />,
       active: pathname === "/sessions",
     },
-    {
-      href: "/sessions/user",
-      label: "Your Sessions",
-      icon: <Sword className="h-4 w-4 mr-2" />,
-      active: pathname === "/sessions/user",
-    },
+    ...(isLoggedIn ? [
+      {
+        href: "/sessions/user",
+        label: "Your Sessions",
+        icon: <Sword className="h-4 w-4 mr-2" />,
+        active: pathname === "/sessions/user",
+      },
+    ] : []),
     {
       href: "/leaderboard",
       label: "Leaderboard",
       icon: <Trophy className="h-4 w-4 mr-2" />,
       active: pathname === "/leaderboard",
-    },
-    {
-      href: "/docs",
-      label: "How to Use",
-      icon: <BookOpen className="h-4 w-4 mr-2" />,
-      active: pathname === "/docs" || pathname?.startsWith("/docs/"),
     },
     ...(isLoggedIn ? [
       {
@@ -64,7 +60,19 @@ export function SiteHeader() {
         icon: <LayoutDashboard className="h-4 w-4 mr-2" />,
         active: pathname === "/dashboard",
       }
-    ] : [])
+    ] : []),
+    {
+      href: "/docs",
+      label: "How to Use",
+      icon: <BookOpen className="h-4 w-4 mr-2" />,
+      active: pathname === "/docs" || pathname?.startsWith("/docs/"),
+    },
+    {
+      href: "/about",
+      label: "About",
+      icon: <Info className="h-4 w-4 mr-2" />,
+      active: pathname === "/about",
+    }
   ];
 
   return (

@@ -32,7 +32,7 @@ export default function DocsPage() {
       <div className="space-y-8">
         {/* Page header */}
         <div className="flex flex-col gap-2">
-          <h1 className="text-3xl font-bold tracking-tight text-shadow-sm">
+          <h1 className="text-3xl md:text-3xl font-bold mb-2 text-gradient bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-600">
             Documentation
           </h1>
           <p className="text-muted-foreground">

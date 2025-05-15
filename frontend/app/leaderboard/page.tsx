@@ -67,7 +67,7 @@ function LeaderboardContent() {
   return (
     <div className="container mx-auto py-6">
       <div className="flex flex-col items-center justify-center mb-8">
-        <h1 className="text-3xl md:text-4xl font-bold text-center bg-clip-text text-transparent bg-gradient-to-r from-purple-300 to-indigo-200">
+        <h1 className="text-3xl md:text-3xl font-bold mb-2 text-gradient bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-600">
           Nightreign Leaderboards
         </h1>
         <p className="text-muted-foreground text-center mt-2 max-w-2xl">
