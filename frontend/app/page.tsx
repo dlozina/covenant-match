@@ -385,7 +385,7 @@ export default function Home() {
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900/80 to-indigo-900/80 z-10"></div>
         <div className="absolute inset-0">
           <Image
-            src="/nightreign-bg.jpeg"
+            src="/nightreign-bg.webp"
             alt="Nightreign Background"
             fill
             priority

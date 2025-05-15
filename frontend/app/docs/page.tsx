@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { MainLayout } from "@/components/layout";
-import { ScrollText, Info, AlertCircle, Users, MessageSquare, UserCircle2, ZoomIn, X, UserMinus, BarChart3, Play, Flag, CheckCircle, UserPlus, BookOpen, ArrowRight, ArrowUp, LogIn, Globe, Monitor, AlertTriangle, LayoutList } from "lucide-react";
+import { ScrollText, Info, AlertCircle, Users, MessageSquare, UserCircle2, ZoomIn, X, UserMinus, BarChart3, Play, Flag, CheckCircle, UserPlus, BookOpen, ArrowRight, ArrowUp, AlertTriangle, LayoutList } from "lucide-react";
 import { useState } from "react";
 import { Footer } from "@/components/layout/Footer";
 export default function DocsPage() {
@@ -135,11 +135,11 @@ export default function DocsPage() {
           <div className="gothic-card-no-hover p-4 sm:p-6 space-y-4 sm:space-y-6">
             <div className="flex flex-col items-center">
               <div className="relative w-full overflow-hidden rounded-lg border border-purple-900/30 group cursor-pointer" 
-                onClick={() => openImageModal("/create_session.png", "Create New Session interface")}
+                onClick={() => openImageModal("/create_session.webp", "Create New Session interface")}
                 role="button"
                 tabIndex={0}
                 aria-label="Open image in fullscreen"
-                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/create_session.png", "Create New Session interface")}
+                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/create_session.webp", "Create New Session interface")}
               >
                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
                   <div className="flex items-center gap-2 text-white">
@@ -148,7 +148,7 @@ export default function DocsPage() {
                   </div>
                 </div>
                 <Image 
-                  src="/create_session.png"
+                  src="/create_session.webp"
                   alt="Create New Session interface showing session details, password field, and character selection"
                   width={900}
                   height={700}
@@ -258,11 +258,11 @@ export default function DocsPage() {
           <div className="gothic-card-no-hover p-4 sm:p-6 space-y-4 sm:space-y-6">
             <div className="flex flex-col items-center">
               <div className="relative w-full overflow-hidden rounded-lg border border-purple-900/30 group cursor-pointer"
-                onClick={() => openImageModal("/session_created_1.png", "Session management interface")}
+                onClick={() => openImageModal("/session_created_1.webp", "Session management interface")}
                 role="button"
                 tabIndex={0}
                 aria-label="Open image in fullscreen"
-                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/session_created_1.png", "Session management interface")}
+                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/session_created_1.webp", "Session management interface")}
               >
                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
                   <div className="flex items-center gap-2 text-white">
@@ -274,7 +274,7 @@ export default function DocsPage() {
                 <div className="relative w-full pt-[75%]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
-                    src="/session_created_1.png"
+                    src="/session_created_1.webp"
                     alt="Session interface showing players list, session information and chat functionality"
                     className="absolute top-0 left-0 w-full h-full object-contain"
                   />
@@ -362,11 +362,11 @@ export default function DocsPage() {
           <div className="gothic-card-no-hover p-4 sm:p-6 space-y-4 sm:space-y-6">
             <div className="flex flex-col items-center">
               <div className="relative w-full overflow-hidden rounded-lg border border-purple-900/30 group cursor-pointer"
-                onClick={() => openImageModal("/session_started.png", "Active session interface")}
+                onClick={() => openImageModal("/session_started.webp", "Active session interface")}
                 role="button"
                 tabIndex={0}
                 aria-label="Open image in fullscreen"
-                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/session_started.png", "Active session interface")}
+                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/session_started.webp", "Active session interface")}
               >
                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
                   <div className="flex items-center gap-2 text-white">
@@ -378,7 +378,7 @@ export default function DocsPage() {
                 <div className="relative w-full pt-[75%]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
-                    src="/session_started.png"
+                    src="/session_started.webp"
                     alt="Active session interface showing running status and player states"
                     className="absolute top-0 left-0 w-full h-full object-contain"
                   />
@@ -458,11 +458,11 @@ export default function DocsPage() {
                   <h4 className="font-medium text-purple-300">Confirmation Dialog</h4>
                   <div className="flex flex-col items-center mb-4">
                     <div className="relative w-full max-w-lg mx-auto overflow-hidden rounded-lg border border-purple-900/30 group cursor-pointer"
-                      onClick={() => openImageModal("/session_finish_session.png", "Session finish confirmation dialog")}
+                      onClick={() => openImageModal("/session_finish_session.webp", "Session finish confirmation dialog")}
                       role="button"
                       tabIndex={0}
                       aria-label="Open image in fullscreen"
-                      onKeyDown={(e) => e.key === 'Enter' && openImageModal("/session_finish_session.png", "Session finish confirmation dialog")}
+                      onKeyDown={(e) => e.key === 'Enter' && openImageModal("/session_finish_session.webp", "Session finish confirmation dialog")}
                     >
                       <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
                         <div className="flex items-center gap-2 text-white">
@@ -474,7 +474,7 @@ export default function DocsPage() {
                       <div className="relative w-full pt-[45%]">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img 
-                          src="/session_finish_session.png"
+                          src="/session_finish_session.webp"
                           alt="Confirmation dialog for finishing a session"
                           className="absolute top-0 left-0 w-full h-full object-contain"
                         />
@@ -522,11 +522,11 @@ export default function DocsPage() {
           <div className="gothic-card-no-hover p-4 sm:p-6 space-y-4 sm:space-y-6">
             <div className="flex flex-col items-center">
               <div className="relative w-full overflow-hidden rounded-lg border border-purple-900/30 group cursor-pointer"
-                onClick={() => openImageModal("/session_report_result.png", "Session report result interface")}
+                onClick={() => openImageModal("/session_report_result.webp", "Session report result interface")}
                 role="button"
                 tabIndex={0}
                 aria-label="Open image in fullscreen"
-                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/session_report_result.png", "Session report result interface")}
+                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/session_report_result.webp", "Session report result interface")}
               >
                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
                   <div className="flex items-center gap-2 text-white">
@@ -538,7 +538,7 @@ export default function DocsPage() {
                 <div className="relative w-full pt-[75%]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
-                    src="/session_report_result.png"
+                    src="/session_report_result.webp"
                     alt="Interface showing how to report session results"
                     className="absolute top-0 left-0 w-full h-full object-contain"
                   />
@@ -614,11 +614,11 @@ export default function DocsPage() {
 
             <div className="mt-8 flex flex-col items-center">
               <div className="relative w-full overflow-hidden rounded-lg border border-purple-900/30 group cursor-pointer"
-                onClick={() => openImageModal("/session_result_reported.png", "Results submitted interface")}
+                onClick={() => openImageModal("/session_result_reported.webp", "Results submitted interface")}
                 role="button"
                 tabIndex={0}
                 aria-label="Open image in fullscreen"
-                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/session_result_reported.png", "Results submitted interface")}
+                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/session_result_reported.webp", "Results submitted interface")}
               >
                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
                   <div className="flex items-center gap-2 text-white">
@@ -630,7 +630,7 @@ export default function DocsPage() {
                 <div className="relative w-full pt-[75%]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
-                    src="/session_result_reported.png"
+                    src="/session_result_reported.webp"
                     alt="Interface showing results have been submitted"
                     className="absolute top-0 left-0 w-full h-full object-contain"
                   />
@@ -696,11 +696,11 @@ export default function DocsPage() {
                   </h4>
                   <div className="flex flex-col items-center mb-4">
                     <div className="relative w-full max-w-lg mx-auto overflow-hidden rounded-lg border border-purple-900/30 group cursor-pointer"
-                      onClick={() => openImageModal("/session_add_friend.png", "Add friend interface in completed session")}
+                      onClick={() => openImageModal("/session_add_friend.webp", "Add friend interface in completed session")}
                       role="button"
                       tabIndex={0}
                       aria-label="Open image in fullscreen"
-                      onKeyDown={(e) => e.key === 'Enter' && openImageModal("/session_add_friend.png", "Add friend interface in completed session")}
+                      onKeyDown={(e) => e.key === 'Enter' && openImageModal("/session_add_friend.webp", "Add friend interface in completed session")}
                     >
                       <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
                         <div className="flex items-center gap-2 text-white">
@@ -712,7 +712,7 @@ export default function DocsPage() {
                       <div className="relative w-full pt-[50%]">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img 
-                          src="/session_add_friend.png"
+                          src="/session_add_friend.webp"
                           alt="Interface showing how to add friends from your session"
                           className="absolute top-0 left-0 w-full h-full object-contain"
                         />
@@ -763,11 +763,11 @@ export default function DocsPage() {
           <div className="gothic-card-no-hover p-4 sm:p-6 space-y-4 sm:space-y-6">
             <div className="flex flex-col items-center">
               <div className="relative w-full overflow-hidden rounded-lg border border-purple-900/30 group cursor-pointer"
-                onClick={() => openImageModal("/session_kick_player.png", "Session kick player interface")}
+                onClick={() => openImageModal("/session_kick_player.webp", "Session kick player interface")}
                 role="button"
                 tabIndex={0}
                 aria-label="Open image in fullscreen"
-                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/session_kick_player.png", "Session kick player interface")}
+                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/session_kick_player.webp", "Session kick player interface")}
               >
                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
                   <div className="flex items-center gap-2 text-white">
@@ -779,7 +779,7 @@ export default function DocsPage() {
                 <div className="relative w-full pt-[75%]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
-                    src="/session_kick_player.png"
+                    src="/session_kick_player.webp"
                     alt="Interface showing how to kick a player from a session"
                     className="absolute top-0 left-0 w-full h-full object-contain"
                   />
@@ -862,11 +862,11 @@ export default function DocsPage() {
           <div className="gothic-card-no-hover p-4 sm:p-6 space-y-4 sm:space-y-6">
             <div className="flex flex-col items-center">
               <div className="relative w-full overflow-hidden rounded-lg border border-purple-900/30 group cursor-pointer"
-                onClick={() => openImageModal("/session_player_stats.png", "Player statistics interface")}
+                onClick={() => openImageModal("/session_player_stats.webp", "Player statistics interface")}
                 role="button"
                 tabIndex={0}
                 aria-label="Open image in fullscreen"
-                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/session_player_stats.png", "Player statistics interface")}
+                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/session_player_stats.webp", "Player statistics interface")}
               >
                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
                   <div className="flex items-center gap-2 text-white">
@@ -878,7 +878,7 @@ export default function DocsPage() {
                 <div className="relative w-full pt-[75%]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
-                    src="/session_player_stats.png"
+                    src="/session_player_stats.webp"
                     alt="Interface showing player statistics and performance data"
                     className="absolute top-0 left-0 w-full h-full object-contain"
                   />
@@ -960,11 +960,11 @@ export default function DocsPage() {
           <div className="gothic-card-no-hover p-4 sm:p-6 space-y-4 sm:space-y-6">
             <div className="flex flex-col items-center">
               <div className="relative w-full overflow-hidden rounded-lg border border-purple-900/30 group cursor-pointer"
-                onClick={() => openImageModal("/dashboard.png", "Player dashboard interface")}
+                onClick={() => openImageModal("/dashboard.webp", "Player dashboard interface")}
                 role="button"
                 tabIndex={0}
                 aria-label="Open image in fullscreen"
-                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/dashboard.png", "Player dashboard interface")}
+                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/dashboard.webp", "Player dashboard interface")}
               >
                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
                   <div className="flex items-center gap-2 text-white">
@@ -976,7 +976,7 @@ export default function DocsPage() {
                 <div className="relative w-full pt-[75%]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
-                    src="/dashboard.png"
+                    src="/dashboard.webp"
                     alt="Dashboard showing overall statistics, Nightfarer and Night Lord performance"
                     className="absolute top-0 left-0 w-full h-full object-contain"
                   />
@@ -1039,11 +1039,11 @@ export default function DocsPage() {
 
             <div className="mt-8 flex flex-col items-center">
               <div className="relative w-full overflow-hidden rounded-lg border border-purple-900/30 group cursor-pointer"
-                onClick={() => openImageModal("/dashboard_session_history.png", "Session history interface")}
+                onClick={() => openImageModal("/dashboard_session_history.webp", "Session history interface")}
                 role="button"
                 tabIndex={0}
                 aria-label="Open image in fullscreen"
-                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/dashboard_session_history.png", "Session history interface")}
+                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/dashboard_session_history.webp", "Session history interface")}
               >
                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
                   <div className="flex items-center gap-2 text-white">
@@ -1055,7 +1055,7 @@ export default function DocsPage() {
                 <div className="relative w-full pt-[50%]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
-                    src="/dashboard_session_history.png"
+                    src="/dashboard_session_history.webp"
                     alt="Dashboard session history showing recent game results"
                     className="absolute top-0 left-0 w-full h-full object-contain"
                   />
@@ -1107,11 +1107,11 @@ export default function DocsPage() {
 
             <div className="mt-8 flex flex-col items-center">
               <div className="relative w-full overflow-hidden rounded-lg border border-purple-900/30 group cursor-pointer"
-                onClick={() => openImageModal("/dashboard_session_details.png", "Session details interface")}
+                onClick={() => openImageModal("/dashboard_session_details.webp", "Session details interface")}
                 role="button"
                 tabIndex={0}
                 aria-label="Open image in fullscreen"
-                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/dashboard_session_details.png", "Session details interface")}
+                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/dashboard_session_details.webp", "Session details interface")}
               >
                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
                   <div className="flex items-center gap-2 text-white">
@@ -1123,7 +1123,7 @@ export default function DocsPage() {
                 <div className="relative w-full pt-[50%]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
-                    src="/dashboard_session_details.png"
+                    src="/dashboard_session_details.webp"
                     alt="Dashboard session details showing player information and results"
                     className="absolute top-0 left-0 w-full h-full object-contain"
                   />
@@ -1211,11 +1211,11 @@ export default function DocsPage() {
           <div className="gothic-card-no-hover p-4 sm:p-6 space-y-4 sm:space-y-6">
             <div className="flex flex-col items-center">
               <div className="relative w-full overflow-hidden rounded-lg border border-purple-900/30 group cursor-pointer"
-                onClick={() => openImageModal("/your_session_screeen.png", "Your Sessions screen interface")}
+                onClick={() => openImageModal("/your_session_screeen.webp", "Your Sessions screen interface")}
                 role="button"
                 tabIndex={0}
                 aria-label="Open image in fullscreen"
-                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/your_session_screeen.png", "Your Sessions screen interface")}
+                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/your_session_screeen.webp", "Your Sessions screen interface")}
               >
                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
                   <div className="flex items-center gap-2 text-white">
@@ -1227,7 +1227,7 @@ export default function DocsPage() {
                 <div className="relative w-full pt-[70%]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
-                    src="/your_session_screeen.png"
+                    src="/your_session_screeen.webp"
                     alt="Your Sessions screen showing current active session"
                     className="absolute top-0 left-0 w-full h-full object-contain"
                   />
@@ -1268,9 +1268,9 @@ export default function DocsPage() {
                     If you navigate away from your session, you can easily return to it:
                   </p>
                   <ol className="list-decimal pl-4 sm:pl-6 text-muted-foreground space-y-1">
-                    <li>Click on the "Your Sessions" tab in the main navigation</li>
+                    <li>Click on the &quot;Your Sessions&quot; tab in the main navigation</li>
                     <li>Your active session will be displayed prominently at the top</li>
-                    <li>Click the "Continue Session" button to immediately return to your active session</li>
+                    <li>Click the &quot;Continue Session&quot; button to immediately return to your active session</li>
                     <li>All session details and chat history will be preserved exactly as you left them</li>
                   </ol>
                   <p className="text-muted-foreground mt-2">
@@ -1302,11 +1302,11 @@ export default function DocsPage() {
           <div className="gothic-card-no-hover p-4 sm:p-6 space-y-4 sm:space-y-6">
             <div className="flex flex-col items-center">
               <div className="relative w-full overflow-hidden rounded-lg border border-purple-900/30 group cursor-pointer"
-                onClick={() => openImageModal("/able_to_join_one_session.png", "Active session restriction notice")}
+                onClick={() => openImageModal("/able_to_join_one_session.webp", "Active session restriction notice")}
                 role="button"
                 tabIndex={0}
                 aria-label="Open image in fullscreen"
-                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/able_to_join_one_session.png", "Active session restriction notice")}
+                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/able_to_join_one_session.webp", "Active session restriction notice")}
               >
                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
                   <div className="flex items-center gap-2 text-white">
@@ -1318,7 +1318,7 @@ export default function DocsPage() {
                 <div className="relative w-full pt-[60%]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img 
-                    src="/able_to_join_one_session.png"
+                    src="/able_to_join_one_session.webp"
                     alt="Notice showing you cannot join multiple sessions simultaneously"
                     className="absolute top-0 left-0 w-full h-full object-contain"
                   />
@@ -1343,8 +1343,8 @@ export default function DocsPage() {
                   </p>
                   <ul className="list-disc pl-4 sm:pl-6 text-muted-foreground space-y-1">
                     <li><span className="font-semibold text-purple-300">You can only join or create one session at a time</span></li>
-                    <li>If you attempt to join another session while one is active, you'll see a notification</li>
-                    <li>This restriction applies whether you're the host or a participant</li>
+                    <li>If you attempt to join another session while one is active, you&apos;ll see a notification</li>
+                    <li>This restriction applies whether you&apos;re the host or a participant</li>
                     <li>The system prevents you from browsing other sessions while in an active one</li>
                   </ul>
                   <p className="text-muted-foreground mt-2">
@@ -1358,23 +1358,23 @@ export default function DocsPage() {
                     Before you can join a different session, you must first:
                   </p>
                   <ol className="list-decimal pl-4 sm:pl-6 text-muted-foreground space-y-1">
-                    <li>Leave your current session by clicking the "Leave Session" button</li>
+                    <li>Leave your current session by clicking the &quot;Leave Session&quot; button</li>
                     <li>Wait for your current session to be completed or canceled</li>
                     <li>Finish reporting results if the session has ended</li>
                   </ol>
                   <p className="text-muted-foreground mt-2">
-                    Once you've properly exited your current session, you'll be able to browse and join other available sessions again.
+                    Once you&apos;ve properly exited your current session, you&apos;ll be able to browse and join other available sessions again.
                   </p>
                 </div>
 
                 <div className="space-y-2">
                   <h4 className="font-medium text-purple-300">Rejoining Your Active Session</h4>
                   <p className="text-muted-foreground">
-                    If you encounter the "You Currently Have an Active Session" notification:
+                    If you encounter the &quot;You Currently Have an Active Session&quot; notification:
                   </p>
                   <ul className="list-disc pl-4 sm:pl-6 text-muted-foreground space-y-1">
-                    <li>Click the "Go to Your Active Session" button to return to your current session</li>
-                    <li>You'll be redirected back to your session screen</li>
+                    <li>Click the &quot;Go to Your Active Session&quot; button to return to your current session</li>
+                    <li>You&apos;ll be redirected back to your session screen</li>
                     <li>This helps prevent accidental navigation away from active sessions</li>
                   </ul>
                   <p className="text-muted-foreground mt-2">
