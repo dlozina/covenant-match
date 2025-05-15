@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { emailService } from '@/utils/api/email-service';
 import { ApiError } from '@/utils/api/errors';
+import { Input } from '@/components/ui/input';
 
 export default function SendResetEmailPage() {
   const [email, setEmail] = useState('');
@@ -43,7 +44,7 @@ export default function SendResetEmailPage() {
     <div className="container max-w-3xl mx-auto px-4 py-12">
       <div className="text-center mb-8">
         <h1 className="text-2xl md:text-3xl font-bold mb-2 text-gradient bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-600">
-          Password Reset
+          Reset Password
         </h1>
         <p className="text-muted-foreground text-lg">
           Reclaim your covenant, nightfarer.
@@ -98,23 +99,23 @@ export default function SendResetEmailPage() {
           ) : (
             <form onSubmit={handleSubmit} className="w-full max-w-md space-y-6">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-muted-foreground mb-1">
+                <label htmlFor="email" className="block text-sm font-medium mb-1">
                   Email Address
                 </label>
                 <div className="relative">
-                  <input
+                  <Input
                     id="email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter your email"
-                    className="w-full px-4 py-3 bg-indigo-950/20 border border-indigo-800/50 rounded-md 
-                      focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 
-                      placeholder-indigo-600/40 text-foreground"
-                    required
+                    className="h-10 pr-10"
                   />
-                  <Mail className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-indigo-500/70" />
+                  <Mail className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Enter the email address associated with your account.
+                </p>
               </div>
               
               {error && (
