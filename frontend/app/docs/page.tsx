@@ -181,15 +181,15 @@ export default function DocsPage() {
                   <h4 className="font-medium text-purple-300">In-Game Password</h4>
                   <p className="text-muted-foreground">
                     Create a unique password that your team will need to configure on their
-                    gaming platform. This ensures only invited players can join your session.
+                    gaming platform. This ensures that you will match with players who have the same password on their platform.
                   </p>
                 </div>
 
                 <div className="space-y-2">
                   <h4 className="font-medium text-purple-300">Session Type</h4>
                   <p className="text-muted-foreground">
-                    Choose whether your session is regular (visible to all players) or private
-                    (only visible to invited friends).
+                    Choose whether your session is regular (visible to all players), friends only
+                    (only visible to players on your friends list), or private (only visible to you - you can share the session link with others).
                   </p>
                 </div>
               </div>
@@ -203,15 +203,14 @@ export default function DocsPage() {
                 <div className="space-y-2">
                   <h4 className="font-medium text-purple-300">Select Nightfarer</h4>
                   <p className="text-muted-foreground">
-                    Choose your Nightfarer character which will be displayed to other players.
-                    Each character has unique abilities and playstyles.
+                    Choose your Nightfarer which will also be displayed to other players, before they join your session.
                   </p>
                 </div>
 
                 <div className="space-y-2">
                   <h4 className="font-medium text-purple-300">Select Night Lord</h4>
                   <p className="text-muted-foreground">
-                    Choose which Night Lord you want to session with your team. This will be
+                    Choose which Night Lord you want to take on in your session. This will be
                     displayed on the session details for other players to see.
                   </p>
                 </div>
@@ -228,10 +227,9 @@ export default function DocsPage() {
                   will be created and you will be redirected to your session screen where you can:
                 </p>
                 <ul className="list-disc pl-4 sm:pl-6 text-muted-foreground space-y-1">
-                  <li>Invite friends to join</li>
                   <li>Track session progress</li>
                   <li>Chat with team members</li>
-                  <li>Modify session settings</li>
+                  <li>Invite friends to join</li>
                 </ul>
               </div>
             </div>
@@ -297,7 +295,7 @@ export default function DocsPage() {
                   <p className="text-muted-foreground">
                     The left panel shows all players in your session. As the host, you can see who has joined,
                     their character selection, and their ready status. Empty slots show as &ldquo;Not Joined&rdquo; until
-                    players fill them.
+                    players join your session.
                   </p>
                 </div>
 
@@ -307,8 +305,8 @@ export default function DocsPage() {
                     The right panel displays key session details including:
                   </p>
                   <ul className="list-disc pl-4 sm:pl-6 text-muted-foreground space-y-1">
-                    <li>In-Game Password - needed by all players to join</li>
-                    <li>Night Lord - the boss your team will session</li>
+                    <li>In-Game Password - needed to be configured on the gaming platform</li>
+                    <li>Night Lord - the boss your team will take on</li>
                     <li>Session creator information</li>
                     <li>Share Session Link button to invite others</li>
                   </ul>
@@ -318,7 +316,7 @@ export default function DocsPage() {
                   <h4 className="font-medium text-purple-300">Session Chat</h4>
                   <p className="text-muted-foreground">
                     The built-in chat system at the bottom lets you communicate with other players in your session.
-                    Use this to coordinate strategies, discuss game plans, or just get to know your teammates
+                    Use this to quickly coordinate strategies, discuss game plans, or just get to know your teammates
                     before starting the session.
                   </p>
                 </div>
@@ -399,13 +397,13 @@ export default function DocsPage() {
                 <div className="space-y-2">
                   <h4 className="font-medium text-purple-300">Session Started State</h4>
                   <p className="text-muted-foreground">
-                    When a session is active, you&apos;ll notice several changes in the interface:
+                    When a host starts a session, you&apos;ll notice several changes in the interface:
                   </p>
                   <ul className="list-disc pl-4 sm:pl-6 text-muted-foreground space-y-1">
                     <li>The status indicator at the top shows &ldquo;InProgress&rdquo;</li>
                     <li>Each player&apos;s status changes from &ldquo;Ready&rdquo; to &ldquo;Running&rdquo;</li>
                     <li>The &ldquo;Start Session&rdquo; button is replaced with &ldquo;Session Started&rdquo; indicator</li>
-                    <li>Only the &ldquo;Finish Session&rdquo; option remains available</li>
+                    <li>Only the &ldquo;Finish Session&rdquo; option remains available for the host</li>
                   </ul>
                 </div>
 
@@ -432,7 +430,7 @@ export default function DocsPage() {
                   <ul className="list-disc pl-4 sm:pl-6 text-muted-foreground space-y-1">
                     <li>Coordinate your session strategy with team members</li>
                     <li>Share information about boss locations and attack patterns</li>
-                    <li>Notify others if you need to take a break or encounter issues</li>
+                    <li>Notify others if you encounter issues</li>
                     <li>Build camaraderie with your team through the shared experience</li>
                   </ul>
                 </div>
@@ -443,7 +441,6 @@ export default function DocsPage() {
                     When your session is complete, the host should:
                   </p>
                   <ol className="list-decimal pl-4 sm:pl-6 text-muted-foreground space-y-1">
-                    <li>Let the team know in chat that they&apos;re finishing the session</li>
                     <li>Click the &ldquo;Finish Session&rdquo; button</li>
                     <li>Confirm the action in the dialog that appears</li>
                     <li>Proceed to report the results of your session</li>
@@ -485,7 +482,7 @@ export default function DocsPage() {
                     </p>
                   </div>
                   <p className="text-muted-foreground">
-                    When you click the &ldquo;Finish Session&rdquo; button, you&apos;ll be prompted with a confirmation dialog:
+                    When host clicks the &ldquo;Finish Session&rdquo; button, host will be prompted with a confirmation dialog:
                   </p>
                   <ul className="list-disc pl-4 sm:pl-6 text-muted-foreground space-y-1">
                     <li>The dialog reminds you that you&apos;ll need to report results after finishing</li>
@@ -577,12 +574,12 @@ export default function DocsPage() {
                   </p>
                   <ul className="list-disc pl-4 sm:pl-6 text-muted-foreground space-y-1">
                     <li><span className="text-emerald-400">WIN</span> - Your team successfully defeated the Night Lord</li>
-                    <li><span className="text-muted-foreground">LOSS</span> - Your team was defeated by the Night Lord</li>
+                    <li><span className="text-muted-foreground">LOSS</span> - Your team was defeated</li>
                     <li><span className="text-muted-foreground">D/C</span> - Disconnected (use only if technical issues prevented completion)</li>
                   </ul>
                   <p className="text-muted-foreground mt-2">
                     Select the outcome that best represents what happened during your session. 
-                    Be honest with your reporting to maintain accurate statistics.
+                    Be honest with your reporting to maintain accurate statistics. The reward for reporting each session is players dashboard with all the detailed statistics.
                   </p>
                 </div>
 
@@ -595,6 +592,7 @@ export default function DocsPage() {
                     <li>Rating is done on a 1-5 star scale</li>
                     <li>Consider factors like teamwork, communication, and overall enjoyment</li>
                     <li>Your ratings help improve matchmaking quality for future sessions</li>
+                    <li>Rating is optional, but it is a great way to give feedback to your team</li>
                   </ul>
                 </div>
 
@@ -680,7 +678,7 @@ export default function DocsPage() {
                   </p>
                   <ul className="list-disc pl-4 sm:pl-6 text-muted-foreground space-y-1">
                     <li><span className="text-purple-300">Create New Session With Same Team</span> - Start a fresh session with the current players</li>
-                    <li><span className="text-purple-300">Back to Sessions</span> - Return to the sessions list to browse other games</li>
+                    <li><span className="text-purple-300">Back to Sessions</span> - Return to the sessions list to browse other available sessions</li>
                     <li><span className="text-purple-300">Create New Session</span> - Start a completely new session with different settings</li>
                   </ul>
                   <p className="text-muted-foreground mt-2">
@@ -816,7 +814,7 @@ export default function DocsPage() {
                   </p>
                   <ol className="list-decimal pl-4 sm:pl-6 text-muted-foreground space-y-1">
                     <li>Locate the player in the Players panel</li>
-                    <li>Look for the &ldquo;Kick player from session&rdquo; button (red X) that appears when you hover over or click on a player</li>
+                    <li>Look for the &ldquo;Kick player from session&rdquo; button (red X) that appears on the other side of player&apos;s name, next to the status indicator</li>
                     <li>Click the button to remove them</li>
                     <li>Confirm your decision when prompted</li>
                   </ol>
@@ -834,7 +832,6 @@ export default function DocsPage() {
                   <ul className="list-disc pl-4 sm:pl-6 text-muted-foreground space-y-1">
                     <li>Send a message in chat before kicking someone, explaining why</li>
                     <li>Give players a chance to respond before removing them for inactivity</li>
-                    <li>Remember that kicked players won&apos;t be able to rejoin your session unless you share a new invitation with them</li>
                   </ul>
                 </div>
               </div>
@@ -899,7 +896,7 @@ export default function DocsPage() {
                 <div className="space-y-2">
                   <h4 className="font-medium text-purple-300">Player Profile Access</h4>
                   <p className="text-muted-foreground">
-                    During a session, you can view detailed statistics for any player by clicking on their name or avatar
+                    During a session, you can view detailed statistics for any player by clicking on their name
                     in the Players panel. This opens a statistics overlay showing their performance history and current status.
                   </p>
                 </div>
@@ -912,7 +909,7 @@ export default function DocsPage() {
                   <ul className="list-disc pl-4 sm:pl-6 text-muted-foreground space-y-1">
                     <li><span className="text-purple-300">Covenant Affiliation</span> - Which faction the player belongs to</li>
                     <li><span className="text-purple-300">Experience Level</span> - Indicated by labels like &ldquo;Veteran&rdquo;</li>
-                    <li><span className="text-purple-300">Games Played</span> - Total number of sessions completed</li>
+                    <li><span className="text-purple-300">Games Played</span> - Total number of sessions played</li>
                     <li><span className="text-purple-300">Win/Loss Record</span> - The player&apos;s success ratio</li>
                     <li><span className="text-purple-300">Win Rate (WR)</span> - Percentage of games won with progress bar</li>
                     <li><span className="text-purple-300">Score</span> - Overall performance rating in the game</li>
@@ -1080,7 +1077,7 @@ export default function DocsPage() {
                   </p>
                   <ul className="list-disc pl-4 sm:pl-6 text-muted-foreground space-y-1">
                     <li>Each row represents a completed session</li>
-                    <li>Information includes the session name, Night Lord, Nightfarer character, result, and timestamp</li>
+                    <li>Information includes the session name, Night Lord, Nightfarer, result, and timestamp</li>
                     <li>Results are color-coded: <span className="text-green-500">Wins</span> in green, <span className="text-red-500">Losses</span> in red, <span className="text-yellow-500">Disconnects</span> in yellow</li>
                     <li>The time column shows how recently the session took place</li>
                   </ul>
@@ -1093,13 +1090,13 @@ export default function DocsPage() {
                   </p>
                   <ul className="list-disc pl-4 sm:pl-6 text-muted-foreground space-y-1">
                     <li><span className="text-purple-300">Night Lord Filter</span> - View sessions with specific Night Lords</li>
-                    <li><span className="text-purple-300">Nightfarer Filter</span> - Filter by the Nightfarer character used</li>
+                    <li><span className="text-purple-300">Nightfarer Filter</span> - Filter by the Nightfarer used</li>
                     <li><span className="text-purple-300">Result Filter</span> - Show only wins, losses, or disconnects</li>
                     <li><span className="text-purple-300">Reset Filters</span> - Clear all filters to view your complete history</li>
                   </ul>
                   <p className="text-muted-foreground mt-2">
                     These filters help you analyze trends in your gameplay. For example, you might discover
-                    that you have a higher win rate against certain Night Lords or when using specific Nightfarer characters.
+                    that you have a higher win rate against certain Night Lords or when using specific Nightfarer.
                   </p>
                 </div>
               </div>
@@ -1161,7 +1158,7 @@ export default function DocsPage() {
                   </p>
                   <ul className="list-disc pl-4 sm:pl-6 text-muted-foreground space-y-1">
                     <li>Player usernames</li>
-                    <li>Each player&apos;s chosen Nightfarer character</li>
+                    <li>Each player&apos;s chosen Nightfarer</li>
                     <li>Individual results (which may differ if players disconnected)</li>
                     <li>Friend status indicators for players on your friends list</li>
                   </ul>
@@ -1179,12 +1176,12 @@ export default function DocsPage() {
                   </p>
                   <ul className="list-disc pl-4 sm:pl-6 text-muted-foreground space-y-1">
                     <li>Identify patterns in your wins and losses</li>
-                    <li>Track your performance with different characters</li>
+                    <li>Track your performance with different Nightfarers</li>
                     <li>Find players you&apos;ve had successful sessions with</li>
                     <li>Monitor your progress over time</li>
                   </ul>
                   <p className="text-muted-foreground mt-2">
-                    Regular review of your dashboard can help you make better decisions about character
+                    Regular review of your dashboard can help you make better decisions about Nightfarer
                     selection, team composition, and skill development, ultimately leading to more
                     enjoyable and successful gaming sessions.
                   </p>
@@ -1248,7 +1245,7 @@ export default function DocsPage() {
                 <div className="space-y-2">
                   <h4 className="font-medium text-purple-300">Your Sessions Tab</h4>
                   <p className="text-muted-foreground">
-                    The Your Sessions tab provides a central hub for tracking and managing your game sessions:
+                    The Your Sessions tab provides a central hub for tracking your game sessions:
                   </p>
                   <ul className="list-disc pl-4 sm:pl-6 text-muted-foreground space-y-1">
                     <li>Always accessible from the main navigation bar at the top of the screen</li>
@@ -1348,7 +1345,7 @@ export default function DocsPage() {
                     <li>The system prevents you from browsing other sessions while in an active one</li>
                   </ul>
                   <p className="text-muted-foreground mt-2">
-                    This limitation ensures that players remain committed to their current session and prevents them from joining multiple sessions simultaneously, which could lead to abandoned games.
+                    This limitation ensures that players remain committed to their current session and prevents them from joining multiple sessions simultaneously, which could lead to abandoned sessions.
                   </p>
                 </div>
 
@@ -1358,9 +1355,9 @@ export default function DocsPage() {
                     Before you can join a different session, you must first:
                   </p>
                   <ol className="list-decimal pl-4 sm:pl-6 text-muted-foreground space-y-1">
-                    <li>Leave your current session by clicking the &quot;Leave Session&quot; button</li>
+                    <li>If you are the host, you can cancel your current session before joining a new one (it needs to be before the session starts)</li>
+                    <li>If you are a participant, you can leave your current session by clicking the &quot;Leave Session&quot; button (if available)</li>
                     <li>Wait for your current session to be completed or canceled</li>
-                    <li>Finish reporting results if the session has ended</li>
                   </ol>
                   <p className="text-muted-foreground mt-2">
                     Once you&apos;ve properly exited your current session, you&apos;ll be able to browse and join other available sessions again.
