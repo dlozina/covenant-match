@@ -230,13 +230,12 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
     // Define default nightlords
     let default_nightlords = vec![
         ("Tricephalos", "Nightlords are the guardians of the realm, they are the ones who protect the realm from the darkness."),
-        ("Libra", "PCR is the Covenant of the Pact, they are the ones who protect the realm from the darkness."),
-        ("Malenia, Blade of Miquella", "PCR is the Covenant of the Pact, they are the ones who protect the realm from the darkness."),
-        ("Maliketh", "Maliketh is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
-        ("Mohg", "Mohg is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
-        ("Midra", "Midra is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
-        ("PCR", "Bayle is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
-        ("Messmer", "Messmer is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
+        ("Gaping Jaw", "Gaping Jaw is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
+        ("Sentient Pest", "Sentient Pest is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
+        ("Augur", "Augur is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
+        ("Equilibrious Beast", "Equilibrious Beast is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
+        ("Darkdrift Knight", "Darkdrift Knight is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
+        ("Fissure in the Fog", "Fissure in the Fog is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
     ];
 
     // Seed nightlords collection
