@@ -13,7 +13,7 @@ import { ApiError } from '@/utils/api/errors';
 const LoadingReset = () => (
   <div className="container max-w-3xl mx-auto px-4 py-12">
     <div className="text-center mb-8">
-      <h1 className="text-2xl md:text-3xl font-bold mb-2 text-gradient bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-indigo-400">
+      <h1 className="text-2xl md:text-3xl font-bold mb-2 text-gradient bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-600">
         Reset Password
       </h1>
       <p className="text-muted-foreground text-lg">
@@ -117,7 +117,7 @@ const ResetPasswordContent = () => {
   return (
     <div className="container max-w-3xl mx-auto px-4 py-12">
       <div className="text-center mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold mb-2 text-gradient bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-indigo-400">
+        <h1 className="text-2xl md:text-3xl font-bold mb-2 text-gradient bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-600">
           Reset Password
         </h1>
         <p className="text-muted-foreground text-lg">

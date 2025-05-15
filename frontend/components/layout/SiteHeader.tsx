@@ -53,7 +53,7 @@ export function SiteHeader() {
     },
     {
       href: "/docs",
-      label: "How to Play",
+      label: "How to Use",
       icon: <BookOpen className="h-4 w-4 mr-2" />,
       active: pathname === "/docs" || pathname?.startsWith("/docs/"),
     },

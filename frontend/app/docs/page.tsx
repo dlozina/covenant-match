@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { MainLayout } from "@/components/layout";
-import { ScrollText, Info, AlertCircle, Users, MessageSquare, UserCircle2, ZoomIn, X, UserMinus, BarChart3, Play, Flag, CheckCircle, UserPlus, BookOpen, ArrowRight, ArrowUp } from "lucide-react";
+import { ScrollText, Info, AlertCircle, Users, MessageSquare, UserCircle2, ZoomIn, X, UserMinus, BarChart3, Play, Flag, CheckCircle, UserPlus, BookOpen, ArrowRight, ArrowUp, LogIn, Globe, Monitor, AlertTriangle, LayoutList } from "lucide-react";
 import { useState } from "react";
 import { Footer } from "@/components/layout/Footer";
 export default function DocsPage() {
@@ -100,6 +100,22 @@ export default function DocsPage() {
               <div className="flex items-center gap-2">
                 <BarChart3 className="h-5 w-5 text-purple-400" />
                 <span className="font-medium">Your Game Dashboard</span>
+              </div>
+              <ArrowRight className="h-4 w-4 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+            </a>
+
+            <a href="#your-sessions" className="group flex items-center p-3 rounded-md border border-purple-900/20 bg-card/50 hover:bg-card/80 transition-colors">
+              <div className="flex items-center gap-2">
+                <LayoutList className="h-5 w-5 text-purple-400" />
+                <span className="font-medium">Your Sessions</span>
+              </div>
+              <ArrowRight className="h-4 w-4 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+            </a>
+            
+            <a href="#session-limitations" className="group flex items-center p-3 rounded-md border border-purple-900/20 bg-card/50 hover:bg-card/80 transition-colors">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-purple-400" />
+                <span className="font-medium">Session Limitations</span>
               </div>
               <ArrowRight className="h-4 w-4 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
             </a>
@@ -1171,6 +1187,214 @@ export default function DocsPage() {
                     Regular review of your dashboard can help you make better decisions about character
                     selection, team composition, and skill development, ultimately leading to more
                     enjoyable and successful gaming sessions.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex justify-end mt-4">
+            <a href="#" className="flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 transition-colors">
+              <ArrowUp className="h-3 w-3" />
+              <span>Move to Top</span>
+            </a>
+          </div>
+        </section>
+
+        {/* Your Sessions Section */}
+        <section id="your-sessions" className="space-y-6 scroll-mt-20">
+          <h2 className="section-title flex items-center gap-2">
+            <LayoutList className="h-5 w-5 text-purple-400" />
+            Your Sessions
+          </h2>
+
+          <div className="gothic-card-no-hover p-4 sm:p-6 space-y-4 sm:space-y-6">
+            <div className="flex flex-col items-center">
+              <div className="relative w-full overflow-hidden rounded-lg border border-purple-900/30 group cursor-pointer"
+                onClick={() => openImageModal("/your_session_screeen.png", "Your Sessions screen interface")}
+                role="button"
+                tabIndex={0}
+                aria-label="Open image in fullscreen"
+                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/your_session_screeen.png", "Your Sessions screen interface")}
+              >
+                <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                  <div className="flex items-center gap-2 text-white">
+                    <ZoomIn className="h-5 w-5" />
+                    <span>Click to zoom</span>
+                  </div>
+                </div>
+                {/* Use a static img tag for components with loading issues */}
+                <div className="relative w-full pt-[70%]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img 
+                    src="/your_session_screeen.png"
+                    alt="Your Sessions screen showing current active session"
+                    className="absolute top-0 left-0 w-full h-full object-contain"
+                  />
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground mt-2 text-center">
+                Your Sessions screen (click to enlarge)
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold flex items-center gap-2">
+                <LayoutList className="h-5 w-5 text-purple-400" />
+                Managing Your Active Sessions
+              </h3>
+              
+              <div className="space-y-4 pl-3 sm:pl-6">
+                <div className="space-y-2">
+                  <h4 className="font-medium text-purple-300">Your Sessions Tab</h4>
+                  <p className="text-muted-foreground">
+                    The Your Sessions tab provides a central hub for tracking and managing your game sessions:
+                  </p>
+                  <ul className="list-disc pl-4 sm:pl-6 text-muted-foreground space-y-1">
+                    <li>Always accessible from the main navigation bar at the top of the screen</li>
+                    <li>Displays your current active session with its status (In Progress, Waiting, etc.)</li>
+                    <li>Shows key session information including the Night Lord and start time</li>
+                    <li>Lists all players in your session with their chosen Nightfarer characters</li>
+                    <li>Identifies the host of the session with a special indicator</li>
+                  </ul>
+                  <p className="text-muted-foreground mt-2">
+                    This screen serves as your home base for ongoing sessions, allowing you to quickly resume gameplay without having to search for your session again.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-medium text-purple-300">Returning to Your Active Session</h4>
+                  <p className="text-muted-foreground">
+                    If you navigate away from your session, you can easily return to it:
+                  </p>
+                  <ol className="list-decimal pl-4 sm:pl-6 text-muted-foreground space-y-1">
+                    <li>Click on the "Your Sessions" tab in the main navigation</li>
+                    <li>Your active session will be displayed prominently at the top</li>
+                    <li>Click the "Continue Session" button to immediately return to your active session</li>
+                    <li>All session details and chat history will be preserved exactly as you left them</li>
+                  </ol>
+                  <p className="text-muted-foreground mt-2">
+                    This feature allows you to check other parts of the application without losing track of your ongoing session.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex justify-end mt-4">
+            <a href="#" className="flex items-center gap-1 text-sm text-purple-400 hover:text-purple-300 transition-colors">
+              <ArrowUp className="h-3 w-3" />
+              <span>Move to Top</span>
+            </a>
+          </div>
+        </section>
+
+        {/* Docs section divider */}
+        <div className="divider"></div>
+
+        {/* Session Limitations Section */}
+        <section id="session-limitations" className="space-y-6 scroll-mt-20">
+          <h2 className="section-title flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-purple-400" />
+            Session Limitations
+          </h2>
+
+          <div className="gothic-card-no-hover p-4 sm:p-6 space-y-4 sm:space-y-6">
+            <div className="flex flex-col items-center">
+              <div className="relative w-full overflow-hidden rounded-lg border border-purple-900/30 group cursor-pointer"
+                onClick={() => openImageModal("/able_to_join_one_session.png", "Active session restriction notice")}
+                role="button"
+                tabIndex={0}
+                aria-label="Open image in fullscreen"
+                onKeyDown={(e) => e.key === 'Enter' && openImageModal("/able_to_join_one_session.png", "Active session restriction notice")}
+              >
+                <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                  <div className="flex items-center gap-2 text-white">
+                    <ZoomIn className="h-5 w-5" />
+                    <span>Click to zoom</span>
+                  </div>
+                </div>
+                {/* Use a static img tag for components with loading issues */}
+                <div className="relative w-full pt-[60%]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img 
+                    src="/able_to_join_one_session.png"
+                    alt="Notice showing you cannot join multiple sessions simultaneously"
+                    className="absolute top-0 left-0 w-full h-full object-contain"
+                  />
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground mt-2 text-center">
+                Active session restriction notice (click to enlarge)
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-xl font-semibold flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-purple-400" />
+                Understanding Session Restrictions
+              </h3>
+              
+              <div className="space-y-4 pl-3 sm:pl-6">
+                <div className="space-y-2">
+                  <h4 className="font-medium text-purple-300">One Active Session Limit</h4>
+                  <p className="text-muted-foreground">
+                    Covenant Match has an important limitation to ensure fair play and system stability:
+                  </p>
+                  <ul className="list-disc pl-4 sm:pl-6 text-muted-foreground space-y-1">
+                    <li><span className="font-semibold text-purple-300">You can only join or create one session at a time</span></li>
+                    <li>If you attempt to join another session while one is active, you'll see a notification</li>
+                    <li>This restriction applies whether you're the host or a participant</li>
+                    <li>The system prevents you from browsing other sessions while in an active one</li>
+                  </ul>
+                  <p className="text-muted-foreground mt-2">
+                    This limitation ensures that players remain committed to their current session and prevents them from joining multiple sessions simultaneously, which could lead to abandoned games.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-medium text-purple-300">How to Join a New Session</h4>
+                  <p className="text-muted-foreground">
+                    Before you can join a different session, you must first:
+                  </p>
+                  <ol className="list-decimal pl-4 sm:pl-6 text-muted-foreground space-y-1">
+                    <li>Leave your current session by clicking the "Leave Session" button</li>
+                    <li>Wait for your current session to be completed or canceled</li>
+                    <li>Finish reporting results if the session has ended</li>
+                  </ol>
+                  <p className="text-muted-foreground mt-2">
+                    Once you've properly exited your current session, you'll be able to browse and join other available sessions again.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-medium text-purple-300">Rejoining Your Active Session</h4>
+                  <p className="text-muted-foreground">
+                    If you encounter the "You Currently Have an Active Session" notification:
+                  </p>
+                  <ul className="list-disc pl-4 sm:pl-6 text-muted-foreground space-y-1">
+                    <li>Click the "Go to Your Active Session" button to return to your current session</li>
+                    <li>You'll be redirected back to your session screen</li>
+                    <li>This helps prevent accidental navigation away from active sessions</li>
+                  </ul>
+                  <p className="text-muted-foreground mt-2">
+                    This system ensures that you never lose track of your active session and helps maintain a positive experience for all players by preventing abandoned sessions.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-medium text-purple-300">Why This Limitation Exists</h4>
+                  <p className="text-muted-foreground">
+                    The one-session limit provides several important benefits:
+                  </p>
+                  <ul className="list-disc pl-4 sm:pl-6 text-muted-foreground space-y-1">
+                    <li><span className="text-purple-300">Improved Session Quality</span> - Ensures all players are fully engaged in their current session</li>
+                    <li><span className="text-purple-300">Reduced Abandonments</span> - Prevents players from leaving sessions without proper conclusion</li>
+                    <li><span className="text-purple-300">System Stability</span> - Helps maintain smooth performance by limiting simultaneous connections</li>
+                    <li><span className="text-purple-300">Fair Play</span> - Creates a level playing field where everyone follows the same rules</li>
+                  </ul>
+                  <p className="text-muted-foreground mt-2">
+                    While this limitation may occasionally require you to wait before joining a new session, it significantly improves the overall experience for the entire community by promoting commitment and responsible participation.
                   </p>
                 </div>
               </div>
