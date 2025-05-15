@@ -177,23 +177,10 @@ pub async fn get_current_announcement(db: &Database) -> Result<AnnouncementRespo
         return Ok(announcement.to_response());
     }
 
-    // If no announcement exists, create a default one
-    log::info!("No announcement found, creating a default one");
+    // If no announcement exists send error
+    log::error!("Announcement not found!");
 
-    // Define default announcement data
-    let default_announcement = doc! {
-        "active": false,
-        "content": "Welcome to Covenant Match!",
-        "updated_by_id": "system",
-        "updated_by_username": "System",
-        "updated_at": mongodb::bson::DateTime::now()
-    };
-
-    // Create and return the default announcement
-    match news_repository::update_announcement(db, default_announcement).await? {
-        Some(announcement) => Ok(announcement.to_response()),
-        None => Err(AppError::AnnouncementNotFound), // This should not happen given our implementation
-    }
+    Err(AppError::AnnouncementNotFound)
 }
 
 pub async fn update_announcement(
