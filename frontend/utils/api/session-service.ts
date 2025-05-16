@@ -237,10 +237,17 @@ export class SessionService {
    */
   async getActiveSession(): Promise<Session | null> {
     try {
-      return await this.client.get<Session | null>(
+      const response = await this.client.get<Session | { status: string; message: string; data: null }>(
         '/api/v1/sessions/active',
         true
       );
+      
+      // Check if response is the info message format
+      if (response && typeof response === 'object' && 'status' in response && response.status === 'info') {
+        return null;
+      }
+      
+      return response as Session;
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         // Not logged in, so no active session
@@ -386,6 +393,7 @@ export class SessionService {
       id: string;
       username: string;
       isFriendsWith: string[];
+      friendRequestSent: string[];
     }>
   }> {
     try {
@@ -394,6 +402,7 @@ export class SessionService {
           id: string;
           username: string;
           isFriendsWith: string[];
+          friendRequestSent: string[];
         }>
       }>(`/api/v1/sessions/${sessionId}/friendship-matrix`, true);
     } catch (error) {

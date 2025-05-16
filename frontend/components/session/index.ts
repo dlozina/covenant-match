@@ -3,7 +3,7 @@ export * from './common/types';
 
 // Export session UI components
 export { SessionControlButtons } from './buttons/SessionControlButtons';
-export { SessionInfoSection } from './common/SessionInfoSection';
+export { SessionInfoSection } from './SessionInfoSection';
 export { ResultReportingSection } from './results/ResultReportingSection';
 export { PlayerSection } from './player/PlayerSection';
 export { SessionHeader } from './SessionHeader';

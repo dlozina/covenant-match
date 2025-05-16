@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode, useCallback 
 import { useRouter, usePathname } from "next/navigation";
 
 // Global constants
-export const TOKEN_REFRESH_INTERVAL = 60 * 60 * 1000; // 1 hour in milliseconds (was 10 minutes)
+export const TOKEN_REFRESH_INTERVAL = 60 * 60 * 1000 * 11; // 11 hours in milliseconds
 
 // Define the user data type
 type UserData = {
@@ -68,8 +68,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [lastTokenRefresh, setLastTokenRefresh] = useState<number>(0);
    
   //todo: We dont need this on frontend when testing is over
-  // Helper to parse JWT and get expiration
-  const getTokenExpiry = (token: string): number => {
+  // Helper to parse JWT and get expiration -> exp is in seconds!
+  const getTokenExpiry = useCallback((token: string): number => {
     try {
       const base64Url = token.split('.')[1];
       const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
@@ -78,13 +78,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }).join(''));
 
       const payload = JSON.parse(jsonPayload);
-      console.log("JWT payload:", payload); // Log the JWT payload to debug
       return payload.exp * 1000; // Convert to milliseconds
     } catch (error) {
       console.error("Error parsing JWT token", error);
       return 0;
     }
-  };
+  }, []);
 
   // Function to fetch user data from the API
   const fetchUserData = useCallback(async (token: string): Promise<UserData | null> => {
@@ -189,7 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return false;
     }
-  }, [lastTokenRefresh]);
+  }, [lastTokenRefresh, getTokenExpiry]);
 
   // Function to refresh user data
   const refreshUserData = useCallback(async (): Promise<void> => {
@@ -409,7 +408,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       return () => clearInterval(refreshInterval);
     }
-  }, [isLoggedIn, refreshToken]);
+  }, [isLoggedIn, refreshToken, getTokenExpiry]);
 
   // Add fetchWithAuth implementation inside AuthProvider
   const fetchWithAuth = useCallback(async <T = unknown>(url: string, options: RequestInit = {}): Promise<T> => {
@@ -525,7 +524,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('API request error:', error);
       throw error;
     }
-  }, [refreshToken, logout]);
+  }, [refreshToken, logout, getTokenExpiry]);
 
   // Add getAuthHeaders implementation inside AuthProvider
   const getAuthHeaders = useCallback(async (): Promise<HeadersInit> => {
@@ -561,7 +560,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
     };
-  }, [refreshToken, logout]);
+  }, [refreshToken, logout, getTokenExpiry]);
 
   return (
     <AuthContext.Provider

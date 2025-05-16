@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
 import { MainLayout } from "@/components/layout";
-import { Sword, Shield, Timer, Users, Trophy, Skull, ScrollText, Compass, Award, AlertCircle } from "lucide-react";
+import { Sword, Shield, Timer, Users, Trophy, Skull, ScrollText, Compass, Award, AlertCircle, UserPlus, GamepadIcon } from "lucide-react";
 // Use for test if css config is not working -> good old way
 // import { TestStyled } from "@/components/ui/test-styled";
 // import { BasicTest } from "@/components/ui/basic-test";
@@ -20,11 +20,16 @@ import {
   fetchSessionsCount,
   fetchCovenantStats,
   fetchRecentNews,
-  fetchAnnouncement 
+  fetchAnnouncement
 } from "@/utils/api";
+import { Session } from "@/utils/api/types";
+import { usePendingFriendRequests } from "@/hooks/usePendingFriendRequests";
+import { Notification } from "@/components/ui/notification";
+import { sessionService } from "@/utils/api/session-service";
 
 export default function Home() {
   const { isLoggedIn, isLoading } = useAuth();
+  const { hasPendingRequests } = usePendingFriendRequests(isLoggedIn);
   const [topPlayers, setTopPlayers] = useState<LeaderboardEntryResponseDto[]>([]);
   const [isLoadingLeaderboard, setIsLoadingLeaderboard] = useState(true);
   const [activeSessions, setActiveSessions] = useState<number>(0);
@@ -35,6 +40,8 @@ export default function Home() {
   const [isLoadingNews, setIsLoadingNews] = useState(true);
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const [isLoadingAnnouncement, setIsLoadingAnnouncement] = useState(true);
+  const [activeSession, setActiveSession] = useState<Session | null>(null);
+  const [isLoadingActiveSession, setIsLoadingActiveSession] = useState(true);
 
   useEffect(() => {
     const getLeaderboard = async () => {
@@ -126,12 +133,33 @@ export default function Home() {
       }
     };
 
+    const checkActiveSession = async () => {
+      if (isLoggedIn) {
+        try {
+          setIsLoadingActiveSession(true);
+          console.log('Checking for active user session...');
+          const session = await sessionService.getActiveSession();
+          console.log('Active session check result:', session);
+          setActiveSession(session);
+        } catch (error) {
+          console.error("Failed to fetch active session:", error);
+          setActiveSession(null);
+        } finally {
+          setIsLoadingActiveSession(false);
+        }
+      } else {
+        setActiveSession(null);
+        setIsLoadingActiveSession(false);
+      }
+    };
+
     getLeaderboard();
     getActiveSessions();
     getTopCovenants();
     getNews();
     getAnnouncement();
-  }, []);
+    checkActiveSession();
+  }, [isLoggedIn]);
 
   // Add custom sidebars with improved styling
   const leftSidebar = (
@@ -301,13 +329,63 @@ export default function Home() {
           </div>
         </div>
       )}
+      
+      {/* Friend Request Notification */}
+      {isLoggedIn && hasPendingRequests && (
+        <div className="my-4 lg:my-6">
+          <Notification 
+            notification={{
+              type: "success",
+              message: (
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2">
+                    <UserPlus className="h-4 w-4" />
+                    <span>You have pending friend requests</span>
+                  </div>
+                  <Link 
+                    href="/friends"
+                    className="text-xs bg-green-200 hover:bg-green-300 text-green-800 px-2 py-1 rounded-sm transition-colors ml-4"
+                  >
+                    View Requests
+                  </Link>
+                </div>
+              )
+            }}
+          />
+        </div>
+      )}
+      
+      {/* Active Session Notification */}
+      {isLoggedIn && !isLoadingActiveSession && activeSession && (
+        <div className="my-4 lg:my-6">
+          <Notification 
+            notification={{
+              type: "success",
+              message: (
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2">
+                    <GamepadIcon className="h-4 w-4" />
+                    <span>You have an active session</span>
+                  </div>
+                  <Link 
+                    href={`/sessions/run?id=${activeSession.id}`}
+                    className="text-xs bg-green-200 hover:bg-green-300 text-green-800 px-2 py-1 rounded-sm transition-colors ml-4"
+                  >
+                    Go to Session
+                  </Link>
+                </div>
+              )
+            }}
+          />
+        </div>
+      )}
 
       {/* Hero Section */}
       <div className="relative rounded-lg overflow-hidden mb-8 lg:mb-12">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900/80 to-indigo-900/80 z-10"></div>
         <div className="absolute inset-0">
           <Image
-            src="/nightreign-bg.jpeg"
+            src="/nightreign-bg.webp"
             alt="Nightreign Background"
             fill
             priority

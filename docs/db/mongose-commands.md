@@ -104,6 +104,10 @@ db.users.find()
 db.users.find({ age: { $gt: 25 } })
 ```
 
+```bash
+db.sessions.find({ _id: ObjectId('67ffd58997f9ce80caa4d8ad')})
+```
+
 ### Pretty print the results
 
 ```bash
@@ -125,6 +129,9 @@ db.users.updateOne(
 )
 ```
 
+```bash
+db.announcements.updateOne({_id: ObjectId('68259fffd3a5c8ba84fe73b3')}, {$set: {active: true}})
+```
 ### Update multiple documents in the collection
 
 ```bash
@@ -138,6 +145,10 @@ db.users.updateMany(
 
 ```bash
 db.users.deleteOne({ name: "Alice" })
+```
+
+```bash
+db.sessions.deleteOne({ _id: ObjectId('67ffd58997f9ce80caa4d8ad')})
 ```
 
 ### Delete multiple documents from the collection

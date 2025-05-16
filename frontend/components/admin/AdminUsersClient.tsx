@@ -186,39 +186,41 @@ export function AdminUsersClient() {
       
       if (searchQuery.trim()) {
         // If there's a search query, filter the users on the client side
-        // This is a simple client-side implementation
-        // For a real application, you might want to add search functionality to your API
         response = await UserService.getUsers(page, limit, role);
         
-        if (response.status === "success") {
-          const filteredUsers = response.data.users.filter(user => 
-            user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            user.email.toLowerCase().includes(searchQuery.toLowerCase())
-          );
-          
-          setUsers(filteredUsers);
-          
-          // Update pagination info for filtered results
-          const totalFilteredUsers = filteredUsers.length;
-          const totalFilteredPages = Math.ceil(totalFilteredUsers / limit);
-          
-          setPagination({
-            total: totalFilteredUsers,
-            page: page > totalFilteredPages ? 1 : page,
-            limit,
-            total_pages: totalFilteredPages || 1,
-          });
-        }
+        // Safely access the users
+        const userList = response.data?.users || [];
+        
+        // Filter users client-side based on search query
+        const filteredUsers = userList.filter(user => 
+          user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          user.email.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+        
+        setUsers(filteredUsers);
+        
+        // Update pagination info for filtered results
+        const totalFilteredUsers = filteredUsers.length;
+        const totalFilteredPages = Math.ceil(totalFilteredUsers / limit);
+        
+        setPagination({
+          total: totalFilteredUsers,
+          page: page > totalFilteredPages ? 1 : page,
+          limit,
+          total_pages: totalFilteredPages || 1,
+        });
       } else {
         // Regular API call without search filtering
         response = await UserService.getUsers(page, limit, role);
         
-        if (response.status === "success") {
-          setUsers(response.data.users);
-          setPagination(response.data.pagination);
-        } else {
-          throw new Error("Failed to fetch users");
-        }
+        // Safely set users and pagination
+        setUsers(response.data?.users || []);
+        setPagination(response.data?.pagination || {
+          total: 0,
+          page: 1,
+          limit,
+          total_pages: 0,
+        });
       }
     } catch (error) {
       console.error("Error fetching users:", error);

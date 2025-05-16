@@ -1,6 +1,10 @@
 use crate::models::error::AppError;
 use crate::models::session::{
-    CovenantStats, CovenantStatsResponse, CreateSessionDto, FriendshipMatrix, FriendshipPlayer, GameResult, GameSession, GameSessionDto, JoinSessionDto, MinimalPlayerInfoDto, MinimalSessionDto, PaginatedSessionsResponse, PaginationMetadata, PlayerInfo, RateSessionDto, SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto, UserSessionHelper, UserSessionResponseDto
+    CovenantStats, CovenantStatsResponse, CreateSessionDto, FriendshipMatrix, FriendshipPlayer,
+    GameResult, GameSession, GameSessionDto, JoinSessionDto, MinimalPlayerInfoDto,
+    MinimalSessionDto, PaginatedSessionsResponse, PaginationMetadata, PlayerInfo, RateSessionDto,
+    SessionResponseDto, SessionResult, SessionStatus, SubmitResultDto, UpdateSessionDto,
+    UserSessionHelper, UserSessionResponseDto,
 };
 use crate::repository::{session_repository, statistics_repository, user_repository};
 use crate::sse::messages::{BroadcastMessage, ServerMessage as SseServerMessage};
@@ -10,8 +14,9 @@ use crate::ws::messages::{Broadcast, ServerMessage as WsServerMessage};
 use crate::ws::SessionManager as WsSessionManager;
 use actix::prelude::*;
 use chrono::Utc;
-use mongodb::bson::{oid::ObjectId, DateTime};
-use mongodb::Database;
+use futures::TryStreamExt;
+use mongodb::bson::{doc, oid::ObjectId, DateTime};
+use mongodb::{Collection, Database};
 use serde_json::json;
 use std::sync::LazyLock;
 use std::sync::Mutex;
@@ -246,7 +251,6 @@ pub async fn check_user_active_session(
 ) -> Result<Option<SessionResponseDto>, AppError> {
     // No need to validate the user ID format - the ID comes directly from JWT claims
     // and should be used as is
-    log::info!("Checking active sessions for user ID: {}", user_id);
 
     // Find active sessions for the user
     let active_sessions = match session_repository::find_active_sessions_for_user(db, user_id).await
@@ -1314,15 +1318,24 @@ pub async fn get_friends_sessions(
     region: Option<String>,
     platform: Option<String>,
 ) -> Result<Vec<SessionResponseDto>, AppError> {
-    // First, get the user to find their friend list
-    let user = user_repository::find_user_by_id(db, user_id)
-        .await?
-        .ok_or(AppError::UserNotFound)?;
+    // Convert user_id string to ObjectId for querying the friendships collection
+    let user_oid = ObjectId::parse_str(user_id).map_err(|_| AppError::InvalidId)?;
+
+    // Get friend IDs directly from friendships collection
+    let friendships_coll: Collection<crate::models::friends::Friendship> =
+        db.collection("friendships");
+    let filter = doc! { "user_id": user_oid };
+
+    let cursor = friendships_coll.find(filter).await?;
+    let friendships: Vec<crate::models::friends::Friendship> = cursor.try_collect().await?;
 
     // If the user has no friends, return an empty list
-    if user.friend_list.is_empty() {
+    if friendships.is_empty() {
         return Ok(Vec::new());
     }
+
+    // Convert ObjectId friends to string IDs
+    let friend_ids: Vec<String> = friendships.iter().map(|f| f.friend_id.to_hex()).collect();
 
     // Convert status string to enum if provided
     let status_filter = match status {
@@ -1340,7 +1353,7 @@ pub async fn get_friends_sessions(
     // Find sessions created by friends
     let sessions = session_repository::find_friends_sessions(
         db,
-        &user.friend_list,
+        &friend_ids,
         status_filter,
         limit,
         offset,
@@ -1520,50 +1533,102 @@ pub async fn get_friendship_matrix(
         .map(|player| player.user_id.clone())
         .collect();
 
-    // 4. Get all user documents in one query for efficiency
-    let users = user_repository::find_users_by_ids(db, &user_ids).await?;
+    // 4. Get all friendships for these users in one query
+    // First, prepare a hashmap to store friendships for each user
+    let mut user_friendships: std::collections::HashMap<String, Vec<String>> =
+        user_ids.iter().map(|id| (id.clone(), Vec::new())).collect();
 
-    // 5. Construct the response with friendship information
+    // Also prepare a hashmap to store pending friend requests
+    let mut user_friend_requests: std::collections::HashMap<String, Vec<String>> =
+        user_ids.iter().map(|id| (id.clone(), Vec::new())).collect();
+
+    // Access the friendships collection directly for better performance
+    let friendship_coll = db.collection::<crate::models::friends::Friendship>("friendships");
+
+    // Query all friendships where one of the session users is involved
+    let user_oids: Vec<ObjectId> = user_ids
+        .iter()
+        .filter_map(|id| ObjectId::parse_str(id).ok())
+        .collect();
+
+    // If we have valid OIDs, query the friendships
+    if !user_oids.is_empty() {
+        // Efficient query to get all relevant friendships in one go
+        let filter = mongodb::bson::doc! {
+            "user_id": { "$in": &user_oids }
+        };
+
+        // Execute the query and process results
+        let friendships = friendship_coll.find(filter).await?;
+        let friendships = futures::TryStreamExt::try_collect::<Vec<_>>(friendships).await?;
+
+        // Process the friendships into our hashmap
+        for friendship in friendships {
+            let user_id = friendship.user_id.to_hex();
+            let friend_id = friendship.friend_id.to_hex();
+
+            // Only store friendships between users in this session
+            if user_ids.contains(&friend_id) {
+                if let Some(friends) = user_friendships.get_mut(&user_id) {
+                    friends.push(friend_id);
+                }
+            }
+        }
+    }
+
+    // 5. Get all pending friend requests for these users
+    // Access the friend_requests collection
+    let friend_request_coll =
+        db.collection::<crate::models::friends::FriendRequest>("friend_requests");
+
+    if !user_oids.is_empty() {
+        // Query all pending friend requests where users in this session are the senders
+        let filter = mongodb::bson::doc! {
+            "sender_id": { "$in": &user_oids },
+            "receiver_id": { "$in": &user_oids },
+            "status": "Pending"
+        };
+
+        let requests = friend_request_coll.find(filter).await?;
+        let requests = futures::TryStreamExt::try_collect::<Vec<_>>(requests).await?;
+
+        // Process the requests into our hashmap
+        for request in requests {
+            let sender_id = request.sender_id.to_hex();
+            let receiver_id = request.receiver_id.to_hex();
+
+            // Only store requests between users in this session
+            if user_ids.contains(&receiver_id) {
+                if let Some(request_sent) = user_friend_requests.get_mut(&sender_id) {
+                    request_sent.push(receiver_id);
+                }
+            }
+        }
+    }
+
+    // 6. Construct the response with friendship information
     let players = session
         .joined_players
         .iter()
         .map(|session_player| {
-            // For each player in the session
-            let mut is_friends_with = Vec::new();
-
-            // Find this player's user document
-            if let Some(user) = users
-                .iter()
-                .find(|u| u.id.to_hex() == session_player.user_id)
-            {
-                // Check which other session players are in this user's friends list
-                for other_player in &session.joined_players {
-                    // Skip checking against self
-                    if other_player.user_id == session_player.user_id {
-                        continue;
-                    }
-
-                    // Try to convert other player's ID to ObjectId for comparison
-                    if let Ok(other_id) = ObjectId::parse_str(&other_player.user_id) {
-                        // If this user has the other player in their friend list
-                        if user.friend_list.contains(&other_id) {
-                            is_friends_with.push(other_player.user_id.clone());
-                        }
-                    }
-                }
-            }
+            let user_id = &session_player.user_id;
+            let is_friends_with = user_friendships.get(user_id).cloned().unwrap_or_default();
+            let friend_request_sent = user_friend_requests
+                .get(user_id)
+                .cloned()
+                .unwrap_or_default();
 
             FriendshipPlayer {
-                id: session_player.user_id.clone(),
+                id: user_id.clone(),
                 username: session_player.username.clone(),
                 is_friends_with,
+                friend_request_sent,
             }
         })
         .collect();
 
     Ok(FriendshipMatrix { players })
 }
-
 
 /// Get sessions with pagination and advanced filtering
 pub async fn get_sessions_with_pagination(
@@ -1757,13 +1822,19 @@ pub async fn get_friends_sessions_with_pagination(
     night_lord: Option<String>,
     host_experience: Option<String>,
 ) -> Result<PaginatedSessionsResponse<SessionResponseDto>, AppError> {
-    // First, get the user to find their friend list
-    let user = user_repository::find_user_by_id(db, user_id)
-        .await?
-        .ok_or(AppError::UserNotFound)?;
+    // Convert user_id string to ObjectId for querying the friendships collection
+    let user_oid = ObjectId::parse_str(user_id).map_err(|_| AppError::InvalidId)?;
+
+    // Get friend IDs directly from friendships collection
+    let friendships_coll: Collection<crate::models::friends::Friendship> =
+        db.collection("friendships");
+    let filter = doc! { "user_id": user_oid };
+
+    let cursor = friendships_coll.find(filter).await?;
+    let friendships: Vec<crate::models::friends::Friendship> = cursor.try_collect().await?;
 
     // If the user has no friends, return an empty paginated response
-    if user.friend_list.is_empty() {
+    if friendships.is_empty() {
         return Ok(PaginatedSessionsResponse {
             items: Vec::new(),
             metadata: PaginationMetadata {
@@ -1774,6 +1845,9 @@ pub async fn get_friends_sessions_with_pagination(
             },
         });
     }
+
+    // Convert ObjectId friends to string IDs
+    let friend_ids: Vec<String> = friendships.iter().map(|f| f.friend_id.to_hex()).collect();
 
     // Convert status string to enum if provided
     let status_filter = match status {
@@ -1787,9 +1861,6 @@ pub async fn get_friends_sessions_with_pagination(
         },
         None => None,
     };
-
-    // Convert ObjectId friends to string IDs
-    let friend_ids: Vec<String> = user.friend_list.iter().map(|id| id.to_hex()).collect();
 
     // Get total count for pagination
     let total_count = session_repository::count_friends_sessions_with_filters(

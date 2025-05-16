@@ -9,7 +9,7 @@ import { MainLayout } from "@/components/layout"
 import { Footer } from "@/components/layout/Footer"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
-import { Info } from "lucide-react"
+import { Info, Eye, EyeOff } from "lucide-react"
 import {
   Form,
   FormControl,
@@ -130,6 +130,10 @@ export default function CreateProfilePage() {
   
   // Character counter states
   const [usernameLength, setUsernameLength] = useState(0)
+  
+  // Password visibility states
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   
   // Debounce timer references
   const [validationTimeout, setValidationTimeout] = useState<NodeJS.Timeout | null>(null)
@@ -363,16 +367,29 @@ export default function CreateProfilePage() {
                       <FormItem>
                         <FormLabel className="text-sm md:text-base">Password</FormLabel>
                         <FormControl>
-                          <Input 
-                            placeholder="********" 
-                            type="password" 
-                            {...field} 
-                            className="h-10"
-                            onChange={(e) => {
-                              field.onChange(e);
-                              debouncedValidate('password');
-                            }}
-                          />
+                          <div className="relative">
+                            <Input 
+                              placeholder="********" 
+                              type={showPassword ? "text" : "password"} 
+                              {...field} 
+                              className="h-10 pr-10"
+                              onChange={(e) => {
+                                field.onChange(e);
+                                debouncedValidate('password');
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                              onClick={() => setShowPassword(!showPassword)}
+                            >
+                              {showPassword ? (
+                                <EyeOff size={16} />
+                              ) : (
+                                <Eye size={16} />
+                              )}
+                            </button>
+                          </div>
                         </FormControl>
                         <FormDescription className="text-xs md:text-sm">
                           Choose a strong password with at least 8 characters, one number, and one special character.
@@ -389,16 +406,29 @@ export default function CreateProfilePage() {
                       <FormItem>
                         <FormLabel className="text-sm md:text-base">Confirm Password</FormLabel>
                         <FormControl>
-                          <Input 
-                            placeholder="********" 
-                            type="password" 
-                            className="h-10"
-                            {...field}
-                            onChange={(e) => {
-                              field.onChange(e);
-                              debouncedValidate('passwordConfirm');
-                            }}
-                          />
+                          <div className="relative">
+                            <Input 
+                              placeholder="********" 
+                              type={showConfirmPassword ? "text" : "password"} 
+                              className="h-10 pr-10"
+                              {...field}
+                              onChange={(e) => {
+                                field.onChange(e);
+                                debouncedValidate('passwordConfirm');
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            >
+                              {showConfirmPassword ? (
+                                <EyeOff size={16} />
+                              ) : (
+                                <Eye size={16} />
+                              )}
+                            </button>
+                          </div>
                         </FormControl>
                         <FormDescription className="text-xs md:text-sm">
                           Re-enter your password to confirm.

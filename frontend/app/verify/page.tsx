@@ -21,7 +21,7 @@ const motion = {
 const LoadingVerification = () => (
   <div className="container max-w-3xl mx-auto px-4 py-12">
     <div className="text-center mb-8">
-      <h1 className="text-3xl md:text-4xl font-bold mb-2 text-shadow-md bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-600">
+      <h1 className="text-2xl md:text-3xl font-bold mb-2 text-gradient bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-600">
         Email Verification
       </h1>
       <p className="text-muted-foreground text-lg">
@@ -109,7 +109,7 @@ const VerificationContent = () => {
   return (
     <div className="container max-w-3xl mx-auto px-4 py-12">
       <div className="text-center mb-8">
-        <h1 className="text-3xl md:text-4xl font-bold mb-2 text-shadow-md bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-600">
+        <h1 className="text-2xl md:text-3xl font-bold mb-2 text-gradient bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-600">
           Email Verification
         </h1>
         <p className="text-muted-foreground text-lg">

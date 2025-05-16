@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, UserPlus, Sword, Users, LayoutDashboard, User, LogOut, LogIn, Shield, Trophy, Bug } from "lucide-react";
+import { Menu, UserPlus, Sword, Users, LayoutDashboard, User, LogOut, LogIn, Shield, Trophy, Bug, BookOpen, Info } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -17,11 +17,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth-context";
+import { usePendingFriendRequests } from "@/hooks/usePendingFriendRequests";
 
 export function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const { isLoggedIn, userData, logout, isLoading } = useAuth();
+  const { hasPendingRequests } = usePendingFriendRequests(isLoggedIn);
   
   const isAdmin = userData?.role === "admin";
 
@@ -37,12 +39,14 @@ export function SiteHeader() {
       icon: <Users className="h-4 w-4 mr-2" />,
       active: pathname === "/sessions",
     },
-    {
-      href: "/sessions/user",
-      label: "Your Sessions",
-      icon: <Sword className="h-4 w-4 mr-2" />,
-      active: pathname === "/sessions/user",
-    },
+    ...(isLoggedIn ? [
+      {
+        href: "/sessions/user",
+        label: "Your Sessions",
+        icon: <Sword className="h-4 w-4 mr-2" />,
+        active: pathname === "/sessions/user",
+      },
+    ] : []),
     {
       href: "/leaderboard",
       label: "Leaderboard",
@@ -56,7 +60,19 @@ export function SiteHeader() {
         icon: <LayoutDashboard className="h-4 w-4 mr-2" />,
         active: pathname === "/dashboard",
       }
-    ] : [])
+    ] : []),
+    {
+      href: "/docs",
+      label: "How to Use",
+      icon: <BookOpen className="h-4 w-4 mr-2" />,
+      active: pathname === "/docs" || pathname?.startsWith("/docs/"),
+    },
+    {
+      href: "/about",
+      label: "About",
+      icon: <Info className="h-4 w-4 mr-2" />,
+      active: pathname === "/about",
+    }
   ];
 
   return (
@@ -164,9 +180,12 @@ export function SiteHeader() {
                         </Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link href="/friends" className="w-full flex items-center">
+                        <Link href="/friends" className="w-full flex items-center relative">
                           <Users className="h-4 w-4 mr-2" />
                           Friends
+                          {hasPendingRequests && (
+                            <span className="absolute right-2 top-1/2 -translate-y-1/2 h-2.5 w-2.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_4px_1px_rgba(34,197,94,0.6)]" />
+                          )}
                         </Link>
                       </DropdownMenuItem>
                       {isAdmin && (

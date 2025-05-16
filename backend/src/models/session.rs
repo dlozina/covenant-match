@@ -192,7 +192,7 @@ pub struct SessionResponseDto {
     pub player_count: Option<u32>,
     pub new_session_created: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub new_session_created_id: Option<ObjectId>,
+    pub new_session_created_id: Option<String>,
 }
 
 impl From<GameSession> for SessionResponseDto {
@@ -265,7 +265,7 @@ impl From<GameSession> for SessionResponseDto {
             host_experience: session.host_experience,
             player_count: Some(player_count),
             new_session_created: session.new_session_created,
-            new_session_created_id: session.new_session_created_id,
+            new_session_created_id: session.new_session_created_id.map(mongodb::bson::oid::ObjectId::to_hex),
         }
     }
 }
@@ -448,6 +448,7 @@ pub struct FriendshipPlayer {
     pub id: String,
     pub username: String,
     pub is_friends_with: Vec<String>,
+    pub friend_request_sent: Vec<String>,
 }
 
 /// Response model for the friendship matrix

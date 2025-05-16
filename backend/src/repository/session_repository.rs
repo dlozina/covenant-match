@@ -1,13 +1,12 @@
 use crate::models::error::AppError;
 use crate::models::session::{GameSession, SessionStatus};
 use futures::TryStreamExt;
-use mongodb::options::FindOptions;
 use mongodb::{
     bson::{doc, oid::ObjectId, to_bson},
     Collection, Database,
 };
 
-fn get_collection(db: &Database) -> Collection<GameSession> {
+pub fn get_collection(db: &Database) -> Collection<GameSession> {
     db.collection::<GameSession>("sessions")
 }
 
@@ -236,7 +235,7 @@ pub async fn count_sessions_by_status(
 /// Find sessions created by friends
 pub async fn find_friends_sessions(
     db: &Database,
-    friend_ids: &[ObjectId],
+    friend_ids: &[String],
     status: Option<SessionStatus>,
     limit: Option<u64>,
     offset: Option<u64>,
@@ -251,13 +250,16 @@ pub async fn find_friends_sessions(
     };
 
     // Add friend filter - session host must be in the friend list
-    let friend_ids_hex: Vec<String> = friend_ids.iter().map(|id| id.to_hex()).collect();
+    if friend_ids.is_empty() {
+        // Return empty result if no friends
+        return Ok(Vec::new());
+    }
 
-    // Add this to the filter
+    // Add this to the filter - host must be one of the friends
     filter = doc! {
         "$and": [
             filter,
-            { "host_id": { "$in": friend_ids_hex } },
+            { "host_id": { "$in": friend_ids } },
             // For friends tab, only show sessions with is_friends_only flag set to true
             { "is_friends_only": true }
         ]

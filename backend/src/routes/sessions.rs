@@ -696,7 +696,12 @@ async fn get_user_active_session(db: web::Data<Database>, req: HttpRequest) -> i
     };
 
     match session_service::check_user_active_session(&db, &user_id).await {
-        Ok(session) => HttpResponse::Ok().json(session),
+        Ok(Some(session)) => HttpResponse::Ok().json(session),
+        Ok(None) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "info",
+            "message": "No active session found",
+            "data": null
+        })),
         Err(e) => {
             log::error!("Error checking active session: {:?}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
@@ -800,7 +805,7 @@ async fn get_friends_sessions(
     };
 
     // Extract query parameters
-    let status = query.get("status").map(|s| s.to_string());
+    let status = query.get("status").map(ToString::to_string);
     let limit = query
         .get("limit")
         .and_then(|l| l.parse::<u64>().ok())

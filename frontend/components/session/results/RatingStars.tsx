@@ -8,7 +8,7 @@ interface RatingStarsProps {
 const RatingStarsComponent = ({ rating, onSetRating }: RatingStarsProps) => {
   return (
     <div>
-      <p className="text-muted-foreground mb-2">Rate Experience:</p>
+      <p className="text-muted-foreground mb-2">Rate Session Experience:</p>
       <div className="flex justify-between sm:justify-start sm:space-x-2">
         {[1, 2, 3, 4, 5].map((star) => {
           // Determine color based on rating value

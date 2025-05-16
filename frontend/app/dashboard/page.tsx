@@ -5,7 +5,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Cell, Label, Legend, Pie, PieChart, ResponsiveContainer, Sector, Tooltip, TooltipProps } from "recharts";
-import { Loader2, ChevronLeft, ChevronRight, Info } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Info, UserPlus, Check } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -21,7 +21,9 @@ import {
   PaginationInfo,
   SessionHistoryEntry,
   SessionDetail,
-  SessionDetailResponse
+  SessionDetailResponse,
+  NightLord,
+  Nightfarer
 } from "@/utils/api";
 import { formatDistanceToNow } from 'date-fns';
 import { Button } from "@/components/ui/button";
@@ -33,6 +35,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Notification, NotificationType } from "@/components/ui/notification";
+import { UserService } from "@/utils/api/user-service";
+import { GameDataService } from "@/utils/api/game-data-service";
+import { Footer } from "@/components/layout/Footer";
 
 interface CharacterStats {
   played: number;
@@ -110,9 +116,14 @@ function DashboardContent() {
   
   // Session history filters
   const [filteredHistory, setFilteredHistory] = useState<SessionHistoryEntry[]>([]);
-  const [nightLordFilter, setNightLordFilter] = useState<string>('');
-  const [nightfarerFilter, setNightfarerFilter] = useState<string>('');
-  const [resultFilter, setResultFilter] = useState<string>('');
+  const [nightLordFilter, setNightLordFilter] = useState<string>('all');
+  const [nightfarerFilter, setNightfarerFilter] = useState<string>('all');
+  const [resultFilter, setResultFilter] = useState<string>('all');
+  
+  // Character data for select dropdowns
+  const [nightLords, setNightLords] = useState<NightLord[]>([]);
+  const [nightfarers, setNightfarers] = useState<Nightfarer[]>([]);
+  const [isLoadingCharacterData, setIsLoadingCharacterData] = useState(false);
   
   // Session details dialog state
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
@@ -120,6 +131,97 @@ function DashboardContent() {
   const [sessionDetails, setSessionDetails] = useState<SessionDetail | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
+  
+  // Friend status tracking
+  const [friendStatus, setFriendStatus] = useState<{
+    friends: string[],
+    pendingRequests: string[],
+    loading: Record<string, boolean>
+  }>({
+    friends: [],
+    pendingRequests: [],
+    loading: {}
+  });
+  
+  // Notification state
+  const [notification, setNotification] = useState<NotificationType | null>(null);
+
+  // Function to fetch consensus results for sessions
+  const fetchConsensusResults = async (sessions: SessionHistoryEntry[]) => {
+    // Only fetch results for completed sessions
+    const completedSessions = sessions.filter(s => s.completed_at);
+    if (completedSessions.length === 0) return;
+    
+    const consensusResults: Record<string, string> = {};
+    
+    // Get consensus results for each completed session
+    for (const session of completedSessions) {
+      try {
+        const response = await fetchWithAuth<SessionResultsResponse>(
+          `/api/v1/sessions/${session.session_id}/results`
+        );
+        
+        if (response.consensus && response.consensus.hasConsensus) {
+          consensusResults[session.session_id] = response.consensus.result || '';
+        }
+      } catch (err) {
+        console.error(`Error fetching results for session ${session.session_id}:`, err);
+        // Continue with other sessions even if one fails
+      }
+    }
+    
+    setSessionConsensusResults(consensusResults);
+  };
+
+  // Function to fetch session history with filters
+  const fetchSessionHistory = async (page: number = 1, filters?: {
+    nightLord?: string;
+    nightfarer?: string;
+    result?: string;
+  }) => {
+    try {
+      setIsLoadingHistory(true);
+      
+      // Build query parameters
+      const queryParams = new URLSearchParams();
+      queryParams.append('page', page.toString());
+      queryParams.append('limit', pagination.limit.toString());
+      
+      // Add filter parameters if they're not 'all'
+      if (filters) {
+        if (filters.nightLord && filters.nightLord !== 'all') {
+          queryParams.append('night_lord', filters.nightLord);
+        }
+        if (filters.nightfarer && filters.nightfarer !== 'all') {
+          queryParams.append('nightfarer', filters.nightfarer);
+        }
+        if (filters.result && filters.result !== 'all') {
+          queryParams.append('result', filters.result);
+        }
+      }
+      
+      const response = await fetchWithAuth<PaginatedResponse<PaginatedSessionHistory>>(
+        `/api/v1/statistics/users/me/sessions?${queryParams.toString()}`
+      );
+      
+      // Convert from 1-indexed to 0-indexed
+      if (response.data && response.data.pagination) {
+        response.data.pagination.page -= 1;
+      }
+      
+      setSessionHistory(response.data.sessions);
+      setFilteredHistory(response.data.sessions);
+      setPagination(response.data.pagination);
+      
+      // Fetch consensus results for completed sessions
+      fetchConsensusResults(response.data.sessions);
+    } catch (err) {
+      console.error('Error fetching session history:', err);
+      setHistoryError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -157,130 +259,70 @@ function DashboardContent() {
         setTimeout(() => setAnimateCharts(true), 300);
       }
     };
-
-    const fetchSessionHistory = async () => {
-      try {
-        setIsLoadingHistory(true);
-        const response = await fetchWithAuth<PaginatedResponse<PaginatedSessionHistory>>(
-          `/api/v1/statistics/users/me/sessions?page=1&limit=10`
-        );
-        
-        // Convert from 1-indexed to 0-indexed
-        if (response.data && response.data.pagination) {
-          response.data.pagination.page -= 1;
-        }
-        
-        setSessionHistory(response.data.sessions);
-        setFilteredHistory(response.data.sessions);
-        setPagination(response.data.pagination);
-        
-        // Fetch consensus results for completed sessions
-        fetchConsensusResults(response.data.sessions);
-      } catch (err) {
-        console.error('Error fetching session history:', err);
-        setHistoryError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setIsLoadingHistory(false);
-      }
-    };
     
-    // Function to fetch consensus results for sessions
-    const fetchConsensusResults = async (sessions: SessionHistoryEntry[]) => {
-      // Only fetch results for completed sessions
-      const completedSessions = sessions.filter(s => s.completed_at);
-      if (completedSessions.length === 0) return;
-      
-      const consensusResults: Record<string, string> = {};
-      
-      // Get consensus results for each completed session
-      for (const session of completedSessions) {
-        try {
-          const response = await fetchWithAuth<SessionResultsResponse>(
-            `/api/v1/sessions/${session.session_id}/results`
-          );
-          
-          if (response.consensus && response.consensus.hasConsensus) {
-            consensusResults[session.session_id] = response.consensus.result || '';
-          }
-        } catch (err) {
-          console.error(`Error fetching results for session ${session.session_id}:`, err);
-          // Continue with other sessions even if one fails
-        }
+    // Fetch character data for select dropdowns
+    const fetchCharacterData = async () => {
+      try {
+        setIsLoadingCharacterData(true);
+        const [lords, farers] = await Promise.all([
+          GameDataService.getNightLords(),
+          GameDataService.getNightfarers()
+        ]);
+        setNightLords(lords);
+        setNightfarers(farers);
+      } catch (error) {
+        console.error('Error fetching character data:', error);
+      } finally {
+        setIsLoadingCharacterData(false);
       }
-      
-      setSessionConsensusResults(consensusResults);
     };
 
     fetchStats();
-    fetchSessionHistory();
+    fetchSessionHistory(1);
+    fetchCharacterData();
   }, [fetchWithAuth]);
   
-  // Apply filters to session history
+  // Effect to fetch session history whenever filters change
   useEffect(() => {
-    if (sessionHistory.length === 0) {
-      setFilteredHistory([]);
-      return;
-    }
+    // Skip on component mount as the initial fetch is already done in the first useEffect
+    if (isLoadingHistory) return;
     
-    let filtered = [...sessionHistory];
+    fetchSessionHistory(1, {
+      nightLord: nightLordFilter,
+      nightfarer: nightfarerFilter,
+      result: resultFilter
+    });
     
-    if (nightLordFilter) {
-      filtered = filtered.filter(session => 
-        session.night_lord.toLowerCase().includes(nightLordFilter.toLowerCase())
-      );
-    }
-    
-    if (nightfarerFilter) {
-      filtered = filtered.filter(session => 
-        session.player_nightfarer.toLowerCase().includes(nightfarerFilter.toLowerCase())
-      );
-    }
-    
-    if (resultFilter) {
-      filtered = filtered.filter(session => 
-        session.player_result.toLowerCase() === resultFilter.toLowerCase()
-      );
-    }
-    
-    setFilteredHistory(filtered);
-  }, [sessionHistory, nightLordFilter, nightfarerFilter, resultFilter]);
-
+    // Don't include isLoadingHistory in dependencies to avoid infinite loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nightLordFilter, nightfarerFilter, resultFilter]);
+  
   // Function to handle page change
   const handlePageChange = async (newPage: number) => {
     if (newPage < 0 || newPage >= pagination.total_pages) {
       return;
     }
     
-    // Reset filters when changing pages since pagination happens at the backend
-    resetFilters();
-    
     try {
       setIsLoadingHistory(true);
-      const response = await fetchWithAuth<PaginatedResponse<PaginatedSessionHistory>>(
-        `/api/v1/statistics/users/me/sessions?page=${newPage + 1}&limit=${pagination.limit}`
-      );
       
-      // Convert from 1-indexed to 0-indexed
-      if (response.data && response.data.pagination) {
-        response.data.pagination.page -= 1;
-      }
-      
-      setSessionHistory(response.data.sessions);
-      setFilteredHistory(response.data.sessions);
-      setPagination(response.data.pagination);
+      // Pass current filter values when changing pages
+      fetchSessionHistory(newPage + 1, {
+        nightLord: nightLordFilter,
+        nightfarer: nightfarerFilter,
+        result: resultFilter
+      });
     } catch (err) {
       console.error('Error fetching session history page:', err);
       setHistoryError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setIsLoadingHistory(false);
     }
   };
 
   // Reset all filters
   const resetFilters = () => {
-    setNightLordFilter('');
-    setNightfarerFilter('');
-    setResultFilter('');
+    setNightLordFilter('all');
+    setNightfarerFilter('all');
+    setResultFilter('all');
   };
 
   // Sort character data by number of games played (descending)
@@ -480,6 +522,7 @@ function DashboardContent() {
 
   // Session History Section
   const renderSessionHistory = () => {
+    // Show loading state
     if (isLoadingHistory) {
       return (
         <div className="text-center py-8 flex flex-col items-center justify-center gap-4">
@@ -489,6 +532,7 @@ function DashboardContent() {
       );
     }
 
+    // Show error state
     if (historyError) {
       return (
         <div className="text-center py-4 text-destructive">
@@ -497,69 +541,90 @@ function DashboardContent() {
       );
     }
 
+    // Filters section - always shown regardless of results
+    const renderFilters = () => (
+      <div className="mb-4 p-4 border border-purple-900/20 rounded-lg bg-background/50">
+        <div className="flex flex-col md:flex-row gap-3 mb-3">
+          <div className="flex-1">
+            <label className="block text-sm font-medium mb-1">Night Lord</label>
+            <Select value={nightLordFilter} onValueChange={setNightLordFilter}>
+              <SelectTrigger className="w-full h-10 bg-background">
+                <SelectValue placeholder="Filter by Night Lord" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Night Lords</SelectItem>
+                {isLoadingCharacterData ? (
+                  <SelectItem value="loading" disabled>Loading...</SelectItem>
+                ) : (
+                  nightLords.map((lord) => (
+                    <SelectItem key={lord.id} value={lord.name}>{lord.name}</SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1">
+            <label className="block text-sm font-medium mb-1">Nightfarer</label>
+            <Select value={nightfarerFilter} onValueChange={setNightfarerFilter}>
+              <SelectTrigger className="w-full h-10 bg-background">
+                <SelectValue placeholder="Filter by Nightfarer" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Nightfarers</SelectItem>
+                {isLoadingCharacterData ? (
+                  <SelectItem value="loading" disabled>Loading...</SelectItem>
+                ) : (
+                  nightfarers.map((farer) => (
+                    <SelectItem key={farer.id} value={farer.name}>{farer.name}</SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1">
+            <label className="block text-sm font-medium mb-1">Result</label>
+            <Select value={resultFilter} onValueChange={setResultFilter}>
+              <SelectTrigger className="w-full h-10 bg-background">
+                <SelectValue placeholder="Filter by Result" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Results</SelectItem>
+                <SelectItem value="Win">Win</SelectItem>
+                <SelectItem value="Loss">Loss</SelectItem>
+                <SelectItem value="Disconnect">Disconnect</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={resetFilters}
+          >
+            Reset Filters
+          </Button>
+        </div>
+      </div>
+    );
+
+    // Show empty state - for when there's no session history at all
     if (sessionHistory.length === 0) {
       return (
-        <div className="text-center py-6 bg-background/50 border border-purple-900/20 rounded-lg">
-          <p className="text-muted-foreground">No session history available yet.</p>
+        <div>
+          {renderFilters()}
+          <div className="text-center py-6 bg-background/50 border border-purple-900/20 rounded-lg">
+            <p className="text-muted-foreground">No session history available yet.</p>
+          </div>
         </div>
       );
     }
     
-    // If we have sessions but all are filtered out
-    if (filteredHistory.length === 0 && sessionHistory.length > 0) {
+    // Show empty state when no sessions match the filter criteria
+    if (filteredHistory.length === 0) {
       return (
         <div>
-          {/* Filters */}
-          <div className="mb-4 p-4 border border-purple-900/20 rounded-lg bg-background/50">
-            <div className="flex flex-col md:flex-row gap-3 mb-3">
-              <div className="flex-1">
-                <label htmlFor="night-lord-filter" className="block text-sm font-medium mb-1">Night Lord</label>
-                <input
-                  id="night-lord-filter"
-                  type="text"
-                  className="w-full p-2 rounded-md border bg-background"
-                  placeholder="Filter by Night Lord"
-                  value={nightLordFilter}
-                  onChange={(e) => setNightLordFilter(e.target.value)}
-                />
-              </div>
-              <div className="flex-1">
-                <label htmlFor="nightfarer-filter" className="block text-sm font-medium mb-1">Nightfarer</label>
-                <input
-                  id="nightfarer-filter"
-                  type="text"
-                  className="w-full p-2 rounded-md border bg-background"
-                  placeholder="Filter by Nightfarer"
-                  value={nightfarerFilter}
-                  onChange={(e) => setNightfarerFilter(e.target.value)}
-                />
-              </div>
-              <div className="flex-1">
-                <label htmlFor="result-filter" className="block text-sm font-medium mb-1">Result</label>
-                <select
-                  id="result-filter"
-                  className="w-full p-2 rounded-md border bg-background"
-                  value={resultFilter}
-                  onChange={(e) => setResultFilter(e.target.value)}
-                >
-                  <option value="">All Results</option>
-                  <option value="win">Win</option>
-                  <option value="loss">Loss</option>
-                  <option value="disconnect">Disconnect</option>
-                </select>
-              </div>
-            </div>
-            <div className="flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={resetFilters}
-              >
-                Reset Filters
-              </Button>
-            </div>
-          </div>
-          
+          {renderFilters()}
           <div className="text-center py-6 bg-background/50 border border-purple-900/20 rounded-lg">
             <p className="text-muted-foreground">No sessions match your filter criteria.</p>
             <Button
@@ -575,58 +640,10 @@ function DashboardContent() {
       );
     }
 
+    // Show results
     return (
       <div>
-        {/* Filters */}
-        <div className="mb-4 p-4 border border-purple-900/20 rounded-lg bg-background/50">
-          <div className="flex flex-col md:flex-row gap-3 mb-3">
-            <div className="flex-1">
-              <label htmlFor="night-lord-filter" className="block text-sm font-medium mb-1">Night Lord</label>
-              <input
-                id="night-lord-filter"
-                type="text"
-                className="w-full p-2 rounded-md border bg-background"
-                placeholder="Filter by Night Lord"
-                value={nightLordFilter}
-                onChange={(e) => setNightLordFilter(e.target.value)}
-              />
-            </div>
-            <div className="flex-1">
-              <label htmlFor="nightfarer-filter" className="block text-sm font-medium mb-1">Nightfarer</label>
-              <input
-                id="nightfarer-filter"
-                type="text"
-                className="w-full p-2 rounded-md border bg-background"
-                placeholder="Filter by Nightfarer"
-                value={nightfarerFilter}
-                onChange={(e) => setNightfarerFilter(e.target.value)}
-              />
-            </div>
-            <div className="flex-1">
-              <label htmlFor="result-filter" className="block text-sm font-medium mb-1">Result</label>
-              <select
-                id="result-filter"
-                className="w-full p-2 rounded-md border bg-background"
-                value={resultFilter}
-                onChange={(e) => setResultFilter(e.target.value)}
-              >
-                <option value="">All Results</option>
-                <option value="win">Win</option>
-                <option value="loss">Loss</option>
-                <option value="disconnect">Disconnect</option>
-              </select>
-            </div>
-          </div>
-          <div className="flex justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={resetFilters}
-            >
-              Reset Filters
-            </Button>
-          </div>
-        </div>
+        {renderFilters()}
         
         <div className="bg-background/50 border border-purple-900/20 rounded-lg overflow-hidden">
           {/* Desktop view - Table */}
@@ -765,16 +782,108 @@ function DashboardContent() {
     }
   };
   
+  // Function to fetch friend status for current user
+  const fetchFriendStatus = async () => {
+    try {
+      if (!sessionDetails) return;
+      
+      // Get the list of player IDs from the session details (excluding current user)
+      const playerIds = sessionDetails.players
+        .filter(player => player.user_id !== userData?.id)
+        .map(player => player.user_id);
+        
+      if (playerIds.length === 0) return;
+      
+      // Use the new efficient endpoint
+      const statusResponse = await UserService.checkFriendStatus(playerIds);
+      
+      setFriendStatus(prev => ({
+        ...prev,
+        friends: statusResponse.friends,
+        pendingRequests: statusResponse.outgoing_requests,
+        loading: {}
+      }));
+    } catch (err) {
+      console.error('Error fetching friend status:', err);
+      // We don't want to break the entire dialog if friend info fails
+    }
+  };
+  
+  // Function to send a friend request
+  const sendFriendRequest = async (receiverId: string) => {
+    try {
+      // Set loading state for this specific user
+      setFriendStatus(prev => ({
+        ...prev,
+        loading: { ...prev.loading, [receiverId]: true }
+      }));
+      
+      await UserService.sendFriendRequest(receiverId);
+      
+      // Update pending requests list
+      setFriendStatus(prev => ({
+        ...prev,
+        pendingRequests: [...prev.pendingRequests, receiverId],
+        loading: { ...prev.loading, [receiverId]: false }
+      }));
+      
+      setNotification({
+        message: "Your friend request has been sent successfully.",
+        type: "success"
+      });
+      
+      // Auto clear notification after 5 seconds
+      setTimeout(() => {
+        setNotification(null);
+      }, 5000);
+    } catch (err) {
+      console.error('Error sending friend request:', err);
+      
+      let errorMessage = "Failed to send friend request.";
+      if (err instanceof Error) {
+        if (err.message.includes("already exists")) {
+          errorMessage = "Friend request already exists or you are already friends.";
+        }
+      }
+      
+      setNotification({
+        message: errorMessage,
+        type: "error"
+      });
+      
+      // Reset loading state
+      setFriendStatus(prev => ({
+        ...prev,
+        loading: { ...prev.loading, [receiverId]: false }
+      }));
+    }
+  };
+  
+  // Function to clear notification
+  const clearNotification = () => {
+    setNotification(null);
+  };
+  
   // Function to open session details dialog
   const openSessionDetails = (sessionId: string) => {
     setSelectedSessionId(sessionId);
     setIsDetailsDialogOpen(true);
     fetchDetails(sessionId);
+    fetchFriendStatus();
   };
   
   return (
     <div className="container mx-auto py-6 md:py-8 px-4 md:px-6">
       <h1 className="text-2xl md:text-3xl font-bold mb-4 md:mb-6">Dashboard</h1>
+      
+      {notification && (
+        <div className="mb-4">
+          <Notification 
+            notification={notification}
+            onDismiss={clearNotification}
+          />
+        </div>
+      )}
       
       <div className="bg-card/50 border border-purple-900/20 rounded-lg p-4 md:p-6 backdrop-blur-sm">
         <h2 className="text-lg md:text-xl font-semibold mb-2 md:mb-4">Welcome, {userData?.username || 'Tarnished'} !</h2>
@@ -1152,10 +1261,6 @@ function DashboardContent() {
                         <div className="text-xs text-muted-foreground mb-1">Status</div>
                         <div className="font-medium">{sessionDetails.status}</div>
                       </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-1">Created</div>
-                        <div className="text-sm">{formatDate(sessionDetails.created_at)}</div>
-                      </div>
                       {sessionDetails.completed_at && (
                         <div>
                           <div className="text-xs text-muted-foreground mb-1">Completed</div>
@@ -1174,24 +1279,58 @@ function DashboardContent() {
                                 <th className="h-10 px-2 text-left align-middle font-medium">Player</th>
                                 <th className="h-10 px-2 text-left align-middle font-medium">Nightfarer</th>
                                 <th className="h-10 px-2 text-left align-middle font-medium">Result</th>
+                                <th className="h-10 px-2 text-left align-middle font-medium">Friend</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {sessionDetails.players.map((player) => (
-                                <tr key={player.user_id} className="border-b transition-colors hover:bg-purple-900/5">
-                                  <td className="p-2 align-middle">{player.username}</td>
-                                  <td className="p-2 align-middle">{player.nightfarer}</td>
-                                  <td className="p-2 align-middle">
-                                    {player.result ? (
-                                      <span className={getResultColor(player.result)}>
-                                        {player.result}
-                                      </span>
-                                    ) : (
-                                      <span className="text-muted-foreground text-xs">No result</span>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
+                              {sessionDetails.players.map((player) => {
+                                const isSelf = player.user_id === userData?.id;
+                                const isFriend = friendStatus.friends.includes(player.user_id);
+                                const hasPendingRequest = friendStatus.pendingRequests.includes(player.user_id);
+                                const isLoading = !!friendStatus.loading[player.user_id];
+                                
+                                return (
+                                  <tr key={player.user_id} className="border-b transition-colors hover:bg-purple-900/5">
+                                    <td className="p-2 align-middle">{player.username}</td>
+                                    <td className="p-2 align-middle">{player.nightfarer}</td>
+                                    <td className="p-2 align-middle">
+                                      {player.result ? (
+                                        <span className={getResultColor(player.result)}>
+                                          {player.result}
+                                        </span>
+                                      ) : (
+                                        <span className="text-muted-foreground text-xs">No result</span>
+                                      )}
+                                    </td>
+                                    <td className="p-2 align-middle">
+                                      {!isSelf && (
+                                        isFriend ? (
+                                          <span className="text-green-500 flex items-center gap-1 text-xs">
+                                            <Check className="h-3 w-3" /> Friends
+                                          </span>
+                                        ) : hasPendingRequest ? (
+                                          <span className="text-orange-500 text-xs">Request sent</span>
+                                        ) : (
+                                          <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            className="h-7 w-7 p-0 rounded-full"
+                                            onClick={() => sendFriendRequest(player.user_id)}
+                                            disabled={isLoading}
+                                          >
+                                            {isLoading ? (
+                                              <Loader2 className="h-3 w-3 animate-spin" />
+                                            ) : (
+                                              <UserPlus className="h-3.5 w-3.5" />
+                                            )}
+                                            <span className="sr-only">Add friend</span>
+                                          </Button>
+                                        )
+                                      )}
+                                    </td>
+                                  </tr>
+                                )
+                              })}
                             </tbody>
                           </table>
                         </div>
@@ -1211,6 +1350,7 @@ function DashboardContent() {
           </AlertDialogContent>
         </AlertDialog>
       </div>
+      <Footer />
     </div>
   );
 } 
