@@ -766,8 +766,8 @@ export const createSession = async (
     });
     
     if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.message || 'Failed to create session');
+      //const data = await response.json();
+      throw new Error('Failed to create session');
     }
     
     return await response.json();

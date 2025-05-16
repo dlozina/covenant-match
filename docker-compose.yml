@@ -1,6 +1,6 @@
 services:
   frontend:
-    image: ghcr.io/dlozina/covenant-match-frontend:latest
+    image: ghcr.io/dlozina/covenant-match-frontend:preview 
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -12,10 +12,10 @@ services:
         - NEXT_PUBLIC_TESTER_PASSWORD=test-covenant-45#
     deploy:
       replicas: 1
-      # resources:
-      #   limits:
-      #     cpus: '0.5'
-      #     memory: 1.5G
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1.5G
       restart_policy:
         condition: on-failure
     environment:
@@ -31,16 +31,16 @@ services:
       - covenant-network
 
   backend:
-    image: ghcr.io/dlozina/covenant-match-backend:latest
+    image: ghcr.io/dlozina/covenant-match-backend:preview 
     build:
       context: ./backend
       dockerfile: Dockerfile
     deploy:
       replicas: 1
-      # resources:
-      #   limits:
-      #     cpus: '2'
-      #     memory: 3G
+      resources:
+        limits:
+          cpus: '2'
+          memory: 3G
       restart_policy:
         condition: on-failure
         delay: 5s
@@ -68,10 +68,10 @@ services:
     image: mongo:latest
     deploy:
       replicas: 1
-      # resources:
-      #   limits:
-      #     cpus: '1'
-      #     memory: 3G
+      resources:
+        limits:
+          cpus: '1'
+          memory: 3G
       restart_policy:
         condition: on-failure
     environment:
@@ -89,16 +89,16 @@ services:
       start_period: 30s
 
   nginx:
-    image: ghcr.io/dlozina/covenant-match-nginx:latest
+    image: ghcr.io/dlozina/covenant-match-nginx:preview 
     build:
       context: ./nginx
       dockerfile: Dockerfile
     deploy:
       replicas: 1
-      # resources:
-      #   limits:
-      #     cpus: '0.5'
-      #     memory: 0.5G
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 0.5G
       restart_policy:
         condition: on-failure
     ports:
@@ -113,10 +113,10 @@ services:
   mongodb-backup:
     image: ghcr.io/dlozina/covenant-match-mongodb-backup:latest
     deploy:
-      # resources:
-      #   limits:
-      #     cpus: '0.2'
-      #     memory: 0.5G
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 0.5G
     environment:
       - BACKUP_SCHEDULE=0 6 * * *  # Run at 6:00 AM every day
       - BACKUP_RETENTION_DAYS=7    # Keep backups for 7 days (default)
