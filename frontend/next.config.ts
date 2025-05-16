@@ -9,6 +9,11 @@ const nextConfig: NextConfig = {
   images: {
     domains: ['localhost', 'covenant-match.com', '127.0.0.1'],
   },
+  compiler: {
+    removeConsole: {
+      exclude: ['error', 'warn'],
+    },
+  },
 };
 
 export default nextConfig;
