@@ -343,7 +343,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(Auth::user())
             .configure(health::config)
             .configure(users::config)
-            .configure(sessions::config)
+            //.configure(sessions::config) -> disabled for preview
             .configure(game_data::config)
             .configure(statistics::config)
             .configure(chat::config)
