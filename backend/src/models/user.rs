@@ -254,4 +254,6 @@ pub struct NewPasswordDto {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ResetPasswordDto {
     pub email: String,
+    /// Cloudflare Turnstile token
+    pub turnstile_token: String,
 }

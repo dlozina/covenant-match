@@ -109,7 +109,35 @@ async fn verify_email(db: web::Data<Database>, path: web::Path<String>) -> impl 
 async fn reset_password_email(
     db: web::Data<Database>,
     reset_password_data: web::Json<ResetPasswordDto>,
+    req: HttpRequest,
 ) -> impl Responder {
+    // Get the client IP address
+    let ip_address = ip_address::get_client_ip(&req);
+
+    // Verify the turnstile token
+    if let Err(e) = auth_service::verify_turnstile_token_reset_password(
+        &ip_address,
+        &reset_password_data.turnstile_token,
+    )
+    .await
+    {
+        log::warn!(
+            "Turnstile verification failed for email reset: {:?}",
+            e
+        );
+
+        // For Turnstile required errors, provide a more helpful response
+        if let AppError::CaptchaRequired(_) = &e {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "status": "error",
+                "message": e.to_string(),
+                "requiresTurnstile": true
+            }));
+        }
+
+        return e.error_response();
+    }
+
     // Grab the email from the request body
     let reset_password_data = reset_password_data.into_inner();
 

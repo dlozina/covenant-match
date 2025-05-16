@@ -8,12 +8,14 @@ import { cn } from '@/lib/utils';
 import { emailService } from '@/utils/api/email-service';
 import { ApiError } from '@/utils/api/errors';
 import { Input } from '@/components/ui/input';
+import { Turnstile } from "next-turnstile";
 
 export default function SendResetEmailPage() {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [token, setToken] = useState<string>();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,11 +25,16 @@ export default function SendResetEmailPage() {
       return;
     }
 
+    if (!token) {
+      setError('You did not pass the turnstile test');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     
     try {
-      await emailService.sendResetPasswordEmail(email);
+      await emailService.sendResetPasswordEmail(email, token);
       setSuccess(true);
     } catch (err) {
       if (err instanceof ApiError) {
@@ -136,8 +143,16 @@ export default function SendResetEmailPage() {
                   {isLoading ? 'Sending...' : 'Send Reset Link'}
                   <Send className="ml-2 w-4 h-4" />
                 </Button>
+                
               </div>
-              
+              <div className="flex justify-center">
+                <Turnstile
+                  className="flex justify-center"
+                  theme="dark"
+                  siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "0x4AAAAAABYet9mhK3xghhXA"}
+                  onVerify={setToken}
+                />
+              </div>
               <div className="text-center pt-2">
                 <Link href="/login" className="text-sm text-indigo-400 hover:text-indigo-300 transition">
                   Return to Login
