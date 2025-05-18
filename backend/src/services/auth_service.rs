@@ -89,3 +89,47 @@ pub async fn verify_turnstile_token(
     Ok(())
 }
 
+pub async fn verify_turnstile_token_reset_password(
+    ip_address: &str,
+    turnstile_token: &str,
+) -> Result<(), AppError> {
+    let secret_key = secrets::read_secret(
+        "turnstile_secret_key",
+        "1x0000000000000000000000000000000AA",
+    );
+
+    // If using the test key, return true for testing purposes
+    if secret_key == "1x0000000000000000000000000000000AA" {
+        log::info!("Using Cloudflare Turnstile test key - verification automatically passing");
+        return Ok(());
+    }
+
+    let client = reqwest::Client::new();
+
+    let url = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
+
+    let payload = TurnstileRequest {
+        secret: &secret_key,
+        response: turnstile_token,
+        remoteip: ip_address,
+    };
+
+    let response =
+        client.post(url).json(&payload).send().await.map_err(|e| {
+            AppError::InternalError(format!("Failed to verify Turnstile token: {e}"))
+        })?;
+
+    let body: TurnstileResponse = response
+        .json()
+        .await
+        .map_err(|e| AppError::InternalError(format!("Failed to parse Turnstile response: {e}")))?;
+
+    if !body.success {
+        return Err(AppError::CaptchaVerificationFailed(
+            "Turnstile token verification failed".to_string(),
+        ));
+    }
+    log::info!("Turnstile token verification passed");
+
+    Ok(())
+}

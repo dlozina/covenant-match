@@ -9,11 +9,11 @@ export class EmailService {
    * @param email User email address
    * @returns Promise that resolves when email is successfully sent
    */
-  async sendResetPasswordEmail(email: string): Promise<void> {
+  async sendResetPasswordEmail(email: string, turnstile_token: string): Promise<void> {
     try {
       await this.client.post<void>(
         '/api/v1/reset-password-email',
-        { email },
+        { email, turnstile_token },
         false
       );
     } catch (error) {

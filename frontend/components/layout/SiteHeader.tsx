@@ -79,8 +79,8 @@ export function SiteHeader() {
     <header className="sticky top-0 z-40 w-full border-b border-accent/20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       {/* Full-width flex container with height */}
       <div className="w-full flex h-16 px-4 sm:px-6 lg:px-8 justify-between items-center">
-        {/* Mobile hamburger menu - visible only on mobile */}
-        <div className="md:hidden">
+        {/* Mobile hamburger menu - visible only on mobile and tablets */}
+        <div className="lg:hidden">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button 
@@ -111,8 +111,8 @@ export function SiteHeader() {
           </DropdownMenu>
         </div>
 
-        {/* Left section: Logo and navigation - desktop layout unchanged, mobile centered */}
-        <div className="flex-1 md:flex-none flex items-center justify-center md:justify-start">
+        {/* Left section: Logo and navigation - desktop layout unchanged, mobile and tablet centered */}
+        <div className="flex-1 lg:flex-none flex items-center justify-center lg:justify-start">
           <Link href="/" className="flex items-center space-x-2 group">
             <div className="relative h-8 w-8 overflow-hidden">
               <div className="absolute inset-0 rounded-full bg-gradient-to-br from-purple-700 to-indigo-900 
@@ -127,7 +127,7 @@ export function SiteHeader() {
               Covenant Match
             </span>
           </Link>
-          <nav className="hidden md:flex md:ml-10 gap-6">
+          <nav className="hidden lg:flex lg:ml-10 gap-6">
             {routes.map((route) => (
               <Link
                 key={route.href}

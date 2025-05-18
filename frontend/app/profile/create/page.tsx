@@ -74,7 +74,7 @@ const profileFormSchema = z.object({
   username: z
     .string()
     .min(3, { message: "Username must be at least 3 characters" })
-    .max(8, { message: "Username must not be longer than 8 characters" })
+    .max(12, { message: "Username must not be longer than 12 characters" })
     .trim()
     .refine(val => usernameRegex.test(val), {
       message: "Username can only contain letters, numbers, underscores, dots, and hyphens"
@@ -201,7 +201,7 @@ export default function CreateProfilePage() {
         type: 'warning'
       });
     }
-  }, [isLoadingGameData, gameData, form, gameDataError, REGIONS, PLATFORMS, COVENANT_NAMES]);
+  }, [isLoadingGameData, gameData, form, gameDataError, REGIONS, PLATFORMS, COVENANT_NAMES, EXPERIENCE]);
 
   // Update character counters whenever field values change
   useEffect(() => {
@@ -310,8 +310,8 @@ export default function CreateProfilePage() {
                       <FormItem>
                         <div className="flex justify-between items-center">
                           <FormLabel className="text-sm md:text-base">Username</FormLabel>
-                          <span className={`text-xs ${usernameLength > 8 ? 'text-red-500' : 'text-muted-foreground'}`}>
-                            {usernameLength} / 8
+                          <span className={`text-xs ${usernameLength > 12 ? 'text-red-500' : 'text-muted-foreground'}`}>
+                            {usernameLength} / 12
                           </span>
                         </div>
                         <FormControl>
@@ -327,7 +327,7 @@ export default function CreateProfilePage() {
                           />
                         </FormControl>
                         <FormDescription className="text-xs md:text-sm">
-                          3-8 characters, can contain letters, numbers, underscores, dots, and hyphens.
+                          3-12 characters, can contain letters, numbers, underscores, dots, and hyphens.
                         </FormDescription>
                         <FormMessage className="text-xs sm:text-sm text-red-600 font-medium" />
                       </FormItem>
