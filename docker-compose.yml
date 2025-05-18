@@ -1,6 +1,6 @@
 services:
   frontend:
-    image: ghcr.io/dlozina/covenant-match-frontend:preview 
+    image: ghcr.io/dlozina/covenant-match-frontend:preview-v2 
     build:
       context: ./frontend
       dockerfile: Dockerfile
