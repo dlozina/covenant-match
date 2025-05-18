@@ -67,7 +67,7 @@ export default function UserSessionsPage() {
   return (
     <MainLayout footer={<Footer />}>
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-2xl font-bold mb-6">Your Sessions</h1>
+        <h1 className="text-2xl md:text-3xl font-bold mb-2 text-gradient bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-indigo-400">Your Sessions</h1>
         <SessionsContent />
       </div>
     </MainLayout>
