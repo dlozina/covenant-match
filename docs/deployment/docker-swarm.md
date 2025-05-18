@@ -41,3 +41,5 @@ docker service ls
 ```
 docker stack ps covenant-match
 ```
+
+# How to deploy component when you have a new image without interrupting the service
