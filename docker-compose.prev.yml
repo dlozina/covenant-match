@@ -1,0 +1,176 @@
+services:
+  frontend:
+    image: ghcr.io/dlozina/covenant-match-frontend:preview-v2 
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        - NEXT_PUBLIC_API_BASE_URL=https://covenant-match.com
+        - NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAABYet9mhK3xghhXA
+        - NEXT_PUBLIC_TESTER_MODE="true"
+        - NEXT_PUBLIC_TESTER_PASSWORD=test-covenant-45#
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1.5G
+      restart_policy:
+        condition: on-failure
+      update_config:
+        order: start-first
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 5s
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_BASE_URL=https://covenant-match.com
+      - NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAABYet9mhK3xghhXA
+      - NEXT_PUBLIC_DISABLE_AUTO_REDIRECT=true
+      - NEXT_PUBLIC_TESTER_MODE=true
+      - NEXT_PUBLIC_TESTER_PASSWORD=test-covenant-45#
+    depends_on:
+      - backend
+    networks:
+      - covenant-network
+
+  backend:
+    image: ghcr.io/dlozina/covenant-match-backend:preview 
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '2'
+          memory: 3G
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        order: start-first
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 5s
+    environment:
+      - RUST_ENV=production
+      - RUST_LOG=info
+      - PORT=8080
+      - LOGIN_ATTEMPTS_RETENTION_DAYS=30
+      - LOGIN_ATTEMPTS_CLEANUP_INTERVAL_HOURS=24
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      - mongodb
+    secrets:
+      - mongodb_uri
+      - jwt_secret
+      - turnstile_secret_key
+      - mailersend_api_key
+    networks:
+      - covenant-network
+
+  mongodb:
+    image: mongo:latest
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '1'
+          memory: 3G
+      restart_policy:
+        condition: on-failure
+      update_config:
+        order: start-first
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 5s
+    environment:
+      - MONGO_INITDB_DATABASE=covenant-match
+    volumes:
+      - mongodb_data:/data/db
+    command: mongod --wiredTigerCacheSizeGB 1.5 --wiredTigerCollectionBlockCompressor=zlib --wiredTigerJournalCompressor=snappy --wiredTigerIndexPrefixCompression=true
+    networks:
+      - covenant-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  nginx:
+    image: ghcr.io/dlozina/covenant-match-nginx:preview 
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 0.5G
+      restart_policy:
+        condition: on-failure
+      update_config:
+        order: start-first
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 5s
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
+    networks:
+      - covenant-network
+  
+  mongodb-backup:
+    image: ghcr.io/dlozina/covenant-match-mongodb-backup:latest
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 0.5G
+      update_config:
+        order: start-first
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 5s
+    environment:
+      - BACKUP_SCHEDULE=0 6 * * *  # Run at 6:00 AM every day
+      - BACKUP_RETENTION_DAYS=7    # Keep backups for 7 days (default)
+    volumes:
+      - mongodb_backup_data:/backups  # Persistent volume for backups
+    depends_on:
+      - mongodb
+    networks:
+      - covenant-network
+
+networks:
+  covenant-network:
+    driver: overlay
+
+volumes:
+  mongodb_data:
+  uploads_data:
+  mongodb_backup_data:
+secrets:
+  mongodb_uri:
+    external: true
+  jwt_secret:
+    external: true
+  turnstile_secret_key:
+    external: true
+  mailersend_api_key:
+    external: true
