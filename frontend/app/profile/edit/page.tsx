@@ -81,7 +81,7 @@ const profileFormSchema = z.object({
   username: z
     .string()
     .min(3, { message: "Username must be at least 3 characters" })
-    .max(8, { message: "Username must not be longer than 8 characters" })
+    .max(12, { message: "Username must not be longer than 12 characters" })
     .trim()
     .refine(val => usernameRegex.test(val), {
       message: "Username can only contain letters, numbers, underscores, dots, and hyphens"

@@ -31,7 +31,7 @@ const usernameRegex = /^[a-zA-Z0-9_.-]+$/;
 const loginFormSchema = z.object({
   username: z.string()
     .min(3, { message: "Username must be at least 3 characters" })
-    .max(8, { message: "Username cannot exceed 8 characters" })
+    .max(12, { message: "Username cannot exceed 12 characters" })
     .trim()
     .refine(val => usernameRegex.test(val), {
       message: "Username can only contain letters, numbers, underscores, dots, and hyphens"
