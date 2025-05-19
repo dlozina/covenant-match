@@ -1,0 +1,115 @@
+services:
+  frontend:
+    image: covenant-match-frontend-dev:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    volumes:
+      - ./frontend:/app
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost
+      - NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA
+      - NEXT_PUBLIC_DISABLE_AUTO_REDIRECT=true
+      - NEXT_PUBLIC_TESTER_MODE=true
+      - NEXT_PUBLIC_TESTER_PASSWORD=test-covenant-45#
+    ports:
+      - "3000:3000"
+    command: npm run dev
+    depends_on:
+      - backend
+    networks:
+      - covenant-network-dev
+
+  backend:
+    image: covenant-match-backend-dev:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    volumes:
+      - ./backend:/app
+      - ./run/secrets:/run/secrets
+      - ./uploads:/app/uploads
+    environment:
+      - RUST_LOG=debug
+      - PORT=8080
+      - RUST_ENV=docker-local
+      - LOGIN_ATTEMPTS_RETENTION_DAYS=30
+      - LOGIN_ATTEMPTS_CLEANUP_INTERVAL_HOURS=24
+    ports:
+      - "8080:8080"
+    command: cargo watch -x run
+    depends_on:
+      - mongodb
+    secrets:
+      - mongodb_uri
+      - jwt_secret
+      - recaptcha_secret_key
+      - mailersend_api_key
+    networks:
+      - covenant-network-dev
+
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongodb_data_dev:/data/db
+    command: mongod --wiredTigerCacheSizeGB 1 --wiredTigerCollectionBlockCompressor=zlib --wiredTigerJournalCompressor=snappy --wiredTigerIndexPrefixCompression=true
+    networks:
+      - covenant-network-dev
+  
+  mongodb-backup:
+    build: 
+      context: ./mongodb-backup  # folder containing backup Dockerfile and scripts
+      dockerfile: Dockerfile
+    environment:
+      - BACKUP_SCHEDULE=0 6 * * *  # Run at 6:00 AM every day
+      - BACKUP_RETENTION_DAYS=1    # Keep backups for 1 days (default)
+    volumes:
+      - mongodb_backup_data:/backups  # Persistent volume for backups
+    depends_on:
+      - mongodb
+    networks:
+      - covenant-network-dev
+
+  nginx:
+    image: covenant-match-nginx-local:latest
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+      args:
+        ENVIRONMENT: local
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/sites/covenant-match-local.conf:/etc/nginx/sites/covenant-match.conf
+      - ./nginx/html:/usr/share/nginx/html
+    depends_on:
+      - frontend
+      - backend
+    links:
+      - frontend
+      - backend
+    networks:
+      - covenant-network-dev
+
+networks:
+  covenant-network-dev:
+
+volumes:
+  mongodb_data_dev:
+  frontend_node_modules:
+  mongodb_backup_data:
+secrets:
+  mongodb_uri:
+    file: ./run/secrets/mongodb_uri.txt
+  jwt_secret:
+    file: ./run/secrets/jwt_secret.txt
+  recaptcha_secret_key:
+    file: ./run/secrets/recaptcha_secret_key.txt
+  mailersend_api_key:
+    file: ./run/secrets/mailersend_api_key.txt

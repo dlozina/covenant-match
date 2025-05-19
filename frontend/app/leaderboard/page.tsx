@@ -70,6 +70,7 @@ function LeaderboardContent() {
         <h1 className="text-3xl md:text-3xl font-bold mb-2 text-gradient bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-600">
           Nightreign Leaderboards
         </h1>
+        <div className="w-20 h-1 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full glow-sm"></div>
         <p className="text-muted-foreground text-center mt-2 max-w-2xl">
           View the top players and covenants in Nightreign. Glory awaits the worthy.
         </p>
@@ -123,7 +124,7 @@ function LeaderboardContent() {
                       <th className="px-3 py-3 text-left">Rank</th>
                       <th className="px-3 py-3 text-left">Player</th>
                       <th className="px-3 py-3 text-right">Score</th>
-                      <th className="px-3 py-3 text-right">Wins</th>
+                      <th className="px-3 py-3 text-right hidden md:table-cell">Wins</th>
                       <th className="px-3 py-3 text-right hidden md:table-cell">Total Games</th>
                       <th className="px-3 py-3 text-right hidden md:table-cell">Win Rate</th>
                     </tr>
@@ -147,7 +148,7 @@ function LeaderboardContent() {
                         </td>
                         <td className="px-3 py-3 font-medium">{player.username}</td>
                         <td className="px-3 py-3 text-right text-purple-400">{player.score.toFixed(2)}</td>
-                        <td className="px-3 py-3 text-right text-green-400">{player.wins}</td>
+                        <td className="px-3 py-3 text-right text-green-400 hidden md:table-cell">{player.wins}</td>
                         <td className="px-3 py-3 text-right hidden md:table-cell">{player.totalGames}</td>
                         <td className="px-3 py-3 text-right hidden md:table-cell">
                           <div className="inline-block px-2 py-1 rounded bg-purple-900/20 text-xs">

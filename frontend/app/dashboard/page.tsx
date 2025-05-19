@@ -874,7 +874,7 @@ function DashboardContent() {
   
   return (
     <div className="container mx-auto py-6 md:py-8 px-4 md:px-6">
-      <h1 className="text-2xl md:text-3xl font-bold mb-4 md:mb-6">Dashboard</h1>
+      <h1 className="text-2xl md:text-3xl font-bold mb-2 text-gradient bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-indigo-400">Dashboard</h1>
       
       {notification && (
         <div className="mb-4">
