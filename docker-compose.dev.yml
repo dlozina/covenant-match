@@ -45,7 +45,7 @@ services:
         failure_action: rollback
         monitor: 5s
     environment:
-      - RUST_ENV=production
+      - RUST_ENV=development
       - RUST_LOG=info
       - PORT=8080
       - LOGIN_ATTEMPTS_RETENTION_DAYS=30

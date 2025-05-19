@@ -248,6 +248,18 @@ async fn main() -> std::io::Result<()> {
                 .expose_headers(vec!["content-disposition"])
                 .supports_credentials()
                 .max_age(3600)
+        } else if config.environment == "development" {
+            // Development environment with origin: https://dev.covenant-match.com
+            let development_origin : &str = "https://dev.covenant-match.com";
+            
+            info!("CORS configured for development environment with origin: {}", development_origin);
+            Cors::default()
+                .allowed_origin(development_origin)
+                .allow_any_method()
+                .allow_any_header()
+                .expose_headers(vec!["content-disposition"])
+                .supports_credentials()
+                .max_age(3600)
         } else if config.environment == "docker-local" || config.environment == "docker" {
             // Special configuration for Docker environments with Nginx
             let mut docker_origins = vec![
