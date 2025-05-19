@@ -249,12 +249,20 @@ async fn main() -> std::io::Result<()> {
                 .supports_credentials()
                 .max_age(3600)
         } else if config.environment == "development" {
-            // Development environment with origin: https://dev.covenant-match.com
-            let development_origin : &str = "https://dev.covenant-match.com";
-            
-            info!("CORS configured for development environment with origin: {}", development_origin);
+            // Restrict CORS in development to specific domains
+            let development_origins = vec![
+                format!("https://{}", config.domain_primary()),
+                format!("https://{}", config.domain_www()),
+            ];
+
+            info!("CORS configured for development with these origins:");
+            for origin in &development_origins {
+                info!(" - {}", origin);
+            }
+
             Cors::default()
-                .allowed_origin(development_origin)
+                .allowed_origin(&development_origins[0])
+                .allowed_origin(&development_origins[1])
                 .allow_any_method()
                 .allow_any_header()
                 .expose_headers(vec!["content-disposition"])
