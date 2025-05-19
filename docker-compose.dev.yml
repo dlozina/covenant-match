@@ -1,13 +1,6 @@
 services:
   frontend:
     image: ghcr.io/dlozina/covenant-match-frontend:dev
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: production
-      args:
-        - NEXT_PUBLIC_API_BASE_URL=https://dev.covenant-match.com
-        - NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAABYet9mhK3xghhXA
     deploy:
       replicas: 1
       # resources:
@@ -34,9 +27,6 @@ services:
 
   backend:
     image: ghcr.io/dlozina/covenant-match-backend:dev
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
     deploy:
       replicas: 1
       # resources:
@@ -104,9 +94,6 @@ services:
 
   nginx:
     image: ghcr.io/dlozina/covenant-match-nginx:dev
-    build:
-      context: ./nginx
-      dockerfile: Dockerfile
     deploy:
       replicas: 1
       # resources:
