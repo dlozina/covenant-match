@@ -93,7 +93,7 @@ services:
       start_period: 30s
 
   nginx:
-    image: ghcr.io/dlozina/covenant-match-nginx:dev
+    image: ghcr.io/dlozina/covenant-match-nginx-dev:devtag
     deploy:
       replicas: 1
       # resources:
