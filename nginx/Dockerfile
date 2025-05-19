@@ -14,10 +14,10 @@ COPY nginx.conf /etc/nginx/nginx.conf
 # Copy environment-specific config and rename it
 COPY sites/covenant-match-${ENVIRONMENT}.conf /etc/nginx/sites/covenant-match.conf
 
-# Create SSL directory only for production
-RUN if [ "$ENVIRONMENT" = "prod" ]; then mkdir -p /etc/nginx/ssl; fi
+# Create SSL directory for both dev and prod
+RUN mkdir -p /etc/nginx/ssl
 
-# Set the correct port to expose based on environment
+# Set the correct port to expose
 EXPOSE 80 443
 
 # Test DNS resolution before starting Nginx
