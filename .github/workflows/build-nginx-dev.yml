@@ -34,6 +34,13 @@ jobs:
         run: |
           echo "Listing nginx/sites directory:"
           ls -la nginx/sites/
+      
+      # Display the tags that will be used
+      - name: Display image tags
+        run: |
+          echo "Building with the following tags:"
+          echo "- Custom tag: ghcr.io/${{ github.repository_owner }}/covenant-match-nginx-dev:${{ inputs.tag }}"
+          echo "- SHA tag: ghcr.io/${{ github.repository_owner }}/covenant-match-nginx-dev:${{ github.sha }}"
 
       # Build and push Nginx Development image
       - name: Build and push Nginx Development image
@@ -49,7 +56,6 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/covenant-match-nginx-dev:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          # Add build output to see what's happening
           outputs: type=docker,dest=/tmp/image.tar
           
       # Debug: Verify the built image
@@ -57,5 +63,21 @@ jobs:
         run: |
           echo "Loading image for inspection..."
           docker load < /tmp/image.tar
-          echo "Inspecting image configuration..."
-          docker run --rm ghcr.io/${{ github.repository_owner }}/covenant-match-nginx-dev:${{ github.sha }} cat /etc/nginx/conf.d/covenant-match.conf | head -n 5 
+          
+          # List all loaded images to verify both tags exist
+          echo "Listing created images:"
+          docker images | grep covenant-match-nginx-dev
+          
+          # Verify configuration using the custom tag
+          echo "Inspecting image with custom tag (${{ inputs.tag }}):"
+          docker run --rm ghcr.io/${{ github.repository_owner }}/covenant-match-nginx-dev:${{ inputs.tag }} cat /etc/nginx/conf.d/covenant-match.conf | head -n 5
+          
+          # Also verify with SHA tag for completeness
+          echo "Inspecting image with SHA tag:"
+          docker run --rm ghcr.io/${{ github.repository_owner }}/covenant-match-nginx-dev:${{ github.sha }} cat /etc/nginx/conf.d/covenant-match.conf | head -n 5
+          
+      - name: Summary
+        run: |
+          echo "Build and push completed. Images should be available at:"
+          echo "- ghcr.io/${{ github.repository_owner }}/covenant-match-nginx-dev:${{ inputs.tag }}"
+          echo "- ghcr.io/${{ github.repository_owner }}/covenant-match-nginx-dev:${{ github.sha }}" 
