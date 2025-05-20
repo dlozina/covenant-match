@@ -604,11 +604,13 @@ pub async fn leave_session(db: &Database, session_id: &str, user_id: &str) -> Re
 
     // Check if the session has already started - can't leave once started
     // We can leave if a session is completed or cancelled
-    if session.status == SessionStatus::InProgress {
-        return Err(AppError::BadRequest(
-            "Cannot leave a session that has already started.".to_string(),
-        ));
-    }
+    // After a second thought we should let players leave if they are not the host,
+    // because we should not enable host to prevent players from leaving
+    // if session.status == SessionStatus::InProgress {
+    //     return Err(AppError::BadRequest(
+    //         "Cannot leave a session that has already started.".to_string(),
+    //     ));
+    // }
 
     // Check if the user is trying to leave is the host - hosts can't leave, they cancel instead
     if session.host_id == user_id {

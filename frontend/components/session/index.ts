@@ -14,6 +14,7 @@ export { WarningDialog } from './dialogs/WarningDialog';
 export { DeleteSessionDialog } from './dialogs/DeleteSessionDialog';
 export { KickPlayerDialog } from './dialogs/KickPlayerDialog';
 export { NewSessionDialog } from './dialogs/NewSessionDialog';
+export { LeaveSessionDialog } from './dialogs/LeaveSessionDialog';
 
 // Export session roles
 export { SessionHost, SessionParticipant } from './roles';

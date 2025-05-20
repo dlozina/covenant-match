@@ -22,6 +22,7 @@ export interface DialogState {
     showDeleteDialog: boolean;
     showNewSessionDialog: boolean;
     showKickDialog: boolean;
+    showLeaveDialog: boolean;
     kickPlayerId: string;
     kickPlayerName: string;
 }
@@ -36,7 +37,9 @@ export type DialogAction =
     | { type: 'SHOW_NEW_SESSION' }
     | { type: 'HIDE_NEW_SESSION' }
     | { type: 'SHOW_KICK_DIALOG', payload: { playerId: string, playerName: string } }
-    | { type: 'HIDE_KICK_DIALOG' };
+    | { type: 'HIDE_KICK_DIALOG' }
+    | { type: 'SHOW_LEAVE' }
+    | { type: 'HIDE_LEAVE' };
 
 export interface ResultState {
     selectedResult: string;
@@ -147,6 +150,16 @@ export function dialogReducer(state: DialogState, action: DialogAction): DialogS
             };
         case 'HIDE_KICK_DIALOG':
             return { ...state, showKickDialog: false };
+        case 'SHOW_LEAVE':
+            return {
+                ...state,
+                showLeaveDialog: true
+            };
+        case 'HIDE_LEAVE':
+            return {
+                ...state,
+                showLeaveDialog: false
+            };
         default:
             return state;
     }

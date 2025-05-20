@@ -182,7 +182,7 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
                 </Button>
               )}
               
-              {onLeaveSession && !sessionState.isSessionStarted && !isHost && (
+              {onLeaveSession && !isHost && (
                 <Button 
                   size="lg" 
                   variant="secondary" 
