@@ -182,16 +182,19 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
                 </Button>
               )}
               
+              <div className="w-full">
               {onLeaveSession && !isHost && (
                 <Button 
                   size="lg" 
                   variant="secondary" 
-                  className="flex-1 h-14 text-lg"
+                  className="h-14 text-lg w-full"
                   onClick={onLeaveSession}
                 >
                   Leave Session
                 </Button>
               )}
+              </div>
+              
             </div>
           </div>
         )}
