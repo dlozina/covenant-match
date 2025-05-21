@@ -19,6 +19,12 @@ services:
     command: npm run dev
     depends_on:
       - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-s", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - covenant-network-dev
 
@@ -43,6 +49,12 @@ services:
     command: cargo watch -x run
     depends_on:
       - mongodb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-s", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     secrets:
       - mongodb_uri
       - jwt_secret
@@ -58,6 +70,12 @@ services:
     volumes:
       - mongodb_data_dev:/data/db
     command: mongod --wiredTigerCacheSizeGB 1 --wiredTigerCollectionBlockCompressor=zlib --wiredTigerJournalCompressor=snappy --wiredTigerIndexPrefixCompression=true
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - covenant-network-dev
   
@@ -72,6 +90,12 @@ services:
       - mongodb_backup_data:/backups  # Persistent volume for backups
     depends_on:
       - mongodb
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - covenant-network-dev
 
@@ -94,6 +118,12 @@ services:
     links:
       - frontend
       - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-s", "http://localhost:8081/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - covenant-network-dev
 

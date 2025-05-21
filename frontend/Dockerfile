@@ -40,6 +40,10 @@ RUN npm run build
 
 # Stage 3: Production environment
 FROM node:20-alpine AS production
+
+# Install curl for health checks -> Docker Swarm
+RUN apk add --no-cache curl
+
 WORKDIR /app
 
 # Copy package files and install dependencies for production

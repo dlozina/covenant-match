@@ -1,5 +1,8 @@
 FROM nginx:alpine
 
+# Install curl for health checks -> Docker Swarm
+RUN apk add --no-cache curl
+
 # Build argument for environment
 ARG ENVIRONMENT=prod
 

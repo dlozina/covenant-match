@@ -68,6 +68,8 @@ exclude_patterns = [
     { path = "/api/v1/news", method = "GET", is_regex = false },
     { path = "/api/v1/news/.*", method = "GET", is_regex = true },
     { path = "/api/v1/announcements/current", method = "GET", is_regex = false },
+    # Internal health check
+    { path = "/health", method = "GET", is_regex = false },
 ] 
 
 [email]
