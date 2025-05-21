@@ -15,6 +15,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "CovenantMatch - Nightreign Matchmaking",
   description: "Find teammates and track your Nightreign gaming sessions",
+  metadataBase: new URL("https://covenant-match.com"),
   manifest: "/manifest.json",
   keywords: "Nightreign, Elden Ring, gaming, matchmaking, teammates, covenant match, team finder, game sessions",
   authors: [{ name: "Covenant Match Team" }],
