@@ -84,7 +84,7 @@ pub async fn health_check_v2(req: HttpRequest) -> impl Responder {
 }
 
 /// Health check internal endpoint -> used by Docker Swarm to check if the service is healthy
-#[get("/health")]
+#[get("/internal/health")]
 pub async fn health_check_internal(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
     // Get connection info and host
     let host = req
