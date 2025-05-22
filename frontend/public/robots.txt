@@ -2,5 +2,51 @@
 User-agent: *
 Allow: /
 
+# Block crawling of API routes and admin areas
+Disallow: /api/
+Disallow: /admin/
+
+# Block crawling of user-specific or sensitive pages
+Disallow: /profile/
+Disallow: /auth/
+
+# Next.js specific rules
+Disallow: /_next/static/chunks/
+Allow: /_next/static/media/
+Allow: /_next/static/css/
+
+# Allow crawling of important static assets
+Allow: /favicon.ico
+Allow: /manifest.json
+Allow: /sitemap.xml
+
+# Specific rules for social media bots
+User-agent: facebookexternalhit/1.1
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: Pinterestbot
+Allow: /
+
+User-agent: Redditbot
+Allow: /
+
+User-agent: Discordbot
+Allow: /
+
+User-agent: WhatsApp
+Allow: /
+
+# Crawl delay
+Crawl-delay: 1
+
 # Sitemap location
-Sitemap: https://covenant-match.com/sitemap.xml 
+Sitemap: https://covenant-match.com/sitemap.xml
