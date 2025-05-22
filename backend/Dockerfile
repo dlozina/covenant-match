@@ -49,7 +49,7 @@ WORKDIR /app
 
 # Install runtime dependencies with correct libssl version
 RUN apt-get update && \
-    apt-get install -y pkg-config libssl3 ca-certificates && \
+    apt-get install -y pkg-config libssl3 ca-certificates curl && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy the built binary from the builder stage
