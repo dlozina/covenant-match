@@ -93,38 +93,63 @@ pub async fn health_check_internal(db: web::Data<Database>, req: HttpRequest) ->
         .unwrap_or("unknown")
         .to_string();
 
-    log::info!("Host for internal health check: {}", host);
+    // Also check the peer addr which might be used in Docker environment
+    let peer_addr = req
+        .connection_info()
+        .peer_addr()
+        .unwrap_or("unknown")
+        .to_string();
+
+    log::info!(
+        "Host for internal health check: {}, Peer: {}",
+        host,
+        peer_addr
+    );
+
+    // Check if this is from localhost (Docker healthcheck)
+    if host == "localhost"
+        || host == "127.0.0.1"
+        || host == "::1"
+        || peer_addr == "localhost"
+        || peer_addr == "127.0.0.1"
+        || peer_addr.starts_with("127.0.0.1:")
+    {
+        log::info!("Internal health check from localhost");
+        return HttpResponse::Ok().json(json!({
+            "status": "healthy",
+            "source": "internal-healthcheck"
+        }));
+    }
 
     // Parse IP and check if it's allowed
-    if let Ok(ip) = host.parse::<IpAddr>() {
-        let is_allowed = match ip {
-            IpAddr::V4(ipv4) => {
-                let octets = ipv4.octets();
-                
-                // Check if IP is loopback (127.0.0.0/8)
-                let is_loopback = octets[0] == 127;
-                
-                // Check if IP is in 10.0.0.0/8
-                let is_class_a = octets[0] == 10;
-                
-                // Check if IP is in 172.16.0.0/12
-                let is_class_b = octets[0] == 172 && (octets[1] >= 16 && octets[1] <= 31);
-                
-                // Check if IP is in 192.168.0.0/16
-                let is_class_c = octets[0] == 192 && octets[1] == 168;
-                
-                is_loopback || is_class_a || is_class_b || is_class_c
-            },
-            IpAddr::V6(ipv6) => ipv6.is_loopback() // Only allow IPv6 loopback
-        };
-        
-        if !is_allowed {
-            log::warn!("Unauthorized IP attempted to access health check: {}", host);
-            return HttpResponse::NotFound().finish();
-        }
-    } else {
-        // Couldn't parse IP, also return 404
-        log::warn!("Invalid IP attempted to access health check: {}", host);
+    // First try with host
+    let mut ip_allowed = false;
+    let mut ip_to_check = host.clone();
+
+    // Strip port if present (Docker might include port)
+    if let Some(idx) = ip_to_check.find(':') {
+        ip_to_check = ip_to_check[..idx].to_string();
+    }
+
+    if let Ok(ip) = ip_to_check.parse::<IpAddr>() {
+        ip_allowed = check_ip_allowed(ip, &ip_to_check);
+    } else if let Ok(ip) = peer_addr
+        .split(':')
+        .next()
+        .unwrap_or(&peer_addr)
+        .parse::<IpAddr>()
+    {
+        // If host parse failed, try with peer_addr
+        ip_allowed = check_ip_allowed(ip, &peer_addr);
+        ip_to_check = peer_addr.clone();
+    }
+
+    if !ip_allowed {
+        log::warn!(
+            "Unauthorized IP attempted to access health check: {} (peer: {})",
+            host,
+            peer_addr
+        );
         return HttpResponse::NotFound().finish();
     }
 
@@ -136,6 +161,47 @@ pub async fn health_check_internal(db: web::Data<Database>, req: HttpRequest) ->
     HttpResponse::Ok().json(json!({
         "status": if db_status { "healthy" } else { "degraded" }
     }))
+}
+
+// Helper function to check if an IP is allowed
+fn check_ip_allowed(ip: IpAddr, host_str: &str) -> bool {
+    match ip {
+        IpAddr::V4(ipv4) => {
+            let octets = ipv4.octets();
+
+            // Check if IP is loopback (127.0.0.0/8)
+            let is_loopback = octets[0] == 127;
+
+            // Check if IP is in 10.0.0.0/8
+            let is_class_a = octets[0] == 10;
+
+            // Check if IP is in 172.16.0.0/12
+            let is_class_b = octets[0] == 172 && (octets[1] >= 16 && octets[1] <= 31);
+
+            // Check if IP is in 192.168.0.0/16
+            let is_class_c = octets[0] == 192 && octets[1] == 168;
+
+            // Check specifically for Docker overlay network (10.0.1.0/24)
+            let is_docker_overlay = octets[0] == 10 && octets[1] == 0 && octets[2] == 1;
+
+            if is_loopback {
+                log::info!("Allowing loopback IP: {}", host_str);
+            } else if is_docker_overlay {
+                log::info!("Allowing Docker overlay IP: {}", host_str);
+            } else if is_class_a || is_class_b || is_class_c {
+                log::info!("Allowing private IP: {}", host_str);
+            }
+
+            is_loopback || is_class_a || is_class_b || is_class_c || is_docker_overlay
+        }
+        IpAddr::V6(ipv6) => {
+            let is_loopback = ipv6.is_loopback();
+            if is_loopback {
+                log::info!("Allowing IPv6 loopback: {}", host_str);
+            }
+            is_loopback // Only allow IPv6 loopback
+        }
+    }
 }
 
 pub fn config(cfg: &mut web::ServiceConfig) {

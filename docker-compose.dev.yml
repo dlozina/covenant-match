@@ -23,7 +23,7 @@ services:
     depends_on:
       - backend
     healthcheck:
-      test: ["CMD", "curl", "-f", "-s", "http://localhost:3000/api/health"]
+      test: ["CMD", "curl", "-f", "-s", "-H", "Host: localhost", "http://localhost:3000/api/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -61,7 +61,7 @@ services:
     depends_on:
       - mongodb
     healthcheck:
-      test: ["CMD", "curl", "-f", "-s", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "-s", "-H", "Host: localhost", "http://localhost:8080/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -128,7 +128,7 @@ services:
       - ./ssl:/etc/nginx/ssl:ro
       - ./logs/nginx:/var/log/nginx
     healthcheck:
-      test: ["CMD", "curl", "-f", "-s", "http://localhost:8081/"]
+      test: ["CMD", "curl", "-f", "-s", "-H", "Host: localhost", "http://localhost:8081/"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -156,12 +156,6 @@ services:
       - mongodb_backup_data:/backups  # Persistent volume for backups
     depends_on:
       - mongodb
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
     networks:
       - covenant-network
 
