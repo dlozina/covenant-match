@@ -29,6 +29,7 @@ use crate::models::news::{
     Announcement, AnnouncementResponse, CreateNewsDto, NewsListData, NewsListResponse,
     NewsResponse, UpdateAnnouncementDto, UpdateNewsDto,
 };
+use crate::models::payment::{CreatePaymentIntentDto, ErrorResponse, PaymentResponse};
 use crate::models::session::{
     CovenantStats, CovenantStatsResponse, CreateSessionDto, FriendshipMatrix, FriendshipPlayer,
     GameResult, GameSessionDto, JoinSessionDto, MinimalSessionDto, PaginatedSessionsResponse,
@@ -331,6 +332,10 @@ use utoipa::{
             FeatureFlagsData,
             CreateFeatureFlagDto,
             PatchFeatureFlagDto,
+            // Payment models
+            CreatePaymentIntentDto,
+            PaymentResponse,
+            ErrorResponse,
             // Common models
             PaginationQuery,
             LimitQuery,

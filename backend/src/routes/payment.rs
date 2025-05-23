@@ -94,3 +94,7 @@ async fn create_payment_intent(payment_data: web::Json<CreatePaymentIntentDto>) 
         }
     }
 }
+
+pub fn config(cfg: &mut web::ServiceConfig) {
+    cfg.service(create_payment_intent);
+}   

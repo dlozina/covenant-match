@@ -12,17 +12,15 @@ mod ws;
 
 use crate::config::get_config;
 use crate::middleware::auth::Auth;
-use crate::models::error::AppError;
 use crate::routes::{admin, bug, health, news, statistics, users};
 use actix::Actor;
 use actix_cors::Cors;
-use actix_web::http::header;
 use actix_web::middleware::Logger;
 use actix_web::{web::Data, App, HttpServer};
 use dotenv::dotenv;
 use log::{info, warn};
 use mongodb::{options::ClientOptions, Client};
-use routes::{chat, friends, game_data, sessions};
+use routes::{chat, friends, game_data, payment, sessions};
 use services::{chat_service, session_service, user_service};
 use sse::heartbeat::HeartbeatActor;
 use sse::partition::{SessionRouter, DEFAULT_PARTITION_COUNT};
@@ -371,6 +369,7 @@ async fn main() -> std::io::Result<()> {
             .configure(admin::config)
             .configure(news::config)
             .configure(friends::config)
+            .configure(payment::config)
             // Add Swagger UI with the OpenAPI schema from our new module
             .service(
                 SwaggerUi::new("/api/docs/{_:.*}")
