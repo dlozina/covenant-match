@@ -70,6 +70,9 @@ exclude_patterns = [
     { path = "/api/v1/announcements/current", method = "GET", is_regex = false },
     # Internal health check
     { path = "/internal/health", method = "GET", is_regex = false },
+    # Donations
+    { path = "/api/v1/payment/create-payment-intent", method = "POST", is_regex = false },
+    { path = "/api/v1/payment/verify-payment", method = "POST", is_regex = false },
 ] 
 
 [email]

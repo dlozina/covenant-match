@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, UserPlus, Sword, Users, LayoutDashboard, User, LogOut, LogIn, Shield, Trophy, Bug, BookOpen, Info } from "lucide-react";
+import { Menu, UserPlus, Sword, Users, LayoutDashboard, User, LogOut, LogIn, Shield, Trophy, Bug, BookOpen, Info, Heart } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -72,6 +72,12 @@ export function SiteHeader() {
       label: "About",
       icon: <Info className="h-4 w-4 mr-2" />,
       active: pathname === "/about",
+    },
+    {
+      href: "/donations",
+      label: "Donate",
+      icon: <Heart className="h-4 w-4 mr-2" />,
+      active: pathname === "/donations",
     }
   ];
 

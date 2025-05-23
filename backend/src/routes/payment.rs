@@ -1,13 +1,19 @@
 use crate::models::payment::CreatePaymentIntentDto;
 use crate::models::payment::ErrorResponse;
 use crate::models::payment::PaymentResponse;
+use crate::models::payment::SessionRequestDto;
+use crate::models::payment::SessionResponse;
 use crate::utils;
+use actix_web::get;
 use actix_web::post;
 use actix_web::web;
 use actix_web::HttpResponse;
 use actix_web::Responder;
+use std::str::FromStr;
 use stripe::CheckoutSession;
+use stripe::CheckoutSessionId;
 use stripe::CheckoutSessionMode;
+use stripe::CheckoutSessionStatus;
 use stripe::Client;
 use stripe::CreateCheckoutSession;
 use stripe::CreateCheckoutSessionLineItems;
@@ -61,8 +67,9 @@ async fn create_payment_intent(payment_data: web::Json<CreatePaymentIntentDto>) 
     let mut params = CreateCheckoutSession::new();
     params.mode = Some(CheckoutSessionMode::Payment);
     //todo: add success and cancel urls
-    params.success_url = Some("https://yoursite.com/success");
-    params.cancel_url = Some("https://yoursite.com/cancel");
+    params.success_url =
+        Some("http://localhost/donations/success?session_id={CHECKOUT_SESSION_ID}");
+    params.cancel_url = Some("http://localhost/donations/cancel");
 
     params.line_items = Some(vec![CreateCheckoutSessionLineItems {
         quantity: Some(1),
@@ -81,7 +88,7 @@ async fn create_payment_intent(payment_data: web::Json<CreatePaymentIntentDto>) 
 
     match CheckoutSession::create(&client, params).await {
         Ok(session) => {
-            println!("Created Stripe session: {}", session.id);
+            log::info!("Created Stripe session: {}", session.id);
             Ok(HttpResponse::Ok().json(PaymentResponse {
                 session_id: session.id.to_string(),
             }))
@@ -95,6 +102,59 @@ async fn create_payment_intent(payment_data: web::Json<CreatePaymentIntentDto>) 
     }
 }
 
+// Verify payment
+#[utoipa::path(
+    post,
+    path = "/api/v1/payment/verify-payment",
+    request_body = SessionRequestDto,
+    responses(
+        (status = 200, description = "Payment verified successfully"),
+        (status = 400, description = "Invalid session ID"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "payment"
+)]
+#[post("/api/v1/payment/verify-payment")]
+async fn verify_payment(session_id: web::Json<SessionRequestDto>) -> impl Responder {
+
+    // Get the secret key from the environment variable
+    let api_key = utils::secrets::read_secret_without_default("stripe_secret_key");
+    let client = Client::new(api_key);
+
+    match CheckoutSession::retrieve(
+        &client,
+        &CheckoutSessionId::from_str(session_id.session_id.as_str())
+            .map_err(|e| actix_web::error::ErrorBadRequest(e.to_string()))?,
+        &[],
+    )
+    .await
+    {
+        Ok(session) => {
+            let status = match session.status {
+                Some(CheckoutSessionStatus::Complete) => "complete",
+                Some(CheckoutSessionStatus::Open) => "open",
+                Some(CheckoutSessionStatus::Expired) => "expired",
+                None => "unknown",
+            };
+
+            Ok::<HttpResponse, actix_web::Error>(HttpResponse::Ok().json(SessionResponse {
+                status: status.to_string(),
+                payment_status: format!("{:?}", session.payment_status),
+                amount_total: session.amount_total,
+                currency: session.currency.map(|c| format!("{c:?}")),
+                customer_email: session.customer_details.and_then(|cd| cd.email),
+            }))
+        }
+        Err(e) => {
+            log::error!("Error retrieving session: {e:?}");
+            Ok(HttpResponse::BadRequest().json(ErrorResponse {
+                error: "Invalid session ID".to_string(),
+            }))
+        }
+    }
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(create_payment_intent);
-}   
+    cfg.service(verify_payment);
+}

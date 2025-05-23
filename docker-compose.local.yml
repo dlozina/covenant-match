@@ -12,6 +12,7 @@ services:
       - NEXT_PUBLIC_API_BASE_URL=http://localhost
       - NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA
       - NEXT_PUBLIC_DISABLE_AUTO_REDIRECT=true
+      - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_51RRsRxBUG0Lq2wZZwiHvFoMjTWgBu99zmYGcHIAmJeo1hkqjrizno8D0s8nRlopt2oYWtHgYnS1AaX1DO5kTMP7100dzccbGpW
     ports:
       - "3000:3000"
     command: npm run dev
