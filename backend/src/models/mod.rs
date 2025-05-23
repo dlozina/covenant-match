@@ -13,3 +13,4 @@ pub mod token;
 pub mod user;
 pub mod user_data;
 pub mod friends;
+pub mod payment;

@@ -42,6 +42,7 @@ actix-multipart = "0.7.2"
 futures-util = "0.3.31"
 sysinfo = "0.29.0"
 lazy_static = "1.5.0"
+async-stripe = { version = "0.41.0", features = ["runtime-tokio-hyper"]}
 
 [dev-dependencies]
 actix-rt = "2.9.0"
