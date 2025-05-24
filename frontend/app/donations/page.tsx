@@ -4,6 +4,13 @@ import { useState } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Button } from "@/components/ui/button";
 import { Heart, Gift, Users } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 console.log("Stripe publishable key:", process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
@@ -102,14 +109,18 @@ export default function DonationForm() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-2">Currency</label>
-            <select 
+            <Select 
               value={currency}
-              onChange={(e) => setCurrency(e.target.value as Currency)}
-              className="w-full p-2 border border-input rounded-md bg-background focus:ring-2 focus:ring-purple-500/50 text-sm sm:text-base"
+              onValueChange={(value: Currency) => setCurrency(value)}
             >
-              <option value="usd">🇺🇸 US Dollar (USD)</option>
-              <option value="eur">🇪🇺 Euro (EUR)</option>
-            </select>
+              <SelectTrigger className="w-full h-10">
+                <SelectValue placeholder="Select currency" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="usd">🇺🇸 US Dollar (USD)</SelectItem>
+                <SelectItem value="eur">🇪🇺 Euro (EUR)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
