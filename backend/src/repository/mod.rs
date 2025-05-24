@@ -9,3 +9,4 @@ pub mod statistics_repository;
 pub mod token_repository;
 pub mod user_repository;
 pub mod friends_repository;
+pub mod payment_repository;

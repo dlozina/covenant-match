@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Button } from "@/components/ui/button";
-import { Heart, Gift, Users } from "lucide-react";
+import { Heart, Users } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -11,6 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 console.log("Stripe publishable key:", process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
@@ -20,6 +21,7 @@ type Currency = 'usd' | 'eur';
 export default function DonationForm() {
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState<Currency>('usd');
+  const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
 
   const currencySymbols = {
@@ -35,7 +37,8 @@ export default function DonationForm() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
         amount: parseInt(amount) * 100, // Convert to cents
-        currency: currency
+        currency: currency,
+        display_name: displayName || undefined // Only send if not empty
       })
     });
 
@@ -108,6 +111,20 @@ export default function DonationForm() {
       <div className="space-y-6 p-4 sm:p-6 rounded-lg border border-accent/20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="space-y-4">
           <div>
+            <label className="block text-sm font-medium mb-2">How would you like to be displayed?</label>
+            <Input 
+              type="text" 
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="Your name (optional)"
+              className="w-full h-10"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              This is how you&apos;ll appear in our supporters list. Leave blank to use your email username.
+            </p>
+          </div>
+
+          <div>
             <label className="block text-sm font-medium mb-2">Currency</label>
             <Select 
               value={currency}
@@ -155,23 +172,9 @@ export default function DonationForm() {
             disabled={loading || !amount}
             className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-sm sm:text-base"
           >
-            <Heart className="h-4 w-4" />
+            <Heart className="h-4 w-4 mr-2" />
             {loading ? 'Processing...' : `Donate ${currencySymbols[currency]}${amount}`}
           </Button>
-        </div>
-      </div>
-
-      {/* Our Generous Supporters */}
-      <div className="mt-8 p-4 sm:p-6 rounded-lg border border-accent/20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex items-center gap-2 mb-4">
-          <Users className="h-5 w-5 text-purple-400" />
-          <h2 className="text-lg sm:text-xl font-semibold">Our Generous Supporters</h2>
-        </div>
-        <div className="space-y-4">
-          <div className="text-muted-foreground text-center py-6 sm:py-8">
-            <Gift className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-4 text-purple-400" />
-            <p className="text-sm sm:text-base">Be the first to support our project!</p>
-          </div>
         </div>
       </div>
 
@@ -179,7 +182,7 @@ export default function DonationForm() {
       <div className="mt-12 p-4 sm:p-6 rounded-lg border border-accent/20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center gap-2 mb-6">
           <Users className="h-5 w-5 text-purple-400" />
-          <h2 className="text-xl sm:text-2xl font-semibold">Our Amazing Community</h2>
+          <h2 className="text-xl sm:text-2xl font-semibold">Our Generous Supporters</h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           {/* Example donor cards - replace with actual data from your backend */}

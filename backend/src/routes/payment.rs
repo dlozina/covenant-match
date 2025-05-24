@@ -1,14 +1,18 @@
 use crate::models::payment::CreatePaymentIntentDto;
+use crate::models::payment::DonorQueryParams;
+use crate::models::payment::DonorsResponse;
 use crate::models::payment::ErrorResponse;
 use crate::models::payment::PaymentResponse;
 use crate::models::payment::SessionRequestDto;
 use crate::models::payment::SessionResponse;
+use crate::services::payment_service;
 use crate::utils;
 use actix_web::get;
 use actix_web::post;
 use actix_web::web;
 use actix_web::HttpResponse;
 use actix_web::Responder;
+use mongodb::Database;
 use std::str::FromStr;
 use stripe::CheckoutSession;
 use stripe::CheckoutSessionId;
@@ -66,10 +70,17 @@ async fn create_payment_intent(payment_data: web::Json<CreatePaymentIntentDto>) 
 
     let mut params = CreateCheckoutSession::new();
     params.mode = Some(CheckoutSessionMode::Payment);
-    //todo: add success and cancel urls
     params.success_url =
         Some("http://localhost/donations/success?session_id={CHECKOUT_SESSION_ID}");
     params.cancel_url = Some("http://localhost/donations/cancel");
+
+    // Add display name to metadata if provided
+    if let Some(display_name) = &payment_data.display_name {
+        params.metadata = Some(std::collections::HashMap::from([(
+            "display_name".to_string(),
+            display_name.clone(),
+        )]));
+    }
 
     params.line_items = Some(vec![CreateCheckoutSessionLineItems {
         quantity: Some(1),
@@ -115,8 +126,10 @@ async fn create_payment_intent(payment_data: web::Json<CreatePaymentIntentDto>) 
     tag = "payment"
 )]
 #[post("/api/v1/payment/verify-payment")]
-async fn verify_payment(session_id: web::Json<SessionRequestDto>) -> impl Responder {
-
+async fn verify_payment(
+    session_id: web::Json<SessionRequestDto>,
+    db: web::Data<Database>,
+) -> impl Responder {
     // Get the secret key from the environment variable
     let api_key = utils::secrets::read_secret_without_default("stripe_secret_key");
     let client = Client::new(api_key);
@@ -137,6 +150,34 @@ async fn verify_payment(session_id: web::Json<SessionRequestDto>) -> impl Respon
                 None => "unknown",
             };
 
+            // If payment is complete, save the donor information
+            if status == "complete" {
+                if let (Some(amount), Some(currency), Some(email)) = (
+                    session.amount_total,
+                    session.currency.map(|c| format!("{c:?}")),
+                    session.customer_details.clone().and_then(|cd| cd.email),
+                ) {
+                    // Get the display name from metadata if available
+                    let display_name = session
+                        .metadata
+                        .and_then(|m| m.get("display_name").cloned());
+
+                    match payment_service::create_donor(
+                        &db,
+                        email.clone(),
+                        amount,
+                        currency.clone(),
+                        format!("{:?}", session.payment_status),
+                        display_name,
+                    )
+                    .await
+                    {
+                        Ok(_) => log::info!("Successfully saved donor information"),
+                        Err(e) => log::error!("Failed to save donor information: {:?}", e),
+                    }
+                }
+            }
+
             Ok::<HttpResponse, actix_web::Error>(HttpResponse::Ok().json(SessionResponse {
                 status: status.to_string(),
                 payment_status: format!("{:?}", session.payment_status),
@@ -154,7 +195,42 @@ async fn verify_payment(session_id: web::Json<SessionRequestDto>) -> impl Respon
     }
 }
 
+// Get donors
+#[utoipa::path(
+    get,
+    path = "/api/v1/payment/donors",
+    params(
+        ("page" = Option<u64>, Query, description = "Page number (default: 1)"),
+        ("limit" = Option<u64>, Query, description = "Items per page (default: 10)")
+    ),
+    responses(
+        (status = 200, description = "List of donors retrieved successfully", body = DonorsResponse),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "payment"
+)]
+#[get("/api/v1/payment/donors")]
+async fn get_donors(
+    db: web::Data<Database>,
+    query: web::Query<DonorQueryParams>,
+) -> Result<HttpResponse, actix_web::Error> {
+    match payment_service::get_donors_paginated(&db, query.page, query.limit).await {
+        Ok((donors, total, page)) => Ok(HttpResponse::Ok().json(DonorsResponse {
+            donors,
+            total,
+            page,
+        })),
+        Err(e) => {
+            log::error!("Error retrieving donors: {:?}", e);
+            Ok(HttpResponse::InternalServerError().json(ErrorResponse {
+                error: "Failed to retrieve donors".to_string(),
+            }))
+        }
+    }
+}
+
 pub fn config(cfg: &mut web::ServiceConfig) {
     cfg.service(create_payment_intent);
     cfg.service(verify_payment);
+    cfg.service(get_donors);
 }
