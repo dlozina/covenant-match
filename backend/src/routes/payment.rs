@@ -1,3 +1,4 @@
+use crate::config::get_config;
 use crate::models::payment::CreatePaymentIntentDto;
 use crate::models::payment::DonorQueryParams;
 use crate::models::payment::DonorsResponse;
@@ -68,11 +69,22 @@ async fn create_payment_intent(payment_data: web::Json<CreatePaymentIntentDto>) 
     let api_key = utils::secrets::read_secret_without_default("stripe_secret_key");
     let client = Client::new(api_key);
 
+    // Load configuration
+    let config = get_config();
+    let domain = config.domain_primary();
+
+    let mut success_url = format!("https://{domain}/donations/success?session_id={{CHECKOUT_SESSION_ID}}");
+    let mut cancel_url = format!("https://{domain}/donations/cancel");
+
+    if config.environment == "docker-local" {
+        success_url = format!("http://{domain}/donations/success?session_id={{CHECKOUT_SESSION_ID}}");
+        cancel_url = format!("http://{domain}/donations/cancel");
+    }
+
     let mut params = CreateCheckoutSession::new();
     params.mode = Some(CheckoutSessionMode::Payment);
-    params.success_url =
-        Some("http://localhost/donations/success?session_id={CHECKOUT_SESSION_ID}");
-    params.cancel_url = Some("http://localhost/donations/cancel");
+    params.success_url = Some(success_url.as_str());
+    params.cancel_url = Some(cancel_url.as_str());
 
     // Add display name to metadata if provided
     if let Some(display_name) = &payment_data.display_name {

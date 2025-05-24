@@ -14,7 +14,6 @@ import {
 import { Input } from "@/components/ui/input";
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
-console.log("Stripe publishable key:", process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
 type Currency = 'usd' | 'eur';
 
@@ -42,6 +41,9 @@ export default function DonationForm() {
   const [loading, setLoading] = useState(false);
   const [donors, setDonors] = useState<Donor[]>([]);
   const [donorsLoading, setDonorsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const donorsPerPage = 10;
 
   const currencySymbols = {
     usd: '$',
@@ -51,9 +53,10 @@ export default function DonationForm() {
   useEffect(() => {
     const fetchDonors = async () => {
       try {
-        const response = await fetch('http://localhost:8080/api/v1/payment/donors?page=1&limit=10');
+        const response = await fetch(`/api/v1/payment/donors?page=${currentPage}&limit=${donorsPerPage}`);
         const data: DonorsResponse = await response.json();
         setDonors(data.donors);
+        setTotalPages(Math.ceil(data.total / donorsPerPage));
       } catch (error) {
         console.error('Error fetching donors:', error);
       } finally {
@@ -62,7 +65,7 @@ export default function DonationForm() {
     };
 
     fetchDonors();
-  }, []);
+  }, [currentPage]);
 
   const handleDonate = async () => {
     setLoading(true);
@@ -224,21 +227,53 @@ export default function DonationForm() {
         ) : donors.length === 0 ? (
           <div className="text-center py-4 text-muted-foreground">Be the first to support!</div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            {donors.map((donor) => (
-              <div key={donor.id} className="p-3 sm:p-4 rounded-lg border border-purple-500/20 bg-purple-500/5">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-gradient-to-br from-purple-700 to-indigo-900 flex items-center justify-center text-white text-sm sm:text-base font-medium">
-                    {donor.display_name.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm sm:text-base">{donor.display_name}</p>
-                    <p className="text-xs sm:text-sm text-muted-foreground">Supporter</p>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              {donors.map((donor) => (
+                <div key={donor.id} className="p-3 sm:p-4 rounded-lg border border-purple-500/20 bg-purple-500/5">
+                  <div className="flex items-center justify-between gap-2 sm:gap-3">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                      <div className="h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0 rounded-full bg-gradient-to-br from-purple-700 to-indigo-900 flex items-center justify-center text-white text-sm sm:text-base font-medium">
+                        {donor.display_name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm sm:text-base truncate">{donor.display_name}</p>
+                        <p className="text-xs sm:text-sm text-muted-foreground">Supporter</p>
+                      </div>
+                    </div>
+                    <span className="text-xl flex-shrink-0">❤️</span>
                   </div>
                 </div>
+              ))}
+            </div>
+            
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mt-6">
+                <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="hover:bg-purple-500/10 hover:text-purple-400 hover:border-purple-500/50 flex-1 sm:flex-none min-w-[100px]"
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="hover:bg-purple-500/10 hover:text-purple-400 hover:border-purple-500/50 flex-1 sm:flex-none min-w-[100px]"
+                  >
+                    Next
+                  </Button>
+                </div>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
     </div>
