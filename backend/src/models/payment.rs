@@ -51,8 +51,6 @@ pub struct Donor {
 pub struct DonorResponse {
     pub id: String,
     pub display_name: String,
-    pub amount: i64,
-    pub currency: String,
     pub payment_status: String,
     pub created_at: DateTime,
 }
@@ -78,8 +76,6 @@ impl From<Donor> for DonorResponse {
                         }
                     )
             }),
-            amount: donor.amount,
-            currency: donor.currency,
             payment_status: donor.payment_status,
             created_at: donor.created_at,
         }

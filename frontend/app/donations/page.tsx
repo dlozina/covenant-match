@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Button } from "@/components/ui/button";
 import { Heart, Users } from "lucide-react";
@@ -18,16 +18,51 @@ console.log("Stripe publishable key:", process.env.NEXT_PUBLIC_STRIPE_PUBLISHABL
 
 type Currency = 'usd' | 'eur';
 
+type Donor = {
+  id: string;
+  display_name: string;
+  payment_status: string;
+  created_at: {
+    $date: {
+      $numberLong: string;
+    };
+  };
+};
+
+type DonorsResponse = {
+  donors: Donor[];
+  total: number;
+  page: number;
+};
+
 export default function DonationForm() {
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState<Currency>('usd');
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [donors, setDonors] = useState<Donor[]>([]);
+  const [donorsLoading, setDonorsLoading] = useState(true);
 
   const currencySymbols = {
     usd: '$',
     eur: '€'
   };
+
+  useEffect(() => {
+    const fetchDonors = async () => {
+      try {
+        const response = await fetch('http://localhost:8080/api/v1/payment/donors?page=1&limit=10');
+        const data: DonorsResponse = await response.json();
+        setDonors(data.donors);
+      } catch (error) {
+        console.error('Error fetching donors:', error);
+      } finally {
+        setDonorsLoading(false);
+      }
+    };
+
+    fetchDonors();
+  }, []);
 
   const handleDonate = async () => {
     setLoading(true);
@@ -184,42 +219,27 @@ export default function DonationForm() {
           <Users className="h-5 w-5 text-purple-400" />
           <h2 className="text-xl sm:text-2xl font-semibold">Our Generous Supporters</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          {/* Example donor cards - replace with actual data from your backend */}
-          <div className="p-3 sm:p-4 rounded-lg border border-purple-500/20 bg-purple-500/5">
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-gradient-to-br from-purple-700 to-indigo-900 flex items-center justify-center text-white text-sm sm:text-base font-medium">
-                JD
+        {donorsLoading ? (
+          <div className="text-center py-4 text-muted-foreground">Loading supporters...</div>
+        ) : donors.length === 0 ? (
+          <div className="text-center py-4 text-muted-foreground">Be the first to support!</div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            {donors.map((donor) => (
+              <div key={donor.id} className="p-3 sm:p-4 rounded-lg border border-purple-500/20 bg-purple-500/5">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-gradient-to-br from-purple-700 to-indigo-900 flex items-center justify-center text-white text-sm sm:text-base font-medium">
+                    {donor.display_name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm sm:text-base">{donor.display_name}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Supporter</p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="font-medium text-sm sm:text-base">John Doe</p>
-                <p className="text-xs sm:text-sm text-muted-foreground">Supporter</p>
-              </div>
-            </div>
+            ))}
           </div>
-          <div className="p-3 sm:p-4 rounded-lg border border-purple-500/20 bg-purple-500/5">
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-gradient-to-br from-purple-700 to-indigo-900 flex items-center justify-center text-white text-sm sm:text-base font-medium">
-                JS
-              </div>
-              <div>
-                <p className="font-medium text-sm sm:text-base">Jane Smith</p>
-                <p className="text-xs sm:text-sm text-muted-foreground">Supporter</p>
-              </div>
-            </div>
-          </div>
-          <div className="p-3 sm:p-4 rounded-lg border border-purple-500/20 bg-purple-500/5">
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-gradient-to-br from-purple-700 to-indigo-900 flex items-center justify-center text-white text-sm sm:text-base font-medium">
-                RJ
-              </div>
-              <div>
-                <p className="font-medium text-sm sm:text-base">Robert Johnson</p>
-                <p className="text-xs sm:text-sm text-muted-foreground">Supporter</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
