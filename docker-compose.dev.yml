@@ -20,6 +20,7 @@ services:
       - NEXT_PUBLIC_API_BASE_URL=https://dev.covenant-match.com
       - NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAABYet9mhK3xghhXA
       - NEXT_PUBLIC_DISABLE_AUTO_REDIRECT=true
+      - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_51RRsRxBUG0Lq2wZZwiHvFoMjTWgBu99zmYGcHIAmJeo1hkqjrizno8D0s8nRlopt2oYWtHgYnS1AaX1DO5kTMP7100dzccbGpW
     depends_on:
       - backend
     healthcheck:
@@ -71,6 +72,7 @@ services:
       - jwt_secret
       - turnstile_secret_key
       - mailersend_api_key
+      - stripe_secret_key
     networks:
       - covenant-network
 
@@ -175,4 +177,6 @@ secrets:
   turnstile_secret_key:
     external: true
   mailersend_api_key:
+    external: true
+  stripe_secret_key:
     external: true
