@@ -20,7 +20,7 @@ services:
       - NEXT_PUBLIC_API_BASE_URL=https://dev.covenant-match.com
       - NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAABYet9mhK3xghhXA
       - NEXT_PUBLIC_DISABLE_AUTO_REDIRECT=true
-      - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_51RRsRxBUG0Lq2wZZwiHvFoMjTWgBu99zmYGcHIAmJeo1hkqjrizno8D0s8nRlopt2oYWtHgYnS1AaX1DO5kTMP7100dzccbGpW
+      - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_51RRsRxBUG0Lq2wZZUruAGAhx29Bad4tzVn5DCJRXNzfg7yeoKVLo6bRVQ3fDSMPh0iHxV8cSCasZtaowlu7s31Mj00xAZvE1Vc
     depends_on:
       - backend
     healthcheck:
