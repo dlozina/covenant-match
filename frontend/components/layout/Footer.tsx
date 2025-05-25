@@ -7,7 +7,7 @@ export function Footer() {
         <p className="text-center text-sm leading-loose text-muted-foreground">
           &copy; {new Date().getFullYear()} CovenantMatch. All rights reserved. 
           <br />
-          Made with ❤️ for Elden Ring.
+          Made with ❤️ for Elden Ring. <a href="/donations" className="text-purple-500 hover:text-purple-600">Donate</a>.
         </p>
       </div>
     </footer>
