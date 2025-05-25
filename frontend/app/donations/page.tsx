@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 
-const stripePromise = loadStripe("pk_live_51RRsRxBUG0Lq2wZZUruAGAhx29Bad4tzVn5DCJRXNzfg7yeoKVLo6bRVQ3fDSMPh0iHxV8cSCasZtaowlu7s31Mj00xAZvE1Vc");
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "pk_live_51RRsRxBUG0Lq2wZZUruAGAhx29Bad4tzVn5DCJRXNzfg7yeoKVLo6bRVQ3fDSMPh0iHxV8cSCasZtaowlu7s31Mj00xAZvE1Vc");
 
 type Currency = 'usd' | 'eur';
 
