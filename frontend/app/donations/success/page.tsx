@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Heart, ArrowLeft, Trophy } from "lucide-react";
@@ -14,7 +14,7 @@ interface PaymentDetails {
   customer_email?: string;
 }
 
-export default function DonationSuccess() {
+function DonationSuccessContent() {
   const searchParams = useSearchParams();
   const [paymentDetails, setPaymentDetails] = useState<PaymentDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -162,5 +162,18 @@ export default function DonationSuccess() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function DonationSuccess() {
+  return (
+    <Suspense fallback={
+      <div className="container max-w-2xl mx-auto px-4 py-16 text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    }>
+      <DonationSuccessContent />
+    </Suspense>
   );
 }
