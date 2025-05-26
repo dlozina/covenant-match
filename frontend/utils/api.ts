@@ -74,6 +74,7 @@ export interface SessionHistoryEntry {
   night_lord: string;
   player_nightfarer: string;
   player_result: string;
+  consensus_result: string;
   created_at: string;
   completed_at: string | null;
 }

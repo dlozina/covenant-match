@@ -63,29 +63,6 @@ interface UserStats {
   reputation_score: number;
 }
 
-// Add this interface to describe the session result structure
-interface SessionResult {
-  user_id: string;
-  result: string;
-  rating?: number;
-  feedback?: string;
-  submitted_at: string;
-}
-
-// Add this interface to describe the session results response
-interface SessionResultsResponse {
-  sessionId: string;
-  status: string;
-  results: SessionResult[];
-  consensus: {
-    hasConsensus: boolean;
-    result: string | null;
-    submittedCount: number;
-    totalPlayers: number;
-  };
-  completed: boolean;
-}
-
 export default function DashboardPage() {
   return (
     <ProtectedRoute>
@@ -104,7 +81,6 @@ function DashboardContent() {
   const [activeNightfarer, setActiveNightfarer] = useState<string | null>(null);
   const [activeNightLord, setActiveNightLord] = useState<string | null>(null);
   const [sessionHistory, setSessionHistory] = useState<SessionHistoryEntry[]>([]);
-  const [sessionConsensusResults, setSessionConsensusResults] = useState<Record<string, string>>({});
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [pagination, setPagination] = useState<PaginationInfo>({
@@ -145,33 +121,6 @@ function DashboardContent() {
   
   // Notification state
   const [notification, setNotification] = useState<NotificationType | null>(null);
-
-  // Function to fetch consensus results for sessions
-  const fetchConsensusResults = async (sessions: SessionHistoryEntry[]) => {
-    // Only fetch results for completed sessions
-    const completedSessions = sessions.filter(s => s.completed_at);
-    if (completedSessions.length === 0) return;
-    
-    const consensusResults: Record<string, string> = {};
-    
-    // Get consensus results for each completed session
-    for (const session of completedSessions) {
-      try {
-        const response = await fetchWithAuth<SessionResultsResponse>(
-          `/api/v1/sessions/${session.session_id}/results`
-        );
-        
-        if (response.consensus && response.consensus.hasConsensus) {
-          consensusResults[session.session_id] = response.consensus.result || '';
-        }
-      } catch (err) {
-        console.error(`Error fetching results for session ${session.session_id}:`, err);
-        // Continue with other sessions even if one fails
-      }
-    }
-    
-    setSessionConsensusResults(consensusResults);
-  };
 
   // Function to fetch session history with filters
   const fetchSessionHistory = async (page: number = 1, filters?: {
@@ -214,7 +163,7 @@ function DashboardContent() {
       setPagination(response.data.pagination);
       
       // Fetch consensus results for completed sessions
-      fetchConsensusResults(response.data.sessions);
+      //fetchConsensusResults(response.data.sessions);
     } catch (err) {
       console.error('Error fetching session history:', err);
       setHistoryError(err instanceof Error ? err.message : 'Unknown error');
@@ -494,8 +443,9 @@ function DashboardContent() {
   // Function to determine the display result and its value
   const getDisplayResultInfo = (session: SessionHistoryEntry) => {
     // For completed sessions with consensus result, use the consensus
-    if (session.completed_at && sessionConsensusResults[session.session_id]) {
-      const consensusResult = sessionConsensusResults[session.session_id];
+    if (session.completed_at && session.consensus_result) {
+      const consensusResult = session.consensus_result;
+      console.log("!!!Consensus result:", consensusResult);
       return {
         text: consensusResult.charAt(0).toUpperCase() + consensusResult.slice(1).toLowerCase(),
         value: consensusResult.toLowerCase()

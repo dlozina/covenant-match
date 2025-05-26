@@ -157,6 +157,7 @@ async fn get_current_user_session_history(
                             night_lord: entry.night_lord,
                             player_nightfarer: entry.player_nightfarer,
                             player_result: entry.player_result,
+                            consensus_result: entry.consensus_result,
                             created_at: entry.created_at,
                             completed_at: entry.completed_at,
                         })

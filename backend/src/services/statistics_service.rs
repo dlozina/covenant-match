@@ -16,6 +16,7 @@ pub struct SessionHistoryEntry {
     pub night_lord: String,
     pub player_nightfarer: String,
     pub player_result: String,
+    pub consensus_result: String,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub completed_at: Option<chrono::DateTime<chrono::Utc>>,
 }
@@ -90,6 +91,8 @@ pub async fn get_user_session_history_paginated(
                 .find(|r| r.user_id == user_id)
                 .map_or_else(|| "Unknown".to_string(), |r| format!("{:?}", r.result));
 
+            let consensus_result = get_consensus_result(&session);
+
             // Convert ObjectId to hex string
             let session_id = session.id.to_hex();
 
@@ -109,6 +112,7 @@ pub async fn get_user_session_history_paginated(
                 night_lord: session.night_lord,
                 player_nightfarer: player.nightfarer.clone(),
                 player_result: result,
+                consensus_result,
                 created_at,
                 completed_at,
             })
@@ -129,16 +133,31 @@ pub async fn get_user_session_history_paginated(
     })
 }
 
-// User session history with pagination and filtering
-pub async fn get_user_session_history_filtered(
-    db: &Database,
+fn get_consensus_result(session: &crate::models::session::GameSession) -> String {
+    // Find the consensus result if available
+    let consensus_result = {
+        let mut result_counts: HashMap<String, usize> = HashMap::new();
+
+        // Count occurrences of each result
+        for result in &session.results {
+            let result_str = format!("{:?}", result.result);
+            *result_counts.entry(result_str).or_insert(0) += 1;
+        }
+
+        // Find the most common result that appears at least twice
+        result_counts
+            .into_iter()
+            .filter(|(_, count)| *count >= 2)
+            .max_by_key(|(_, count)| *count)
+            .map_or_else(|| "No Consensus".to_string(), |(result, _)| result)
+    };
+    consensus_result
+}
+
+fn build_session_filter(
     user_id: &str,
-    page: u64,
-    limit: u64,
-    filters: HashMap<String, Option<String>>,
-) -> Result<PaginatedSessionHistory, AppError> {
-    // Find sessions where this user is a participant
-    // The MongoDB document uses both userId and user_id in different places
+    filters: &HashMap<String, Option<String>>,
+) -> mongodb::bson::Document {
     let mut filter = doc! {
         "$or": [
             { "joined_players.user_id": user_id },
@@ -147,7 +166,6 @@ pub async fn get_user_session_history_filtered(
         ]
     };
 
-    // Apply additional filters if they contain values
     if let Some(night_lord) = filters.get("night_lord").cloned().flatten() {
         filter = doc! {
             "$and": [
@@ -163,7 +181,6 @@ pub async fn get_user_session_history_filtered(
                 filter,
                 {
                     "$or": [
-                        // Check both nightfarer and Nightfarer fields to handle case variations
                         { "joined_players.nightfarer": nightfarer },
                     ]
                 }
@@ -171,7 +188,6 @@ pub async fn get_user_session_history_filtered(
         };
     }
 
-    // For result filtering, we need to look at the results array
     if let Some(result_filter) = filters.get("result").cloned().flatten() {
         filter = doc! {
             "$and": [
@@ -188,23 +204,63 @@ pub async fn get_user_session_history_filtered(
         };
     }
 
-    // Get total count
+    filter
+}
+
+fn transform_session_to_history_entry(
+    session: crate::models::session::GameSession,
+    user_id: &str,
+) -> Option<SessionHistoryEntry> {
+    let player = session
+        .joined_players
+        .iter()
+        .find(|p| p.user_id == user_id)?;
+    let result = session
+        .results
+        .iter()
+        .find(|r| r.user_id == user_id)
+        .map_or_else(|| "Unknown".to_string(), |r| format!("{:?}", r.result));
+    let consensus_result = get_consensus_result(&session);
+    let session_id = session.id.to_hex();
+    let created_at =
+        chrono::DateTime::from_timestamp(session.created_at.timestamp_millis() / 1000, 0)
+            .unwrap_or_else(chrono::Utc::now);
+    let completed_at = session.completed_at.map(|dt| {
+        chrono::DateTime::from_timestamp(dt.timestamp_millis() / 1000, 0)
+            .unwrap_or_else(chrono::Utc::now)
+    });
+
+    Some(SessionHistoryEntry {
+        session_id,
+        session_name: session.name,
+        night_lord: session.night_lord,
+        player_nightfarer: player.nightfarer.clone(),
+        player_result: result,
+        consensus_result,
+        created_at,
+        completed_at,
+    })
+}
+
+pub async fn get_user_session_history_filtered(
+    db: &Database,
+    user_id: &str,
+    page: u64,
+    limit: u64,
+    filters: HashMap<String, Option<String>>,
+) -> Result<PaginatedSessionHistory, AppError> {
+    let filter = build_session_filter(user_id, &filters);
     let total = session_repository::get_collection(db)
         .count_documents(filter.clone())
         .await?;
-
-    // Get the sessions with pagination
     let collection = session_repository::get_collection(db);
     let cursor = collection.find(filter).await?;
     let mut sessions: Vec<crate::models::session::GameSession> = cursor.try_collect().await?;
 
-    // Sort, then apply pagination manually
     sessions.sort_by(|a, b| b.created_at.cmp(&a.created_at));
-
     let start = page * limit;
     let end = start + limit;
 
-    // Apply pagination manually
     if start < (sessions.len() as u64) {
         let end_idx = if end < (sessions.len() as u64) {
             end as usize
@@ -216,55 +272,16 @@ pub async fn get_user_session_history_filtered(
         sessions.clear();
     }
 
-    // Transform sessions into a simplified format
     let history: Vec<SessionHistoryEntry> = sessions
         .into_iter()
-        .filter_map(|session| {
-            // Find this user in the joined players
-            let player = session
-                .joined_players
-                .iter()
-                .find(|p| p.user_id == user_id)?;
-
-            // Find this user's result if available
-            let result = session
-                .results
-                .iter()
-                .find(|r| r.user_id == user_id)
-                .map_or_else(|| "Unknown".to_string(), |r| format!("{:?}", r.result));
-
-            // Convert ObjectId to hex string
-            let session_id = session.id.to_hex();
-
-            // Convert MongoDB DateTime to Chrono DateTime
-            let created_at =
-                chrono::DateTime::from_timestamp(session.created_at.timestamp_millis() / 1000, 0)
-                    .unwrap_or_else(chrono::Utc::now);
-
-            let completed_at = session.completed_at.map(|dt| {
-                chrono::DateTime::from_timestamp(dt.timestamp_millis() / 1000, 0)
-                    .unwrap_or_else(chrono::Utc::now)
-            });
-
-            Some(SessionHistoryEntry {
-                session_id,
-                session_name: session.name,
-                night_lord: session.night_lord,
-                player_nightfarer: player.nightfarer.clone(),
-                player_result: result,
-                created_at,
-                completed_at,
-            })
-        })
+        .filter_map(|session| transform_session_to_history_entry(session, user_id))
         .collect();
 
-    // Create pagination info
     let total_pages = if total == 0 {
         0
     } else {
         (total as f64 / limit as f64).ceil() as u64
     };
-
     let pagination = PaginationInfo {
         page,
         limit,

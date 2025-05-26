@@ -59,6 +59,7 @@ pub struct SessionHistoryResponse {
     pub night_lord: String,
     pub player_nightfarer: String,
     pub player_result: String,
+    pub consensus_result: String,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub completed_at: Option<chrono::DateTime<chrono::Utc>>,
 }
