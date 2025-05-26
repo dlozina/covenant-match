@@ -1,5 +1,5 @@
 use crate::models::error::AppError;
-use crate::models::statistics::{LeaderboardEntryResponseDto, UserStatistics, UserStatsResponse};
+use crate::models::statistics::{LeaderboardEntryResponseDto, PaginatedSessionHistory, PaginationInfo, SessionHistoryEntry, UserStatistics, UserStatsResponse};
 use crate::repository::statistics_repository;
 use crate::repository::{session_repository, user_repository};
 use crate::routes::statistics::{PlayerDetail, SessionDetail};
@@ -7,35 +7,6 @@ use futures::stream::TryStreamExt;
 use mongodb::{bson::doc, bson::oid::ObjectId, Database};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap; // For try_collect
-
-// Define a simplified session history structure
-#[derive(Serialize, Deserialize, Debug)]
-pub struct SessionHistoryEntry {
-    pub session_id: String,
-    pub session_name: String,
-    pub night_lord: String,
-    pub player_nightfarer: String,
-    pub player_result: String,
-    pub consensus_result: String,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    pub completed_at: Option<chrono::DateTime<chrono::Utc>>,
-}
-
-// Pagination response structure
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PaginationInfo {
-    pub page: u64,
-    pub limit: u64,
-    pub total: u64,
-    pub total_pages: u64,
-}
-
-// Paginated response wrapper
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PaginatedSessionHistory {
-    pub pagination: PaginationInfo,
-    pub sessions: Vec<SessionHistoryEntry>,
-}
 
 pub async fn get_user_statistics(
     db: &Database,

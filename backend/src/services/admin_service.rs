@@ -1,6 +1,7 @@
+use crate::config::get_config;
 use crate::models::admin::{
-    AdminDashboardStats, AdminSessionResponse, AdminSessionsData,
-    AdminSessionsPaginationResponse, AdminSessionsResponse, CreateFeatureFlagDto, DashboardStatsData, DashboardStatsResponse,
+    AdminDashboardStats, AdminSessionResponse, AdminSessionsData, AdminSessionsPaginationResponse,
+    AdminSessionsResponse, CreateFeatureFlagDto, DashboardStatsData, DashboardStatsResponse,
     FeatureFlag, FeatureFlagApiResponse, FeatureFlagData, FeatureFlagResponse, FeatureFlagsData,
     FeatureFlagsResponse, GameSessionDTO, LoginAttemptDTO, LoginAttemptsData,
     LoginAttemptsResponse, MemoryUsage, PatchFeatureFlagDto, SystemInfo, SystemStatusData,
@@ -9,7 +10,8 @@ use crate::models::admin::{
 use crate::models::error::AppError;
 use crate::models::session::{GameSession, SessionStatus};
 use crate::repository::{
-    auth_repository, feature_flag_repository, news_repository, session_repository, user_repository,
+    auth_repository, bug_repository, feature_flag_repository, news_repository, session_repository,
+    user_repository,
 };
 use lazy_static::lazy_static;
 use log::{debug, error};
@@ -100,6 +102,10 @@ pub async fn get_dashboard_stats(db: &Database) -> Result<DashboardStatsResponse
     let news_items = news_repository::find_all_news(db).await?;
     let news_count = news_items.len() as u64;
 
+    // Get bug reports count
+    let bug_reports = bug_repository::get_all_bug_reports(db).await?;
+    let bug_reports_count = bug_reports.len() as u64;
+
     // Get published news count
     let published_news_count = news_items.iter().filter(|news| news.published).count() as u64;
 
@@ -111,6 +117,7 @@ pub async fn get_dashboard_stats(db: &Database) -> Result<DashboardStatsResponse
         completed_sessions,
         news_count,
         published_news_count,
+        bug_reports_count,
     };
 
     let response = DashboardStatsResponse {
@@ -122,7 +129,7 @@ pub async fn get_dashboard_stats(db: &Database) -> Result<DashboardStatsResponse
 }
 
 /// Get system information for admin panel
-pub async fn get_system_info() -> Result<SystemStatusResponse, AppError> {
+pub async fn get_system_info(db: &Database) -> Result<SystemStatusResponse, AppError> {
     // Get uptime
     let uptime = match Command::new("uptime").output() {
         Ok(output) => String::from_utf8(output.stdout)
@@ -140,7 +147,7 @@ pub async fn get_system_info() -> Result<SystemStatusResponse, AppError> {
     let used_memory = sys.used_memory() / 1024 / 1024; // Convert to MB
     let free_memory = total_memory - used_memory;
     let used_percent = if total_memory > 0 {
-        (used_memory as f64 / total_memory as f64) * 100.0
+        ((used_memory as f64 / total_memory as f64) * 100.0 * 100.0).round() / 100.0
     } else {
         0.0
     };
@@ -152,20 +159,25 @@ pub async fn get_system_info() -> Result<SystemStatusResponse, AppError> {
         used_percent,
     };
 
-    // Get environment
-    let env = if cfg!(debug_assertions) {
-        "development"
-    } else {
-        "production"
+    // Get environment from config
+    let config = get_config();
+
+    // Check if the database is connected
+    let db_status = match db.run_command(bson::doc! { "ping": 1 }).await {
+        Ok(_) => "OK".to_string(),
+        Err(e) => {
+            error!("Database connection check failed: {:?}", e);
+            "ERROR".to_string()
+        }
     };
 
     // Build system info
     let system_info = SystemInfo {
         version: VERSION.to_string(),
-        environment: env.to_string(),
-        uptime: uptime,
+        environment: config.environment.clone(),
+        uptime,
         memory_usage,
-        db_status: "OK".to_string(), // Simplified - in reality, you'd want to check DB connection
+        db_status,
         api_status: "OK".to_string(),
     };
 

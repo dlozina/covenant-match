@@ -77,7 +77,7 @@ pub struct PaginatedSessionData {
     pub sessions: Vec<SessionHistoryResponse>,
 }
 
-#[derive(Serialize, ToSchema)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct PaginationInfo {
     pub page: u64,
     pub limit: u64,
@@ -113,4 +113,24 @@ pub struct BatchUserStatsResponse {
     pub status: String,
     pub data: Vec<UserStatsResponse>,
     pub not_found_users: Option<Vec<String>>,
+}
+
+// Define a simplified session history structure
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SessionHistoryEntry {
+    pub session_id: String,
+    pub session_name: String,
+    pub night_lord: String,
+    pub player_nightfarer: String,
+    pub player_result: String,
+    pub consensus_result: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub completed_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+// Paginated response wrapper
+#[derive(Serialize, Deserialize)]
+pub struct PaginatedSessionHistory {
+    pub pagination: PaginationInfo,
+    pub sessions: Vec<SessionHistoryEntry>,
 }
