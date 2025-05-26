@@ -139,7 +139,7 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 ">
             <div className="flex flex-col sm:flex-row gap-4">
               {startSession && isHost && (
                 <div className="flex-1 flex flex-col">
@@ -182,8 +182,8 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
                 </Button>
               )}
               
-              <div className="w-full">
               {onLeaveSession && !isHost && (
+                <div className="w-full">
                 <Button 
                   size="lg" 
                   variant="secondary" 
@@ -192,8 +192,8 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
                 >
                   Leave Session
                 </Button>
+                </div>
               )}
-              </div>
               
             </div>
           </div>
