@@ -104,15 +104,15 @@ export default function DonationForm() {
               <ul className="space-y-2 text-muted-foreground text-sm sm:text-base">
                 <li className="flex items-center gap-2">
                   <span className="text-purple-400">✓</span>
-                  Covenant Match will always be completely free to use - We are gamers
+                  Covenant Match will always be completely free to use
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-purple-400">✓</span>
-                  No ads - I believe in a clean, distraction-free experience
+                  No ads
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="text-purple-400">✓</span>
-                  No third-party cookies or data collection - not a fan of that
+                  No third-party cookies or data collection
                 </li>
               </ul>
             </div>

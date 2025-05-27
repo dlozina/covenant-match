@@ -40,6 +40,29 @@ export default function DocsPage() {
           </p>
         </div>
 
+        {/* YouTube Tutorial Link */}
+        <div className="gothic-card-no-hover p-4 sm:p-6">
+          <div className="flex flex-col items-center text-center space-y-4">
+            <div className="flex items-center gap-2">
+              <Play className="h-6 w-6 text-purple-400" />
+              <h2 className="text-xl font-semibold">Video Tutorial</h2>
+            </div>
+            <p className="text-muted-foreground max-w-2xl">
+              Watch my comprehensive video guide to learn how to use Covenant Match effectively.
+              The tutorial covers all essential features.
+            </p>
+            <a 
+              href="https://www.youtube.com/watch?v=j-T7jMqSvgM&t=203s"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md transition-colors"
+            >
+              <Play className="h-5 w-5" />
+              <span>Watch Tutorial</span>
+            </a>
+          </div>
+        </div>
+
         {/* Table of Contents */}
         <div className="gothic-card-no-hover p-4 sm:p-6 space-y-4">
           <div className="flex items-center gap-2 mb-2">
