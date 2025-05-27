@@ -162,8 +162,7 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
               {showConfirmDialog && isHost && (
                 <Button 
                   size="lg" 
-                  variant="destructive" 
-                  className="flex-1 h-14 text-lg"
+                  className="flex-1 h-14 text-lg bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600"
                   onClick={showConfirmDialog}
                   disabled={finishButtonDisabled}
                 >
@@ -171,11 +170,10 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
                 </Button>
               )}
               
-              {onCancelSession && !sessionState.isSessionStarted && isHost && (
+              {onCancelSession && isHost && (
                 <Button 
                   size="lg" 
-                  variant="destructive" 
-                  className="flex-1 h-14 text-lg"
+                  className="flex-1 h-14 text-lg bg-gradient-to-r from-red-700 to-rose-600 hover:from-red-800 hover:to-rose-700"
                   onClick={onCancelSession}
                 >
                   Cancel Session
