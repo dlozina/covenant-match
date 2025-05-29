@@ -11,6 +11,7 @@ pub struct AdminDashboardStats {
     pub completed_sessions: u64,
     pub news_count: u64,
     pub published_news_count: u64,
+    pub bug_reports_count: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]

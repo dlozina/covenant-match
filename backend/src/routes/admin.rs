@@ -66,7 +66,7 @@ async fn get_dashboard_stats(db: web::Data<Database>, req: HttpRequest) -> impl 
     tag = "admin"
 )]
 #[get("/api/v1/admin/system-info")]
-async fn get_system_info(req: HttpRequest) -> impl Responder {
+async fn get_system_info(db: web::Data<Database>, req: HttpRequest) -> impl Responder {
     // Check if the user is an admin
     if !is_admin(&req) {
         return HttpResponse::Forbidden().json(serde_json::json!({
@@ -75,7 +75,8 @@ async fn get_system_info(req: HttpRequest) -> impl Responder {
         }));
     }
 
-    match admin_service::get_system_info().await {
+    // Get basic system info
+    match admin_service::get_system_info(&db).await {
         Ok(info) => HttpResponse::Ok().json(info),
         Err(e) => {
             log::error!("Error fetching system info: {:?}", e);

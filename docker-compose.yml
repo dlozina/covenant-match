@@ -1,21 +1,12 @@
 services:
   frontend:
-    image: ghcr.io/dlozina/covenant-match-frontend:latest
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: production
-      args:
-        - NEXT_PUBLIC_API_BASE_URL=https://covenant-match.com
-        - NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAABYet9mhK3xghhXA
-        - NEXT_PUBLIC_TESTER_MODE="true"
-        - NEXT_PUBLIC_TESTER_PASSWORD=test-covenant-45#
+    image: ghcr.io/dlozina/covenant-match-frontend:release
     deploy:
       replicas: 1
-      # resources:
-      #   limits:
-      #     cpus: '0.5'
-      #     memory: 1.5G
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1.5G
       restart_policy:
         condition: on-failure
       update_config:
@@ -29,24 +20,29 @@ services:
       - NEXT_PUBLIC_API_BASE_URL=https://covenant-match.com
       - NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAABYet9mhK3xghhXA
       - NEXT_PUBLIC_DISABLE_AUTO_REDIRECT=true
-      - NEXT_PUBLIC_TESTER_MODE=true
-      - NEXT_PUBLIC_TESTER_PASSWORD=test-covenant-45#
+      - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_51RRsRxBUG0Lq2wZZUruAGAhx29Bad4tzVn5DCJRXNzfg7yeoKVLo6bRVQ3fDSMPh0iHxV8cSCasZtaowlu7s31Mj00xAZvE1Vc
     depends_on:
       - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-s", "-H", "Host: localhost", "http://localhost:3000/api/internal/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - covenant-network
 
   backend:
-    image: ghcr.io/dlozina/covenant-match-backend:latest
+    image: ghcr.io/dlozina/covenant-match-backend:release
     build:
       context: ./backend
       dockerfile: Dockerfile
     deploy:
       replicas: 1
-      # resources:
-      #   limits:
-      #     cpus: '2'
-      #     memory: 3G
+      resources:
+        limits:
+          cpus: '2'
+          memory: 3G
       restart_policy:
         condition: on-failure
         delay: 5s
@@ -68,11 +64,18 @@ services:
       - uploads_data:/app/uploads
     depends_on:
       - mongodb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-s", "-H", "Host: localhost", "http://localhost:8080/internal/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     secrets:
       - mongodb_uri
       - jwt_secret
       - turnstile_secret_key
       - mailersend_api_key
+      - stripe_secret_key
     networks:
       - covenant-network
 
@@ -80,10 +83,10 @@ services:
     image: mongo:latest
     deploy:
       replicas: 1
-      # resources:
-      #   limits:
-      #     cpus: '1'
-      #     memory: 3G
+      resources:
+        limits:
+          cpus: '1'
+          memory: 3G
       restart_policy:
         condition: on-failure
       update_config:
@@ -107,16 +110,16 @@ services:
       start_period: 30s
 
   nginx:
-    image: ghcr.io/dlozina/covenant-match-nginx:latest
+    image: ghcr.io/dlozina/covenant-match-nginx:release
     build:
       context: ./nginx
       dockerfile: Dockerfile
     deploy:
       replicas: 1
-      # resources:
-      #   limits:
-      #     cpus: '0.5'
-      #     memory: 0.5G
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 0.5G
       restart_policy:
         condition: on-failure
       update_config:
@@ -131,16 +134,22 @@ services:
     volumes:
       - ./ssl:/etc/nginx/ssl:ro
       - ./logs/nginx:/var/log/nginx
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-s", "-H", "Host: localhost", "http://localhost:8081/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - covenant-network
   
   mongodb-backup:
-    image: ghcr.io/dlozina/covenant-match-mongodb-backup:latest
+    image: ghcr.io/dlozina/covenant-match-mongodb-backup:release
     deploy:
-      # resources:
-      #   limits:
-      #     cpus: '0.2'
-      #     memory: 0.5G
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 0.5G
       update_config:
         order: start-first
         parallelism: 1
@@ -173,4 +182,6 @@ secrets:
   turnstile_secret_key:
     external: true
   mailersend_api_key:
+    external: true
+  stripe_secret_key:
     external: true

@@ -1,5 +1,8 @@
 FROM nginx:alpine
 
+# Install curl for health checks -> Docker Swarm
+RUN apk add --no-cache curl
+
 # Build argument for environment
 ARG ENVIRONMENT=prod
 
@@ -13,6 +16,9 @@ COPY nginx.conf /etc/nginx/nginx.conf
 
 # Copy environment-specific config and rename it
 COPY sites/covenant-match-${ENVIRONMENT}.conf /etc/nginx/sites/covenant-match.conf
+
+# Copy allowed_ips.conf
+COPY sites/allowed_ips.conf /etc/nginx/sites/allowed_ips.conf
 
 # Create SSL directory for both dev and prod
 RUN mkdir -p /etc/nginx/ssl

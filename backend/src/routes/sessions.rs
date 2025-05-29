@@ -317,7 +317,7 @@ async fn cancel_session(
     ),
     responses(
         (status = 200, description = "Left session successfully"),
-        (status = 400, description = "Cannot leave session (already started or not a member)"),
+        (status = 400, description = "Cannot leave session (Host cannot leave session or not a member)"),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Session not found"),
         (status = 500, description = "Internal server error")

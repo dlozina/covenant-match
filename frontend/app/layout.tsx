@@ -15,6 +15,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "CovenantMatch - Nightreign Matchmaking",
   description: "Find teammates and track your Nightreign gaming sessions",
+  metadataBase: new URL("https://covenant-match.com"),
   manifest: "/manifest.json",
   keywords: "Nightreign, Elden Ring, gaming, matchmaking, teammates, covenant match, team finder, game sessions",
   authors: [{ name: "Covenant Match Team" }],
@@ -35,10 +36,10 @@ export const metadata: Metadata = {
     description: "Find teammates and track your Nightreign gaming sessions",
     images: [
       {
-        url: "/web-app-manifest-512x512.png",
-        width: 512,
-        height: 512,
-        alt: "Covenant Match Logo"
+        url: "/social/cm-1200-630.png",
+        width: 1200,
+        height: 630,
+        alt: "Covenant Match - Find teammates for Nightreign"
       }
     ]
   },
@@ -46,7 +47,14 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "CovenantMatch - Nightreign Matchmaking",
     description: "Find teammates and track your Nightreign gaming sessions",
-    images: ["/web-app-manifest-512x512.png"]
+    images: [
+      {
+        url: "/social/cm-1200-628.png",
+        width: 1200,
+        height: 628,
+        alt: "Covenant Match - Find teammates for Nightreign"
+      }
+    ]
   },
   alternates: {
     canonical: "https://covenant-match.com/"

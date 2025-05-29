@@ -29,6 +29,7 @@ use crate::models::news::{
     Announcement, AnnouncementResponse, CreateNewsDto, NewsListData, NewsListResponse,
     NewsResponse, UpdateAnnouncementDto, UpdateNewsDto,
 };
+use crate::models::payment::{CreatePaymentIntentDto, DonorQueryParams, DonorResponse, DonorsResponse, ErrorResponse, PaymentResponse, SessionRequestDto, SessionResponse};
 use crate::models::session::{
     CovenantStats, CovenantStatsResponse, CreateSessionDto, FriendshipMatrix, FriendshipPlayer,
     GameResult, GameSessionDto, JoinSessionDto, MinimalSessionDto, PaginatedSessionsResponse,
@@ -51,7 +52,7 @@ use crate::sse::messages::{ServerMessage, SessionInfo, SseSessionStatus};
 
 use crate::routes::{
     admin::*, bug::*, chat::*, friends::*, game_data::*, health::*, news::*, sessions::*, sse::*,
-    statistics::*, user_data::*, users::*, ws::*,
+    statistics::*, user_data::*, users::*, ws::*, payment::*,
 };
 
 // Import SSE models
@@ -185,6 +186,10 @@ use utoipa::{
         create_bug_report,
         get_all_bug_reports,
         get_bug_report_by_id,
+        // Payment routes
+        create_payment_intent,
+        verify_payment,
+        get_donors,
     ),
     components(
         schemas(
@@ -331,6 +336,15 @@ use utoipa::{
             FeatureFlagsData,
             CreateFeatureFlagDto,
             PatchFeatureFlagDto,
+            // Payment models
+            CreatePaymentIntentDto,
+            PaymentResponse,
+            ErrorResponse,
+            SessionRequestDto,
+            SessionResponse,
+            DonorResponse,
+            DonorQueryParams,
+            DonorsResponse,
             // Common models
             PaginationQuery,
             LimitQuery,

@@ -1,0 +1,30 @@
+environment = "production"
+
+[database]
+# In Docker, we typically connect to other containers by service name
+url = "mongodb://mongodb:27017"
+
+[server]
+port = 8080       # Default port, can be overridden by env vars
+host = "0.0.0.0"  # Listen on all interfaces
+workers = 1       # More workers for production
+
+[auth]
+# Auth config is inherited from default.toml 
+
+[domain]
+primary = "dev.covenant-match.com"
+www = "www.dev.covenant-match.com"
+internal_service_name = "backend"
+allow_local = false  # Don't allow local testing in production
+
+[email]
+frontend_url = "https://dev.covenant-match.com"
+mailersend_url = "https://api.mailersend.com/v1/email"
+from_email = "noreply@dev.covenant-match.com"
+from_name = "Covenant Match"
+
+# The database URL and JWT secret should be set via secrets
+# in production using mongodb_uri and jwt_secret 
+
+# The rest of the settings will be inherited from default.toml 

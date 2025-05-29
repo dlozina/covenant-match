@@ -139,7 +139,7 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 ">
             <div className="flex flex-col sm:flex-row gap-4">
               {startSession && isHost && (
                 <div className="flex-1 flex flex-col">
@@ -162,8 +162,7 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
               {showConfirmDialog && isHost && (
                 <Button 
                   size="lg" 
-                  variant="destructive" 
-                  className="flex-1 h-14 text-lg"
+                  className="flex-1 h-14 text-lg bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600"
                   onClick={showConfirmDialog}
                   disabled={finishButtonDisabled}
                 >
@@ -171,27 +170,29 @@ export const SessionControlButtons: React.FC<SessionControlButtonsProps> = ({
                 </Button>
               )}
               
-              {onCancelSession && !sessionState.isSessionStarted && isHost && (
+              {onCancelSession && isHost && (
                 <Button 
                   size="lg" 
-                  variant="destructive" 
-                  className="flex-1 h-14 text-lg"
+                  className="flex-1 h-14 text-lg bg-gradient-to-r from-red-700 to-rose-600 hover:from-red-800 hover:to-rose-700"
                   onClick={onCancelSession}
                 >
                   Cancel Session
                 </Button>
               )}
               
-              {onLeaveSession && !sessionState.isSessionStarted && !isHost && (
+              {onLeaveSession && !isHost && (
+                <div className="w-full">
                 <Button 
                   size="lg" 
                   variant="secondary" 
-                  className="flex-1 h-14 text-lg"
+                  className="h-14 text-lg w-full"
                   onClick={onLeaveSession}
                 >
                   Leave Session
                 </Button>
+                </div>
               )}
+              
             </div>
           </div>
         )}

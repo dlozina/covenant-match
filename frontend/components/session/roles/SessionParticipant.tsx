@@ -9,6 +9,7 @@ import {
   ResultReportingSection,
   WarningDialog,
   NewSessionDialog,
+  LeaveSessionDialog,
   dialogReducer,
   resultReducer,
   DialogState
@@ -42,7 +43,11 @@ export function SessionParticipant() {
     showConfirmDialog: false,
     showWarningDialog: false,
     showDeleteDialog: false,
-    showNewSessionDialog: false
+    showNewSessionDialog: false,
+    showLeaveDialog: false,
+    showKickDialog: false,
+    kickPlayerId: '',
+    kickPlayerName: ''
   } as DialogState);
   const [resultState, dispatchResult] = useReducer(resultReducer, {
     selectedResult: 'win',
@@ -225,8 +230,14 @@ export function SessionParticipant() {
     }
   }, [sessionData, userData, resultState, resultSubmitted, fetchWithAuth, showNotification, updatePlayerReportedStatus]);
   
-  // Handle leave session
-  const handleLeaveSession = useCallback(async () => {
+  // Handle initiating the leave session process
+  const handleLeaveSession = useCallback(() => {
+    // Show the leave session dialog
+    dispatchDialog({ type: 'SHOW_LEAVE' });
+  }, [dispatchDialog]);
+  
+  // Handle confirming leave session
+  const handleConfirmLeaveSession = useCallback(async () => {
     if (!sessionData) return;
     
     try {
@@ -354,7 +365,7 @@ export function SessionParticipant() {
             sessionData={sessionData}
             isHost={false}
             resultSubmitted={resultSubmitted}
-            onLeaveSession={!sessionState.isSessionStarted ? handleLeaveSession : undefined}
+            onLeaveSession={handleLeaveSession}
           />
         </div>
 
@@ -400,6 +411,14 @@ export function SessionParticipant() {
         isOpen={dialogState.showNewSessionDialog}
         onClose={handleCloseNewSessionDialog}
         onConfirm={joinNewSession}
+      />
+
+      {/* Leave Session Dialog */}
+      <LeaveSessionDialog
+        isOpen={dialogState.showLeaveDialog}
+        isSessionRunning={sessionState.isSessionStarted && !sessionState.isSessionFinished}
+        onClose={() => dispatchDialog({ type: 'HIDE_LEAVE' })}
+        onConfirm={handleConfirmLeaveSession}
       />
     </>
   );

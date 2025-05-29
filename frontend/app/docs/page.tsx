@@ -40,6 +40,40 @@ export default function DocsPage() {
           </p>
         </div>
 
+        {/* YouTube Tutorial Link */}
+        <div className="gothic-card-no-hover p-4 sm:p-6">
+          <div className="flex flex-col items-center text-center space-y-4">
+            <div className="flex items-center gap-2">
+              <Play className="h-6 w-6 text-purple-400" />
+              <h2 className="text-xl font-semibold">Video Tutorials</h2>
+            </div>
+            <p className="text-muted-foreground max-w-2xl">
+              Watch my comprehensive video guides to learn how to use Covenant Match effectively.
+              The tutorials cover all essential features.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
+              <a 
+                href="https://www.youtube.com/watch?v=j-T7jMqSvgM&t=203s"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md transition-colors"
+              >
+                <Play className="h-5 w-5" />
+                <span>Watch Tutorial 1</span>
+              </a>
+              <a 
+                href="https://www.youtube.com/watch?v=q03ZEJCshkM"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md transition-colors"
+              >
+                <Play className="h-5 w-5" />
+                <span>Watch Tutorial 2</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
         {/* Table of Contents */}
         <div className="gothic-card-no-hover p-4 sm:p-6 space-y-4">
           <div className="flex items-center gap-2 mb-2">

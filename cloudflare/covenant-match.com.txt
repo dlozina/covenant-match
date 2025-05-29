@@ -1,0 +1,51 @@
+;;
+;; Domain:     covenant-match.com.
+;; Exported:   2025-05-21 10:36:25
+;;
+;; This file is intended for use for informational and archival
+;; purposes ONLY and MUST be edited before use on a production
+;; DNS server.  In particular, you must:
+;;   -- update the SOA record with the correct authoritative name server
+;;   -- update the SOA record with the contact e-mail address information
+;;   -- update the NS record(s) with the authoritative name servers for this domain.
+;;
+;; For further information, please consult the BIND documentation
+;; located on the following website:
+;;
+;; http://www.isc.org/
+;;
+;; And RFC 1035:
+;;
+;; http://www.ietf.org/rfc/rfc1035.txt
+;;
+;; Please note that we do NOT offer technical support for any use
+;; of this zone data, the BIND name server, or any other third-party
+;; DNS software.
+;;
+;; Use at your own risk.
+;; SOA Record
+covenant-match.com	3600	IN	SOA	guss.ns.cloudflare.com. dns.cloudflare.com. 2049949038 10000 2400 604800 3600
+
+;; NS Records
+covenant-match.com.	86400	IN	NS	guss.ns.cloudflare.com.
+covenant-match.com.	86400	IN	NS	lily.ns.cloudflare.com.
+
+;; A Records
+covenant-match.com.	1	IN	A	139.59.151.158 ; A Record for the Root Domain cf_tags=cf-proxied:true
+dev.covenant-match.com.	1	IN	A	161.35.67.181 ; dev env cf_tags=cf-proxied:true
+www.covenant-match.com.	1	IN	A	139.59.151.158 ; A Record for the WWW Subdomain cf_tags=cf-proxied:true
+
+;; CNAME Records
+email.covenant-match.com.	300	IN	CNAME	links.mailersend.net. ; cf_tags=cf-proxied:false
+mlsend2._domainkey.covenant-match.com.	300	IN	CNAME	mlsend2._domainkey.mailersend.net. ; cf_tags=cf-proxied:false
+mta.covenant-match.com.	300	IN	CNAME	mailersend.net. ; cf_tags=cf-proxied:false
+
+;; MX Records
+covenant-match.com.	1	IN	MX	75 route3.mx.cloudflare.net.
+covenant-match.com.	1	IN	MX	58 route2.mx.cloudflare.net.
+covenant-match.com.	1	IN	MX	88 route1.mx.cloudflare.net.
+inbound.covenant-match.com.	300	IN	MX	10 inbound.mailersend.net.
+
+;; TXT Records
+cf2024-1._domainkey.covenant-match.com.	1	IN	TXT	"v=DKIM1; h=sha256; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAiweykoi+o48IOGuP7GR3X0MOExCUDY/BCRHoWBnh3rChl7WhdyCxW3jgq1daEjPPqoi7sJvdg5hEQVsgVRQP4DcnQDVjGMbASQtrY4WmB1VebF+RPJB2ECPsEDTpeiI5ZyUAwJaVX7r6bznU67g7LvFq35yIo4sdlmtZGV+i0H4cpYH9+3JJ78k" "m4KXwaf9xUJCWF6nxeD+qG6Fyruw1Qlbds2r85U9dkNDVAS3gioCvELryh1TxKGiVTkg4wqHTyHfWsp7KD3WQHYJn0RyfJJu6YEmL77zonn7p2SRMvTMP3ZEXibnC9gz3nnhR6wcYL8Q7zXypKTMD58bTixDSJwIDAQAB"
+covenant-match.com.	3600	IN	TXT	"v=spf1 include:_spf.mx.cloudflare.net include:_spf.mailersend.net ~all"

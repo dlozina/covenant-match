@@ -340,7 +340,7 @@ export function SessionHost() {
             sessionData={sessionData}
             isHost={true}
             resultSubmitted={resultSubmitted}
-            onCancelSession={!sessionState.isSessionStarted ? () => dispatchDialog({ type: 'SHOW_DELETE' }) : undefined}
+            onCancelSession={() => dispatchDialog({ type: 'SHOW_DELETE' })}
           />
         </div>
 

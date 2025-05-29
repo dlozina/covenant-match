@@ -12,13 +12,18 @@ services:
       - NEXT_PUBLIC_API_BASE_URL=http://localhost
       - NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA
       - NEXT_PUBLIC_DISABLE_AUTO_REDIRECT=true
-      - NEXT_PUBLIC_TESTER_MODE=true
-      - NEXT_PUBLIC_TESTER_PASSWORD=test-covenant-45#
+      - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_51RRsRxBUG0Lq2wZZwiHvFoMjTWgBu99zmYGcHIAmJeo1hkqjrizno8D0s8nRlopt2oYWtHgYnS1AaX1DO5kTMP7100dzccbGpW
     ports:
       - "3000:3000"
     command: npm run dev
     depends_on:
       - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-s", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - covenant-network-dev
 
@@ -43,11 +48,18 @@ services:
     command: cargo watch -x run
     depends_on:
       - mongodb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-s", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     secrets:
       - mongodb_uri
       - jwt_secret
       - recaptcha_secret_key
       - mailersend_api_key
+      - stripe_secret_key
     networks:
       - covenant-network-dev
 
@@ -58,6 +70,12 @@ services:
     volumes:
       - mongodb_data_dev:/data/db
     command: mongod --wiredTigerCacheSizeGB 1 --wiredTigerCollectionBlockCompressor=zlib --wiredTigerJournalCompressor=snappy --wiredTigerIndexPrefixCompression=true
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - covenant-network-dev
   
@@ -72,6 +90,12 @@ services:
       - mongodb_backup_data:/backups  # Persistent volume for backups
     depends_on:
       - mongodb
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - covenant-network-dev
 
@@ -94,6 +118,12 @@ services:
     links:
       - frontend
       - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-s", "http://localhost:8081/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - covenant-network-dev
 
@@ -113,3 +143,5 @@ secrets:
     file: ./run/secrets/recaptcha_secret_key.txt
   mailersend_api_key:
     file: ./run/secrets/mailersend_api_key.txt
+  stripe_secret_key:
+    file: ./run/secrets/stripe_secret_key.txt

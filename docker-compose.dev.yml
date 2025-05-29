@@ -20,8 +20,15 @@ services:
       - NEXT_PUBLIC_API_BASE_URL=https://dev.covenant-match.com
       - NEXT_PUBLIC_TURNSTILE_SITE_KEY=0x4AAAAAABYet9mhK3xghhXA
       - NEXT_PUBLIC_DISABLE_AUTO_REDIRECT=true
+      - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_51RRsRxBUG0Lq2wZZUruAGAhx29Bad4tzVn5DCJRXNzfg7yeoKVLo6bRVQ3fDSMPh0iHxV8cSCasZtaowlu7s31Mj00xAZvE1Vc
     depends_on:
       - backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-s", "-H", "Host: localhost", "http://localhost:3000/api/internal/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - covenant-network
 
@@ -45,7 +52,7 @@ services:
         failure_action: rollback
         monitor: 5s
     environment:
-      - RUST_ENV=production
+      - RUST_ENV=development
       - RUST_LOG=info
       - PORT=8080
       - LOGIN_ATTEMPTS_RETENTION_DAYS=30
@@ -54,11 +61,18 @@ services:
       - uploads_data:/app/uploads
     depends_on:
       - mongodb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-s", "-H", "Host: localhost", "http://localhost:8080/internal/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     secrets:
       - mongodb_uri
       - jwt_secret
       - turnstile_secret_key
       - mailersend_api_key
+      - stripe_secret_key
     networks:
       - covenant-network
 
@@ -83,17 +97,18 @@ services:
     volumes:
       - mongodb_data:/data/db
     command: mongod --wiredTigerCacheSizeGB 1.5 --wiredTigerCollectionBlockCompressor=zlib --wiredTigerJournalCompressor=snappy --wiredTigerIndexPrefixCompression=true
-    networks:
-      - covenant-network
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - covenant-network
+    
 
   nginx:
-    image: ghcr.io/dlozina/covenant-match-nginx:dev
+    image: ghcr.io/dlozina/covenant-match-nginx-dev:devtag
     deploy:
       replicas: 1
       # resources:
@@ -114,6 +129,12 @@ services:
     volumes:
       - ./ssl:/etc/nginx/ssl:ro
       - ./logs/nginx:/var/log/nginx
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-s", "-H", "Host: localhost", "http://localhost:8081/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - covenant-network
   
@@ -156,4 +177,6 @@ secrets:
   turnstile_secret_key:
     external: true
   mailersend_api_key:
+    external: true
+  stripe_secret_key:
     external: true

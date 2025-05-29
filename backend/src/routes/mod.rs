@@ -10,4 +10,5 @@ pub mod statistics;
 pub mod user_data;
 pub mod users;
 pub mod friends;
+pub mod payment;
 pub mod ws;

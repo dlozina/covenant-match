@@ -183,6 +183,9 @@ async fn seed_default_data(db: &Database) -> Result<(), Error> {
     // Seed announcements
     seed_announcements(db).await?;
 
+    // Seed donors
+    seed_donors(db).await?;
+
     Ok(())
 }
 
@@ -394,24 +397,24 @@ async fn seed_news(db: &Database) -> Result<(), Error> {
             })
             .await?;
 
-        let news_content_release = "<p>Hi all,<br>\nI'm planning to release the full version of the page on June 1st.</p>\n<p>Before then, I’d like to double-check, once the game is out, will there be any major changes I should implement for Covenant Match.</p>\n<p>The best way to support the project is by signing up.</p>\n<p>See you all in Limveld!</p>";
-        
+        let news_content_release = "<p>Hi all,<br>\nI'm planning to release the full version of the page on June 1st.</p>\n<p>Before then, I'd like to double-check, once the game is out, will there be any major changes I should implement for Covenant Match.</p>\n<p>The best way to support the project is by signing up.</p>\n<p>See you all in Limveld!</p>";
+
         collection
-        .insert_one(doc! {
-            "_id": ObjectId::new(),
-            "title": "Release date - June 1",
-            "content": news_content_release,
-            "summary": "Covenant Match Release Date",
-            "image_url": null,
-            "author_id": akri_id.to_string(),
-            "author_username": "akri",
-            "updated_by_id": akri_id.to_string(),
-            "updated_by_username": "akri",
-            "published": true,
-            "created_at": created_date,
-            "updated_at": created_date,
-        })
-        .await?;
+            .insert_one(doc! {
+                "_id": ObjectId::new(),
+                "title": "Release date - June 1",
+                "content": news_content_release,
+                "summary": "Covenant Match Release Date",
+                "image_url": null,
+                "author_id": akri_id.to_string(),
+                "author_username": "akri",
+                "updated_by_id": akri_id.to_string(),
+                "updated_by_username": "akri",
+                "published": true,
+                "created_at": created_date,
+                "updated_at": created_date,
+            })
+            .await?;
 
         info!("Seeded news collection with origin story article");
     }
@@ -639,6 +642,36 @@ async fn seed_announcements(db: &Database) -> Result<(), Error> {
             .await?;
 
         info!("Seeded announcements collection with welcome message");
+    }
+
+    Ok(())
+}
+
+// Helper function to seed donors
+async fn seed_donors(db: &Database) -> Result<(), Error> {
+    let collection: Collection<Document> = db.collection("donors");
+
+    // Check if we already have donors
+    let count = collection.count_documents(doc! {}).await?;
+
+    // Only seed if the collection is empty
+    if count == 0 {
+        let created_date = bson::DateTime::from_millis(1_747_262_292_891); // 2025-05-24T11:15:38.756Z
+
+        collection
+            .insert_one(doc! {
+                "_id": ObjectId::new(),
+                "email": "akri@covenant-match.com",
+                "display_name": "Akri",
+                "amount": 50000,
+                "currency": "USD",
+                "payment_status": "Paid",
+                "created_at": created_date,
+                "updated_at": created_date
+            })
+            .await?;
+
+        info!("Seeded donors collection with initial donor");
     }
 
     Ok(())
