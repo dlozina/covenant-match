@@ -522,13 +522,14 @@ async fn seed_admin_users(db: &Database) -> Result<(), Error> {
 // Helper function to seed nightlords collection
 async fn seed_nightlords(db: &Database) -> Result<(), Error> {
     let default_nightlords = vec![
-        ("Tricephalos", "Nightlords are the guardians of the realm, they are the ones who protect the realm from the darkness."),
-        ("Gaping Jaw", "Gaping Jaw is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
-        ("Sentient Pest", "Sentient Pest is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
-        ("Augur", "Augur is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
-        ("Equilibrious Beast", "Equilibrious Beast is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
-        ("Darkdrift Knight", "Darkdrift Knight is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
-        ("Fissure in the Fog", "Fissure in the Fog is the Nightlord of the Pact, he is the one who protects the realm from the darkness."),
+        ("Tricephalos", "Tricephalosis is the Nightlord of the Pact, he is the one who protects the realm of the darkness."),
+        ("Gaping Jaw", "Gaping Jaw is the Nightlord of the Pact, he is the one who protects the realm of the darkness."),
+        ("Sentient Pest", "Sentient Pest is the Nightlord of the Pact, he is the one who protects the realm of the darkness."),
+        ("Augur", "Augur is the Nightlord of the Pact, he is the one who protects the realm of the darkness."),
+        ("Equilibrious Beast", "Equilibrious Beast is the Nightlord of the Pact, he is the one who protects the realm of the darkness."),
+        ("Darkdrift Knight", "Darkdrift Knight is the Nightlord of the Pact, he is the one who protects the realm of the darkness."),
+        ("Fissure in the Fog", "Fissure in the Fog is the Nightlord of the Pact, he is the one who protects the realm of the darkness."),
+        ("Night Aspect", "Night Aspect is the Nightlord of the Pact, he is the one who protects the realm of the darkness."),
     ];
 
     seed_collection(db, "nightlords", default_nightlords).await
@@ -542,7 +543,7 @@ async fn seed_nightfarers(db: &Database) -> Result<(), Error> {
         ("Recluse", "Sorcerer build"),
         ("Duchess", "Dexterity build"),
         ("Ironeye", "Dexterity build with long range"),
-        ("Rider", "Strength build"),
+        ("Rider", "Tank build"),
         ("Executor", "Sekiro build"),
         ("Revenant", "Summoner build"),
     ];
