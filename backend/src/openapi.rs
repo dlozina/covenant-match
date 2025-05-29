@@ -25,11 +25,18 @@ use crate::models::game_data::{
     RegionResponse,
 };
 use crate::models::geo_location::{CoordinatesDto, GeoLocationDataDto};
+use crate::models::message::{
+    ConversationResponse, MessageResponse, MessagesListResponse, SendMessageRequest,
+    UnreadCountResponse,
+};
 use crate::models::news::{
     Announcement, AnnouncementResponse, CreateNewsDto, NewsListData, NewsListResponse,
     NewsResponse, UpdateAnnouncementDto, UpdateNewsDto,
 };
-use crate::models::payment::{CreatePaymentIntentDto, DonorQueryParams, DonorResponse, DonorsResponse, ErrorResponse, PaymentResponse, SessionRequestDto, SessionResponse};
+use crate::models::payment::{
+    CreatePaymentIntentDto, DonorQueryParams, DonorResponse, DonorsResponse, ErrorResponse,
+    PaymentResponse, SessionRequestDto, SessionResponse,
+};
 use crate::models::session::{
     CovenantStats, CovenantStatsResponse, CreateSessionDto, FriendshipMatrix, FriendshipPlayer,
     GameResult, GameSessionDto, JoinSessionDto, MinimalSessionDto, PaginatedSessionsResponse,
@@ -51,8 +58,8 @@ use crate::routes::users::{JwtInfoDto, TokenInfoResponse};
 use crate::sse::messages::{ServerMessage, SessionInfo, SseSessionStatus};
 
 use crate::routes::{
-    admin::*, bug::*, chat::*, friends::*, game_data::*, health::*, news::*, sessions::*, sse::*,
-    statistics::*, user_data::*, users::*, ws::*, payment::*,
+    admin::*, bug::*, chat::*, friends::*, game_data::*, health::*, message::*, news::*,
+    payment::*, sessions::*, sse::*, statistics::*, user_data::*, users::*, ws::*,
 };
 
 // Import SSE models
@@ -190,6 +197,13 @@ use utoipa::{
         create_payment_intent,
         verify_payment,
         get_donors,
+        // Message routes
+        get_conversations,
+        get_messages,
+        send_message,
+        mark_as_read,
+        get_or_create_conversation,
+        get_unread_count,
     ),
     components(
         schemas(
@@ -348,6 +362,12 @@ use utoipa::{
             // Common models
             PaginationQuery,
             LimitQuery,
+            // Message models
+            ConversationResponse,
+            MessageResponse,
+            MessagesListResponse,
+            SendMessageRequest,
+            UnreadCountResponse,
         ),
     ),
     tags(
@@ -363,6 +383,7 @@ use utoipa::{
         (name = "news", description = "News and announcements management endpoints"),
         (name = "feature-flags", description = "Feature flag management endpoints"),
         (name = "friends", description = "Friend management and friend requests endpoints"),
+        (name = "messages", description = "Messaging system endpoints"),
     ),
     modifiers(&SecurityAddon),
 )]

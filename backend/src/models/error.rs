@@ -126,6 +126,12 @@ pub enum AppError {
 
     #[error("Invalid friend request: {0}")]
     InvalidFriendRequest(String),
+
+    #[error("Conversation not found")]
+    ConversationNotFound,
+
+    #[error("Unauthorized")]
+    Unauthorized,
 }
 
 impl ResponseError for AppError {
@@ -192,6 +198,10 @@ impl ResponseError for AppError {
             AppError::EmailNotVerified => StatusCode::BAD_REQUEST,
 
             AppError::AccountDisabled => StatusCode::FORBIDDEN,
+
+            AppError::ConversationNotFound => StatusCode::NOT_FOUND,
+
+            AppError::Unauthorized => StatusCode::UNAUTHORIZED,
         }
     }
 }

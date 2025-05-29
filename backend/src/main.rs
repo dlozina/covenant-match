@@ -20,7 +20,7 @@ use actix_web::{web::Data, App, HttpServer};
 use dotenv::dotenv;
 use log::{info, warn};
 use mongodb::{options::ClientOptions, Client};
-use routes::{chat, friends, game_data, payment, sessions};
+use routes::{chat, friends, game_data, message, payment, sessions};
 use services::{chat_service, session_service, user_service};
 use sse::heartbeat::HeartbeatActor;
 use sse::partition::{SessionRouter, DEFAULT_PARTITION_COUNT};
@@ -370,6 +370,7 @@ async fn main() -> std::io::Result<()> {
             .configure(news::config)
             .configure(friends::config)
             .configure(payment::config)
+            .configure(message::config)
             // Add Swagger UI with the OpenAPI schema from our new module
             .service(
                 SwaggerUi::new("/api/docs/{_:.*}")

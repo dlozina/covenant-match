@@ -10,3 +10,4 @@ pub mod statistics_service;
 pub mod user_service;
 pub mod friends_service;
 pub mod payment_service;
+pub mod message_service;

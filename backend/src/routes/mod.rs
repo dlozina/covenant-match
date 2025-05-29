@@ -12,3 +12,4 @@ pub mod users;
 pub mod friends;
 pub mod payment;
 pub mod ws;
+pub mod message;
