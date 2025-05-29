@@ -399,7 +399,7 @@ pub async fn get_batch_user_stats(
                             wins: stats.wins,
                             losses: stats.losses,
                             win_rate: stats.win_rate,
-                            score: stats.reputation_score,
+                            score: stats.score,
                         });
                     }
                     Ok(None) => {
@@ -414,7 +414,7 @@ pub async fn get_batch_user_stats(
                             wins: stats.wins,
                             losses: stats.losses,
                             win_rate: stats.win_rate,
-                            score: stats.reputation_score,
+                            score: stats.score,
                         });
                     }
                     Err(e) => {
