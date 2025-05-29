@@ -9,7 +9,7 @@ The IP whitelist is a configuration file that allows you to specify which IP add
 Go inside the nginx container:
 
 ```bash
-docker exec -it  covenant-match_nginx.1.58vm4dgf7snq2phufmx9m1mpu sh
+docker exec -it  covenant-match_nginx.1.3nxsptm77js4gu1jgaovakhhz sh
 ```
 
 Change the IP whitelist in the `allowed_ips.conf` file.
@@ -21,7 +21,7 @@ vi /etc/nginx/sites/allowed_ips.conf
 Then reload Nginx:
 
 ```bash
-docker exec covenant-match_nginx.1.58vm4dgf7snq2phufmx9m1mpu nginx -s reload
+docker exec covenant-match_nginx.1.3nxsptm77js4gu1jgaovakhhz nginx -s reload
 ```
 
 ## Check environment variables
